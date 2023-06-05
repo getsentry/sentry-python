@@ -1,5 +1,188 @@
 # Changelog
 
+## 1.25.0
+
+### Various fixes & improvements
+
+- Support urllib3>=2.0.0 (#2148) by @asottile-sentry
+
+  We're now supporting urllib3's new major version, 2.0.0. If you encounter issues (e.g. some of your dependencies not supporting the new urllib3 version yet) you might consider pinning the urllib3 version to `<2.0.0` manually in your project. Check out the [the urllib3 migration guide](https://urllib3.readthedocs.io/en/latest/v2-migration-guide.html#migrating-as-an-application-developer) for details.
+
+- Auto-retry tests on failure (#2134) by @sentrivana
+- Correct `importlib.metadata` check in `test_modules` (#2149) by @asottile-sentry
+- Fix distribution name normalization (PEP-0503) (#2144) by @rominf
+- Fix `functions_to_trace` typing (#2141) by @rcmarron
+
+## 1.24.0
+
+### Various fixes & improvements
+
+- **New:** Celery Beat exclude tasks option (#2130) by @antonpirker
+
+  You can exclude Celery Beat tasks from being auto-instrumented. To do this, add a list of tasks you want to exclude as option `exclude_beat_tasks` when creating `CeleryIntegration`. The list can contain simple strings with the full task name, as specified in the Celery Beat schedule, or regular expressions to match multiple tasks.
+
+  For more information, see the documentation for [Crons](https://docs.sentry.io/platforms/python/guides/celery/crons/) for more information.
+
+  Usage:
+
+  ```python
+      exclude_beat_tasks = [
+          "some-task-a",
+          "payment-check-.*",
+      ]
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              CeleryIntegration(
+                  monitor_beat_tasks=True,
+                  exclude_beat_tasks=exclude_beat_tasks,
+              ),
+          ],
+      )
+  ```
+
+  In this example the task `some-task-a` and all tasks with a name starting with `payment-check-` will be ignored.
+
+- **New:** Add support for **ExceptionGroups** (#2025) by @antonpirker
+
+  _Note:_ If running Self-Hosted Sentry, you should wait to adopt this SDK update until after updating to the 23.6.0 (est. June 2023) release of Sentry. Updating early will not break anything, but you will not get the full benefit of the Exception Groups improvements to issue grouping that were added to the Sentry backend.
+
+- Prefer `importlib.metadata` over `pkg_resources` if available (#2081) by @sentrivana
+- Work with a copy of request, vars in the event (#2125) by @sentrivana
+- Pinned version of dependency that broke the build (#2133) by @antonpirker
+
+## 1.23.1
+
+### Various fixes & improvements
+
+- Disable Django Cache spans by default. (#2120) by @antonpirker
+
+## 1.23.0
+
+### Various fixes & improvements
+
+- **New:** Add `loguru` integration (#1994) by @PerchunPak
+
+  Check [the documentation](https://docs.sentry.io/platforms/python/configuration/integrations/loguru/) for more information.
+
+  Usage:
+
+  ```python
+  from loguru import logger
+  import sentry_sdk
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      integrations=[
+          LoguruIntegration(),
+      ],
+  )
+
+  logger.debug("I am ignored")
+  logger.info("I am a breadcrumb")
+  logger.error("I am an event", extra=dict(bar=43))
+  logger.exception("An exception happened")
+  ```
+
+  - An error event with the message `"I am an event"` will be created.
+  - `"I am a breadcrumb"` will be attached as a breadcrumb to that event.
+  - `bar` will end up in the `extra` attributes of that event.
+  - `"An exception happened"` will send the current exception from `sys.exc_info()` with the stack trace to Sentry. If there's no exception, the current stack will be attached.
+  - The debug message `"I am ignored"` will not be captured by Sentry. To capture it, set `level` to `DEBUG` or lower in `LoguruIntegration`.
+
+- Do not truncate request body if `request_bodies` is `"always"` (#2092) by @sentrivana
+- Fixed Celery headers for Beat auto-instrumentation (#2102) by @antonpirker
+- Add `db.operation` to Redis and MongoDB spans (#2089) by @antonpirker
+- Make sure we're importing `redis` the library (#2106) by @sentrivana
+- Add `include_source_context` option (#2020) by @farhat-nawaz and @sentrivana
+- Import `Markup` from `markupsafe` (#2047) by @rco-ableton
+- Fix `__qualname__` missing attribute in asyncio integration (#2105) by @sl0thentr0py
+- Remove relay extension from AWS Layer (#2068) by @sl0thentr0py
+- Add a note about `pip freeze` to the bug template (#2103) by @sentrivana
+
+## 1.22.2
+
+### Various fixes & improvements
+
+- Fix: Django caching spans when using keyword arguments (#2086) by @antonpirker
+- Fix: Duration in Celery Beat tasks monitoring (#2087) by @antonpirker
+- Fix: Docstrings of SPANDATA (#2084) by @antonpirker
+
+## 1.22.1
+
+### Various fixes & improvements
+
+- Fix: Handle a list of keys (not just a single key) in Django cache spans (#2082) by @antonpirker
+
+## 1.22.0
+
+### Various fixes & improvements
+
+- Add `cache.hit` and `cache.item_size` to Django (#2057) by @antonpirker
+
+  _Note:_ This will add spans for all requests to the caches configured in Django. This will probably add some overhead to your server an also add multiple spans to your performance waterfall diagrams. If you do not want this, you can disable this feature in the DjangoIntegration:
+
+  ```python
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[
+          DjangoIntegration(cache_spans=False),
+      ]
+  )
+  ```
+
+- Use `http.method` instead of `method` (#2054) by @AbhiPrasad
+- Handle non-int `exc.status_code` in Starlette (#2075) by @sentrivana
+- Handle SQLAlchemy `engine.name` being bytes (#2074) by @sentrivana
+- Fix `KeyError` in `capture_checkin` if SDK is not initialized (#2073) by @antonpirker
+- Use `functools.wrap` for `ThreadingIntegration` patches to fix attributes (#2080) by @EpicWink
+- Pin `urllib3` to <2.0.0 for now (#2069) by @sl0thentr0py
+
+## 1.21.1
+
+### Various fixes & improvements
+
+- Do not send monitor_config when unset (#2058) by @evanpurkhiser
+- Add `db.system` span data (#2040, #2042) by @antonpirker
+- Fix memory leak in profiling (#2049) by @Zylphrex
+- Fix crash loop when returning none in before_send (#2045) by @sentrivana
+
+## 1.21.0
+
+### Various fixes & improvements
+
+- Better handling of redis span/breadcrumb data (#2033) by @antonpirker
+
+  _Note:_ With this release we will limit the description of redis db spans and the data in breadcrumbs represting redis db operations to 1024 characters.
+
+  This can can lead to truncated data. If you do not want this there is a new parameter `max_data_size` in `RedisIntegration`. You can set this to `None` for disabling trimming.
+
+  Example for **disabling** trimming of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=None),
+    ]
+  )
+  ```
+
+  Example for custom trim size of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=50),
+    ]
+  )`
+
+  ```
+
+- Add `db.system` to redis and SQLAlchemy db spans (#2037, #2038, #2039) (#2037) by @AbhiPrasad
+- Upgraded linting tooling (#2026) by @antonpirker
+- Made code more resilient. (#2031) by @antonpirker
+
 ## 1.20.0
 
 ### Various fixes & improvements

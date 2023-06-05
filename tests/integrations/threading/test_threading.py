@@ -7,6 +7,9 @@ import pytest
 from sentry_sdk import configure_scope, capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
+original_start = Thread.start
+original_run = Thread.run
+
 
 @pytest.mark.forked
 @pytest.mark.parametrize("integrations", [[ThreadingIntegration()], []])
@@ -26,7 +29,8 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
 
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
-        assert exception["mechanism"] == {"type": "threading", "handled": False}
+        assert exception["mechanism"]["type"] == "threading"
+        assert not exception["mechanism"]["handled"]
     else:
         assert not events
 
@@ -60,7 +64,8 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     (exception,) = event["exception"]["values"]
 
     assert exception["type"] == "ZeroDivisionError"
-    assert exception["mechanism"] == {"type": "threading", "handled": False}
+    assert exception["mechanism"]["type"] == "threading"
+    assert not exception["mechanism"]["handled"]
 
     if propagate_hub:
         assert event["tags"]["stage1"] == "true"
@@ -114,3 +119,25 @@ def test_double_patching(sentry_init, capture_events):
     for event in events:
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
+
+
+def test_wrapper_attributes(sentry_init):
+    sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
+
+    def target():
+        assert t.run.__name__ == "run"
+        assert t.run.__qualname__ == original_run.__qualname__
+
+    t = Thread(target=target)
+    t.start()
+    t.join()
+
+    assert Thread.start.__name__ == "start"
+    assert Thread.start.__qualname__ == original_start.__qualname__
+    assert t.start.__name__ == "start"
+    assert t.start.__qualname__ == original_start.__qualname__
+
+    assert Thread.run.__name__ == "run"
+    assert Thread.run.__qualname__ == original_run.__qualname__
+    assert t.run.__name__ == "run"
+    assert t.run.__qualname__ == original_run.__qualname__

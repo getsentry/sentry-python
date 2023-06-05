@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -63,6 +63,7 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
                     "redis.commands",
                     {"count": len(self.command_stack), "first_ten": commands},
                 )
+                span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
             return old_execute(self, *args, **kwargs)
 
@@ -114,14 +115,14 @@ class RedisIntegration(Integration):
     def setup_once():
         # type: () -> None
         try:
-            import redis
+            from redis import StrictRedis, client
         except ImportError:
             raise DidNotEnable("Redis client not installed")
 
-        patch_redis_client(redis.StrictRedis, is_cluster=False)
-        patch_redis_pipeline(redis.client.Pipeline, False, _get_redis_command_args)
+        patch_redis_client(StrictRedis, is_cluster=False)
+        patch_redis_pipeline(client.Pipeline, False, _get_redis_command_args)
         try:
-            strict_pipeline = redis.client.StrictPipeline  # type: ignore
+            strict_pipeline = client.StrictPipeline  # type: ignore
         except AttributeError:
             pass
         else:
@@ -195,6 +196,7 @@ def patch_redis_client(cls, is_cluster):
 
             if name:
                 span.set_tag("redis.command", name)
+                span.set_tag(SPANDATA.DB_OPERATION, name)
 
             if name and args:
                 name_low = name.lower()

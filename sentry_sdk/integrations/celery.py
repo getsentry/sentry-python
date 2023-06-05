@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import sys
+import time
 
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -15,13 +16,14 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
-    now,
+    match_regex_list,
 )
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import TypeVar
@@ -59,10 +61,16 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 class CeleryIntegration(Integration):
     identifier = "celery"
 
-    def __init__(self, propagate_traces=True, monitor_beat_tasks=False):
-        # type: (bool, bool) -> None
+    def __init__(
+        self,
+        propagate_traces=True,
+        monitor_beat_tasks=False,
+        exclude_beat_tasks=None,
+    ):
+        # type: (bool, bool, Optional[List[str]]) -> None
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
+        self.exclude_beat_tasks = exclude_beat_tasks
 
         if monitor_beat_tasks:
             _patch_beat_apply_entry()
@@ -114,6 +122,16 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
+def _now_seconds_since_epoch():
+    # type: () -> float
+    # We cannot use `time.perf_counter()` when dealing with the duration
+    # of a Celery task, because the start of a Celery task and
+    # the end are recorded in different processes.
+    # Start happens in the Celery Beat process,
+    # the end in a Celery Worker process.
+    return time.time()
+
+
 def _wrap_apply_async(f):
     # type: (F) -> F
     @wraps(f)
@@ -130,7 +148,8 @@ def _wrap_apply_async(f):
                     if integration.monitor_beat_tasks:
                         headers.update(
                             {
-                                "sentry-monitor-start-timestamp-s": "%.9f" % now(),
+                                "sentry-monitor-start-timestamp-s": "%.9f"
+                                % _now_seconds_since_epoch(),
                             }
                         )
 
@@ -146,6 +165,13 @@ def _wrap_apply_async(f):
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
+
+                        # Add the Sentry options potentially added in `sentry_apply_entry`
+                        # to the headers (done when auto-instrumenting Celery Beat tasks)
+                        for key, value in kwarg_headers.items():
+                            if key.startswith("sentry-"):
+                                kwarg_headers["headers"][key] = value
+
                         kwargs["headers"] = kwarg_headers
 
                 return f(*args, **kwargs)
@@ -402,8 +428,17 @@ def _patch_beat_apply_entry():
         app = scheduler.app
 
         celery_schedule = schedule_entry.schedule
-        monitor_config = _get_monitor_config(celery_schedule, app)
         monitor_name = schedule_entry.name
+
+        hub = Hub.current
+        integration = hub.get_integration(CeleryIntegration)
+        if integration is None:
+            return original_apply_entry(*args, **kwargs)
+
+        if match_regex_list(monitor_name, integration.exclude_beat_tasks):
+            return original_apply_entry(*args, **kwargs)
+
+        monitor_config = _get_monitor_config(celery_schedule, app)
 
         headers = schedule_entry.options.pop("headers", {})
         headers.update(
@@ -420,7 +455,9 @@ def _patch_beat_apply_entry():
         )
         headers.update({"sentry-monitor-check-in-id": check_in_id})
 
-        schedule_entry.options.update(headers)
+        # Set the Sentry configuration in the options of the ScheduleEntry.
+        # Those will be picked up in `apply_async` and added to the headers.
+        schedule_entry.options["headers"] = headers
         return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
@@ -449,7 +486,7 @@ def crons_task_success(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=now() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - start_timestamp_s,
         status=MonitorStatus.OK,
     )
 
@@ -470,7 +507,7 @@ def crons_task_failure(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=now() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )
 
@@ -491,6 +528,6 @@ def crons_task_retry(sender, **kwargs):
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=now() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - start_timestamp_s,
         status=MonitorStatus.ERROR,
     )

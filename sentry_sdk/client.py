@@ -320,10 +320,14 @@ class _Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(event)
+            event = serialize(event, request_bodies=self.options.get("request_bodies"))
 
         before_send = self.options["before_send"]
-        if before_send is not None and event.get("type") != "transaction":
+        if (
+            before_send is not None
+            and event is not None
+            and event.get("type") != "transaction"
+        ):
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
@@ -336,7 +340,11 @@ class _Client(object):
             event = new_event  # type: ignore
 
         before_send_transaction = self.options["before_send_transaction"]
-        if before_send_transaction is not None and event.get("type") == "transaction":
+        if (
+            before_send_transaction is not None
+            and event is not None
+            and event.get("type") == "transaction"
+        ):
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})

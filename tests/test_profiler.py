@@ -20,6 +20,7 @@ from sentry_sdk.profiler import (
     setup_profiler,
 )
 from sentry_sdk.tracing import Transaction
+from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._queue import Queue
 
 try:
@@ -472,35 +473,40 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
-    _, stack, frames = extract_stack(
-        frame, max_stack_depth=max_stack_depth + base_stack_depth
+    _, frame_ids, frames = extract_stack(
+        frame, LRUCache(max_size=1), max_stack_depth=max_stack_depth + base_stack_depth
     )
-    assert len(stack) == base_stack_depth + actual_depth
+    assert len(frame_ids) == base_stack_depth + actual_depth
     assert len(frames) == base_stack_depth + actual_depth
 
     for i in range(actual_depth):
-        assert get_frame_name(frames[i]) == "get_frame", i
+        assert frames[i]["function"] == "get_frame", i
 
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
     if sys.version_info >= (3, 11):
         assert (
-            get_frame_name(frames[actual_depth])
+            frames[actual_depth]["function"]
             == "test_extract_stack_with_max_depth.<locals>.<lambda>"
         ), actual_depth
     else:
-        assert get_frame_name(frames[actual_depth]) == "<lambda>", actual_depth
+        assert frames[actual_depth]["function"] == "<lambda>", actual_depth
 
 
-def test_extract_stack_with_cache():
-    frame = get_frame(depth=1)
+@pytest.mark.parametrize(
+    ("frame", "depth"),
+    [(get_frame(depth=1), len(inspect.stack()))],
+)
+def test_extract_stack_with_cache(frame, depth):
+    # make sure cache has enough room or this test will fail
+    cache = LRUCache(max_size=depth)
+    _, _, frames1 = extract_stack(frame, cache)
+    _, _, frames2 = extract_stack(frame, cache)
 
-    prev_cache = extract_stack(frame)
-    _, stack1, _ = prev_cache
-    _, stack2, _ = extract_stack(frame, prev_cache)
-
-    assert len(stack1) == len(stack2)
-    for i, (frame1, frame2) in enumerate(zip(stack1, stack2)):
+    assert len(frames1) > 0
+    assert len(frames2) > 0
+    assert len(frames1) == len(frames2)
+    for i, (frame1, frame2) in enumerate(zip(frames1, frames2)):
         # DO NOT use `==` for the assertion here since we are
         # testing for identity, and using `==` would test for
         # equality which would always pass since we're extract
@@ -629,9 +635,7 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 )
 @mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
-    sample = [("1", extract_stack(get_frame()))]
-
-    cwd = os.getcwd()
+    sample = [("1", extract_stack(get_frame(), LRUCache(max_size=1)))]
 
     with scheduler_class(frequency=1000) as scheduler:
         transaction = Transaction(sampled=True)
@@ -640,15 +644,15 @@ def test_max_profile_duration_reached(scheduler_class):
             assert profile.active
 
             # write a sample at the start time, so still active
-            profile.write(cwd, profile.start_ns + 0, sample, {})
+            profile.write(profile.start_ns + 0, sample)
             assert profile.active
 
             # write a sample at max time, so still active
-            profile.write(cwd, profile.start_ns + 1, sample, {})
+            profile.write(profile.start_ns + 1, sample)
             assert profile.active
 
             # write a sample PAST the max time, so now inactive
-            profile.write(cwd, profile.start_ns + 2, sample, {})
+            profile.write(profile.start_ns + 2, sample)
             assert not profile.active
 
 
@@ -675,8 +679,8 @@ thread_metadata = {
 
 
 sample_stacks = [
-    extract_stack(get_frame(), max_stack_depth=1),
-    extract_stack(get_frame(), max_stack_depth=2),
+    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=1),
+    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=2),
 ]
 
 
@@ -706,7 +710,7 @@ sample_stacks = [
         pytest.param(
             [(0, [("1", sample_stacks[0])])],
             {
-                "frames": [extract_frame(sample_stacks[0][2][0], os.getcwd())],
+                "frames": [sample_stacks[0][2][0]],
                 "samples": [
                     {
                         "elapsed_since_start_ns": "0",
@@ -725,7 +729,7 @@ sample_stacks = [
                 (1, [("1", sample_stacks[0])]),
             ],
             {
-                "frames": [extract_frame(sample_stacks[0][2][0], os.getcwd())],
+                "frames": [sample_stacks[0][2][0]],
                 "samples": [
                     {
                         "elapsed_since_start_ns": "0",
@@ -750,8 +754,8 @@ sample_stacks = [
             ],
             {
                 "frames": [
-                    extract_frame(sample_stacks[0][2][0], os.getcwd()),
-                    extract_frame(sample_stacks[1][2][0], os.getcwd()),
+                    sample_stacks[0][2][0],
+                    sample_stacks[1][2][0],
                 ],
                 "samples": [
                     {
@@ -785,7 +789,7 @@ def test_profile_processing(
                 # force the sample to be written at a time relative to the
                 # start of the profile
                 now = profile.start_ns + ts
-                profile.write(os.getcwd(), now, sample, {})
+                profile.write(now, sample)
 
             processed = profile.process()
 
