@@ -1470,7 +1470,7 @@ def match_regex_list(item, regex_list=None, substring_matching=False):
 
 
 def parse_version(version):
-    # type: (str) -> Optional[Tuple[int, int, Optional[int]]]
+    # type: (str) -> Optional[Tuple[int, Optional[int], Optional[int]]]
     """
     Parses a version string into a tuple of integers.
     This uses the parsing loging from PEP 440:
