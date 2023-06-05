@@ -1514,7 +1514,9 @@ def parse_version(version):
 
     try:
         release = pattern.match(version).groupdict()["release"]  # type: ignore
-        release_tuple = tuple(map(int, release.split(".")[:3]))
+        release_tuple = tuple(
+            map(int, release.split(".")[:3])
+        )  # type: Tuple[int, Optional[int], Optional[int]]
     except (TypeError, ValueError, AttributeError):
         return None
 
