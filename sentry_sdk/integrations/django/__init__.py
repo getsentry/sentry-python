@@ -103,7 +103,7 @@ class DjangoIntegration(Integration):
         transaction_style="url",
         middleware_spans=True,
         signals_spans=True,
-        cache_spans=True,
+        cache_spans=False,
     ):
         # type: (str, bool, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:

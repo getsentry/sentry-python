@@ -189,7 +189,8 @@ def test_basic(run_lambda_function):
 
     assert frame1["in_app"] is True
 
-    assert exception["mechanism"] == {"type": "aws_lambda", "handled": False}
+    assert exception["mechanism"]["type"] == "aws_lambda"
+    assert not exception["mechanism"]["handled"]
 
     assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
 
@@ -327,7 +328,8 @@ def test_timeout_error(run_lambda_function):
         "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds.",
     )
 
-    assert exception["mechanism"] == {"type": "threading", "handled": False}
+    assert exception["mechanism"]["type"] == "threading"
+    assert not exception["mechanism"]["handled"]
 
     assert event["extra"]["lambda"]["function_name"].startswith("test_function_")
 

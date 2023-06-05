@@ -17,6 +17,7 @@ class LayerBuilder:
         # type: (...) -> None
         self.base_dir = base_dir
         self.python_site_packages = os.path.join(self.base_dir, PYTHON_SITE_PACKAGES)
+        self.out_zip_filename = f"sentry-python-serverless-{SDK_VERSION}.zip"
 
     def make_directories(self):
         # type: (...) -> None
@@ -57,16 +58,35 @@ class LayerBuilder:
             "scripts/init_serverless_sdk.py", f"{serverless_sdk_path}/__init__.py"
         )
 
+    def zip(self):
+        # type: (...) -> None
+        subprocess.run(
+            [
+                "zip",
+                "-q",  # Quiet
+                "-x",  # Exclude files
+                "**/__pycache__/*",  # Files to be excluded
+                "-r",  # Recurse paths
+                self.out_zip_filename,  # Output filename
+                PYTHON_SITE_PACKAGES,  # Files to be zipped
+            ],
+            cwd=self.base_dir,
+            check=True,  # Raises CalledProcessError if exit status is non-zero
+        )
 
-def build_layer_dir():
+        shutil.copy(
+            os.path.join(self.base_dir, self.out_zip_filename),
+            os.path.abspath(DIST_PATH)
+        )
+
+def build_packaged_zip():
     with tempfile.TemporaryDirectory() as base_dir:
         layer_builder = LayerBuilder(base_dir)
         layer_builder.make_directories()
         layer_builder.install_python_packages()
         layer_builder.create_init_serverless_sdk_package()
-
-        shutil.copytree(base_dir, "dist-serverless")
+        layer_builder.zip()
 
 
 if __name__ == "__main__":
-    build_layer_dir()
+    build_packaged_zip()

@@ -115,14 +115,14 @@ class RedisIntegration(Integration):
     def setup_once():
         # type: () -> None
         try:
-            import redis
+            from redis import StrictRedis, client
         except ImportError:
             raise DidNotEnable("Redis client not installed")
 
-        patch_redis_client(redis.StrictRedis, is_cluster=False)
-        patch_redis_pipeline(redis.client.Pipeline, False, _get_redis_command_args)
+        patch_redis_client(StrictRedis, is_cluster=False)
+        patch_redis_pipeline(client.Pipeline, False, _get_redis_command_args)
         try:
-            strict_pipeline = redis.client.StrictPipeline  # type: ignore
+            strict_pipeline = client.StrictPipeline  # type: ignore
         except AttributeError:
             pass
         else:
@@ -196,6 +196,7 @@ def patch_redis_client(cls, is_cluster):
 
             if name:
                 span.set_tag("redis.command", name)
+                span.set_tag(SPANDATA.DB_OPERATION, name)
 
             if name and args:
                 name_low = name.lower()

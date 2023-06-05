@@ -26,7 +26,7 @@ except ImportError:
     flask_login = None
 
 try:
-    from flask import Flask, Markup, Request  # type: ignore
+    from flask import Flask, Request  # type: ignore
     from flask import __version__ as FLASK_VERSION
     from flask import request as flask_request
     from flask.signals import (
@@ -34,6 +34,7 @@ try:
         got_request_exception,
         request_started,
     )
+    from markupsafe import Markup
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 

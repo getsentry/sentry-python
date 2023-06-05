@@ -2,6 +2,7 @@ import asyncio
 import base64
 import functools
 import json
+import logging
 import os
 import threading
 
@@ -873,3 +874,32 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         transactions = profile.payload.json["transactions"]
         assert len(transactions) == 1
         assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+
+def test_original_request_not_scrubbed(sentry_init, capture_events):
+    sentry_init(integrations=[StarletteIntegration()])
+
+    events = capture_events()
+
+    async def _error(request):
+        logging.critical("Oh no!")
+        assert request.headers["Authorization"] == "Bearer ohno"
+        assert await request.json() == {"password": "ohno"}
+        return starlette.responses.JSONResponse({"status": "Oh no!"})
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/error", _error, methods=["POST"]),
+        ],
+    )
+
+    client = TestClient(app)
+    client.post(
+        "/error",
+        json={"password": "ohno"},
+        headers={"Authorization": "Bearer ohno"},
+    )
+
+    event = events[0]
+    assert event["request"]["data"] == {"password": "[Filtered]"}
+    assert event["request"]["headers"]["authorization"] == "[Filtered]"

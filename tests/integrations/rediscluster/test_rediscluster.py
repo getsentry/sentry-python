@@ -43,6 +43,7 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
         "category": "redis",
         "message": "GET 'foobar'",
         "data": {
+            "db.operation": "GET",
             "redis.key": "foobar",
             "redis.command": "GET",
             "redis.is_cluster": True,
