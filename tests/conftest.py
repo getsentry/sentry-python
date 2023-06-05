@@ -2,7 +2,6 @@ import json
 import os
 import socket
 from threading import Thread
-import sys
 
 import pytest
 import jsonschema
@@ -38,8 +37,6 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
-sys.stdin.reconfigure(encoding="utf-8")
-sys.stdout.reconfigure(encoding="utf-8")
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 

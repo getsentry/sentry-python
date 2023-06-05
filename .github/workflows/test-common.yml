@@ -60,10 +60,14 @@ jobs:
             coverage erase
 
             locale
-            export LC_ALL=en_US.UTF-8
             export LANG=en_US.UTF-8
-            export LANGUAGE=en_US.UTF-8
             locale
+
+            python -c 'import sys; print(sys.getdefaultencoding())'
+            python -c 'import sys; print(sys.stdin.encoding, sys.stdout.encoding)'
+            PYTHONIOENCODING="utf-8" python -c 'import sys; print(sys.stdin.encoding, sys.stdout.encoding)'
+            python -c 'import sys; print(sys.getdefaultencoding())'
+            python -c 'import sys; print(sys.stdin.encoding, sys.stdout.encoding)'
 
             # Run tests
             ./scripts/runtox.sh "py${{ matrix.python-version }}-common" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
