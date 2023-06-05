@@ -372,7 +372,7 @@ class Span(object):
     def set_http_status(self, http_status):
         # type: (int) -> None
         self.set_tag(
-            SPANDATA.HTTP_STATUS_CODE, str(http_status)
+            "http.status_code", str(http_status)
         )  # we keep this for backwards compatability
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
 
