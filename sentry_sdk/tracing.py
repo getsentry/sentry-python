@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk._compat import text_type
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
 from sentry_sdk._compat import PY2
 from sentry_sdk.consts import SPANDATA
@@ -375,7 +374,7 @@ class Span(object):
         self.set_tag(
             SPANDATA.HTTP_STATUS_CODE, str(http_status)
         )  # we keep this for backwards compatability
-        self.set_data(SPANDATA.HTTP_STATUS_CODE, text_type(http_status))
+        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
 
         if http_status < 400:
             self.set_status("ok")

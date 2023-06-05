@@ -4,7 +4,6 @@ import responses
 requests = pytest.importorskip("requests")
 
 from sentry_sdk import capture_message
-from sentry_sdk._compat import text_type
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
@@ -29,6 +28,6 @@ def test_crumb_capture(sentry_init, capture_events):
         SPANDATA.HTTP_METHOD: "GET",
         SPANDATA.HTTP_FRAGMENT: "",
         SPANDATA.HTTP_QUERY: "",
-        SPANDATA.HTTP_STATUS_CODE: text_type(response.status_code),
+        SPANDATA.HTTP_STATUS_CODE: response.status_code,
         "reason": response.reason,
     }

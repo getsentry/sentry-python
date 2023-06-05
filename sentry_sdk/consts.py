@@ -101,10 +101,10 @@ class SPANDATA:
     Example: GET
     """
 
-    HTTP_STATUS_CODE = "http.status_code"
+    HTTP_STATUS_CODE = "http.response.status_code"
     """
-    The HTTP status code as string.
-    Example: "418"
+    The HTTP status code an integer.
+    Example: 418
     """
 
 
