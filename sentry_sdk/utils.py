@@ -1476,7 +1476,7 @@ def parse_version(version):
     This uses the parsing loging from PEP 440:
     https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
     """
-    VERSION_PATTERN = r"""
+    VERSION_PATTERN = r"""  # noqa: N806
         v?
         (?:
             (?:(?P<epoch>[0-9]+)!)?                           # epoch
