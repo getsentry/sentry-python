@@ -16,4 +16,4 @@ fi
 searchstring="$1"
 
 export TOX_PARALLEL_NO_SPINNER=1
-LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 exec $TOXPATH -vv -p auto -e "$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')" -- "${@:2}"
+exec $TOXPATH -vv -p auto -e "$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')" -- "${@:2}"

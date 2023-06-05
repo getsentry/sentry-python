@@ -37,6 +37,9 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
+import sys
+
+sys.setdefaultencoding("utf-8")
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 
