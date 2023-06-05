@@ -60,6 +60,8 @@ jobs:
             coverage erase
 
             locale
+            export LC_ALL=en_US.UTF-8
+            locale
 
             # Run tests
             ./scripts/runtox.sh "py${{ matrix.python-version }}-common" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
