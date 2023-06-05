@@ -58,9 +58,9 @@ class SanicIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        version = parse_version(SANIC_VERSION)
+        SanicIntegration.version = parse_version(SANIC_VERSION)
 
-        if version is None:
+        if SanicIntegration.version is None:
             raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
         if SanicIntegration.version < (0, 8):
