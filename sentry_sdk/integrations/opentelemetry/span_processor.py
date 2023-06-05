@@ -26,7 +26,7 @@ from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
-from urllib3.util import parse_url as urlparse  # type: ignore
+from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
     from typing import Any
