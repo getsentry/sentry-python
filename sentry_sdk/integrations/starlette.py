@@ -549,6 +549,8 @@ class StarletteRequestExtractor:
                 if "operationName" in json:
                     return json["operationName"]
 
+        return None
+
     async def content_length(self):
         # type: (StarletteRequestExtractor) -> Optional[int]
         if "content-length" in self.request.headers:
