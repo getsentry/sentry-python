@@ -1,10 +1,21 @@
+import re
 import sentry_sdk
 
 from sentry_sdk.integrations.modules import (
     ModulesIntegration,
     _get_installed_modules,
-    _normalize_module_name,
 )
+
+
+def _normalize_distribution_name(name):
+    # type: (str) -> str
+    """Normalize distribution name according to PEP-0503.
+
+    See:
+    https://peps.python.org/pep-0503/#normalized-names
+    for more details.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def test_basic(sentry_init, capture_events):
@@ -20,7 +31,7 @@ def test_basic(sentry_init, capture_events):
 
 def test_installed_modules():
     try:
-        from importlib import distributions, version
+        from importlib.metadata import distributions, version
 
         importlib_available = True
     except ImportError:
@@ -33,28 +44,23 @@ def test_installed_modules():
     except ImportError:
         pkg_resources_available = False
 
-    installed_modules = _get_installed_modules()
-
-    # This one package is reported differently by importlib
-    # and pkg_resources, but we don't really care, so let's
-    # just ignore it
-    installed_modules.pop("typing-extensions", None)
-    installed_modules.pop("typing_extensions", None)
+    installed_distributions = {
+        _normalize_distribution_name(dist): version
+        for dist, version in _get_installed_modules().items()
+    }
 
     if importlib_available:
-        importlib_modules = {
-            _normalize_module_name(dist.metadata["Name"]): version(
+        importlib_distributions = {
+            _normalize_distribution_name(dist.metadata["Name"]): version(
                 dist.metadata["Name"]
             )
             for dist in distributions()
         }
-        importlib_modules.pop("typing-extensions", None)
-        assert installed_modules == importlib_modules
+        assert installed_distributions == importlib_distributions
 
     if pkg_resources_available:
-        pkg_resources_modules = {
-            _normalize_module_name(dist.key): dist.version
+        pkg_resources_distributions = {
+            _normalize_distribution_name(dist.key): dist.version
             for dist in pkg_resources.working_set
         }
-        pkg_resources_modules.pop("typing-extensions", None)
-        assert installed_modules == pkg_resources_modules
+        assert installed_distributions == pkg_resources_distributions
