@@ -1,6 +1,7 @@
 from copy import copy
 from collections import deque
 from itertools import chain
+import os
 import uuid
 
 from sentry_sdk.attachments import Attachment
@@ -121,7 +122,51 @@ class Scope(object):
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
         self.clear()
-        self.generate_propagation_context()
+
+        incoming_trace_information = self._load_trace_data_from_env()
+        self.generate_propagation_context(incoming_data=incoming_trace_information)
+
+    def _load_trace_data_from_env(self):
+        # type: () -> Optional[Dict[str, str]]
+        """
+        Load Sentry trace id and baggage from environment variables.
+        Can be disabled by setting SENTRY_TRACING_USE_ENVIRONMENT to "false".
+        """
+        incoming_trace_information = None
+
+        false_values = [
+            "false",
+            "False",
+            "FALSE",
+            "no",
+            "No",
+            "NO",
+            "n",
+            "0",
+            "off",
+            "Off",
+            "OFF",
+        ]
+
+        use_environment = (
+            False
+            if os.environ.get("SENTRY_TRACING_USE_ENVIRONMENT") in false_values
+            else True
+        )
+        if use_environment:
+            incoming_trace_information = {}
+
+            if os.environ.get("SENTRY_TRACING_SENTRY_TRACE"):
+                incoming_trace_information[SENTRY_TRACE_HEADER_NAME] = os.environ.get(
+                    "SENTRY_TRACING_SENTRY_TRACE"
+                )
+
+            if os.environ.get("SENTRY_TRACING_BAGGAGE"):
+                incoming_trace_information[BAGGAGE_HEADER_NAME] = os.environ.get(
+                    "SENTRY_TRACING_BAGGAGE"
+                )
+
+        return incoming_trace_information or None
 
     def _normalize_incoming_data(self, incoming_data):
         # type: (Dict[str, Any]) -> Dict[str, Any]
