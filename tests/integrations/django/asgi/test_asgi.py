@@ -233,6 +233,9 @@ async def test_async_middleware_spans(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
 
@@ -259,6 +262,9 @@ async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
 
@@ -282,6 +288,9 @@ async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
 
@@ -314,6 +323,9 @@ async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_ev
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
 async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
 
