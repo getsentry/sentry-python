@@ -7,6 +7,7 @@ from sentry_sdk.utils import (
     logger,
     match_regex_list,
     parse_url,
+    parse_version,
     sanitize_url,
     serialize_frame,
 )
@@ -263,3 +264,39 @@ def test_include_source_context_when_serializing_frame(include_source_context):
 )
 def test_match_regex_list(item, regex_list, expected_result):
     assert match_regex_list(item, regex_list) == expected_result
+
+
+@pytest.mark.parametrize(
+    "version,expected_result",
+    [
+        ["3.5.15", (3, 5, 15)],
+        ["2.0.9", (2, 0, 9)],
+        ["2.0.0", (2, 0, 0)],
+        ["0.6.0", (0, 6, 0)],
+        ["2.0.0.post1", (2, 0, 0)],
+        ["2.0.0rc3", (2, 0, 0)],
+        ["2.0.0rc2", (2, 0, 0)],
+        ["2.0.0rc1", (2, 0, 0)],
+        ["2.0.0b4", (2, 0, 0)],
+        ["2.0.0b3", (2, 0, 0)],
+        ["2.0.0b2", (2, 0, 0)],
+        ["2.0.0b1", (2, 0, 0)],
+        ["0.6beta3", (0, 6)],
+        ["0.6beta2", (0, 6)],
+        ["0.6beta1", (0, 6)],
+        ["0.4.2b", (0, 4, 2)],
+        ["0.4.2a", (0, 4, 2)],
+        ["0.0.1", (0, 0, 1)],
+        ["0.0.0", (0, 0, 0)],
+        ["1", (1,)],
+        ["1.0", (1, 0)],
+        ["1.0.0", (1, 0, 0)],
+        [" 1.0.0 ", (1, 0, 0)],
+        ["  1.0.0   ", (1, 0, 0)],
+        ["x1.0.0", None],
+        ["1.0.0x", None],
+        ["x1.0.0x", None],
+    ],
+)
+def test_parse_version(version, expected_result):
+    assert parse_version(version) == expected_result

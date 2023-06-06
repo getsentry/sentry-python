@@ -10,6 +10,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    parse_version,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -51,15 +52,15 @@ except AttributeError:
 
 class SanicIntegration(Integration):
     identifier = "sanic"
-    version = (0, 0)  # type: Tuple[int, ...]
+    version = None
 
     @staticmethod
     def setup_once():
         # type: () -> None
 
-        try:
-            SanicIntegration.version = tuple(map(int, SANIC_VERSION.split(".")))
-        except (TypeError, ValueError):
+        SanicIntegration.version = parse_version(SANIC_VERSION)
+
+        if SanicIntegration.version is None:
             raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
         if SanicIntegration.version < (0, 8):
@@ -225,7 +226,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
         finally:
             # As mentioned in previous comment in _startup, this can be removed
             # after https://github.com/sanic-org/sanic/issues/2297 is resolved
-            if SanicIntegration.version == (21, 9):
+            if SanicIntegration.version and SanicIntegration.version == (21, 9):
                 await _hub_exit(request)
 
     return sentry_wrapped_error_handler
