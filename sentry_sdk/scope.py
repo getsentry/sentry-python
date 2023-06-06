@@ -1,31 +1,33 @@
 from copy import copy
 from collections import deque
 from itertools import chain
-from typing import Iterator, Tuple
 import uuid
 
+from sentry_sdk.attachments import Attachment
 from sentry_sdk._functools import wraps
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
     has_tracing_enabled,
 )
-from sentry_sdk.utils import logger, capture_internal_exceptions
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
     Transaction,
 )
-from sentry_sdk.attachments import Attachment
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.utils import logger, capture_internal_exceptions
+
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Iterator
     from typing import Optional
     from typing import Deque
     from typing import List
     from typing import Callable
+    from typing import Tuple
     from typing import TypeVar
 
     from sentry_sdk._types import (
