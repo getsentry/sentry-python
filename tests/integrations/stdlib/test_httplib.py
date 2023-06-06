@@ -49,7 +49,7 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["data"] == {
         "url": url,
         SPANDATA.HTTP_METHOD: "GET",
-        "status_code": 200,
+        SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
         SPANDATA.HTTP_FRAGMENT: "",
         SPANDATA.HTTP_QUERY: "",
@@ -76,7 +76,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     assert crumb["data"] == {
         "url": url,
         SPANDATA.HTTP_METHOD: "GET",
-        "status_code": 200,
+        SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
         "extra": "foo",
         SPANDATA.HTTP_FRAGMENT: "",
@@ -134,7 +134,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["data"] == {
         "url": "http://localhost:{}/200".format(PORT),
         SPANDATA.HTTP_METHOD: "GET",
-        "status_code": 200,
+        SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
         SPANDATA.HTTP_FRAGMENT: "",
         SPANDATA.HTTP_QUERY: "",

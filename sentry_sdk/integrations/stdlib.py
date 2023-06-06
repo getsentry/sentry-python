@@ -120,7 +120,6 @@ def _install_httplib():
 
         rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_data("status_code", rv.status)
         span.set_http_status(int(rv.status))
         span.set_data("reason", rv.reason)
         span.finish()
