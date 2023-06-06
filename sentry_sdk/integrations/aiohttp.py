@@ -15,6 +15,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction, TRANSACTION_SOURCE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -64,10 +65,10 @@ class AioHttpIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(map(int, AIOHTTP_VERSION.split(".")[:2]))
-        except (TypeError, ValueError):
-            raise DidNotEnable("AIOHTTP version unparsable: {}".format(AIOHTTP_VERSION))
+        version = parse_version(AIOHTTP_VERSION)
+
+        if version is None:
+            raise DidNotEnable("Unparsable AIOHTTP version: {}".format(AIOHTTP_VERSION))
 
         if version < (3, 4):
             raise DidNotEnable("AIOHTTP 3.4 or newer required.")
