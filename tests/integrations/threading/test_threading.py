@@ -121,7 +121,7 @@ def test_double_patching(sentry_init, capture_events):
         assert exception["type"] == "ZeroDivisionError"
 
 
-@pytest.mark.skipif(sys.version_info == (2, 7), reason="no __qualname__ in py2.7")
+@pytest.mark.skipif(sys.version_info < (3, 2), reason="no __qualname__ in older python")
 def test_wrapper_attributes(sentry_init):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
