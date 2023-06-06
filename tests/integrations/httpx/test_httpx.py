@@ -46,7 +46,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
-            "status_code": 200,
+            SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
             "extra": "foo",
         }
