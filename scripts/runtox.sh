@@ -18,6 +18,8 @@ searchstring="$1"
 export TOX_PARALLEL_NO_SPINNER=1
 ENV="$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')"
 
+# Run the common 2.7 suite without the -p flag, otherwise we hit an encoding
+# issue in tox.
 if [ "$ENV" = py2.7-common, ] || [ "$ENV" = py2.7-gevent, ]; then
     exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
 else
