@@ -1354,7 +1354,7 @@ Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fra
 
 
 def sanitize_url(url, remove_authority=True, remove_query_values=True, split=False):
-    # type: (str, bool, bool, bool) -> str
+    # type: (str, bool, bool, bool) -> Union[str, Components]
     """
     Removes the authority and query parameter values from a given URL.
     """
