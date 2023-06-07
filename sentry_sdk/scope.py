@@ -130,7 +130,7 @@ class Scope(object):
         # type: () -> Optional[Dict[str, str]]
         """
         Load Sentry trace id and baggage from environment variables.
-        Can be disabled by setting SENTRY_TRACING_USE_ENVIRONMENT to "false".
+        Can be disabled by setting SENTRY_USE_ENVIRONMENT to "false".
         """
         incoming_trace_information = None
 
@@ -149,21 +149,19 @@ class Scope(object):
         ]
 
         use_environment = (
-            False
-            if os.environ.get("SENTRY_TRACING_USE_ENVIRONMENT") in false_values
-            else True
+            False if os.environ.get("SENTRY_USE_ENVIRONMENT") in false_values else True
         )
         if use_environment:
             incoming_trace_information = {}
 
-            if os.environ.get("SENTRY_TRACING_SENTRY_TRACE"):
+            if os.environ.get("SENTRY_TRACE"):
                 incoming_trace_information[SENTRY_TRACE_HEADER_NAME] = os.environ.get(
-                    "SENTRY_TRACING_SENTRY_TRACE"
+                    "SENTRY_TRACE"
                 )
 
-            if os.environ.get("SENTRY_TRACING_BAGGAGE"):
+            if os.environ.get("SENTRY_BAGGAGE"):
                 incoming_trace_information[BAGGAGE_HEADER_NAME] = os.environ.get(
-                    "SENTRY_TRACING_BAGGAGE"
+                    "SENTRY_BAGGAGE"
                 )
 
         return incoming_trace_information or None
