@@ -1,9 +1,13 @@
-import mock
 import pytest
 import uuid
 
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")

@@ -1,11 +1,14 @@
-import mock
-
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from fakeredis import FakeStrictRedis
 import pytest
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def test_basic(sentry_init, capture_events):
