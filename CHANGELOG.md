@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.25.1
+
+### Django update (ongoing)
+
+Collections of improvements to our Django integration.
+
+By: @mgaligniana (#1773)
+
+### Various fixes & improvements
+
+- Fix `parse_url` (#2161) by @sentrivana
+- test: Fix using unittest.mock whenever available (#1926) by @mgorny
+- build(deps): bump sphinx from 5.3.0 to 7.0.1 (#2112) by @dependabot
+- build(deps): bump black from 22.12.0 to 23.3.0 (#1984) by @dependabot
+- build(deps): bump mypy from 1.2.0 to 1.3.0 (#2110) by @dependabot
+- Fix 2.7 `common` tests (#2145) by @sentrivana
+- Better version parsing in integrations (#2152) by @antonpirker
+- Align HTTP status code as span data field `http.response.status_code` (#2113) by @antonpirker
+- build(deps): bump actions/stale from 6 to 8 (#1978) by @dependabot
+- Do not encode cached value to determine size (#2143) by @sentrivana
+
 ## 1.25.0
 
 ### Various fixes & improvements
