@@ -1,5 +1,3 @@
-import mock
-
 import pytest
 
 pytest.importorskip("celery")
@@ -15,6 +13,11 @@ from sentry_sdk.integrations.celery import (
 )
 from sentry_sdk.crons import MonitorStatus
 from celery.schedules import crontab, schedule
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def test_get_headers():
