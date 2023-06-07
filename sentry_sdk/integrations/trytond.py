@@ -22,7 +22,6 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
     @staticmethod
     def setup_once():  # type: () -> None
-
         app.wsgi_app = sentry_sdk.integrations.wsgi.SentryWsgiMiddleware(app.wsgi_app)
 
         def error_handler(e):  # type: (Exception) -> None

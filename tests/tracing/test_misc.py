@@ -1,4 +1,3 @@
-from mock import MagicMock
 import pytest
 import gc
 import uuid
@@ -12,8 +11,10 @@ from sentry_sdk.tracing_utils import should_propagate_trace
 
 try:
     from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
 except ImportError:
     import mock  # python < 3.3
+    from mock import MagicMock
 
 
 def test_span_trimming(sentry_init, capture_events):
