@@ -165,7 +165,6 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
     ) as transaction:
-
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
 
         (request_str,) = mock_send.call_args[0]
@@ -326,7 +325,6 @@ def test_option_trace_propagation_targets(
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
     ) as transaction:
-
         HTTPSConnection(host).request("GET", path)
 
         (request_str,) = mock_send.call_args[0]
