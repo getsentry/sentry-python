@@ -1,8 +1,13 @@
 import json
 
 import pytest
-import mock
-from mock import MagicMock
+
+try:
+    from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
+except ImportError:
+    import mock  # python < 3.3
+    from mock import MagicMock
 
 from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
@@ -400,6 +405,6 @@ def test_setup_once(
                 fake_set_context.assert_not_called()
 
             if warning_called:
-                fake_warning.assert_called_once()
+                assert fake_warning.call_count == 1
             else:
                 fake_warning.assert_not_called()

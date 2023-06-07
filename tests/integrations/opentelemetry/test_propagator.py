@@ -1,5 +1,9 @@
-from mock import MagicMock
-import mock
+try:
+    from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
+except ImportError:
+    import mock  # python < 3.3
+    from mock import MagicMock
 
 from opentelemetry.context import get_current
 from opentelemetry.trace.propagation import get_current_span

@@ -93,7 +93,6 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 @pytest.fixture
 def run_cloud_function():
     def inner(code, subprocess_kwargs=()):
-
         events = []
         envelopes = []
         return_value = None
