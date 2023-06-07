@@ -72,11 +72,12 @@ def test_sanitize_url(url, expected_result):
 
 def test_sanitize_url_and_split():
     parts = sanitize_url(
-        "https://example.com?token=abc&sessionid=123&save=true", split=True
+        "https://username:password@example.com?token=abc&sessionid=123&save=true",
+        split=True,
     )
     assert parts == Components(
         scheme="https",
-        netloc="example.com",
+        netloc="[Filtered]:[Filtered]@example.com",
         path="",
         query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
         fragment="",
