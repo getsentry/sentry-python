@@ -1,5 +1,5 @@
 pip  # always use newest pip
-mock # for testing under python < 3.3
+mock ; python_version<'3.3'
 pytest<7
 pytest-cov==2.8.1
 pytest-forked<=1.4.0

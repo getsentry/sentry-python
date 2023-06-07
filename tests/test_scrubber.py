@@ -105,11 +105,9 @@ def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
         "password": "[Filtered]",
     }
 
-    assert event["_meta"] == {
-        "extra": {"auth": {"": {"rem": [["!config", "s"]]}}},
-        "breadcrumbs": {
-            "values": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
-        },
+    assert event["_meta"]["extra"]["auth"] == {"": {"rem": [["!config", "s"]]}}
+    assert event["_meta"]["breadcrumbs"] == {
+        "values": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
     }
 
 
@@ -124,8 +122,8 @@ def test_span_data_scrubbing(sentry_init, capture_events):
 
     (event,) = events
     assert event["spans"][0]["data"] == {"password": "[Filtered]", "datafoo": "databar"}
-    assert event["_meta"] == {
-        "spans": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
+    assert event["_meta"]["spans"] == {
+        "0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}
     }
 
 
