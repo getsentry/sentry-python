@@ -188,17 +188,23 @@ class Scope(object):
         context = {}  # type: Dict[str, Any]
         normalized_data = self._normalize_incoming_data(data)
 
-        if normalized_data.get(BAGGAGE_HEADER_NAME):
-            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
-                normalized_data.get(BAGGAGE_HEADER_NAME)
-            ).dynamic_sampling_context()
-
         if normalized_data.get(SENTRY_TRACE_HEADER_NAME):
             sentrytrace_data = extract_sentrytrace_data(
                 normalized_data.get(SENTRY_TRACE_HEADER_NAME)
             )
             if sentrytrace_data is not None:
                 context.update(sentrytrace_data)
+
+        if normalized_data.get(BAGGAGE_HEADER_NAME):
+            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
+                normalized_data.get(BAGGAGE_HEADER_NAME)
+            ).dynamic_sampling_context()
+
+        only_baggage_no_sentry_trace = (
+            "dynamic_sampling_context" in context and "trace_id" not in context
+        )
+        if only_baggage_no_sentry_trace:
+            context.update(self._create_new_propagation_context())
 
         if context:
             if not context.get("span_id"):
