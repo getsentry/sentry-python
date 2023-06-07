@@ -93,7 +93,6 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
 def test_transaction_with_error(
     sentry_init, capture_events, DictionaryContaining  # noqa:N803
 ):
-
     sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 

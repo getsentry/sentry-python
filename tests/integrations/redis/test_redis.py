@@ -184,7 +184,6 @@ def test_data_truncation_custom(sentry_init, capture_events):
 
 
 def test_breadcrumbs(sentry_init, capture_events):
-
     sentry_init(
         integrations=[RedisIntegration(max_data_size=30)],
         send_default_pii=True,

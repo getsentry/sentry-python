@@ -444,7 +444,7 @@ class _Client(object):
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for (k, v) in iteritems(headers or {}):
+            for k, v in iteritems(headers or {}):
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
