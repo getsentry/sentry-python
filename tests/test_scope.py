@@ -143,6 +143,7 @@ BAGGAGE_VALUE = (
             {
                 "SENTRY_USE_ENVIRONMENT": "True",
                 "MY_OTHER_VALUE": "asdf",
+                "SENTRY_RELEASE": "1.0.0",
             },
             None,
         ),
