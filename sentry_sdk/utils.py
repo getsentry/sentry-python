@@ -1353,8 +1353,8 @@ def from_base64(base64_string):
 Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
 
 
-def sanitize_url(url, remove_authority=True, remove_query_values=True):
-    # type: (str, bool, bool) -> str
+def sanitize_url(url, remove_authority=True, remove_query_values=True, split=False):
+    # type: (str, bool, bool, bool) -> str
     """
     Removes the authority and query parameter values from a given URL.
     """
@@ -1383,17 +1383,18 @@ def sanitize_url(url, remove_authority=True, remove_query_values=True):
     else:
         query_string = parsed_url.query
 
-    safe_url = urlunsplit(
-        Components(
-            scheme=parsed_url.scheme,
-            netloc=netloc,
-            query=query_string,
-            path=parsed_url.path,
-            fragment=parsed_url.fragment,
-        )
+    components = Components(
+        scheme=parsed_url.scheme,
+        netloc=netloc,
+        query=query_string,
+        path=parsed_url.path,
+        fragment=parsed_url.fragment,
     )
 
-    return safe_url
+    if split:
+        return components
+    else:
+        return urlunsplit(components)
 
 
 ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
@@ -1406,9 +1407,10 @@ def parse_url(url, sanitize=True):
     parameters will be sanitized to remove sensitive data. The autority (username and password)
     in the URL will always be removed.
     """
-    url = sanitize_url(url, remove_authority=True, remove_query_values=sanitize)
+    parsed_url = sanitize_url(
+        url, remove_authority=True, remove_query_values=sanitize, split=True
+    )
 
-    parsed_url = urlsplit(url)
     base_url = urlunsplit(
         Components(
             scheme=parsed_url.scheme,
