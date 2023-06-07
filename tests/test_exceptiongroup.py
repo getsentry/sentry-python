@@ -194,6 +194,7 @@ def test_exceptiongroup_simple():
     assert frame["context_line"] == "        raise ExceptionGroup("
 
 
+@minimum_python_311
 def test_exception_chain_cause():
     exception_chain_cause = ValueError("Exception with cause")
     exception_chain_cause.__context__ = TypeError("Exception in __context__")
@@ -235,6 +236,7 @@ def test_exception_chain_cause():
     assert exception_values == expected_exception_values
 
 
+@minimum_python_311
 def test_exception_chain_context():
     exception_chain_context = ValueError("Exception with context")
     exception_chain_context.__context__ = TypeError("Exception in __context__")
@@ -273,6 +275,7 @@ def test_exception_chain_context():
     assert exception_values == expected_exception_values
 
 
+@minimum_python_311
 def test_simple_exception():
     simple_excpetion = ValueError("A simple exception")
 
