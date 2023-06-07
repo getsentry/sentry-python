@@ -3,7 +3,6 @@ import re
 import sys
 
 from sentry_sdk.utils import (
-    Components,
     is_valid_sample_rate,
     logger,
     match_regex_list,
@@ -75,13 +74,17 @@ def test_sanitize_url_and_split():
         "https://username:password@example.com?token=abc&sessionid=123&save=true",
         split=True,
     )
-    assert parts == Components(
-        scheme="https",
-        netloc="[Filtered]:[Filtered]@example.com",
-        path="",
-        query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
-        fragment="",
+
+    expected_query = sorted(
+        "token=[Filtered]&sessionid=[Filtered]&save=[Filtered]".split("&")
     )
+    query = sorted(parts.split("&"))
+
+    assert parts.scheme == "https"
+    assert parts.netloc == "[Filtered]:[Filtered]@example.com"
+    assert query == expected_query
+    assert parts.path == ""
+    assert parts.fragment == ""
 
 
 @pytest.mark.parametrize(
