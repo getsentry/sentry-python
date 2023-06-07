@@ -1409,7 +1409,7 @@ def parse_url(url, sanitize=True):
     """
     parsed_url = sanitize_url(
         url, remove_authority=True, remove_query_values=sanitize, split=True
-    )
+    )  # type: Components
 
     base_url = urlunsplit(
         Components(
