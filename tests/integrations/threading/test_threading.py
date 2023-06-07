@@ -1,5 +1,5 @@
 import gc
-
+import sys
 from threading import Thread
 
 import pytest
@@ -121,6 +121,7 @@ def test_double_patching(sentry_init, capture_events):
         assert exception["type"] == "ZeroDivisionError"
 
 
+@pytest.mark.skipif(sys.version_info < (3, 2), reason="no __qualname__ in older python")
 def test_wrapper_attributes(sentry_init):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
@@ -141,3 +142,24 @@ def test_wrapper_attributes(sentry_init):
     assert Thread.run.__qualname__ == original_run.__qualname__
     assert t.run.__name__ == "run"
     assert t.run.__qualname__ == original_run.__qualname__
+
+
+@pytest.mark.skipif(
+    sys.version_info > (2, 7),
+    reason="simpler test for py2.7 without py3 only __qualname__",
+)
+def test_wrapper_attributes_no_qualname(sentry_init):
+    sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
+
+    def target():
+        assert t.run.__name__ == "run"
+
+    t = Thread(target=target)
+    t.start()
+    t.join()
+
+    assert Thread.start.__name__ == "start"
+    assert t.start.__name__ == "start"
+
+    assert Thread.run.__name__ == "run"
+    assert t.run.__name__ == "run"
