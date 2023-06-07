@@ -1409,19 +1409,23 @@ def parse_url(url, sanitize=True):
     """
     parsed_url = sanitize_url(
         url, remove_authority=True, remove_query_values=sanitize, split=True
-    )  # type: Components
+    )
 
     base_url = urlunsplit(
         Components(
-            scheme=parsed_url.scheme,
-            netloc=parsed_url.netloc,
+            scheme=parsed_url.scheme,  # type: ignore
+            netloc=parsed_url.netloc,  # type: ignore
             query="",
-            path=parsed_url.path,
+            path=parsed_url.path,  # type: ignore
             fragment="",
         )
     )
 
-    return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+    return ParsedUrl(
+        url=base_url,
+        query=parsed_url.query,  # type: ignore
+        fragment=parsed_url.fragment,  # type: ignore
+    )
 
 
 def is_valid_sample_rate(rate, source):
