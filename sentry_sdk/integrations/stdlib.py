@@ -84,7 +84,9 @@ def _install_httplib():
                 url,
             )
 
-        parsed_url = parse_url(real_url, sanitize=False)
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(real_url, sanitize=False)
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
@@ -92,9 +94,11 @@ def _install_httplib():
         )
 
         span.set_data(SPANDATA.HTTP_METHOD, method)
-        span.set_data("url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        if parsed_url is not None:
+            span.set_data("url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
