@@ -1,6 +1,4 @@
-import platform
 import random
-import sys
 
 import pytest
 
@@ -25,7 +23,7 @@ except ImportError:
 
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import MATCH_ALL
+from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
@@ -50,11 +48,11 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
         "url": url,
-        "method": "GET",
-        "status_code": 200,
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
     }
 
 
@@ -67,7 +65,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
-    response = urlopen(url)
+    urlopen(url)
 
     capture_message("Testing!")
 
@@ -77,16 +75,13 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
         "url": url,
-        "method": "GET",
-        "status_code": 200,
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
         "extra": "foo",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
     }
-
-    if platform.python_implementation() != "PyPy":
-        assert sys.getrefcount(response) == 2
 
 
 def test_empty_realurl(sentry_init, capture_events):
@@ -138,11 +133,11 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
         "url": "http://localhost:{}/200".format(PORT),
-        "method": "GET",
-        "status_code": 200,
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
-        "http.fragment": "",
-        "http.query": "",
+        SPANDATA.HTTP_FRAGMENT: "",
+        SPANDATA.HTTP_QUERY: "",
     }
 
 
@@ -170,7 +165,6 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
     ) as transaction:
-
         HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
 
         (request_str,) = mock_send.call_args[0]
@@ -331,7 +325,6 @@ def test_option_trace_propagation_targets(
         op="greeting.sniff",
         trace_id="12312012123120121231201212312012",
     ) as transaction:
-
         HTTPSConnection(host).request("GET", path)
 
         (request_str,) = mock_send.call_args[0]

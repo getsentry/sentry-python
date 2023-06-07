@@ -21,6 +21,15 @@ if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
 
 
+def get_name(coro):
+    # type: (Any) -> str
+    return (
+        getattr(coro, "__qualname__", None)
+        or getattr(coro, "__name__", None)
+        or "coroutine without __name__"
+    )
+
+
 def patch_asyncio():
     # type: () -> None
     orig_task_factory = None
@@ -37,7 +46,7 @@ def patch_asyncio():
                 result = None
 
                 with hub:
-                    with hub.start_span(op=OP.FUNCTION, description=coro.__qualname__):
+                    with hub.start_span(op=OP.FUNCTION, description=get_name(coro)):
                         try:
                             result = await coro
                         except Exception:
@@ -47,7 +56,7 @@ def patch_asyncio():
 
             # Trying to use user set task factory (if there is one)
             if orig_task_factory:
-                return orig_task_factory(loop, _coro_creating_hub_and_span())  # type: ignore
+                return orig_task_factory(loop, _coro_creating_hub_and_span())
 
             # The default task factory in `asyncio` does not have its own function
             # but is just a couple of lines in `asyncio.base_events.create_task()`

@@ -26,8 +26,8 @@ def _get_receiver_name(receiver):
     elif hasattr(
         receiver, "func"
     ):  # certain functions (like partials) dont have a name
-        if hasattr(receiver, "func") and hasattr(receiver.func, "__name__"):  # type: ignore
-            name = "partial(<function " + receiver.func.__name__ + ">)"  # type: ignore
+        if hasattr(receiver, "func") and hasattr(receiver.func, "__name__"):
+            name = "partial(<function " + receiver.func.__name__ + ">)"
 
     if (
         name == ""

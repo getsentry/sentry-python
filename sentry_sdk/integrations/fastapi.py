@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -116,7 +117,7 @@ def patch_get_request_handler():
                                 request_info["cookies"] = info["cookies"]
                             if "data" in info:
                                 request_info["data"] = info["data"]
-                        event["request"] = request_info
+                        event["request"] = deepcopy(request_info)
 
                         return event
 

@@ -5,22 +5,25 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import logger, nanosecond_time
+from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
+from sentry_sdk._compat import PY2
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
     import typing
 
-    from typing import Optional
     from typing import Any
     from typing import Dict
-    from typing import List
-    from typing import Tuple
     from typing import Iterator
+    from typing import List
+    from typing import Optional
+    from typing import Tuple
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, SamplingContext, MeasurementUnit
+    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
@@ -368,7 +371,10 @@ class Span(object):
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_tag("http.status_code", str(http_status))
+        self.set_tag(
+            "http.status_code", str(http_status)
+        )  # we keep this for backwards compatability
+        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
 
         if http_status < 400:
             self.set_status("ok")
@@ -629,7 +635,6 @@ class Transaction(Span):
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
-            contexts.update({"profile": self._profile.get_profile_context()})
             self._profile = None
 
         event["measurements"] = self._measurements
@@ -722,7 +727,7 @@ class Transaction(Span):
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are
         # booleans or numbers between 0 and 1.)
-        if not is_valid_sample_rate(sample_rate):
+        if not is_valid_sample_rate(sample_rate, source="Tracing"):
             logger.warning(
                 "[Tracing] Discarding {transaction_description} because of invalid sample rate.".format(
                     transaction_description=transaction_description,
@@ -780,7 +785,7 @@ class NoOpSpan(Span):
 
     def new_span(self, **kwargs):
         # type: (**Any) -> NoOpSpan
-        pass
+        return self.start_child(**kwargs)
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -803,6 +808,36 @@ class NoOpSpan(Span):
         pass
 
 
+def trace(func=None):
+    # type: (Any) -> Any
+    """
+    Decorator to start a child span under the existing current transaction.
+    If there is no current transaction, than nothing will be traced.
+
+    Usage:
+        import sentry_sdk
+
+        @sentry_sdk.trace
+        def my_function():
+            ...
+
+        @sentry_sdk.trace
+        async def my_async_function():
+            ...
+    """
+    if PY2:
+        from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
+    else:
+        from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
+
+    # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
+    # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278
+    if func:
+        return start_child_span_decorator(func)
+    else:
+        return start_child_span_decorator
+
+
 # Circular imports
 
 from sentry_sdk.tracing_utils import (
@@ -810,6 +845,5 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     extract_sentrytrace_data,
     has_tracing_enabled,
-    is_valid_sample_rate,
     maybe_create_breadcrumbs_from_span,
 )

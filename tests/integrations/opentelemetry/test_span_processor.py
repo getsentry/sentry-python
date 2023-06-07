@@ -1,7 +1,13 @@
 from datetime import datetime
-from mock import MagicMock
-import mock
 import time
+
+try:
+    from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
+except ImportError:
+    import mock
+    from mock import MagicMock  # python < 3.3
+
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
@@ -190,11 +196,10 @@ def test_update_span_with_otel_data_http_method():
 
     assert sentry_span.op == "http.client"
     assert sentry_span.description == "GET example.com /"
-    assert sentry_span._tags["http.status_code"] == "429"
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
-    assert sentry_span._data["http.status_code"] == 429
+    assert sentry_span._data["http.response.status_code"] == 429
     assert sentry_span._data["http.status_text"] == "xxx"
     assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
     assert sentry_span._data["net.peer.name"] == "example.com"
@@ -220,11 +225,10 @@ def test_update_span_with_otel_data_http_method2():
 
     assert sentry_span.op == "http.server"
     assert sentry_span.description == "GET https://example.com/status/403"
-    assert sentry_span._tags["http.status_code"] == "429"
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
-    assert sentry_span._data["http.status_code"] == 429
+    assert sentry_span._data["http.response.status_code"] == 429
     assert sentry_span._data["http.status_text"] == "xxx"
     assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
     assert (

@@ -1,5 +1,6 @@
 import pytest
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 
@@ -13,7 +14,6 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 
 @pytest.fixture(autouse=True)
 def monkeypatch_rediscluster_classes(reset_integrations):
-
     try:
         pipeline_cls = rediscluster.pipeline.ClusterPipeline
     except AttributeError:
@@ -42,6 +42,7 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
         "category": "redis",
         "message": "GET 'foobar'",
         "data": {
+            "db.operation": "GET",
             "redis.key": "foobar",
             "redis.command": "GET",
             "redis.is_cluster": True,
@@ -71,7 +72,8 @@ def test_rediscluster_pipeline(sentry_init, capture_events):
         "redis.commands": {
             "count": 3,
             "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
-        }
+        },
+        SPANDATA.DB_SYSTEM: "redis",
     }
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False

@@ -157,11 +157,11 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
 
     def check_envelope(envelope):
         with capture_internal_exceptions():
-            # Assert error events are sent without envelope to server, for compat.
-            # This does not apply if any item in the envelope is an attachment.
-            if not any(x.type == "attachment" for x in envelope.items):
-                assert not any(item.data_category == "error" for item in envelope.items)
-                assert not any(item.get_event() is not None for item in envelope.items)
+            # There used to be a check here for errors are not sent in envelopes.
+            # We changed the behaviour to send errors in envelopes when tracing is enabled.
+            # This is checked in test_client.py::test_sending_events_with_tracing
+            # and test_client.py::test_sending_events_with_no_tracing
+            pass
 
     def inner(client):
         monkeypatch.setattr(
@@ -311,20 +311,21 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         monkeypatch.setattr(test_client.transport, "capture_event", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
-        return EventStreamReader(events_r)
+        return EventStreamReader(events_r, events_w)
 
     return inner
 
 
 class EventStreamReader(object):
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, read_file, write_file):
+        self.read_file = read_file
+        self.write_file = write_file
 
     def read_event(self):
-        return json.loads(self.file.readline().decode("utf-8"))
+        return json.loads(self.read_file.readline().decode("utf-8"))
 
     def read_flush(self):
-        assert self.file.readline() == b"flush\n"
+        assert self.read_file.readline() == b"flush\n"
 
 
 # scope=session ensures that fixture is run earlier

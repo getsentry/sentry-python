@@ -1,7 +1,21 @@
 import pytest
 import re
+import sys
 
-from sentry_sdk.utils import parse_url, sanitize_url
+from sentry_sdk.utils import (
+    is_valid_sample_rate,
+    logger,
+    match_regex_list,
+    parse_url,
+    parse_version,
+    sanitize_url,
+    serialize_frame,
+)
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 @pytest.mark.parametrize(
@@ -184,3 +198,105 @@ def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragmen
     expected_query_parts = sorted(re.split(r"\&|\?|\#", expected_query))
 
     assert query_parts == expected_query_parts
+
+
+@pytest.mark.parametrize(
+    "rate",
+    [0.0, 0.1231, 1.0, True, False],
+)
+def test_accepts_valid_sample_rate(rate):
+    with mock.patch.object(logger, "warning", mock.Mock()):
+        result = is_valid_sample_rate(rate, source="Testing")
+        assert logger.warning.called is False
+        assert result is True
+
+
+@pytest.mark.parametrize(
+    "rate",
+    [
+        "dogs are great",  # wrong type
+        (0, 1),  # wrong type
+        {"Maisey": "Charllie"},  # wrong type
+        [True, True],  # wrong type
+        {0.2012},  # wrong type
+        float("NaN"),  # wrong type
+        None,  # wrong type
+        -1.121,  # wrong value
+        1.231,  # wrong value
+    ],
+)
+def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
+    with mock.patch.object(logger, "warning", mock.Mock()):
+        result = is_valid_sample_rate(rate, source="Testing")
+        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
+        assert result is False
+
+
+@pytest.mark.parametrize(
+    "include_source_context",
+    [True, False],
+)
+def test_include_source_context_when_serializing_frame(include_source_context):
+    frame = sys._getframe()
+    result = serialize_frame(frame, include_source_context=include_source_context)
+
+    assert include_source_context ^ ("pre_context" in result) ^ True
+    assert include_source_context ^ ("context_line" in result) ^ True
+    assert include_source_context ^ ("post_context" in result) ^ True
+
+
+@pytest.mark.parametrize(
+    "item,regex_list,expected_result",
+    [
+        ["", [], False],
+        [None, [], False],
+        ["", None, False],
+        [None, None, False],
+        ["some-string", [], False],
+        ["some-string", None, False],
+        ["some-string", ["some-string"], True],
+        ["some-string", ["some"], False],
+        ["some-string", ["some$"], False],  # same as above
+        ["some-string", ["some.*"], True],
+        ["some-string", ["Some"], False],  # we do case sensitive matching
+        ["some-string", [".*string$"], True],
+    ],
+)
+def test_match_regex_list(item, regex_list, expected_result):
+    assert match_regex_list(item, regex_list) == expected_result
+
+
+@pytest.mark.parametrize(
+    "version,expected_result",
+    [
+        ["3.5.15", (3, 5, 15)],
+        ["2.0.9", (2, 0, 9)],
+        ["2.0.0", (2, 0, 0)],
+        ["0.6.0", (0, 6, 0)],
+        ["2.0.0.post1", (2, 0, 0)],
+        ["2.0.0rc3", (2, 0, 0)],
+        ["2.0.0rc2", (2, 0, 0)],
+        ["2.0.0rc1", (2, 0, 0)],
+        ["2.0.0b4", (2, 0, 0)],
+        ["2.0.0b3", (2, 0, 0)],
+        ["2.0.0b2", (2, 0, 0)],
+        ["2.0.0b1", (2, 0, 0)],
+        ["0.6beta3", (0, 6)],
+        ["0.6beta2", (0, 6)],
+        ["0.6beta1", (0, 6)],
+        ["0.4.2b", (0, 4, 2)],
+        ["0.4.2a", (0, 4, 2)],
+        ["0.0.1", (0, 0, 1)],
+        ["0.0.0", (0, 0, 0)],
+        ["1", (1,)],
+        ["1.0", (1, 0)],
+        ["1.0.0", (1, 0, 0)],
+        [" 1.0.0 ", (1, 0, 0)],
+        ["  1.0.0   ", (1, 0, 0)],
+        ["x1.0.0", None],
+        ["1.0.0x", None],
+        ["x1.0.0x", None],
+    ],
+)
+def test_parse_version(version, expected_result):
+    assert parse_version(version) == expected_result
