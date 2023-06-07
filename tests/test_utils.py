@@ -78,7 +78,7 @@ def test_sanitize_url_and_split():
     expected_query = sorted(
         "token=[Filtered]&sessionid=[Filtered]&save=[Filtered]".split("&")
     )
-    query = sorted(parts.split("&"))
+    query = sorted(parts.query.split("&"))
 
     assert parts.scheme == "https"
     assert parts.netloc == "[Filtered]:[Filtered]@example.com"
