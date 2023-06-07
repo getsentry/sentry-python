@@ -295,10 +295,10 @@ def test_exclude_beat_tasks_option(
 
                 if task_in_excluded_beat_tasks:
                     # Only the original Scheduler.apply_entry() is called, _get_monitor_config is NOT called.
-                    fake_apply_entry.assert_called_once()
+                    assert fake_apply_entry.call_count == 1
                     _get_monitor_config.assert_not_called()
 
                 else:
                     # The original Scheduler.apply_entry() is called, AND _get_monitor_config is called.
-                    fake_apply_entry.assert_called_once()
-                    _get_monitor_config.assert_called_once()
+                    assert fake_apply_entry.call_count == 1
+                    assert _get_monitor_config.call_count == 1
