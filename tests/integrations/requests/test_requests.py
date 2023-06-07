@@ -28,6 +28,6 @@ def test_crumb_capture(sentry_init, capture_events):
         SPANDATA.HTTP_METHOD: "GET",
         SPANDATA.HTTP_FRAGMENT: "",
         SPANDATA.HTTP_QUERY: "",
-        "status_code": response.status_code,
+        SPANDATA.HTTP_STATUS_CODE: response.status_code,
         "reason": response.reason,
     }

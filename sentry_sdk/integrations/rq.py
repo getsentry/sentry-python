@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     format_timestamp,
+    parse_version,
 )
 
 try:
@@ -39,9 +40,9 @@ class RqIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(map(int, RQ_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
+        version = parse_version(RQ_VERSION)
+
+        if version is None:
             raise DidNotEnable("Unparsable RQ version: {}".format(RQ_VERSION))
 
         if version < (0, 6):

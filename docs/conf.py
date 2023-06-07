@@ -11,6 +11,7 @@ import sphinx.builders.latex
 import sphinx.builders.texinfo
 import sphinx.builders.text
 import sphinx.ext.autodoc
+import urllib3.exceptions
 
 typing.TYPE_CHECKING = True
 
@@ -29,7 +30,7 @@ project = "sentry-python"
 copyright = "2019, Sentry Team and Contributors"
 author = "Sentry Team and Contributors"
 
-release = "1.24.0"
+release = "1.25.0"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 
