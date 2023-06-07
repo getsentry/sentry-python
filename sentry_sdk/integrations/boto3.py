@@ -7,7 +7,7 @@ from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import parse_url
+from sentry_sdk.utils import parse_url, parse_version
 
 if TYPE_CHECKING:
     from typing import Any
@@ -30,14 +30,17 @@ class Boto3Integration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        try:
-            version = tuple(map(int, BOTOCORE_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
+
+        version = parse_version(BOTOCORE_VERSION)
+
+        if version is None:
             raise DidNotEnable(
                 "Unparsable botocore version: {}".format(BOTOCORE_VERSION)
             )
+
         if version < (1, 12):
             raise DidNotEnable("Botocore 1.12 or newer is required.")
+
         orig_init = BaseClient.__init__
 
         def sentry_patched_init(self, *args, **kwargs):

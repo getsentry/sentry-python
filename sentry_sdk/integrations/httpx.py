@@ -64,7 +64,6 @@ def _install_httpx_client():
 
             rv = real_send(self, request, **kwargs)
 
-            span.set_data("status_code", rv.status_code)
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
@@ -105,7 +104,6 @@ def _install_httpx_async_client():
 
             rv = await real_send(self, request, **kwargs)
 
-            span.set_data("status_code", rv.status_code)
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
