@@ -1,9 +1,12 @@
-import mock
-
 from sentry_sdk.tracing_utils_py2 import (
     start_child_span_decorator as start_child_span_decorator_py2,
 )
 from sentry_sdk.utils import logger
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def my_example_function():
