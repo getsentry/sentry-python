@@ -2,17 +2,22 @@ import os
 import subprocess
 import sys
 import platform
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing_utils import EnvironHeaders
-from sentry_sdk.utils import capture_internal_exceptions, logger, safe_repr
+from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    logger,
+    safe_repr,
+    parse_url,
+)
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -79,22 +84,28 @@ def _install_httplib():
                 url,
             )
 
+        parsed_url = parse_url(real_url, sanitize=False)
+
         span = hub.start_span(
-            op=OP.HTTP_CLIENT, description="%s %s" % (method, real_url)
+            op=OP.HTTP_CLIENT,
+            description="%s %s" % (method, parsed_url.url),
         )
 
-        span.set_data("method", method)
-        span.set_data("url", real_url)
+        span.set_data(SPANDATA.HTTP_METHOD, method)
+        span.set_data("url", parsed_url.url)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        for key, value in hub.iter_trace_propagation_headers(span):
-            logger.debug(
-                "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
-                    key=key, value=value, real_url=real_url
+        if should_propagate_trace(hub, real_url):
+            for key, value in hub.iter_trace_propagation_headers(span):
+                logger.debug(
+                    "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
+                        key=key, value=value, real_url=real_url
+                    )
                 )
-            )
-            self.putheader(key, value)
+                self.putheader(key, value)
 
         self._sentrysdk_span = span
 
@@ -109,7 +120,6 @@ def _install_httplib():
 
         rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_data("status_code", rv.status)
         span.set_http_status(int(rv.status))
         span.set_data("reason", rv.reason)
         span.finish()

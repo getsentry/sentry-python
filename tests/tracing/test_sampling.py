@@ -4,7 +4,6 @@ import pytest
 
 from sentry_sdk import Hub, start_span, start_transaction
 from sentry_sdk.tracing import Transaction
-from sentry_sdk.tracing_utils import is_valid_sample_rate
 from sentry_sdk.utils import logger
 
 try:
@@ -51,38 +50,6 @@ def test_no_double_sampling(sentry_init, capture_events):
     assert len(events) == 1
 
 
-@pytest.mark.parametrize(
-    "rate",
-    [0.0, 0.1231, 1.0, True, False],
-)
-def test_accepts_valid_sample_rate(rate):
-    with mock.patch.object(logger, "warning", mock.Mock()):
-        result = is_valid_sample_rate(rate)
-        assert logger.warning.called is False
-        assert result is True
-
-
-@pytest.mark.parametrize(
-    "rate",
-    [
-        "dogs are great",  # wrong type
-        (0, 1),  # wrong type
-        {"Maisey": "Charllie"},  # wrong type
-        [True, True],  # wrong type
-        {0.2012},  # wrong type
-        float("NaN"),  # wrong type
-        None,  # wrong type
-        -1.121,  # wrong value
-        1.231,  # wrong value
-    ],
-)
-def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
-    with mock.patch.object(logger, "warning", mock.Mock()):
-        result = is_valid_sample_rate(rate)
-        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
-        assert result is False
-
-
 @pytest.mark.parametrize("sampling_decision", [True, False])
 def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
     sentry_init, sampling_decision
@@ -109,7 +76,6 @@ def test_uses_traces_sample_rate_correctly(
     sentry_init(traces_sample_rate=traces_sample_rate)
 
     with mock.patch.object(random, "random", return_value=0.5):
-
         transaction = start_transaction(name="dogpark")
         assert transaction.sampled is expected_decision
 
@@ -126,7 +92,6 @@ def test_uses_traces_sampler_return_value_correctly(
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
     with mock.patch.object(random, "random", return_value=0.5):
-
         transaction = start_transaction(name="dogpark")
         assert transaction.sampled is expected_decision
 

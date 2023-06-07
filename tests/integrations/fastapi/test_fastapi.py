@@ -1,13 +1,22 @@
+import json
+import logging
+import threading
+
 import pytest
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 fastapi = pytest.importorskip("fastapi")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def fastapi_app_factory():
@@ -22,6 +31,20 @@ def fastapi_app_factory():
     async def _message_with_id(message_id):
         capture_message("Hi")
         return {"message": "Hi"}
+
+    @app.get("/sync/thread_ids")
+    def _thread_ids_sync():
+        return {
+            "main": str(threading.main_thread().ident),
+            "active": str(threading.current_thread().ident),
+        }
+
+    @app.get("/async/thread_ids")
+    async def _thread_ids_async():
+        return {
+            "main": str(threading.main_thread().ident),
+            "active": str(threading.current_thread().ident),
+        }
 
     return app
 
@@ -135,3 +158,63 @@ def test_legacy_setup(
 
     (event,) = events
     assert event["transaction"] == "/message/{message_id}"
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+    app = fastapi_app_factory()
+    asgi_app = SentryAsgiMiddleware(app)
+
+    envelopes = capture_envelopes()
+
+    client = TestClient(asgi_app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    data = json.loads(response.content)
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1
+
+    for profile in profiles:
+        transactions = profile.payload.json["transactions"]
+        assert len(transactions) == 1
+        assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+
+@pytest.mark.asyncio
+async def test_original_request_not_scrubbed(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    app = FastAPI()
+
+    @app.post("/error")
+    async def _error(request: Request):
+        logging.critical("Oh no!")
+        assert request.headers["Authorization"] == "Bearer ohno"
+        assert await request.json() == {"password": "secret"}
+
+        return {"error": "Oh no!"}
+
+    events = capture_events()
+
+    client = TestClient(app)
+    client.post(
+        "/error", json={"password": "secret"}, headers={"Authorization": "Bearer ohno"}
+    )
+
+    event = events[0]
+    assert event["request"]["data"] == {"password": "[Filtered]"}
+    assert event["request"]["headers"]["authorization"] == "[Filtered]"

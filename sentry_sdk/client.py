@@ -1,3 +1,4 @@
+from importlib import import_module
 import os
 import uuid
 import random
@@ -17,6 +18,7 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
+from sentry_sdk.tracing import trace, has_tracing_enabled
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_OPTIONS,
@@ -28,16 +30,17 @@ from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import setup_profiler
-from sentry_sdk.tracing_utils import has_tracestate_enabled, reinflate_tracestate
+from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.scrubber import EventScrubber
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
     from typing import Optional
+    from typing import Sequence
 
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
@@ -72,7 +75,18 @@ def _get_options(*args, **kwargs):
 
     for key, value in iteritems(options):
         if key not in rv:
+            # Option "with_locals" was renamed to "include_local_variables"
+            if key == "with_locals":
+                msg = (
+                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
+                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+                )
+                logger.warning(msg)
+                rv["include_local_variables"] = value
+                continue
+
             raise TypeError("Unknown option %r" % (key,))
+
         rv[key] = value
 
     if rv["dsn"] is None:
@@ -90,7 +104,29 @@ def _get_options(*args, **kwargs):
     if rv["instrumenter"] is None:
         rv["instrumenter"] = INSTRUMENTER.SENTRY
 
+    if rv["project_root"] is None:
+        try:
+            project_root = os.getcwd()
+        except Exception:
+            project_root = None
+
+        rv["project_root"] = project_root
+
+    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
+        rv["traces_sample_rate"] = 1.0
+
+    if rv["event_scrubber"] is None:
+        rv["event_scrubber"] = EventScrubber()
+
     return rv
+
+
+try:
+    # Python 3.6+
+    module_not_found_error = ModuleNotFoundError
+except Exception:
+    # Older Python versions
+    module_not_found_error = ImportError  # type: ignore
 
 
 class _Client(object):
@@ -103,6 +139,7 @@ class _Client(object):
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
+
         self._init_impl()
 
     def __getstate__(self):
@@ -113,6 +150,52 @@ class _Client(object):
         # type: (Any) -> None
         self.options = state["options"]
         self._init_impl()
+
+    def _setup_instrumentation(self, functions_to_trace):
+        # type: (Sequence[Dict[str, str]]) -> None
+        """
+        Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
+        """
+        for function in functions_to_trace:
+            class_name = None
+            function_qualname = function["qualified_name"]
+            module_name, function_name = function_qualname.rsplit(".", 1)
+
+            try:
+                # Try to import module and function
+                # ex: "mymodule.submodule.funcname"
+
+                module_obj = import_module(module_name)
+                function_obj = getattr(module_obj, function_name)
+                setattr(module_obj, function_name, trace(function_obj))
+                logger.debug("Enabled tracing for %s", function_qualname)
+
+            except module_not_found_error:
+                try:
+                    # Try to import a class
+                    # ex: "mymodule.submodule.MyClassName.member_function"
+
+                    module_name, class_name = module_name.rsplit(".", 1)
+                    module_obj = import_module(module_name)
+                    class_obj = getattr(module_obj, class_name)
+                    function_obj = getattr(class_obj, function_name)
+                    setattr(class_obj, function_name, trace(function_obj))
+                    setattr(module_obj, class_name, class_obj)
+                    logger.debug("Enabled tracing for %s", function_qualname)
+
+                except Exception as e:
+                    logger.warning(
+                        "Can not enable tracing for '%s'. (%s) Please check your `functions_to_trace` parameter.",
+                        function_qualname,
+                        e,
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    "Can not enable tracing for '%s'. (%s) Please check your `functions_to_trace` parameter.",
+                    function_qualname,
+                    e,
+                )
 
     def _init_impl(self):
         # type: () -> None
@@ -152,12 +235,13 @@ class _Client(object):
         finally:
             _client_init_debug.set(old_debug)
 
-        profiles_sample_rate = self.options["_experiments"].get("profiles_sample_rate")
-        if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        if has_profiling_enabled(self.options):
             try:
                 setup_profiler(self.options)
             except ValueError as e:
                 logger.debug(str(e))
+
+        self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
     @property
     def dsn(self):
@@ -202,7 +286,7 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["with_locals"]
+                                self.options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,
@@ -222,29 +306,53 @@ class _Client(object):
             event["platform"] = "python"
 
         event = handle_in_app(
-            event, self.options["in_app_exclude"], self.options["in_app_include"]
+            event,
+            self.options["in_app_exclude"],
+            self.options["in_app_include"],
+            self.options["project_root"],
         )
+
+        if event is not None:
+            event_scrubber = self.options["event_scrubber"]
+            if event_scrubber and not self.options["send_default_pii"]:
+                event_scrubber.scrub_event(event)
 
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(
-                event,
-                smart_transaction_trimming=self.options["_experiments"].get(
-                    "smart_transaction_trimming"
-                ),
-            )
+            event = serialize(event, request_bodies=self.options.get("request_bodies"))
 
         before_send = self.options["before_send"]
-        if before_send is not None and event.get("type") != "transaction":
+        if (
+            before_send is not None
+            and event is not None
+            and event.get("type") != "transaction"
+        ):
             new_event = None
             with capture_internal_exceptions():
                 new_event = before_send(event, hint or {})
             if new_event is None:
-                logger.info("before send dropped event (%s)", event)
+                logger.info("before send dropped event")
                 if self.transport:
                     self.transport.record_lost_event(
                         "before_send", data_category="error"
+                    )
+            event = new_event  # type: ignore
+
+        before_send_transaction = self.options["before_send_transaction"]
+        if (
+            before_send_transaction is not None
+            and event is not None
+            and event.get("type") == "transaction"
+        ):
+            new_event = None
+            with capture_internal_exceptions():
+                new_event = before_send_transaction(event, hint or {})
+            if new_event is None:
+                logger.info("before send transaction dropped event")
+                if self.transport:
+                    self.transport.record_lost_event(
+                        "before_send", data_category="transaction"
                     )
             event = new_event  # type: ignore
 
@@ -336,7 +444,7 @@ class _Client(object):
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for (k, v) in iteritems(headers or {}):
+            for k, v in iteritems(headers or {}):
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
@@ -395,14 +503,9 @@ class _Client(object):
         if not is_transaction and not self._should_sample_error(event):
             return None
 
+        tracing_enabled = has_tracing_enabled(self.options)
+        is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
-
-        # this is outside of the `if` immediately below because even if we don't
-        # use the value, we want to make sure we remove it before the event is
-        # sent
-        raw_tracestate = (
-            event_opt.get("contexts", {}).get("trace", {}).pop("tracestate", "")
-        )
 
         dynamic_sampling_context = (
             event_opt.get("contexts", {})
@@ -410,42 +513,40 @@ class _Client(object):
             .pop("dynamic_sampling_context", {})
         )
 
-        # Transactions or events with attachments should go to the /envelope/
-        # endpoint.
-        if is_transaction or attachments:
-
+        # If tracing is enabled all events should go to /envelope endpoint.
+        # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
+        should_use_envelope_endpoint = (
+            tracing_enabled or is_transaction or is_checkin or bool(attachments)
+        )
+        if should_use_envelope_endpoint:
             headers = {
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime.utcnow()),
             }
 
-            if has_tracestate_enabled():
-                tracestate_data = raw_tracestate and reinflate_tracestate(
-                    raw_tracestate.replace("sentry=", "")
-                )
-
-                if tracestate_data:
-                    headers["trace"] = tracestate_data
-            elif dynamic_sampling_context:
+            if dynamic_sampling_context:
                 headers["trace"] = dynamic_sampling_context
 
             envelope = Envelope(headers=headers)
 
             if is_transaction:
                 if profile is not None:
-                    envelope.add_profile(
-                        profile.to_json(event_opt, self.options, scope)
-                    )
+                    envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
+            elif is_checkin:
+                envelope.add_checkin(event_opt)
             else:
                 envelope.add_event(event_opt)
 
             for attachment in attachments or ():
                 envelope.add_item(attachment.to_envelope_item())
+
             self.transport.capture_envelope(envelope)
+
         else:
-            # All other events go to the /store/ endpoint.
+            # All other events go to the legacy /store/ endpoint (will be removed in the future).
             self.transport.capture_event(event_opt)
+
         return event_id
 
     def capture_session(
@@ -501,9 +602,9 @@ class _Client(object):
         self.close()
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.
     #

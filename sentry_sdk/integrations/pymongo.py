@@ -2,19 +2,20 @@ from __future__ import absolute_import
 import copy
 
 from sentry_sdk import Hub
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from pymongo import monitoring
 except ImportError:
     raise DidNotEnable("Pymongo not installed")
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Dict, Union
 
     from pymongo.monitoring import (
@@ -109,8 +110,8 @@ class CommandTracer(monitoring.CommandListener):
 
             tags = {
                 "db.name": event.database_name,
-                "db.system": "mongodb",
-                "db.operation": event.command_name,
+                SPANDATA.DB_SYSTEM: "mongodb",
+                SPANDATA.DB_OPERATION: event.command_name,
             }
 
             try:
@@ -119,10 +120,11 @@ class CommandTracer(monitoring.CommandListener):
             except TypeError:
                 pass
 
-            data = {"operation_ids": {}}  # type: Dict[str, Dict[str, Any]]
+            data = {"operation_ids": {}}  # type: Dict[str, Any]
 
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
+            data[SPANDATA.DB_SYSTEM] = "mongodb"
 
             try:
                 lsid = command.pop("lsid")["id"]

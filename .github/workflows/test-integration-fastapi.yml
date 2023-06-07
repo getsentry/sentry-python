@@ -26,12 +26,12 @@ jobs:
   test:
     name: fastapi, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.8","3.9","3.10"]
+        python-version: ["3.7","3.8","3.9","3.10","3.11"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -46,19 +46,28 @@ jobs:
 
       - name: Setup Test Env
         run: |
-          pip install codecov "tox>=3,<4"
+          pip install coverage "tox>=3,<4"
 
       - name: Test fastapi
-        timeout-minutes: 45
-        shell: bash
-        run: |
-          set -x # print commands that are executed
-          coverage erase
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          retry_wait_seconds: 5
+          shell: bash
+          command: |
+            set -x # print commands that are executed
+            coverage erase
 
-          ./scripts/runtox.sh "${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
-          coverage xml -i
-          codecov --file coverage.xml
+            # Run tests
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            coverage combine .coverage* &&
+            coverage xml -i
+
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
 
   check_required_tests:
     name: All fastapi tests passed or skipped

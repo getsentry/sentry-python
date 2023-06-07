@@ -5,7 +5,7 @@ from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import event_from_exception
 
 try:
@@ -15,10 +15,19 @@ except ImportError:
     raise DidNotEnable("asyncio not available")
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
     from sentry_sdk._types import ExcInfo
+
+
+def get_name(coro):
+    # type: (Any) -> str
+    return (
+        getattr(coro, "__qualname__", None)
+        or getattr(coro, "__name__", None)
+        or "coroutine without __name__"
+    )
 
 
 def patch_asyncio():
@@ -32,18 +41,22 @@ def patch_asyncio():
             # type: (Any, Any) -> Any
 
             async def _coro_creating_hub_and_span():
-                # type: () -> None
+                # type: () -> Any
                 hub = Hub(Hub.current)
+                result = None
+
                 with hub:
-                    with hub.start_span(op=OP.FUNCTION, description=coro.__qualname__):
+                    with hub.start_span(op=OP.FUNCTION, description=get_name(coro)):
                         try:
-                            await coro
+                            result = await coro
                         except Exception:
                             reraise(*_capture_exception(hub))
 
+                return result
+
             # Trying to use user set task factory (if there is one)
             if orig_task_factory:
-                return orig_task_factory(loop, _coro_creating_hub_and_span())  # type: ignore
+                return orig_task_factory(loop, _coro_creating_hub_and_span())
 
             # The default task factory in `asyncio` does not have its own function
             # but is just a couple of lines in `asyncio.base_events.create_task()`

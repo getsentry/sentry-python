@@ -1,73 +1,81 @@
 """
-This file is originally based on code from https://github.com/nylas/nylas-perftools, which is published under the following license:
+This file is originally based on code from https://github.com/nylas/nylas-perftools,
+which is published under the following license:
 
 The MIT License (MIT)
 
 Copyright (c) 2014 Nylas
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
 import atexit
 import os
 import platform
 import random
-import signal
 import sys
 import threading
 import time
 import uuid
-from collections import deque, namedtuple
-from contextlib import contextmanager
+from collections import deque
 
 import sentry_sdk
-from sentry_sdk._compat import PY33
-from sentry_sdk._queue import Queue
-from sentry_sdk._types import MYPY
+from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
+    capture_internal_exception,
     filename_for_module,
-    handle_in_app_impl,
+    is_valid_sample_rate,
     logger,
     nanosecond_time,
+    set_in_app_in_frames,
 )
 
-RawFrameData = namedtuple(
-    "RawFrameData", ["abs_path", "filename", "function", "lineno", "module"]
-)
-
-if MYPY:
+if TYPE_CHECKING:
     from types import FrameType
     from typing import Any
     from typing import Callable
     from typing import Deque
     from typing import Dict
-    from typing import Generator
     from typing import List
     from typing import Optional
+    from typing import Set
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
-    import sentry_sdk.scope
+
     import sentry_sdk.tracing
+    from sentry_sdk._types import SamplingContext, ProfilerMode
 
-    RawStack = Tuple[RawFrameData, ...]
-    RawSample = Sequence[Tuple[str, RawStack]]
-    RawSampleWithId = Sequence[Tuple[str, int, RawStack]]
-
-    ProcessedStack = Tuple[int, ...]
+    ThreadId = str
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
         {
             "elapsed_since_start_ns": str,
-            "thread_id": str,
+            "thread_id": ThreadId,
             "stack_id": int,
         },
     )
+
+    ProcessedStack = List[int]
 
     ProcessedFrame = TypedDict(
         "ProcessedFrame",
@@ -91,53 +99,137 @@ if MYPY:
             "frames": List[ProcessedFrame],
             "stacks": List[ProcessedStack],
             "samples": List[ProcessedSample],
-            "thread_metadata": Dict[str, ProcessedThreadMetadata],
+            "thread_metadata": Dict[ThreadId, ProcessedThreadMetadata],
         },
     )
+
+    ProfileContext = TypedDict(
+        "ProfileContext",
+        {"profile_id": str},
+    )
+
+    FrameId = Tuple[
+        str,  # abs_path
+        int,  # lineno
+    ]
+    FrameIds = Tuple[FrameId, ...]
+
+    # The exact value of this id is not very meaningful. The purpose
+    # of this id is to give us a compact and unique identifier for a
+    # raw stack that can be used as a key to a dictionary so that it
+    # can be used during the sampled format generation.
+    StackId = Tuple[int, int]
+
+    ExtractedStack = Tuple[StackId, FrameIds, List[ProcessedFrame]]
+    ExtractedSample = Sequence[Tuple[ThreadId, ExtractedStack]]
+
+
+try:
+    from gevent import get_hub as get_gevent_hub  # type: ignore
+    from gevent.monkey import get_original, is_module_patched  # type: ignore
+    from gevent.threadpool import ThreadPool  # type: ignore
+
+    thread_sleep = get_original("time", "sleep")
+except ImportError:
+
+    def get_gevent_hub():
+        # type: () -> Any
+        return None
+
+    thread_sleep = time.sleep
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
+
+    ThreadPool = None
+
+
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")
 
 
 _scheduler = None  # type: Optional[Scheduler]
 
+# The default sampling frequency to use. This is set at 101 in order to
+# mitigate the effects of lockstep sampling.
+DEFAULT_SAMPLING_FREQUENCY = 101
+
+
+# The minimum number of unique samples that must exist in a profile to be
+# considered valid.
+PROFILE_MINIMUM_SAMPLES = 2
+
+
+def has_profiling_enabled(options):
+    # type: (Dict[str, Any]) -> bool
+    profiles_sampler = options["profiles_sampler"]
+    if profiles_sampler is not None:
+        return True
+
+    profiles_sample_rate = options["profiles_sample_rate"]
+    if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        return True
+
+    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
+    if profiles_sample_rate is not None and profiles_sample_rate > 0:
+        return True
+
+    return False
+
 
 def setup_profiler(options):
-    # type: (Dict[str, Any]) -> None
-
-    """
-    `buffer_secs` determines the max time a sample will be buffered for
-    `frequency` determines the number of samples to take per second (Hz)
-    """
-
+    # type: (Dict[str, Any]) -> bool
     global _scheduler
 
     if _scheduler is not None:
-        logger.debug("profiling is already setup")
-        return
+        logger.debug("[Profiling] Profiler is already setup")
+        return False
 
     if not PY33:
-        logger.warn("profiling is only supported on Python >= 3.3")
-        return
+        logger.warn("[Profiling] Profiler requires Python >= 3.3")
+        return False
 
-    buffer_secs = 30
-    frequency = 101
+    frequency = DEFAULT_SAMPLING_FREQUENCY
 
-    # To buffer samples for `buffer_secs` at `frequency` Hz, we need
-    # a capcity of `buffer_secs * frequency`.
-    buffer = SampleBuffer(capacity=buffer_secs * frequency)
+    if is_gevent():
+        # If gevent has patched the threading modules then we cannot rely on
+        # them to spawn a native thread for sampling.
+        # Instead we default to the GeventScheduler which is capable of
+        # spawning native threads within gevent.
+        default_profiler_mode = GeventScheduler.mode
+    else:
+        default_profiler_mode = ThreadScheduler.mode
 
-    profiler_mode = options["_experiments"].get("profiler_mode", SleepScheduler.mode)
-    if profiler_mode == SigprofScheduler.mode:
-        _scheduler = SigprofScheduler(sample_buffer=buffer, frequency=frequency)
-    elif profiler_mode == SigalrmScheduler.mode:
-        _scheduler = SigalrmScheduler(sample_buffer=buffer, frequency=frequency)
-    elif profiler_mode == SleepScheduler.mode:
-        _scheduler = SleepScheduler(sample_buffer=buffer, frequency=frequency)
-    elif profiler_mode == EventScheduler.mode:
-        _scheduler = EventScheduler(sample_buffer=buffer, frequency=frequency)
+    if options.get("profiler_mode") is not None:
+        profiler_mode = options["profiler_mode"]
+    else:
+        profiler_mode = (
+            options.get("_experiments", {}).get("profiler_mode")
+            or default_profiler_mode
+        )
+
+    if (
+        profiler_mode == ThreadScheduler.mode
+        # for legacy reasons, we'll keep supporting sleep mode for this scheduler
+        or profiler_mode == "sleep"
+    ):
+        _scheduler = ThreadScheduler(frequency=frequency)
+    elif profiler_mode == GeventScheduler.mode:
+        _scheduler = GeventScheduler(frequency=frequency)
     else:
         raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
+
+    logger.debug(
+        "[Profiling] Setting up profiler in {mode} mode".format(mode=_scheduler.mode)
+    )
     _scheduler.setup()
 
     atexit.register(teardown_profiler)
+
+    return True
 
 
 def teardown_profiler():
@@ -155,8 +247,16 @@ def teardown_profiler():
 MAX_STACK_DEPTH = 128
 
 
-def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
-    # type: (Optional[FrameType], int) -> Tuple[RawFrameData, ...]
+CWD = os.getcwd()
+
+
+def extract_stack(
+    raw_frame,  # type: Optional[FrameType]
+    cache,  # type: LRUCache
+    cwd=CWD,  # type: str
+    max_stack_depth=MAX_STACK_DEPTH,  # type: int
+):
+    # type: (...) -> ExtractedStack
     """
     Extracts the stack starting the specified frame. The extracted stack
     assumes the specified frame is the top of the stack, and works back
@@ -166,17 +266,45 @@ def extract_stack(frame, max_stack_depth=MAX_STACK_DEPTH):
     only the first `MAX_STACK_DEPTH` frames will be returned.
     """
 
-    stack = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
+    raw_frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
 
-    while frame is not None:
-        stack.append(frame)
-        frame = frame.f_back
+    while raw_frame is not None:
+        f_back = raw_frame.f_back
+        raw_frames.append(raw_frame)
+        raw_frame = f_back
 
-    return tuple(extract_frame(frame) for frame in stack)
+    frame_ids = tuple(frame_id(raw_frame) for raw_frame in raw_frames)
+    frames = []
+    for i, fid in enumerate(frame_ids):
+        frame = cache.get(fid)
+        if frame is None:
+            frame = extract_frame(raw_frames[i], cwd)
+            cache.set(fid, frame)
+        frames.append(frame)
+
+    # Instead of mapping the stack into frame ids and hashing
+    # that as a tuple, we can directly hash the stack.
+    # This saves us from having to generate yet another list.
+    # Additionally, using the stack as the key directly is
+    # costly because the stack can be large, so we pre-hash
+    # the stack, and use the hash as the key as this will be
+    # needed a few times to improve performance.
+    #
+    # To Reduce the likelihood of hash collisions, we include
+    # the stack depth. This means that only stacks of the same
+    # depth can suffer from hash collisions.
+    stack_id = len(raw_frames), hash(frame_ids)
+
+    return stack_id, frame_ids, frames
 
 
-def extract_frame(frame):
-    # type: (FrameType) -> RawFrameData
+def frame_id(raw_frame):
+    # type: (FrameType) -> FrameId
+    return (raw_frame.f_code.co_filename, raw_frame.f_lineno)
+
+
+def extract_frame(frame, cwd):
+    # type: (FrameType, str) -> ProcessedFrame
     abs_path = frame.f_code.co_filename
 
     try:
@@ -184,113 +312,386 @@ def extract_frame(frame):
     except Exception:
         module = None
 
-    return RawFrameData(
-        abs_path=os.path.abspath(abs_path),
-        filename=filename_for_module(module, abs_path) or None,
-        function=get_frame_name(frame),
-        lineno=frame.f_lineno,
-        module=module,
-    )
+    # namedtuples can be many times slower when initialing
+    # and accessing attribute so we opt to use a tuple here instead
+    return {
+        # This originally was `os.path.abspath(abs_path)` but that had
+        # a large performance overhead.
+        #
+        # According to docs, this is equivalent to
+        # `os.path.normpath(os.path.join(os.getcwd(), path))`.
+        # The `os.getcwd()` call is slow here, so we precompute it.
+        #
+        # Additionally, since we are using normalized path already,
+        # we skip calling `os.path.normpath` entirely.
+        "abs_path": os.path.join(cwd, abs_path),
+        "module": module,
+        "filename": filename_for_module(module, abs_path) or None,
+        "function": get_frame_name(frame),
+        "lineno": frame.f_lineno,
+    }
 
 
-def get_frame_name(frame):
-    # type: (FrameType) -> str
+if PY311:
 
-    # in 3.11+, there is a frame.f_code.co_qualname that
-    # we should consider using instead where possible
+    def get_frame_name(frame):
+        # type: (FrameType) -> str
+        return frame.f_code.co_qualname
 
-    f_code = frame.f_code
-    # co_name only contains the frame name.  If the frame was a method,
-    # the class name will NOT be included.
-    name = f_code.co_name
+else:
 
-    # if it was a method, we can get the class name by inspecting
-    # the f_locals for the `self` argument
+    def get_frame_name(frame):
+        # type: (FrameType) -> str
+
+        f_code = frame.f_code
+        co_varnames = f_code.co_varnames
+
+        # co_name only contains the frame name.  If the frame was a method,
+        # the class name will NOT be included.
+        name = f_code.co_name
+
+        # if it was a method, we can get the class name by inspecting
+        # the f_locals for the `self` argument
+        try:
+            if (
+                # the co_varnames start with the frame's positional arguments
+                # and we expect the first to be `self` if its an instance method
+                co_varnames
+                and co_varnames[0] == "self"
+                and "self" in frame.f_locals
+            ):
+                for cls in frame.f_locals["self"].__class__.__mro__:
+                    if name in cls.__dict__:
+                        return "{}.{}".format(cls.__name__, name)
+        except AttributeError:
+            pass
+
+        # if it was a class method, (decorated with `@classmethod`)
+        # we can get the class name by inspecting the f_locals for the `cls` argument
+        try:
+            if (
+                # the co_varnames start with the frame's positional arguments
+                # and we expect the first to be `cls` if its a class method
+                co_varnames
+                and co_varnames[0] == "cls"
+                and "cls" in frame.f_locals
+            ):
+                for cls in frame.f_locals["cls"].__mro__:
+                    if name in cls.__dict__:
+                        return "{}.{}".format(cls.__name__, name)
+        except AttributeError:
+            pass
+
+        # nothing we can do if it is a staticmethod (decorated with @staticmethod)
+
+        # we've done all we can, time to give up and return what we have
+        return name
+
+
+MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
+
+
+def get_current_thread_id(thread=None):
+    # type: (Optional[threading.Thread]) -> Optional[int]
+    """
+    Try to get the id of the current thread, with various fall backs.
+    """
+
+    # if a thread is specified, that takes priority
+    if thread is not None:
+        try:
+            thread_id = thread.ident
+            if thread_id is not None:
+                return thread_id
+        except AttributeError:
+            pass
+
+    # if the app is using gevent, we should look at the gevent hub first
+    # as the id there differs from what the threading module reports
+    if is_gevent():
+        gevent_hub = get_gevent_hub()
+        if gevent_hub is not None:
+            try:
+                # this is undocumented, so wrap it in try except to be safe
+                return gevent_hub.thread_ident
+            except AttributeError:
+                pass
+
+    # use the current thread's id if possible
     try:
-        if (
-            # the co_varnames start with the frame's positional arguments
-            # and we expect the first to be `self` if its an instance method
-            f_code.co_varnames
-            and f_code.co_varnames[0] == "self"
-            and "self" in frame.f_locals
-        ):
-            for cls in frame.f_locals["self"].__class__.__mro__:
-                if name in cls.__dict__:
-                    return "{}.{}".format(cls.__name__, name)
+        current_thread_id = threading.current_thread().ident
+        if current_thread_id is not None:
+            return current_thread_id
     except AttributeError:
         pass
 
-    # if it was a class method, (decorated with `@classmethod`)
-    # we can get the class name by inspecting the f_locals for the `cls` argument
+    # if we can't get the current thread id, fall back to the main thread id
     try:
-        if (
-            # the co_varnames start with the frame's positional arguments
-            # and we expect the first to be `cls` if its a class method
-            f_code.co_varnames
-            and f_code.co_varnames[0] == "cls"
-            and "cls" in frame.f_locals
-        ):
-            for cls in frame.f_locals["cls"].__mro__:
-                if name in cls.__dict__:
-                    return "{}.{}".format(cls.__name__, name)
+        main_thread_id = threading.main_thread().ident
+        if main_thread_id is not None:
+            return main_thread_id
     except AttributeError:
         pass
 
-    # nothing we can do if it is a staticmethod (decorated with @staticmethod)
-
-    # we've done all we can, time to give up and return what we have
-    return name
+    # we've tried everything, time to give up
+    return None
 
 
 class Profile(object):
     def __init__(
         self,
-        scheduler,  # type: Scheduler
         transaction,  # type: sentry_sdk.tracing.Transaction
         hub=None,  # type: Optional[sentry_sdk.Hub]
+        scheduler=None,  # type: Optional[Scheduler]
     ):
         # type: (...) -> None
-        self.scheduler = scheduler
-        self.transaction = transaction
+        self.scheduler = _scheduler if scheduler is None else scheduler
         self.hub = hub
-        self._start_ns = None  # type: Optional[int]
-        self._stop_ns = None  # type: Optional[int]
+
+        self.event_id = uuid.uuid4().hex  # type: str
+
+        # Here, we assume that the sampling decision on the transaction has been finalized.
+        #
+        # We cannot keep a reference to the transaction around here because it'll create
+        # a reference cycle. So we opt to pull out just the necessary attributes.
+        self.sampled = transaction.sampled  # type: Optional[bool]
+
+        # Various framework integrations are capable of overwriting the active thread id.
+        # If it is set to `None` at the end of the profile, we fall back to the default.
+        self._default_active_thread_id = get_current_thread_id() or 0  # type: int
+        self.active_thread_id = None  # type: Optional[int]
+
+        try:
+            self.start_ns = transaction._start_timestamp_monotonic_ns  # type: int
+        except AttributeError:
+            self.start_ns = 0
+
+        self.stop_ns = 0  # type: int
+        self.active = False  # type: bool
+
+        self.indexed_frames = {}  # type: Dict[FrameId, int]
+        self.indexed_stacks = {}  # type: Dict[StackId, int]
+        self.frames = []  # type: List[ProcessedFrame]
+        self.stacks = []  # type: List[ProcessedStack]
+        self.samples = []  # type: List[ProcessedSample]
+
+        self.unique_samples = 0
 
         transaction._profile = self
 
-    def __enter__(self):
+    def update_active_thread_id(self):
         # type: () -> None
-        self._start_ns = nanosecond_time()
-        self.scheduler.start_profiling()
+        self.active_thread_id = get_current_thread_id()
+        logger.debug(
+            "[Profiling] updating active thread id to {tid}".format(
+                tid=self.active_thread_id
+            )
+        )
+
+    def _set_initial_sampling_decision(self, sampling_context):
+        # type: (SamplingContext) -> None
+        """
+        Sets the profile's sampling decision according to the following
+        precdence rules:
+
+        1. If the transaction to be profiled is not sampled, that decision
+        will be used, regardless of anything else.
+
+        2. Use `profiles_sample_rate` to decide.
+        """
+
+        # The corresponding transaction was not sampled,
+        # so don't generate a profile for it.
+        if not self.sampled:
+            logger.debug(
+                "[Profiling] Discarding profile because transaction is discarded."
+            )
+            self.sampled = False
+            return
+
+        # The profiler hasn't been properly initialized.
+        if self.scheduler is None:
+            logger.debug(
+                "[Profiling] Discarding profile because profiler was not started."
+            )
+            self.sampled = False
+            return
+
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+
+        # The client is None, so we can't get the sample rate.
+        if client is None:
+            self.sampled = False
+            return
+
+        options = client.options
+
+        if callable(options.get("profiles_sampler")):
+            sample_rate = options["profiles_sampler"](sampling_context)
+        elif options["profiles_sample_rate"] is not None:
+            sample_rate = options["profiles_sample_rate"]
+        else:
+            sample_rate = options["_experiments"].get("profiles_sample_rate")
+
+        # The profiles_sample_rate option was not set, so profiling
+        # was never enabled.
+        if sample_rate is None:
+            logger.debug(
+                "[Profiling] Discarding profile because profiling was not enabled."
+            )
+            self.sampled = False
+            return
+
+        if not is_valid_sample_rate(sample_rate, source="Profiling"):
+            logger.warning(
+                "[Profiling] Discarding profile because of invalid sample rate."
+            )
+            self.sampled = False
+            return
+
+        # Now we roll the dice. random.random is inclusive of 0, but not of 1,
+        # so strict < is safe here. In case sample_rate is a boolean, cast it
+        # to a float (True becomes 1.0 and False becomes 0.0)
+        self.sampled = random.random() < float(sample_rate)
+
+        if self.sampled:
+            logger.debug("[Profiling] Initializing profile")
+        else:
+            logger.debug(
+                "[Profiling] Discarding profile because it's not included in the random sample (sample rate = {sample_rate})".format(
+                    sample_rate=float(sample_rate)
+                )
+            )
+
+    def start(self):
+        # type: () -> None
+        if not self.sampled or self.active:
+            return
+
+        assert self.scheduler, "No scheduler specified"
+        logger.debug("[Profiling] Starting profile")
+        self.active = True
+        if not self.start_ns:
+            self.start_ns = nanosecond_time()
+        self.scheduler.start_profiling(self)
+
+    def stop(self):
+        # type: () -> None
+        if not self.sampled or not self.active:
+            return
+
+        assert self.scheduler, "No scheduler specified"
+        logger.debug("[Profiling] Stopping profile")
+        self.active = False
+        self.scheduler.stop_profiling(self)
+        self.stop_ns = nanosecond_time()
+
+    def __enter__(self):
+        # type: () -> Profile
+        hub = self.hub or sentry_sdk.Hub.current
+
+        _, scope = hub._stack[-1]
+        old_profile = scope.profile
+        scope.profile = self
+
+        self._context_manager_state = (hub, scope, old_profile)
+
+        self.start()
+
+        return self
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        self.scheduler.stop_profiling()
-        self._stop_ns = nanosecond_time()
+        self.stop()
 
-    def to_json(self, event_opt, options, scope):
-        # type: (Any, Dict[str, Any], Optional[sentry_sdk.scope.Scope]) -> Dict[str, Any]
-        assert self._start_ns is not None
-        assert self._stop_ns is not None
+        _, scope, old_profile = self._context_manager_state
+        del self._context_manager_state
 
-        profile = self.scheduler.sample_buffer.slice_profile(
-            self._start_ns, self._stop_ns
+        scope.profile = old_profile
+
+    def write(self, ts, sample):
+        # type: (int, ExtractedSample) -> None
+        if not self.active:
+            return
+
+        if ts < self.start_ns:
+            return
+
+        offset = ts - self.start_ns
+        if offset > MAX_PROFILE_DURATION_NS:
+            self.stop()
+            return
+
+        self.unique_samples += 1
+
+        elapsed_since_start_ns = str(offset)
+
+        for tid, (stack_id, frame_ids, frames) in sample:
+            try:
+                # Check if the stack is indexed first, this lets us skip
+                # indexing frames if it's not necessary
+                if stack_id not in self.indexed_stacks:
+                    for i, frame_id in enumerate(frame_ids):
+                        if frame_id not in self.indexed_frames:
+                            self.indexed_frames[frame_id] = len(self.indexed_frames)
+                            self.frames.append(frames[i])
+
+                    self.indexed_stacks[stack_id] = len(self.indexed_stacks)
+                    self.stacks.append(
+                        [self.indexed_frames[frame_id] for frame_id in frame_ids]
+                    )
+
+                self.samples.append(
+                    {
+                        "elapsed_since_start_ns": elapsed_since_start_ns,
+                        "thread_id": tid,
+                        "stack_id": self.indexed_stacks[stack_id],
+                    }
+                )
+            except AttributeError:
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
+                capture_internal_exception(sys.exc_info())
+
+    def process(self):
+        # type: () -> ProcessedProfile
+
+        # This collects the thread metadata at the end of a profile. Doing it
+        # this way means that any threads that terminate before the profile ends
+        # will not have any metadata associated with it.
+        thread_metadata = {
+            str(thread.ident): {
+                "name": str(thread.name),
+            }
+            for thread in threading.enumerate()
+        }  # type: Dict[str, ProcessedThreadMetadata]
+
+        return {
+            "frames": self.frames,
+            "stacks": self.stacks,
+            "samples": self.samples,
+            "thread_metadata": thread_metadata,
+        }
+
+    def to_json(self, event_opt, options):
+        # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        profile = self.process()
+
+        set_in_app_in_frames(
+            profile["frames"],
+            options["in_app_exclude"],
+            options["in_app_include"],
+            options["project_root"],
         )
-
-        handle_in_app_impl(
-            profile["frames"], options["in_app_exclude"], options["in_app_include"]
-        )
-
-        # the active thread id from the scope always take priorty if it exists
-        active_thread_id = None if scope is None else scope.active_thread_id
 
         return {
             "environment": event_opt.get("environment"),
-            "event_id": uuid.uuid4().hex,
+            "event_id": self.event_id,
             "platform": "python",
             "profile": profile,
             "release": event_opt.get("release", ""),
-            "timestamp": event_opt["timestamp"],
+            "timestamp": event_opt["start_timestamp"],
             "version": "1",
             "device": {
                 "architecture": platform.machine(),
@@ -306,139 +707,84 @@ class Profile(object):
             "transactions": [
                 {
                     "id": event_opt["event_id"],
-                    "name": self.transaction.name,
+                    "name": event_opt["transaction"],
                     # we start the transaction before the profile and this is
                     # the transaction start time relative to the profile, so we
                     # hardcode it to 0 until we can start the profile before
                     "relative_start_ns": "0",
                     # use the duration of the profile instead of the transaction
                     # because we end the transaction after the profile
-                    "relative_end_ns": str(self._stop_ns - self._start_ns),
-                    "trace_id": self.transaction.trace_id,
+                    "relative_end_ns": str(self.stop_ns - self.start_ns),
+                    "trace_id": event_opt["contexts"]["trace"]["trace_id"],
                     "active_thread_id": str(
-                        self.transaction._active_thread_id
-                        if active_thread_id is None
-                        else active_thread_id
+                        self._default_active_thread_id
+                        if self.active_thread_id is None
+                        else self.active_thread_id
                     ),
                 }
             ],
         }
 
+    def valid(self):
+        # type: () -> bool
+        if self.sampled is None or not self.sampled:
+            return False
 
-class SampleBuffer(object):
-    """
-    A simple implementation of a ring buffer to buffer the samples taken.
+        if self.unique_samples < PROFILE_MINIMUM_SAMPLES:
+            logger.debug("[Profiling] Discarding profile because insufficient samples.")
+            return False
 
-    At some point, the ring buffer will start overwriting old samples.
-    This is a trade off we've chosen to ensure the memory usage does not
-    grow indefinitely. But by having a sufficiently large buffer, this is
-    largely not a problem.
-    """
+        return True
 
-    def __init__(self, capacity):
+
+class Scheduler(object):
+    mode = "unknown"  # type: ProfilerMode
+
+    def __init__(self, frequency):
         # type: (int) -> None
+        self.interval = 1.0 / frequency
 
-        self.buffer = [
-            None
-        ] * capacity  # type: List[Optional[Tuple[int, RawSampleWithId]]]
-        self.capacity = capacity  # type: int
-        self.idx = 0  # type: int
+        self.sampler = self.make_sampler()
 
-    def write(self, ts, raw_sample):
-        # type: (int, RawSample) -> None
-        """
-        Writing to the buffer is not thread safe. There is the possibility
-        that parallel writes will overwrite one another.
+        # cap the number of new profiles at any time so it does not grow infinitely
+        self.new_profiles = deque(maxlen=128)  # type: Deque[Profile]
+        self.active_profiles = set()  # type: Set[Profile]
 
-        This should only be a problem if the signal handler itself is
-        interrupted by the next signal.
-        (i.e. SIGPROF is sent again before the handler finishes).
+    def __enter__(self):
+        # type: () -> Scheduler
+        self.setup()
+        return self
 
-        For this reason, and to keep it performant, we've chosen not to add
-        any synchronization mechanisms here like locks.
-        """
-        idx = self.idx
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        self.teardown()
 
-        sample = [
-            (
-                thread_id,
-                # Instead of mapping the stack into frame ids and hashing
-                # that as a tuple, we can directly hash the stack.
-                # This saves us from having to generate yet another list.
-                # Additionally, using the stack as the key directly is
-                # costly because the stack can be large, so we pre-hash
-                # the stack, and use the hash as the key as this will be
-                # needed a few times to improve performance.
-                hash(stack),
-                stack,
-            )
-            for thread_id, stack in raw_sample
-        ]
+    def setup(self):
+        # type: () -> None
+        raise NotImplementedError
 
-        self.buffer[idx] = (ts, sample)
-        self.idx = (idx + 1) % self.capacity
+    def teardown(self):
+        # type: () -> None
+        raise NotImplementedError
 
-    def slice_profile(self, start_ns, stop_ns):
-        # type: (int, int) -> ProcessedProfile
-        samples = []  # type: List[ProcessedSample]
-        stacks = dict()  # type: Dict[int, int]
-        stacks_list = list()  # type: List[ProcessedStack]
-        frames = dict()  # type: Dict[RawFrameData, int]
-        frames_list = list()  # type: List[ProcessedFrame]
+    def ensure_running(self):
+        # type: () -> None
+        raise NotImplementedError
 
-        for ts, sample in filter(None, self.buffer):
-            if start_ns > ts or ts > stop_ns:
-                continue
+    def start_profiling(self, profile):
+        # type: (Profile) -> None
+        self.ensure_running()
+        self.new_profiles.append(profile)
 
-            elapsed_since_start_ns = str(ts - start_ns)
-
-            for tid, hashed_stack, stack in sample:
-                # Check if the stack is indexed first, this lets us skip
-                # indexing frames if it's not necessary
-                if hashed_stack not in stacks:
-                    for frame in stack:
-                        if frame not in frames:
-                            frames[frame] = len(frames)
-                            frames_list.append(
-                                {
-                                    "abs_path": frame.abs_path,
-                                    "function": frame.function or "<unknown>",
-                                    "filename": frame.filename,
-                                    "lineno": frame.lineno,
-                                    "module": frame.module,
-                                }
-                            )
-
-                    stacks[hashed_stack] = len(stacks)
-                    stacks_list.append(tuple(frames[frame] for frame in stack))
-
-                samples.append(
-                    {
-                        "elapsed_since_start_ns": elapsed_since_start_ns,
-                        "thread_id": tid,
-                        "stack_id": stacks[hashed_stack],
-                    }
-                )
-
-        # This collects the thread metadata at the end of a profile. Doing it
-        # this way means that any threads that terminate before the profile ends
-        # will not have any metadata associated with it.
-        thread_metadata = {
-            str(thread.ident): {
-                "name": str(thread.name),
-            }
-            for thread in threading.enumerate()
-        }  # type: Dict[str, ProcessedThreadMetadata]
-
-        return {
-            "stacks": stacks_list,
-            "frames": frames_list,
-            "samples": samples,
-            "thread_metadata": thread_metadata,
-        }
+    def stop_profiling(self, profile):
+        # type: (Profile) -> None
+        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
+        cwd = os.getcwd()
+
+        cache = LRUCache(max_size=256)
 
         def _sample_stack(*args, **kwargs):
             # type: (*Any, **Any) -> None
@@ -446,65 +792,84 @@ class SampleBuffer(object):
             Take a sample of the stack on all the threads in the process.
             This should be called at a regular interval to collect samples.
             """
+            # no profiles taking place, so we can stop early
+            if not self.new_profiles and not self.active_profiles:
+                # make sure to clear the cache if we're not profiling so we dont
+                # keep a reference to the last stack of frames around
+                return
 
-            self.write(
-                nanosecond_time(),
-                [
-                    (str(tid), extract_stack(frame))
+            # This is the number of profiles we want to pop off.
+            # It's possible another thread adds a new profile to
+            # the list and we spend longer than we want inside
+            # the loop below.
+            #
+            # Also make sure to set this value before extracting
+            # frames so we do not write to any new profiles that
+            # were started after this point.
+            new_profiles = len(self.new_profiles)
+
+            now = nanosecond_time()
+
+            try:
+                sample = [
+                    (str(tid), extract_stack(frame, cache, cwd))
                     for tid, frame in sys._current_frames().items()
-                ],
-            )
+                ]
+            except AttributeError:
+                # For some reason, the frame we get doesn't have certain attributes.
+                # When this happens, we abandon the current sample as it's bad.
+                capture_internal_exception(sys.exc_info())
+                return
+
+            # Move the new profiles into the active_profiles set.
+            #
+            # We cannot directly add the to active_profiles set
+            # in `start_profiling` because it is called from other
+            # threads which can cause a RuntimeError when it the
+            # set sizes changes during iteration without a lock.
+            #
+            # We also want to avoid using a lock here so threads
+            # that are starting profiles are not blocked until it
+            # can acquire the lock.
+            for _ in range(new_profiles):
+                self.active_profiles.add(self.new_profiles.popleft())
+
+            inactive_profiles = []
+
+            for profile in self.active_profiles:
+                if profile.active:
+                    profile.write(now, sample)
+                else:
+                    # If a thread is marked inactive, we buffer it
+                    # to `inactive_profiles` so it can be removed.
+                    # We cannot remove it here as it would result
+                    # in a RuntimeError.
+                    inactive_profiles.append(profile)
+
+            for profile in inactive_profiles:
+                self.active_profiles.remove(profile)
 
         return _sample_stack
 
 
-class Scheduler(object):
-    mode = "unknown"
-
-    def __init__(self, sample_buffer, frequency):
-        # type: (SampleBuffer, int) -> None
-        self.sample_buffer = sample_buffer
-        self.sampler = sample_buffer.make_sampler()
-        self._lock = threading.Lock()
-        self._count = 0
-        self._interval = 1.0 / frequency
-
-    def setup(self):
-        # type: () -> None
-        raise NotImplementedError
-
-    def teardown(self):
-        # type: () -> None
-        raise NotImplementedError
-
-    def start_profiling(self):
-        # type: () -> bool
-        with self._lock:
-            self._count += 1
-            return self._count == 1
-
-    def stop_profiling(self):
-        # type: () -> bool
-        with self._lock:
-            self._count -= 1
-            return self._count == 0
-
-
 class ThreadScheduler(Scheduler):
     """
-    This abstract scheduler is based on running a daemon thread that will call
+    This scheduler is based on running a daemon thread that will call
     the sampler at a regular interval.
     """
 
-    mode = "thread"
-    name = None  # type: Optional[str]
+    mode = "thread"  # type: ProfilerMode
+    name = "sentry.profiler.ThreadScheduler"
 
-    def __init__(self, sample_buffer, frequency):
-        # type: (SampleBuffer, int) -> None
-        super(ThreadScheduler, self).__init__(
-            sample_buffer=sample_buffer, frequency=frequency
-        )
-        self.stop_events = Queue()
+    def __init__(self, frequency):
+        # type: (int) -> None
+        super(ThreadScheduler, self).__init__(frequency=frequency)
+
+        # used to signal to the thread that it should stop
+        self.running = False
+        self.thread = None  # type: Optional[threading.Thread]
+        self.pid = None  # type: Optional[int]
+        self.lock = threading.Lock()
 
     def setup(self):
         # type: () -> None
@@ -512,266 +877,135 @@ class ThreadScheduler(Scheduler):
 
     def teardown(self):
         # type: () -> None
-        pass
+        if self.running:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
 
-    def start_profiling(self):
-        # type: () -> bool
-        if super(ThreadScheduler, self).start_profiling():
-            # make sure to clear the event as we reuse the same event
-            # over the lifetime of the scheduler
-            event = threading.Event()
-            self.stop_events.put_nowait(event)
-            run = self.make_run(event)
+    def ensure_running(self):
+        # type: () -> None
+        pid = os.getpid()
+
+        # is running on the right process
+        if self.running and self.pid == pid:
+            return
+
+        with self.lock:
+            # another thread may have tried to acquire the lock
+            # at the same time so it may start another thread
+            # make sure to check again before proceeding
+            if self.running and self.pid == pid:
+                return
+
+            self.pid = pid
+            self.running = True
 
             # make sure the thread is a daemon here otherwise this
             # can keep the application running after other threads
             # have exited
-            thread = threading.Thread(name=self.name, target=run, daemon=True)
-            thread.start()
-            return True
-        return False
+            self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
+            self.thread.start()
 
-    def stop_profiling(self):
-        # type: () -> bool
-        if super(ThreadScheduler, self).stop_profiling():
-            # make sure the set the event here so that the thread
-            # can check to see if it should keep running
-            event = self.stop_events.get_nowait()
-            event.set()
-            return True
-        return False
+    def run(self):
+        # type: () -> None
+        last = time.perf_counter()
 
-    def make_run(self, event):
-        # type: (threading.Event) -> Callable[..., None]
-        raise NotImplementedError
-
-
-class SleepScheduler(ThreadScheduler):
-    """
-    This scheduler uses time.sleep to wait the required interval before calling
-    the sampling function.
-    """
-
-    mode = "sleep"
-    name = "sentry.profiler.SleepScheduler"
-
-    def make_run(self, event):
-        # type: (threading.Event) -> Callable[..., None]
-
-        def run():
-            # type: () -> None
+        while self.running:
             self.sampler()
 
+            # some time may have elapsed since the last time
+            # we sampled, so we need to account for that and
+            # not sleep for too long
+            elapsed = time.perf_counter() - last
+            if elapsed < self.interval:
+                thread_sleep(self.interval - elapsed)
+
+            # after sleeping, make sure to take the current
+            # timestamp so we can use it next iteration
             last = time.perf_counter()
 
-            while True:
-                # some time may have elapsed since the last time
-                # we sampled, so we need to account for that and
-                # not sleep for too long
-                now = time.perf_counter()
-                elapsed = max(now - last, 0)
 
-                if elapsed < self._interval:
-                    time.sleep(self._interval - elapsed)
-
-                last = time.perf_counter()
-
-                if event.is_set():
-                    break
-
-                self.sampler()
-
-        return run
-
-
-class EventScheduler(ThreadScheduler):
+class GeventScheduler(Scheduler):
     """
-    This scheduler uses threading.Event to wait the required interval before
-    calling the sampling function.
+    This scheduler is based on the thread scheduler but adapted to work with
+    gevent. When using gevent, it may monkey patch the threading modules
+    (`threading` and `_thread`). This results in the use of greenlets instead
+    of native threads.
+
+    This is an issue because the sampler CANNOT run in a greenlet because
+    1. Other greenlets doing sync work will prevent the sampler from running
+    2. The greenlet runs in the same thread as other greenlets so when taking
+       a sample, other greenlets will have been evicted from the thread. This
+       results in a sample containing only the sampler's code.
     """
 
-    mode = "event"
-    name = "sentry.profiler.EventScheduler"
+    mode = "gevent"  # type: ProfilerMode
+    name = "sentry.profiler.GeventScheduler"
 
-    def make_run(self, event):
-        # type: (threading.Event) -> Callable[..., None]
+    def __init__(self, frequency):
+        # type: (int) -> None
 
-        def run():
-            # type: () -> None
-            self.sampler()
+        if ThreadPool is None:
+            raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-            while True:
-                event.wait(timeout=self._interval)
+        super(GeventScheduler, self).__init__(frequency=frequency)
 
-                if event.is_set():
-                    break
+        # used to signal to the thread that it should stop
+        self.running = False
+        self.thread = None  # type: Optional[ThreadPool]
+        self.pid = None  # type: Optional[int]
 
-                self.sampler()
-
-        return run
-
-
-class SignalScheduler(Scheduler):
-    """
-    This abstract scheduler is based on UNIX signals. It sets up a
-    signal handler for the specified signal, and the matching itimer in order
-    for the signal handler to fire at a regular interval.
-
-    See https://www.gnu.org/software/libc/manual/html_node/Alarm-Signals.html
-    """
-
-    mode = "signal"
-
-    @property
-    def signal_num(self):
-        # type: () -> signal.Signals
-        raise NotImplementedError
-
-    @property
-    def signal_timer(self):
-        # type: () -> int
-        raise NotImplementedError
+        # This intentionally uses the gevent patched threading.Lock.
+        # The lock will be required when first trying to start profiles
+        # as we need to spawn the profiler thread from the greenlets.
+        self.lock = threading.Lock()
 
     def setup(self):
         # type: () -> None
-        """
-        This method sets up the application so that it can be profiled.
-        It MUST be called from the main thread. This is a limitation of
-        python's signal library where it only allows the main thread to
-        set a signal handler.
-        """
-
-        # This setups a process wide signal handler that will be called
-        # at an interval to record samples.
-        try:
-            signal.signal(self.signal_num, self.sampler)
-        except ValueError:
-            raise ValueError(
-                "Signal based profiling can only be enabled from the main thread."
-            )
-
-        # Ensures that system calls interrupted by signals are restarted
-        # automatically. Otherwise, we may see some strage behaviours
-        # such as IOErrors caused by the system call being interrupted.
-        signal.siginterrupt(self.signal_num, False)
+        pass
 
     def teardown(self):
         # type: () -> None
+        if self.running:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
 
-        # setting the timer with 0 will stop will clear the timer
-        signal.setitimer(self.signal_timer, 0)
+    def ensure_running(self):
+        # type: () -> None
+        pid = os.getpid()
 
-        # put back the default signal handler
-        signal.signal(self.signal_num, signal.SIG_DFL)
+        # is running on the right process
+        if self.running and self.pid == pid:
+            return
 
-    def start_profiling(self):
-        # type: () -> bool
-        if super(SignalScheduler, self).start_profiling():
-            signal.setitimer(self.signal_timer, self._interval, self._interval)
-            return True
-        return False
+        with self.lock:
+            # another thread may have tried to acquire the lock
+            # at the same time so it may start another thread
+            # make sure to check again before proceeding
+            if self.running and self.pid == pid:
+                return
 
-    def stop_profiling(self):
-        # type: () -> bool
-        if super(SignalScheduler, self).stop_profiling():
-            signal.setitimer(self.signal_timer, 0)
-            return True
-        return False
+            self.pid = pid
+            self.running = True
 
+            self.thread = ThreadPool(1)
+            self.thread.spawn(self.run)
 
-class SigprofScheduler(SignalScheduler):
-    """
-    This scheduler uses SIGPROF to regularly call a signal handler where the
-    samples will be taken.
+    def run(self):
+        # type: () -> None
+        last = time.perf_counter()
 
-    This is not based on wall time, and you may see some variances
-    in the frequency at which this handler is called.
+        while self.running:
+            self.sampler()
 
-    This has some limitations:
-    - Only the main thread counts towards the time elapsed. This means that if
-      the main thread is blocking on a sleep() or select() system call, then
-      this clock will not count down. Some examples of this in practice are
-        - When using uwsgi with multiple threads in a worker, the non main
-          threads will only be profiled if the main thread is actively running
-          at the same time.
-        - When using gunicorn with threads, the main thread does not handle the
-          requests directly, so the clock counts down slower than expected since
-          its mostly idling while waiting for requests.
-    """
+            # some time may have elapsed since the last time
+            # we sampled, so we need to account for that and
+            # not sleep for too long
+            elapsed = time.perf_counter() - last
+            if elapsed < self.interval:
+                thread_sleep(self.interval - elapsed)
 
-    mode = "sigprof"
-
-    @property
-    def signal_num(self):
-        # type: () -> signal.Signals
-        return signal.SIGPROF
-
-    @property
-    def signal_timer(self):
-        # type: () -> int
-        return signal.ITIMER_PROF
-
-
-class SigalrmScheduler(SignalScheduler):
-    """
-    This scheduler uses SIGALRM to regularly call a signal handler where the
-    samples will be taken.
-
-    This is based on real time, so it *should* be called close to the expected
-    frequency.
-    """
-
-    mode = "sigalrm"
-
-    @property
-    def signal_num(self):
-        # type: () -> signal.Signals
-        return signal.SIGALRM
-
-    @property
-    def signal_timer(self):
-        # type: () -> int
-        return signal.ITIMER_REAL
-
-
-def _should_profile(transaction, hub):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> bool
-
-    # The corresponding transaction was not sampled,
-    # so don't generate a profile for it.
-    if not transaction.sampled:
-        return False
-
-    # The profiler hasn't been properly initialized.
-    if _scheduler is None:
-        return False
-
-    hub = hub or sentry_sdk.Hub.current
-    client = hub.client
-
-    # The client is None, so we can't get the sample rate.
-    if client is None:
-        return False
-
-    options = client.options
-    profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-
-    # The profiles_sample_rate option was not set, so profiling
-    # was never enabled.
-    if profiles_sample_rate is None:
-        return False
-
-    return random.random() < float(profiles_sample_rate)
-
-
-@contextmanager
-def start_profiling(transaction, hub=None):
-    # type: (sentry_sdk.tracing.Transaction, Optional[sentry_sdk.Hub]) -> Generator[None, None, None]
-
-    # if profiling was not enabled, this should be a noop
-    if _should_profile(transaction, hub):
-        assert _scheduler is not None
-        with Profile(_scheduler, transaction, hub=hub):
-            yield
-    else:
-        yield
+            # after sleeping, make sure to take the current
+            # timestamp so we can use it next iteration
+            last = time.perf_counter()

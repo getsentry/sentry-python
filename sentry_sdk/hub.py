@@ -8,6 +8,7 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
+from sentry_sdk.profiler import Profile
 from sentry_sdk.tracing import NoOpSpan, Span, Transaction
 from sentry_sdk.session import Session
 from sentry_sdk.utils import (
@@ -17,9 +18,9 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Union
     from typing import Any
     from typing import Optional
@@ -124,9 +125,9 @@ def _init(*args, **kwargs):
     return rv
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
     #
@@ -222,7 +223,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     # Mypy doesn't pick up on the metaclass.
 
-    if MYPY:
+    if TYPE_CHECKING:
         current = None  # type: Hub
         main = None  # type: Hub
 
@@ -547,6 +548,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         }
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
+
+        profile = Profile(transaction, hub=self)
+        profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction

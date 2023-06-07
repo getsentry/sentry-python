@@ -3,12 +3,12 @@ from collections import deque
 from itertools import chain
 
 from sentry_sdk._functools import wraps
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.attachments import Attachment
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
@@ -27,6 +27,7 @@ if MYPY:
         Type,
     )
 
+    from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
     from sentry_sdk.session import Session
 
@@ -94,10 +95,7 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
-        # The thread that is handling the bulk of the work. This can just
-        # be the main thread, but that's not always true. For web frameworks,
-        # this would be the thread handling the request.
-        "_active_thread_id",
+        "_profile",
     )
 
     def __init__(self):
@@ -129,7 +127,7 @@ class Scope(object):
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
-        self._active_thread_id = None  # type: Optional[int]
+        self._profile = None  # type: Optional[Profile]
 
     @_attr_setter
     def level(self, value):
@@ -235,15 +233,15 @@ class Scope(object):
                 self._transaction = transaction.name
 
     @property
-    def active_thread_id(self):
-        # type: () -> Optional[int]
-        """Get/set the current active thread id."""
-        return self._active_thread_id
+    def profile(self):
+        # type: () -> Optional[Profile]
+        return self._profile
 
-    def set_active_thread_id(self, active_thread_id):
-        # type: (Optional[int]) -> None
-        """Set the current active thread id."""
-        self._active_thread_id = active_thread_id
+    @profile.setter
+    def profile(self, profile):
+        # type: (Optional[Profile]) -> None
+
+        self._profile = profile
 
     def set_tag(
         self,
@@ -372,9 +370,9 @@ class Scope(object):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
-        def _drop(event, cause, ty):
-            # type: (Dict[str, Any], Any, str) -> Optional[Any]
-            logger.info("%s (%s) dropped event (%s)", ty, cause, event)
+        def _drop(cause, ty):
+            # type: (Any, str) -> Optional[Any]
+            logger.info("%s (%s) dropped event", ty, cause)
             return None
 
         is_transaction = event.get("type") == "transaction"
@@ -427,7 +425,7 @@ class Scope(object):
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    return _drop(event, error_processor, "error processor")
+                    return _drop(error_processor, "error processor")
                 event = new_event
 
         for event_processor in chain(global_event_processors, self._event_processors):
@@ -435,7 +433,7 @@ class Scope(object):
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
-                return _drop(event, event_processor, "event processor")
+                return _drop(event_processor, "event processor")
             event = new_event
 
         return event
@@ -464,8 +462,8 @@ class Scope(object):
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
-        if scope._active_thread_id is not None:
-            self._active_thread_id = scope._active_thread_id
+        if scope._profile:
+            self._profile = scope._profile
 
     def update_from_kwargs(
         self,
@@ -515,7 +513,7 @@ class Scope(object):
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = list(self._attachments)
 
-        rv._active_thread_id = self._active_thread_id
+        rv._profile = self._profile
 
         return rv
 

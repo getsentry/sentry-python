@@ -1,17 +1,23 @@
-from sentry_sdk._types import MYPY
+import asyncio
+from copy import deepcopy
+
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.starlette import (
-    StarletteIntegration,
-    StarletteRequestExtractor,
-)
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import transaction_from_function
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Callable, Dict
-
     from sentry_sdk.scope import Scope
+
+try:
+    from sentry_sdk.integrations.starlette import (
+        StarletteIntegration,
+        StarletteRequestExtractor,
+    )
+except DidNotEnable:
+    raise DidNotEnable("Starlette is not installed")
 
 try:
     import fastapi  # type: ignore
@@ -62,6 +68,24 @@ def patch_get_request_handler():
 
     def _sentry_get_request_handler(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        dependant = kwargs.get("dependant")
+        if (
+            dependant
+            and dependant.call is not None
+            and not asyncio.iscoroutinefunction(dependant.call)
+        ):
+            old_call = dependant.call
+
+            def _sentry_call(*args, **kwargs):
+                # type: (*Any, **Any) -> Any
+                hub = Hub.current
+                with hub.configure_scope() as sentry_scope:
+                    if sentry_scope.profile is not None:
+                        sentry_scope.profile.update_active_thread_id()
+                    return old_call(*args, **kwargs)
+
+            dependant.call = _sentry_call
+
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args, **kwargs):
@@ -93,7 +117,7 @@ def patch_get_request_handler():
                                 request_info["cookies"] = info["cookies"]
                             if "data" in info:
                                 request_info["data"] = info["data"]
-                        event["request"] = request_info
+                        event["request"] = deepcopy(request_info)
 
                         return event
 

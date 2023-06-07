@@ -1,6 +1,7 @@
+import logging
 import os
 import sys
-import logging
+import time
 
 import pytest
 
@@ -16,7 +17,6 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -25,6 +25,7 @@ from sentry_sdk.scope import (  # noqa: F401
     global_event_processors,
 )
 from sentry_sdk.utils import get_sdk_name
+from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
 def test_processors(sentry_init, capture_events):
@@ -91,7 +92,93 @@ def test_event_id(sentry_init, capture_events):
     assert Hub.current.last_event_id() == event_id
 
 
-def test_option_callback(sentry_init, capture_events, monkeypatch):
+def test_generic_mechanism(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "generic"
+    assert event["exception"]["values"][0]["mechanism"]["handled"]
+
+
+def test_option_before_send(sentry_init, capture_events):
+    def before_send(event, hint):
+        event["extra"] = {"before_send_called": True}
+        return event
+
+    def do_this():
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    sentry_init(before_send=before_send)
+    events = capture_events()
+
+    do_this()
+
+    (event,) = events
+    assert event["extra"] == {"before_send_called": True}
+
+
+def test_option_before_send_discard(sentry_init, capture_events):
+    def before_send_discard(event, hint):
+        return None
+
+    def do_this():
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    sentry_init(before_send=before_send_discard)
+    events = capture_events()
+
+    do_this()
+
+    assert len(events) == 0
+
+
+def test_option_before_send_transaction(sentry_init, capture_events):
+    def before_send_transaction(event, hint):
+        assert event["type"] == "transaction"
+        event["extra"] = {"before_send_transaction_called": True}
+        return event
+
+    sentry_init(
+        before_send_transaction=before_send_transaction,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    transaction = start_transaction(name="foo")
+    transaction.finish()
+
+    (event,) = events
+    assert event["transaction"] == "foo"
+    assert event["extra"] == {"before_send_transaction_called": True}
+
+
+def test_option_before_send_transaction_discard(sentry_init, capture_events):
+    def before_send_transaction_discard(event, hint):
+        return None
+
+    sentry_init(
+        before_send_transaction=before_send_transaction_discard,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    transaction = start_transaction(name="foo")
+    transaction.finish()
+
+    assert len(events) == 0
+
+
+def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     drop_events = False
     drop_breadcrumbs = False
     reports = []
@@ -141,6 +228,32 @@ def test_option_callback(sentry_init, capture_events, monkeypatch):
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
     assert crumb["type"] == "default"
+
+
+@pytest.mark.parametrize(
+    "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
+    [
+        (None, None, False, None),
+        (False, 0.0, False, 0.0),
+        (False, 1.0, False, 1.0),
+        (None, 1.0, True, 1.0),
+        (True, 1.0, True, 1.0),
+        (None, 0.0, True, 0.0),  # We use this as - it's configured but turned off
+        (True, 0.0, True, 0.0),  # We use this as - it's configured but turned off
+        (True, None, True, 1.0),
+    ],
+)
+def test_option_enable_tracing(
+    sentry_init,
+    enable_tracing,
+    traces_sample_rate,
+    tracing_enabled,
+    updated_traces_sample_rate,
+):
+    sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
+    options = Hub.current.client.options
+    assert has_tracing_enabled(options) is tracing_enabled
+    assert options["traces_sample_rate"] == updated_traces_sample_rate
 
 
 def test_breadcrumb_arguments(sentry_init, capture_events):
@@ -504,3 +617,70 @@ def test_event_processor_drop_records_client_report(
 )
 def test_get_sdk_name(installed_integrations, expected_name):
     assert get_sdk_name(installed_integrations) == expected_name
+
+
+def _hello_world(word):
+    return "Hello, {}".format(word)
+
+
+def test_functions_to_trace(sentry_init, capture_events):
+    functions_to_trace = [
+        {"qualified_name": "tests.test_basics._hello_world"},
+        {"qualified_name": "time.sleep"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        time.sleep(0)
+
+        for word in ["World", "You"]:
+            _hello_world(word)
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 3
+    assert event["spans"][0]["description"] == "time.sleep"
+    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+
+
+class WorldGreeter:
+    def __init__(self, word):
+        self.word = word
+
+    def greet(self, new_word=None):
+        return "Hello, {}".format(new_word if new_word else self.word)
+
+
+def test_functions_to_trace_with_class(sentry_init, capture_events):
+    functions_to_trace = [
+        {"qualified_name": "tests.test_basics.WorldGreeter.greet"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        wg = WorldGreeter("World")
+        wg.greet()
+        wg.greet("You")
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 2
+    assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
+    assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"

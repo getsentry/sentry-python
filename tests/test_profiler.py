@@ -1,72 +1,292 @@
 import inspect
-import platform
+import os
 import sys
 import threading
 import time
 
 import pytest
 
+from collections import defaultdict
+from sentry_sdk import start_transaction
 from sentry_sdk.profiler import (
-    EventScheduler,
-    RawFrameData,
-    SampleBuffer,
-    SleepScheduler,
+    GeventScheduler,
+    Profile,
+    Scheduler,
+    ThreadScheduler,
+    extract_frame,
     extract_stack,
+    get_current_thread_id,
     get_frame_name,
     setup_profiler,
 )
+from sentry_sdk.tracing import Transaction
+from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk._queue import Queue
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
+try:
+    import gevent
+except ImportError:
+    gevent = None
 
 
-minimum_python_33 = pytest.mark.skipif(
-    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
+def requires_python_version(major, minor, reason=None):
+    if reason is None:
+        reason = "Requires Python {}.{}".format(major, minor)
+    return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
+
+
+requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+
+
+def process_test_sample(sample):
+    # insert a mock hashable for the stack
+    return [(tid, (stack, stack)) for tid, stack in sample]
+
+
+def non_experimental_options(mode=None, sample_rate=None):
+    return {"profiler_mode": mode, "profiles_sample_rate": sample_rate}
+
+
+def experimental_options(mode=None, sample_rate=None):
+    return {
+        "_experiments": {"profiler_mode": mode, "profiles_sample_rate": sample_rate}
+    }
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("foo"),
+        pytest.param(
+            "gevent",
+            marks=pytest.mark.skipif(gevent is not None, reason="gevent not enabled"),
+        ),
+    ],
 )
-
-unix_only = pytest.mark.skipif(
-    platform.system().lower() not in {"linux", "darwin"}, reason="UNIX only"
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
 )
-
-
-@minimum_python_33
-def test_profiler_invalid_mode(teardown_profiling):
+def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
     with pytest.raises(ValueError):
-        setup_profiler({"_experiments": {"profiler_mode": "magic"}})
+        setup_profiler(make_options(mode))
 
 
-@unix_only
-@minimum_python_33
-@pytest.mark.parametrize("mode", ["sigprof", "sigalrm"])
-def test_profiler_signal_mode_none_main_thread(mode, teardown_profiling):
-    """
-    signal based profiling must be initialized from the main thread because
-    of how the signal library in python works
-    """
-
-    class ProfilerThread(threading.Thread):
-        def run(self):
-            self.exc = None
-            try:
-                setup_profiler({"_experiments": {"profiler_mode": mode}})
-            except Exception as e:
-                # store the exception so it can be raised in the caller
-                self.exc = e
-
-        def join(self, timeout=None):
-            ret = super(ProfilerThread, self).join(timeout=timeout)
-            if self.exc:
-                raise self.exc
-            return ret
-
-    with pytest.raises(ValueError):
-        thread = ProfilerThread()
-        thread.start()
-        thread.join()
-
-
-@unix_only
-@pytest.mark.parametrize("mode", ["sleep", "event", "sigprof", "sigalrm"])
-def test_profiler_valid_mode(mode, teardown_profiling):
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("sleep"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
+def test_profiler_valid_mode(mode, make_options, teardown_profiling):
     # should not raise any exceptions
-    setup_profiler({"_experiments": {"profiler_mode": mode}})
+    setup_profiler(make_options(mode))
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
+def test_profiler_setup_twice(make_options, teardown_profiling):
+    # setting up the first time should return True to indicate success
+    assert setup_profiler(make_options())
+    # setting up the second time should return False to indicate no-op
+    assert not setup_profiler(make_options())
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    ("profiles_sample_rate", "profile_count"),
+    [
+        pytest.param(1.00, 1, id="profiler sampled at 1.00"),
+        pytest.param(0.75, 1, id="profiler sampled at 0.75"),
+        pytest.param(0.25, 0, id="profiler sampled at 0.25"),
+        pytest.param(0.00, 0, id="profiler sampled at 0.00"),
+        pytest.param(None, 0, id="profiler not enabled"),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(experimental_options, id="experiment"),
+        pytest.param(non_experimental_options, id="non experimental"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_profiles_sample_rate(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+    profiles_sample_rate,
+    profile_count,
+    make_options,
+    mode,
+):
+    options = make_options(mode=mode, sample_rate=profiles_sample_rate)
+    sentry_init(
+        traces_sample_rate=1.0,
+        profiler_mode=options.get("profiler_mode"),
+        profiles_sample_rate=options.get("profiles_sample_rate"),
+        _experiments=options.get("_experiments", {}),
+    )
+
+    envelopes = capture_envelopes()
+
+    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+        with start_transaction(name="profiling"):
+            pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == profile_count
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    ("profiles_sampler", "profile_count"),
+    [
+        pytest.param(lambda _: 1.00, 1, id="profiler sampled at 1.00"),
+        pytest.param(lambda _: 0.75, 1, id="profiler sampled at 0.75"),
+        pytest.param(lambda _: 0.25, 0, id="profiler sampled at 0.25"),
+        pytest.param(lambda _: 0.00, 0, id="profiler sampled at 0.00"),
+        pytest.param(lambda _: None, 0, id="profiler not enabled"),
+        pytest.param(
+            lambda ctx: 1 if ctx["transaction_context"]["name"] == "profiling" else 0,
+            1,
+            id="profiler sampled for transaction name",
+        ),
+        pytest.param(
+            lambda ctx: 0 if ctx["transaction_context"]["name"] == "profiling" else 1,
+            0,
+            id="profiler not sampled for transaction name",
+        ),
+        pytest.param(
+            lambda _: "1", 0, id="profiler not sampled because string sample rate"
+        ),
+        pytest.param(lambda _: True, 1, id="profiler sampled at True"),
+        pytest.param(lambda _: False, 0, id="profiler sampled at False"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_profiles_sampler(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+    profiles_sampler,
+    profile_count,
+    mode,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        profiles_sampler=profiles_sampler,
+    )
+
+    envelopes = capture_envelopes()
+
+    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+        with start_transaction(name="profiling"):
+            pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == profile_count
+
+
+@requires_python_version(3, 3)
+def test_minimum_unique_samples_required(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        pass
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    # because we dont leave any time for the profiler to
+    # take any samples, it should be not be sent
+    assert len(items["profile"]) == 0
+
+
+@requires_python_version(3, 3)
+def test_profile_captured(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+
+    envelopes = capture_envelopes()
+
+    with start_transaction(name="profiling"):
+        time.sleep(0.05)
+
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile"]) == 1
 
 
 def get_frame(depth=1):
@@ -88,7 +308,6 @@ class GetFrameBase:
 
     def inherited_instance_method_wrapped(self):
         def wrapped():
-            self
             return inspect.currentframe()
 
         return wrapped
@@ -100,7 +319,6 @@ class GetFrameBase:
     @classmethod
     def inherited_class_method_wrapped(cls):
         def wrapped():
-            cls
             return inspect.currentframe()
 
         return wrapped
@@ -116,7 +334,6 @@ class GetFrame(GetFrameBase):
 
     def instance_method_wrapped(self):
         def wrapped():
-            self
             return inspect.currentframe()
 
         return wrapped
@@ -128,7 +345,6 @@ class GetFrame(GetFrameBase):
     @classmethod
     def class_method_wrapped(cls):
         def wrapped():
-            cls
             return inspect.currentframe()
 
         return wrapped
@@ -138,6 +354,7 @@ class GetFrame(GetFrameBase):
         return inspect.currentframe()
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("frame", "frame_name"),
     [
@@ -158,7 +375,9 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().instance_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrame.instance_method_wrapped.<locals>.wrapped",
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -168,14 +387,15 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().class_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrame.class_method_wrapped.<locals>.wrapped",
             id="class_method_wrapped",
         ),
         pytest.param(
             GetFrame().static_method(),
-            "GetFrame.static_method",
+            "static_method" if sys.version_info < (3, 11) else "GetFrame.static_method",
             id="static_method",
-            marks=pytest.mark.skip(reason="unsupported"),
         ),
         pytest.param(
             GetFrame().inherited_instance_method(),
@@ -184,7 +404,9 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_instance_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped",
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -194,14 +416,17 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_class_method_wrapped()(),
-            "wrapped",
+            "wrapped"
+            if sys.version_info < (3, 11)
+            else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped",
             id="inherited_class_method_wrapped",
         ),
         pytest.param(
             GetFrame().inherited_static_method(),
-            "GetFrameBase.static_method",
+            "inherited_static_method"
+            if sys.version_info < (3, 11)
+            else "GetFrameBase.inherited_static_method",
             id="inherited_static_method",
-            marks=pytest.mark.skip(reason="unsupported"),
         ),
     ],
 )
@@ -209,6 +434,35 @@ def test_get_frame_name(frame, frame_name):
     assert get_frame_name(frame) == frame_name
 
 
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    ("get_frame", "function"),
+    [
+        pytest.param(lambda: get_frame(depth=1), "get_frame", id="simple"),
+    ],
+)
+def test_extract_frame(get_frame, function):
+    cwd = os.getcwd()
+    frame = get_frame()
+    extracted_frame = extract_frame(frame, cwd)
+
+    # the abs_path should be equal toe the normalized path of the co_filename
+    assert extracted_frame["abs_path"] == os.path.normpath(frame.f_code.co_filename)
+
+    # the module should be pull from this test module
+    assert extracted_frame["module"] == __name__
+
+    # the filename should be the file starting after the cwd
+    assert extracted_frame["filename"] == __file__[len(cwd) + 1 :]
+
+    assert extracted_frame["function"] == function
+
+    # the lineno will shift over time as this file is modified so just check
+    # that it is an int
+    assert isinstance(extracted_frame["lineno"], int)
+
+
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("depth", "max_stack_depth", "actual_depth"),
     [
@@ -227,163 +481,207 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
-    stack = extract_stack(frame, max_stack_depth + base_stack_depth)
-    assert len(stack) == base_stack_depth + actual_depth
+    _, frame_ids, frames = extract_stack(
+        frame, LRUCache(max_size=1), max_stack_depth=max_stack_depth + base_stack_depth
+    )
+    assert len(frame_ids) == base_stack_depth + actual_depth
+    assert len(frames) == base_stack_depth + actual_depth
 
     for i in range(actual_depth):
-        assert stack[i].function == "get_frame", i
+        assert frames[i]["function"] == "get_frame", i
 
     # index 0 contains the inner most frame on the stack, so the lamdba
     # should be at index `actual_depth`
-    assert stack[actual_depth].function == "<lambda>", actual_depth
+    if sys.version_info >= (3, 11):
+        assert (
+            frames[actual_depth]["function"]
+            == "test_extract_stack_with_max_depth.<locals>.<lambda>"
+        ), actual_depth
+    else:
+        assert frames[actual_depth]["function"] == "<lambda>", actual_depth
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    ("frame", "depth"),
+    [(get_frame(depth=1), len(inspect.stack()))],
+)
+def test_extract_stack_with_cache(frame, depth):
+    # make sure cache has enough room or this test will fail
+    cache = LRUCache(max_size=depth)
+    _, _, frames1 = extract_stack(frame, cache)
+    _, _, frames2 = extract_stack(frame, cache)
+
+    assert len(frames1) > 0
+    assert len(frames2) > 0
+    assert len(frames1) == len(frames2)
+    for i, (frame1, frame2) in enumerate(zip(frames1, frames2)):
+        # DO NOT use `==` for the assertion here since we are
+        # testing for identity, and using `==` would test for
+        # equality which would always pass since we're extract
+        # the same stack.
+        assert frame1 is frame2, i
+
+
+@requires_python_version(3, 3)
+def test_get_current_thread_id_explicit_thread():
+    results = Queue(maxsize=1)
+
+    def target1():
+        pass
+
+    def target2():
+        results.put(get_current_thread_id(thread1))
+
+    thread1 = threading.Thread(target=target1)
+    thread1.start()
+
+    thread2 = threading.Thread(target=target2)
+    thread2.start()
+
+    thread2.join()
+    thread1.join()
+
+    assert thread1.ident == results.get(timeout=1)
+
+
+@requires_python_version(3, 3)
+@requires_gevent
+def test_get_current_thread_id_gevent_in_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        job = gevent.spawn(get_current_thread_id)
+        job.join()
+        results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert thread.ident == results.get(timeout=1)
+
+
+@requires_python_version(3, 3)
+def test_get_current_thread_id_running_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        results.put(get_current_thread_id())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert thread.ident == results.get(timeout=1)
+
+
+@requires_python_version(3, 3)
+def test_get_current_thread_id_main_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        # mock that somehow the current thread doesn't exist
+        with mock.patch("threading.current_thread", side_effect=[None]):
+            results.put(get_current_thread_id())
+
+    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert thread_id == results.get(timeout=1)
 
 
 def get_scheduler_threads(scheduler):
     return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
 
-class DummySampleBuffer(SampleBuffer):
-    def __init__(self, capacity, sample_data=None):
-        super(DummySampleBuffer, self).__init__(capacity)
-        self.sample_data = [] if sample_data is None else sample_data
-
-    def make_sampler(self):
-        def _sample_stack(*args, **kwargs):
-            ts, sample = self.sample_data.pop(0)
-            self.write(ts, sample)
-
-        return _sample_stack
-
-
-@minimum_python_33
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("scheduler_class",),
     [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
-    ],
-)
-def test_thread_scheduler_takes_first_samples(scheduler_class):
-    sample_buffer = DummySampleBuffer(
-        capacity=1,
-        sample_data=[
-            (
-                0,
-                [
-                    (
-                        0,
-                        (
-                            RawFrameData(
-                                "/path/to/file.py", "file.py", "name", 1, "file"
-                            ),
-                        ),
-                    )
-                ],
-            )
-        ],
-    )
-    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
-    assert scheduler.start_profiling()
-    # immediately stopping means by the time the sampling thread will exit
-    # before it samples at the end of the first iteration
-    assert scheduler.stop_profiling()
-    time.sleep(0.002)
-    assert len(get_scheduler_threads(scheduler)) == 0
-
-    # there should be exactly 1 sample because we always sample once immediately
-    profile = sample_buffer.slice_profile(0, 1)
-    assert len(profile["samples"]) == 1
-
-
-@minimum_python_33
-@pytest.mark.parametrize(
-    ("scheduler_class",),
-    [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
-    ],
-)
-def test_thread_scheduler_takes_more_samples(scheduler_class):
-    sample_buffer = DummySampleBuffer(
-        capacity=10,
-        sample_data=[
-            (
-                i,
-                [
-                    (
-                        0,
-                        (
-                            RawFrameData(
-                                "/path/to/file.py", "file.py", "name", 1, "file"
-                            ),
-                        ),
-                    )
-                ],
-            )
-            for i in range(3)
-        ],
-    )
-    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
-    assert scheduler.start_profiling()
-    # waiting a little before stopping the scheduler means the profiling
-    # thread will get a chance to take a few samples before exiting
-    time.sleep(0.002)
-    assert scheduler.stop_profiling()
-    time.sleep(0.002)
-    assert len(get_scheduler_threads(scheduler)) == 0
-
-    # there should be more than 1 sample because we always sample once immediately
-    # plus any samples take afterwards
-    profile = sample_buffer.slice_profile(0, 3)
-    assert len(profile["samples"]) > 1
-
-
-@minimum_python_33
-@pytest.mark.parametrize(
-    ("scheduler_class",),
-    [
-        pytest.param(SleepScheduler, id="sleep scheduler"),
-        pytest.param(EventScheduler, id="event scheduler"),
+        pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(
+            GeventScheduler,
+            marks=[
+                requires_gevent,
+                pytest.mark.skip(
+                    reason="cannot find this thread via threading.enumerate()"
+                ),
+            ],
+            id="gevent scheduler",
+        ),
     ],
 )
 def test_thread_scheduler_single_background_thread(scheduler_class):
-    sample_buffer = SampleBuffer(1)
-    scheduler = scheduler_class(sample_buffer=sample_buffer, frequency=1000)
+    scheduler = scheduler_class(frequency=1000)
 
-    assert scheduler.start_profiling()
+    # not yet setup, no scheduler threads yet
+    assert len(get_scheduler_threads(scheduler)) == 0
 
-    # the scheduler thread does not immediately exit
-    # but it should exit after the next time it samples
-    assert scheduler.stop_profiling()
+    scheduler.setup()
 
-    assert scheduler.start_profiling()
+    # setup but no profiles started so still no threads
+    assert len(get_scheduler_threads(scheduler)) == 0
 
-    # because the scheduler thread does not immediately exit
-    # after stop_profiling is called, we have to wait a little
-    # otherwise, we'll see an extra scheduler thread in the
-    # following assertion
-    #
-    # one iteration of the scheduler takes 1.0 / frequency seconds
-    # so make sure this sleeps for longer than that to avoid flakes
-    time.sleep(0.002)
+    scheduler.ensure_running()
 
-    # there should be 1 scheduler thread now because the first
-    # one should be stopped and a new one started
+    # the scheduler will start always 1 thread
     assert len(get_scheduler_threads(scheduler)) == 1
 
-    assert scheduler.stop_profiling()
+    scheduler.ensure_running()
 
-    # because the scheduler thread does not immediately exit
-    # after stop_profiling is called, we have to wait a little
-    # otherwise, we'll see an extra scheduler thread in the
-    # following assertion
-    #
-    # one iteration of the scheduler takes 1.0 / frequency seconds
-    # so make sure this sleeps for longer than that to avoid flakes
-    time.sleep(0.002)
+    # the scheduler still only has 1 thread
+    assert len(get_scheduler_threads(scheduler)) == 1
 
-    # there should be 0 scheduler threads now because they stopped
+    scheduler.teardown()
+
+    # once finished, the thread should stop
     assert len(get_scheduler_threads(scheduler)) == 0
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
+def test_max_profile_duration_reached(scheduler_class):
+    sample = [("1", extract_stack(get_frame(), LRUCache(max_size=1)))]
+
+    with scheduler_class(frequency=1000) as scheduler:
+        transaction = Transaction(sampled=True)
+        with Profile(transaction, scheduler=scheduler) as profile:
+            # profile just started, it's active
+            assert profile.active
+
+            # write a sample at the start time, so still active
+            profile.write(profile.start_ns + 0, sample)
+            assert profile.active
+
+            # write a sample at max time, so still active
+            profile.write(profile.start_ns + 1, sample)
+            assert profile.active
+
+            # write a sample PAST the max time, so now inactive
+            profile.write(profile.start_ns + 2, sample)
+            assert not profile.active
+
+
+class NoopScheduler(Scheduler):
+    def setup(self):
+        # type: () -> None
+        pass
+
+    def teardown(self):
+        # type: () -> None
+        pass
+
+    def ensure_running(self):
+        # type: () -> None
+        pass
 
 
 current_thread = threading.current_thread()
@@ -394,13 +692,17 @@ thread_metadata = {
 }
 
 
+sample_stacks = [
+    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=1),
+    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=2),
+]
+
+
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
-    ("capacity", "start_ns", "stop_ns", "samples", "profile"),
+    ("samples", "expected"),
     [
         pytest.param(
-            10,
-            0,
-            1,
             [],
             {
                 "frames": [],
@@ -411,24 +713,7 @@ thread_metadata = {
             id="empty",
         ),
         pytest.param(
-            10,
-            0,
-            1,
-            [
-                (
-                    2,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                )
-            ],
+            [(6, [("1", sample_stacks[0])])],
             {
                 "frames": [],
                 "samples": [],
@@ -438,34 +723,9 @@ thread_metadata = {
             id="single sample out of range",
         ),
         pytest.param(
-            10,
-            0,
-            1,
-            [
-                (
-                    0,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                )
-            ],
+            [(0, [("1", sample_stacks[0])])],
             {
-                "frames": [
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name",
-                        "filename": "file.py",
-                        "lineno": 1,
-                        "module": "file",
-                    },
-                ],
+                "frames": [sample_stacks[0][2][0]],
                 "samples": [
                     {
                         "elapsed_since_start_ns": "0",
@@ -473,53 +733,18 @@ thread_metadata = {
                         "stack_id": 0,
                     },
                 ],
-                "stacks": [(0,)],
+                "stacks": [[0]],
                 "thread_metadata": thread_metadata,
             },
             id="single sample in range",
         ),
         pytest.param(
-            10,
-            0,
-            1,
             [
-                (
-                    0,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
-                (
-                    1,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name", 1, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
+                (0, [("1", sample_stacks[0])]),
+                (1, [("1", sample_stacks[0])]),
             ],
             {
-                "frames": [
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name",
-                        "filename": "file.py",
-                        "lineno": 1,
-                        "module": "file",
-                    },
-                ],
+                "frames": [sample_stacks[0][2][0]],
                 "samples": [
                     {
                         "elapsed_since_start_ns": "0",
@@ -532,62 +757,20 @@ thread_metadata = {
                         "stack_id": 0,
                     },
                 ],
-                "stacks": [(0,)],
+                "stacks": [[0]],
                 "thread_metadata": thread_metadata,
             },
             id="two identical stacks",
         ),
         pytest.param(
-            10,
-            0,
-            1,
             [
-                (
-                    0,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
-                (
-                    1,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name2", 2, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
+                (0, [("1", sample_stacks[0])]),
+                (1, [("1", sample_stacks[1])]),
             ],
             {
                 "frames": [
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name1",
-                        "filename": "file.py",
-                        "lineno": 1,
-                        "module": "file",
-                    },
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name2",
-                        "filename": "file.py",
-                        "lineno": 2,
-                        "module": "file",
-                    },
+                    sample_stacks[0][2][0],
+                    sample_stacks[1][2][0],
                 ],
                 "samples": [
                     {
@@ -601,166 +784,33 @@ thread_metadata = {
                         "stack_id": 1,
                     },
                 ],
-                "stacks": [(0,), (0, 1)],
+                "stacks": [[0], [1, 0]],
                 "thread_metadata": thread_metadata,
             },
-            id="two identical frames",
-        ),
-        pytest.param(
-            10,
-            0,
-            1,
-            [
-                (
-                    0,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name2", 2, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
-                (
-                    1,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name3", 3, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name4", 4, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
-            ],
-            {
-                "frames": [
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name1",
-                        "filename": "file.py",
-                        "lineno": 1,
-                        "module": "file",
-                    },
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name2",
-                        "filename": "file.py",
-                        "lineno": 2,
-                        "module": "file",
-                    },
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name3",
-                        "filename": "file.py",
-                        "lineno": 3,
-                        "module": "file",
-                    },
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name4",
-                        "filename": "file.py",
-                        "lineno": 4,
-                        "module": "file",
-                    },
-                ],
-                "samples": [
-                    {
-                        "elapsed_since_start_ns": "0",
-                        "thread_id": "1",
-                        "stack_id": 0,
-                    },
-                    {
-                        "elapsed_since_start_ns": "1",
-                        "thread_id": "1",
-                        "stack_id": 1,
-                    },
-                ],
-                "stacks": [(0, 1), (2, 3)],
-                "thread_metadata": thread_metadata,
-            },
-            id="two unique stacks",
-        ),
-        pytest.param(
-            1,
-            0,
-            1,
-            [
-                (
-                    0,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name1", 1, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
-                (
-                    1,
-                    [
-                        (
-                            "1",
-                            (
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name2", 2, "file"
-                                ),
-                                RawFrameData(
-                                    "/path/to/file.py", "file.py", "name3", 3, "file"
-                                ),
-                            ),
-                        )
-                    ],
-                ),
-            ],
-            {
-                "frames": [
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name2",
-                        "filename": "file.py",
-                        "lineno": 2,
-                        "module": "file",
-                    },
-                    {
-                        "abs_path": "/path/to/file.py",
-                        "function": "name3",
-                        "filename": "file.py",
-                        "lineno": 3,
-                        "module": "file",
-                    },
-                ],
-                "samples": [
-                    {
-                        "elapsed_since_start_ns": "1",
-                        "thread_id": "1",
-                        "stack_id": 0,
-                    },
-                ],
-                "stacks": [(0, 1)],
-                "thread_metadata": thread_metadata,
-            },
-            id="wraps around buffer",
+            id="two identical stacks",
         ),
     ],
 )
-def test_sample_buffer(capacity, start_ns, stop_ns, samples, profile):
-    buffer = SampleBuffer(capacity)
-    for ts, sample in samples:
-        buffer.write(ts, sample)
-    result = buffer.slice_profile(start_ns, stop_ns)
-    assert result == profile
+@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 5)
+def test_profile_processing(
+    DictionaryContaining,  # noqa: N803
+    samples,
+    expected,
+):
+    with NoopScheduler(frequency=1000) as scheduler:
+        transaction = Transaction(sampled=True)
+        with Profile(transaction, scheduler=scheduler) as profile:
+            for ts, sample in samples:
+                # force the sample to be written at a time relative to the
+                # start of the profile
+                now = profile.start_ns + ts
+                profile.write(now, sample)
+
+            processed = profile.process()
+
+            assert processed["thread_metadata"] == DictionaryContaining(
+                expected["thread_metadata"]
+            )
+            assert processed["frames"] == expected["frames"]
+            assert processed["stacks"] == expected["stacks"]
+            assert processed["samples"] == expected["samples"]

@@ -5,16 +5,18 @@ import sys
 import threading
 import weakref
 
-from sentry_sdk._types import MYPY
-from sentry_sdk.consts import OP
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
+    AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    SENSITIVE_DATA_SUBSTITUTE,
     logger,
     capture_internal_exceptions,
     event_from_exception,
@@ -28,6 +30,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 try:
     from django import VERSION as DJANGO_VERSION
+    from django.conf import settings as django_settings
     from django.core import signals
 
     try:
@@ -36,7 +39,6 @@ try:
         from django.core.urlresolvers import resolve
 except ImportError:
     raise DidNotEnable("Django not installed")
-
 
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import (
@@ -47,8 +49,13 @@ from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.views import patch_views
 
+if DJANGO_VERSION[:2] > (1, 8):
+    from sentry_sdk.integrations.django.caching import patch_caching
+else:
+    patch_caching = None  # type: ignore
 
-if MYPY:
+
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -61,6 +68,7 @@ if MYPY:
     from django.http.request import QueryDict
     from django.utils.datastructures import MultiValueDict
 
+    from sentry_sdk.tracing import Span
     from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
@@ -87,9 +95,17 @@ class DjangoIntegration(Integration):
 
     transaction_style = ""
     middleware_spans = None
+    signals_spans = None
+    cache_spans = None
 
-    def __init__(self, transaction_style="url", middleware_spans=True):
-        # type: (str, bool) -> None
+    def __init__(
+        self,
+        transaction_style="url",
+        middleware_spans=True,
+        signals_spans=True,
+        cache_spans=False,
+    ):
+        # type: (str, bool, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -97,6 +113,8 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.signals_spans = signals_spans
+        self.cache_spans = cache_spans
 
     @staticmethod
     def setup_once():
@@ -215,6 +233,9 @@ class DjangoIntegration(Integration):
         patch_views()
         patch_templates()
         patch_signals()
+
+        if patch_caching is not None:
+            patch_caching()
 
 
 _DRF_PATCHED = False
@@ -454,7 +475,6 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
-
         if request is not None and integration.transaction_style == "url":
             with hub.configure_scope() as scope:
                 _attempt_resolve_again(request, scope, integration.transaction_style)
@@ -476,8 +496,20 @@ class DjangoRequestExtractor(RequestExtractor):
         return self.request.META
 
     def cookies(self):
-        # type: () -> Dict[str, str]
-        return self.request.COOKIES
+        # type: () -> Dict[str, Union[str, AnnotatedValue]]
+        privacy_cookies = [
+            django_settings.CSRF_COOKIE_NAME,
+            django_settings.SESSION_COOKIE_NAME,
+        ]
+
+        clean_cookies = {}  # type: Dict[str, Union[str, AnnotatedValue]]
+        for key, val in self.request.COOKIES.items():
+            if key in privacy_cookies:
+                clean_cookies[key] = SENSITIVE_DATA_SUBSTITUTE
+            else:
+                clean_cookies[key] = val
+
+        return clean_cookies
 
     def raw_data(self):
         # type: () -> bytes
@@ -559,7 +591,8 @@ def install_sql_hook():
 
         with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
-        ):
+        ) as span:
+            _set_db_system_on_span(span, self.db.vendor)
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -570,7 +603,8 @@ def install_sql_hook():
 
         with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
-        ):
+        ) as span:
+            _set_db_system_on_span(span, self.db.vendor)
             return real_executemany(self, sql, param_list)
 
     def connect(self):
@@ -582,10 +616,18 @@ def install_sql_hook():
         with capture_internal_exceptions():
             hub.add_breadcrumb(message="connect", category="query")
 
-        with hub.start_span(op=OP.DB, description="connect"):
+        with hub.start_span(op=OP.DB, description="connect") as span:
+            _set_db_system_on_span(span, self.vendor)
             return real_connect(self)
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
     ignore_logger("django.db.backends")
+
+
+# https://github.com/django/django/blob/6a0dc2176f4ebf907e124d433411e52bba39a28e/django/db/backends/base/base.py#L29
+# Avaliable in Django 1.8+
+def _set_db_system_on_span(span, vendor):
+    # type: (Span, str) -> None
+    span.set_data(SPANDATA.DB_SYSTEM, vendor)

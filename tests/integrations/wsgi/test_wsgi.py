@@ -140,6 +140,8 @@ def test_transaction_with_error(
     assert error_event["transaction"] == "generic WSGI request"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
+    assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert (
         error_event["exception"]["values"][0]["value"]
         == "Fetch aborted. The ball was not returned."
@@ -287,21 +289,11 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
 @pytest.mark.skipif(
     sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
 )
-@pytest.mark.parametrize(
-    "profiles_sample_rate,profile_count",
-    [
-        pytest.param(1.0, 1, id="profiler sampled at 1.0"),
-        pytest.param(0.75, 1, id="profiler sampled at 0.75"),
-        pytest.param(0.25, 0, id="profiler not sampled at 0.25"),
-        pytest.param(None, 0, id="profiler not enabled"),
-    ],
-)
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_sent(
-    capture_envelopes,
     sentry_init,
+    capture_envelopes,
     teardown_profiling,
-    profiles_sample_rate,
-    profile_count,
 ):
     def test_app(environ, start_response):
         start_response("200 OK", [])
@@ -309,17 +301,16 @@ def test_profile_sent(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": profiles_sample_rate},
+        _experiments={"profiles_sample_rate": 1.0},
     )
     app = SentryWsgiMiddleware(test_app)
     envelopes = capture_envelopes()
 
-    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
-        client = Client(app)
-        client.get("/")
+    client = Client(app)
+    client.get("/")
 
-    count_item_types = Counter()
-    for envelope in envelopes:
-        for item in envelope.items:
-            count_item_types[item.type] += 1
-    assert count_item_types["profile"] == profile_count
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1

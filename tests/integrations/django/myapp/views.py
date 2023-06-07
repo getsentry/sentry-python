@@ -1,16 +1,23 @@
+import json
+import threading
+
 from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
+from django.template import Context, Template
 from django.template.response import TemplateResponse
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
 
+
 try:
     from rest_framework.decorators import api_view
+    from rest_framework.response import Response
 
     @api_view(["POST"])
     def rest_framework_exc(request):
@@ -29,6 +36,10 @@ try:
     def rest_permission_denied_exc(request):
         raise PermissionDenied("bye")
 
+    @api_view(["GET"])
+    def rest_json_response(request):
+        return Response(dict(ok=True))
+
 except ImportError:
     pass
 
@@ -39,6 +50,28 @@ import sentry_sdk
 @csrf_exempt
 def view_exc(request):
     1 / 0
+
+
+@cache_page(60)
+def cached_view(request):
+    return HttpResponse("ok")
+
+
+def not_cached_view(request):
+    return HttpResponse("ok")
+
+
+def view_with_cached_template_fragment(request):
+    template = Template(
+        """{% load cache %}
+        Not cached content goes here.
+        {% cache 500 some_identifier %}
+            And here some cached content.
+        {% endcache %}
+        """
+    )
+    rendered = template.render(Context({}))
+    return HttpResponse(rendered)
 
 
 # This is a "class based view" as previously found in the sentry codebase. The
@@ -154,6 +187,16 @@ def csrf_hello_not_exempt(*args, **kwargs):
     return HttpResponse("ok")
 
 
+def thread_ids_sync(*args, **kwargs):
+    response = json.dumps(
+        {
+            "main": threading.main_thread().ident,
+            "active": threading.current_thread().ident,
+        }
+    )
+    return HttpResponse(response)
+
+
 if VERSION >= (3, 1):
     # Use exec to produce valid Python 2
     exec(
@@ -168,6 +211,16 @@ if VERSION >= (3, 1):
     await asyncio.sleep(1)
     return HttpResponse('Hello World')"""
     )
+
+    exec(
+        """async def thread_ids_async(request):
+    response = json.dumps({
+        "main": threading.main_thread().ident,
+        "active": threading.current_thread().ident,
+    })
+    return HttpResponse(response)"""
+    )
 else:
     async_message = None
     my_async_view = None
+    thread_ids_async = None

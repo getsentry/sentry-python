@@ -2,46 +2,83 @@ import base64
 import json
 import linecache
 import logging
+import math
 import os
+import re
+import subprocess
 import sys
 import threading
-import subprocess
-import re
 import time
+from collections import namedtuple
+from copy import copy
+from decimal import Decimal
+from numbers import Real
+
+try:
+    # Python 3
+    from urllib.parse import parse_qs
+    from urllib.parse import unquote
+    from urllib.parse import urlencode
+    from urllib.parse import urlsplit
+    from urllib.parse import urlunsplit
+
+except ImportError:
+    # Python 2
+    from cgi import parse_qs  # type: ignore
+    from urllib import unquote  # type: ignore
+    from urllib import urlencode  # type: ignore
+    from urlparse import urlsplit  # type: ignore
+    from urlparse import urlunsplit  # type: ignore
+
+try:
+    # Python 3.11
+    from builtins import BaseExceptionGroup
+except ImportError:
+    # Python 3.10 and below
+    BaseExceptionGroup = None  # type: ignore
 
 from datetime import datetime
+from functools import partial
+
+try:
+    from functools import partialmethod
+
+    _PARTIALMETHOD_AVAILABLE = True
+except ImportError:
+    _PARTIALMETHOD_AVAILABLE = False
 
 import sentry_sdk
-from sentry_sdk._compat import urlparse, text_type, implements_str, PY2, PY33, PY37
+from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
+from sentry_sdk._types import TYPE_CHECKING
 
-from sentry_sdk._types import MYPY
+if TYPE_CHECKING:
+    from types import FrameType, TracebackType
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Iterator,
+        List,
+        Optional,
+        Set,
+        Tuple,
+        Type,
+        Union,
+    )
 
-if MYPY:
-    from types import FrameType
-    from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import ContextManager
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import Set
-    from typing import Tuple
-    from typing import Union
-    from typing import Type
-
-    from sentry_sdk._types import ExcInfo, EndpointType
+    from sentry_sdk._types import EndpointType, ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
-
 
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
 MAX_STRING_LENGTH = 1024
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
+
+SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 
 def json_dumps(data):
@@ -363,8 +400,24 @@ class AnnotatedValue(object):
             },
         )
 
+    @classmethod
+    def substituted_because_contains_sensitive_data(cls):
+        # type: () -> AnnotatedValue
+        """The actual value was removed because it contained sensitive information."""
+        return AnnotatedValue(
+            value=SENSITIVE_DATA_SUBSTITUTE,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
+                        "s",  # The fields original value was substituted
+                    ]
+                ]
+            },
+        )
 
-if MYPY:
+
+if TYPE_CHECKING:
     from typing import TypeVar
 
     T = TypeVar("T")
@@ -548,8 +601,10 @@ def filename_for_module(module, abs_path):
         return abs_path
 
 
-def serialize_frame(frame, tb_lineno=None, with_locals=True):
-    # type: (FrameType, Optional[int], bool) -> Dict[str, Any]
+def serialize_frame(
+    frame, tb_lineno=None, include_local_variables=True, include_source_context=True
+):
+    # type: (FrameType, Optional[int], bool, bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -565,33 +620,40 @@ def serialize_frame(frame, tb_lineno=None, with_locals=True):
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
-    pre_context, context_line, post_context = get_source_context(frame, tb_lineno)
-
     rv = {
         "filename": filename_for_module(module, abs_path) or None,
         "abs_path": os.path.abspath(abs_path) if abs_path else None,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
-        "pre_context": pre_context,
-        "context_line": context_line,
-        "post_context": post_context,
     }  # type: Dict[str, Any]
-    if with_locals:
-        rv["vars"] = frame.f_locals
+
+    if include_source_context:
+        rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
+            frame, tb_lineno
+        )
+
+    if include_local_variables:
+        rv["vars"] = copy(frame.f_locals)
 
     return rv
 
 
-def current_stacktrace(with_locals=True):
-    # type: (bool) -> Any
+def current_stacktrace(include_local_variables=True, include_source_context=True):
+    # type: (bool, bool) -> Any
     __tracebackhide__ = True
     frames = []
 
     f = sys._getframe()  # type: Optional[FrameType]
     while f is not None:
         if not should_hide_frame(f):
-            frames.append(serialize_frame(f, with_locals=with_locals))
+            frames.append(
+                serialize_frame(
+                    f,
+                    include_local_variables=include_local_variables,
+                    include_source_context=include_source_context,
+                )
+            )
         f = f.f_back
 
     frames.reverse()
@@ -610,40 +672,76 @@ def single_exception_from_error_tuple(
     tb,  # type: Optional[TracebackType]
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
+    exception_id=None,  # type: Optional[int]
+    parent_id=None,  # type: Optional[int]
+    source=None,  # type: Optional[str]
 ):
     # type: (...) -> Dict[str, Any]
+    """
+    Creates a dict that goes into the events `exception.values` list and is ingestible by Sentry.
+
+    See the Exception Interface documentation for more details:
+    https://develop.sentry.dev/sdk/event-payloads/exception/
+    """
+    exception_value = {}  # type: Dict[str, Any]
+    exception_value["mechanism"] = (
+        mechanism.copy() if mechanism else {"type": "generic", "handled": True}
+    )
+    if exception_id is not None:
+        exception_value["mechanism"]["exception_id"] = exception_id
+
     if exc_value is not None:
         errno = get_errno(exc_value)
     else:
         errno = None
 
     if errno is not None:
-        mechanism = mechanism or {"type": "generic"}
-        mechanism.setdefault("meta", {}).setdefault("errno", {}).setdefault(
-            "number", errno
-        )
+        exception_value["mechanism"].setdefault("meta", {}).setdefault(
+            "errno", {}
+        ).setdefault("number", errno)
+
+    if source is not None:
+        exception_value["mechanism"]["source"] = source
+
+    is_root_exception = exception_id == 0
+    if not is_root_exception and parent_id is not None:
+        exception_value["mechanism"]["parent_id"] = parent_id
+        exception_value["mechanism"]["type"] = "chained"
+
+    if is_root_exception and "type" not in exception_value["mechanism"]:
+        exception_value["mechanism"]["type"] = "generic"
+
+    is_exception_group = BaseExceptionGroup is not None and isinstance(
+        exc_value, BaseExceptionGroup
+    )
+    if is_exception_group:
+        exception_value["mechanism"]["is_exception_group"] = True
+
+    exception_value["module"] = get_type_module(exc_type)
+    exception_value["type"] = get_type_name(exc_type)
+    exception_value["value"] = getattr(exc_value, "message", safe_str(exc_value))
 
     if client_options is None:
-        with_locals = True
+        include_local_variables = True
+        include_source_context = True
     else:
-        with_locals = client_options["with_locals"]
+        include_local_variables = client_options["include_local_variables"]
+        include_source_context = client_options["include_source_context"]
 
     frames = [
-        serialize_frame(tb.tb_frame, tb_lineno=tb.tb_lineno, with_locals=with_locals)
+        serialize_frame(
+            tb.tb_frame,
+            tb_lineno=tb.tb_lineno,
+            include_local_variables=include_local_variables,
+            include_source_context=include_source_context,
+        )
         for tb in iter_stacks(tb)
     ]
 
-    rv = {
-        "module": get_type_module(exc_type),
-        "type": get_type_name(exc_type),
-        "value": safe_str(exc_value),
-        "mechanism": mechanism,
-    }
-
     if frames:
-        rv["stacktrace"] = {"frames": frames}
+        exception_value["stacktrace"] = {"frames": frames}
 
-    return rv
+    return exception_value
 
 
 HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
@@ -687,6 +785,104 @@ else:
         yield exc_info
 
 
+def exceptions_from_error(
+    exc_type,  # type: Optional[type]
+    exc_value,  # type: Optional[BaseException]
+    tb,  # type: Optional[TracebackType]
+    client_options=None,  # type: Optional[Dict[str, Any]]
+    mechanism=None,  # type: Optional[Dict[str, Any]]
+    exception_id=0,  # type: int
+    parent_id=0,  # type: int
+    source=None,  # type: Optional[str]
+):
+    # type: (...) -> Tuple[int, List[Dict[str, Any]]]
+    """
+    Creates the list of exceptions.
+    This can include chained exceptions and exceptions from an ExceptionGroup.
+
+    See the Exception Interface documentation for more details:
+    https://develop.sentry.dev/sdk/event-payloads/exception/
+    """
+
+    parent = single_exception_from_error_tuple(
+        exc_type=exc_type,
+        exc_value=exc_value,
+        tb=tb,
+        client_options=client_options,
+        mechanism=mechanism,
+        exception_id=exception_id,
+        parent_id=parent_id,
+        source=source,
+    )
+    exceptions = [parent]
+
+    parent_id = exception_id
+    exception_id += 1
+
+    should_supress_context = (
+        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    )
+    if should_supress_context:
+        # Add direct cause.
+        # The field `__cause__` is set when raised with the exception (using the `from` keyword).
+        exception_has_cause = (
+            exc_value
+            and hasattr(exc_value, "__cause__")
+            and exc_value.__cause__ is not None
+        )
+        if exception_has_cause:
+            cause = exc_value.__cause__  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(cause),
+                exc_value=cause,
+                tb=getattr(cause, "__traceback__", None),
+                client_options=client_options,
+                mechanism=mechanism,
+                exception_id=exception_id,
+                source="__cause__",
+            )
+            exceptions.extend(child_exceptions)
+
+    else:
+        # Add indirect cause.
+        # The field `__context__` is assigned if another exception occurs while handling the exception.
+        exception_has_content = (
+            exc_value
+            and hasattr(exc_value, "__context__")
+            and exc_value.__context__ is not None
+        )
+        if exception_has_content:
+            context = exc_value.__context__  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(context),
+                exc_value=context,
+                tb=getattr(context, "__traceback__", None),
+                client_options=client_options,
+                mechanism=mechanism,
+                exception_id=exception_id,
+                source="__context__",
+            )
+            exceptions.extend(child_exceptions)
+
+    # Add exceptions from an ExceptionGroup.
+    is_exception_group = exc_value and hasattr(exc_value, "exceptions")
+    if is_exception_group:
+        for idx, e in enumerate(exc_value.exceptions):  # type: ignore
+            (exception_id, child_exceptions) = exceptions_from_error(
+                exc_type=type(e),
+                exc_value=e,
+                tb=getattr(e, "__traceback__", None),
+                client_options=client_options,
+                mechanism=mechanism,
+                exception_id=exception_id,
+                parent_id=parent_id,
+                source="exceptions[%s]" % idx,
+            )
+            exceptions.extend(child_exceptions)
+
+    return (exception_id, exceptions)
+
+
 def exceptions_from_error_tuple(
     exc_info,  # type: ExcInfo
     client_options=None,  # type: Optional[Dict[str, Any]]
@@ -694,17 +890,34 @@ def exceptions_from_error_tuple(
 ):
     # type: (...) -> List[Dict[str, Any]]
     exc_type, exc_value, tb = exc_info
-    rv = []
-    for exc_type, exc_value, tb in walk_exception_chain(exc_info):
-        rv.append(
-            single_exception_from_error_tuple(
-                exc_type, exc_value, tb, client_options, mechanism
-            )
+
+    is_exception_group = BaseExceptionGroup is not None and isinstance(
+        exc_value, BaseExceptionGroup
+    )
+
+    if is_exception_group:
+        (_, exceptions) = exceptions_from_error(
+            exc_type=exc_type,
+            exc_value=exc_value,
+            tb=tb,
+            client_options=client_options,
+            mechanism=mechanism,
+            exception_id=0,
+            parent_id=0,
         )
 
-    rv.reverse()
+    else:
+        exceptions = []
+        for exc_type, exc_value, tb in walk_exception_chain(exc_info):
+            exceptions.append(
+                single_exception_from_error_tuple(
+                    exc_type, exc_value, tb, client_options, mechanism
+                )
+            )
 
-    return rv
+    exceptions.reverse()
+
+    return exceptions
 
 
 def to_string(value):
@@ -736,44 +949,54 @@ def iter_event_frames(event):
             yield frame
 
 
-def handle_in_app(event, in_app_exclude=None, in_app_include=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]]) -> Dict[str, Any]
+def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
+    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
     for stacktrace in iter_event_stacktraces(event):
-        handle_in_app_impl(
+        set_in_app_in_frames(
             stacktrace.get("frames"),
             in_app_exclude=in_app_exclude,
             in_app_include=in_app_include,
+            project_root=project_root,
         )
 
     return event
 
 
-def handle_in_app_impl(frames, in_app_exclude, in_app_include):
-    # type: (Any, Optional[List[str]], Optional[List[str]]) -> Optional[Any]
+def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=None):
+    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> Optional[Any]
     if not frames:
         return None
 
-    any_in_app = False
     for frame in frames:
-        in_app = frame.get("in_app")
-        if in_app is not None:
-            if in_app:
-                any_in_app = True
+        # if frame has already been marked as in_app, skip it
+        current_in_app = frame.get("in_app")
+        if current_in_app is not None:
             continue
 
         module = frame.get("module")
-        if not module:
-            continue
-        elif _module_in_set(module, in_app_include):
-            frame["in_app"] = True
-            any_in_app = True
-        elif _module_in_set(module, in_app_exclude):
-            frame["in_app"] = False
 
-    if not any_in_app:
-        for frame in frames:
-            if frame.get("in_app") is None:
-                frame["in_app"] = True
+        # check if module in frame is in the list of modules to include
+        if _module_in_list(module, in_app_include):
+            frame["in_app"] = True
+            continue
+
+        # check if module in frame is in the list of modules to exclude
+        if _module_in_list(module, in_app_exclude):
+            frame["in_app"] = False
+            continue
+
+        # if frame has no abs_path, skip further checks
+        abs_path = frame.get("abs_path")
+        if abs_path is None:
+            continue
+
+        if _is_external_source(abs_path):
+            frame["in_app"] = False
+            continue
+
+        if _is_in_project_root(abs_path, project_root):
+            frame["in_app"] = True
+            continue
 
     return frames
 
@@ -821,13 +1044,39 @@ def event_from_exception(
     )
 
 
-def _module_in_set(name, set):
+def _module_in_list(name, items):
     # type: (str, Optional[List[str]]) -> bool
-    if not set:
+    if name is None:
         return False
-    for item in set or ():
+
+    if not items:
+        return False
+
+    for item in items:
         if item == name or name.startswith(item + "."):
             return True
+
+    return False
+
+
+def _is_external_source(abs_path):
+    # type: (str) -> bool
+    # check if frame is in 'site-packages' or 'dist-packages'
+    external_source = (
+        re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
+    )
+    return external_source
+
+
+def _is_in_project_root(abs_path, project_root):
+    # type: (str, Optional[str]) -> bool
+    if project_root is None:
+        return False
+
+    # check if path is in the project root
+    if abs_path.startswith(project_root):
+        return True
+
     return False
 
 
@@ -968,9 +1217,12 @@ Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more in
 """
 
 
-def transaction_from_function(func):
+def qualname_from_function(func):
     # type: (Callable[..., Any]) -> Optional[str]
-    # Methods in Python 2
+    """Return the qualified name of func. Works with regular function, lambda, partial and partialmethod."""
+    func_qualname = None  # type: Optional[str]
+
+    # Python 2
     try:
         return "%s.%s.%s" % (
             func.im_class.__module__,  # type: ignore
@@ -980,24 +1232,36 @@ def transaction_from_function(func):
     except Exception:
         pass
 
-    func_qualname = (
-        getattr(func, "__qualname__", None) or getattr(func, "__name__", None) or None
-    )  # type: Optional[str]
+    prefix, suffix = "", ""
 
-    if not func_qualname:
-        # No idea what it is
-        return None
+    if (
+        _PARTIALMETHOD_AVAILABLE
+        and hasattr(func, "_partialmethod")
+        and isinstance(func._partialmethod, partialmethod)
+    ):
+        prefix, suffix = "partialmethod(<function ", ">)"
+        func = func._partialmethod.func
+    elif isinstance(func, partial) and hasattr(func.func, "__name__"):
+        prefix, suffix = "partial(<function ", ">)"
+        func = func.func
 
-    # Methods in Python 3
-    # Functions
-    # Classes
-    try:
-        return "%s.%s" % (func.__module__, func_qualname)
-    except Exception:
-        pass
+    if hasattr(func, "__qualname__"):
+        func_qualname = func.__qualname__
+    elif hasattr(func, "__name__"):  # Python 2.7 has no __qualname__
+        func_qualname = func.__name__
 
-    # Possibly a lambda
+    # Python 3: methods, functions, classes
+    if func_qualname is not None:
+        if hasattr(func, "__module__"):
+            func_qualname = func.__module__ + "." + func_qualname
+        func_qualname = prefix + func_qualname + suffix
+
     return func_qualname
+
+
+def transaction_from_function(func):
+    # type: (Callable[..., Any]) -> Optional[str]
+    return qualname_from_function(func)
 
 
 disable_capture_event = ContextVar("disable_capture_event")
@@ -1086,6 +1350,177 @@ def from_base64(base64_string):
     return utf8_string
 
 
+Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
+
+
+def sanitize_url(url, remove_authority=True, remove_query_values=True):
+    # type: (str, bool, bool) -> str
+    """
+    Removes the authority and query parameter values from a given URL.
+    """
+    parsed_url = urlsplit(url)
+    query_params = parse_qs(parsed_url.query, keep_blank_values=True)
+
+    # strip username:password (netloc can be usr:pwd@example.com)
+    if remove_authority:
+        netloc_parts = parsed_url.netloc.split("@")
+        if len(netloc_parts) > 1:
+            netloc = "%s:%s@%s" % (
+                SENSITIVE_DATA_SUBSTITUTE,
+                SENSITIVE_DATA_SUBSTITUTE,
+                netloc_parts[-1],
+            )
+        else:
+            netloc = parsed_url.netloc
+    else:
+        netloc = parsed_url.netloc
+
+    # strip values from query string
+    if remove_query_values:
+        query_string = unquote(
+            urlencode({key: SENSITIVE_DATA_SUBSTITUTE for key in query_params})
+        )
+    else:
+        query_string = parsed_url.query
+
+    safe_url = urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=netloc,
+            query=query_string,
+            path=parsed_url.path,
+            fragment=parsed_url.fragment,
+        )
+    )
+
+    return safe_url
+
+
+ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
+
+
+def parse_url(url, sanitize=True):
+    # type: (str, bool) -> ParsedUrl
+    """
+    Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
+    parameters will be sanitized to remove sensitive data. The autority (username and password)
+    in the URL will always be removed.
+    """
+    url = sanitize_url(url, remove_authority=True, remove_query_values=sanitize)
+
+    parsed_url = urlsplit(url)
+    base_url = urlunsplit(
+        Components(
+            scheme=parsed_url.scheme,
+            netloc=parsed_url.netloc,
+            query="",
+            path=parsed_url.path,
+            fragment="",
+        )
+    )
+
+    return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+
+
+def is_valid_sample_rate(rate, source):
+    # type: (Any, str) -> bool
+    """
+    Checks the given sample rate to make sure it is valid type and value (a
+    boolean or a number between 0 and 1, inclusive).
+    """
+
+    # both booleans and NaN are instances of Real, so a) checking for Real
+    # checks for the possibility of a boolean also, and b) we have to check
+    # separately for NaN and Decimal does not derive from Real so need to check that too
+    if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
+        logger.warning(
+            "{source} Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
+                source=source, rate=rate, type=type(rate)
+            )
+        )
+        return False
+
+    # in case rate is a boolean, it will get cast to 1 if it's True and 0 if it's False
+    rate = float(rate)
+    if rate < 0 or rate > 1:
+        logger.warning(
+            "{source} Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
+                source=source, rate=rate
+            )
+        )
+        return False
+
+    return True
+
+
+def match_regex_list(item, regex_list=None, substring_matching=False):
+    # type: (str, Optional[List[str]], bool) -> bool
+    if regex_list is None:
+        return False
+
+    for item_matcher in regex_list:
+        if not substring_matching and item_matcher[-1] != "$":
+            item_matcher += "$"
+
+        matched = re.search(item_matcher, item)
+        if matched:
+            return True
+
+    return False
+
+
+def parse_version(version):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    """
+    Parses a version string into a tuple of integers.
+    This uses the parsing loging from PEP 440:
+    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+    """
+    VERSION_PATTERN = r"""  # noqa: N806
+        v?
+        (?:
+            (?:(?P<epoch>[0-9]+)!)?                           # epoch
+            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+            (?P<pre>                                          # pre-release
+                [-_\.]?
+                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+                [-_\.]?
+                (?P<pre_n>[0-9]+)?
+            )?
+            (?P<post>                                         # post release
+                (?:-(?P<post_n1>[0-9]+))
+                |
+                (?:
+                    [-_\.]?
+                    (?P<post_l>post|rev|r)
+                    [-_\.]?
+                    (?P<post_n2>[0-9]+)?
+                )
+            )?
+            (?P<dev>                                          # dev release
+                [-_\.]?
+                (?P<dev_l>dev)
+                [-_\.]?
+                (?P<dev_n>[0-9]+)?
+            )?
+        )
+        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+    """
+
+    pattern = re.compile(
+        r"^\s*" + VERSION_PATTERN + r"\s*$",
+        re.VERBOSE | re.IGNORECASE,
+    )
+
+    try:
+        release = pattern.match(version).groupdict()["release"]  # type: ignore
+        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+    return release_tuple
+
+
 if PY37:
 
     def nanosecond_time():
@@ -1096,12 +1531,23 @@ elif PY33:
 
     def nanosecond_time():
         # type: () -> int
-
         return int(time.perf_counter() * 1e9)
 
 else:
 
     def nanosecond_time():
         # type: () -> int
-
         raise AttributeError
+
+
+if PY2:
+
+    def now():
+        # type: () -> float
+        return time.time()
+
+else:
+
+    def now():
+        # type: () -> float
+        return time.perf_counter()

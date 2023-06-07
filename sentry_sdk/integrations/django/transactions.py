@@ -7,9 +7,9 @@ from __future__ import absolute_import
 
 import re
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from django.urls.resolvers import URLResolver
     from typing import Dict
     from typing import List
@@ -37,7 +37,7 @@ def get_regex(resolver_or_pattern):
 
 class RavenResolver(object):
     _optional_group_matcher = re.compile(r"\(\?\:([^\)]+)\)")
-    _named_group_matcher = re.compile(r"\(\?P<(\w+)>[^\)]+\)+")
+    _named_group_matcher = re.compile(r"\(\?P<(\w+)>.*\)")
     _non_named_group_matcher = re.compile(r"\([^\)]+\)")
     # [foo|bar|baz]
     _either_option_matcher = re.compile(r"\[([^\]]+)\|([^\]]+)\]")

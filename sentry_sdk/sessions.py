@@ -6,10 +6,10 @@ from contextlib import contextmanager
 import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.session import Session
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import format_timestamp
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -93,7 +93,7 @@ class SessionFlusher(object):
 
             envelope.add_session(session)
 
-        for (attrs, states) in pending_aggregates.items():
+        for attrs, states in pending_aggregates.items():
             if len(envelope.items) == MAX_ENVELOPE_ITEMS:
                 self.capture_func(envelope)
                 envelope = Envelope()

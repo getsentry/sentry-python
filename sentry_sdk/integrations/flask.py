@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -10,9 +10,10 @@ from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
 )
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
     from sentry_sdk._types import EventProcessor
@@ -26,7 +27,7 @@ except ImportError:
     flask_login = None
 
 try:
-    from flask import Flask, Markup, Request  # type: ignore
+    from flask import Flask, Request  # type: ignore
     from flask import __version__ as FLASK_VERSION
     from flask import request as flask_request
     from flask.signals import (
@@ -34,6 +35,7 @@ try:
         got_request_exception,
         request_started,
     )
+    from markupsafe import Markup
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
@@ -63,16 +65,13 @@ class FlaskIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        # This version parsing is absolutely naive but the alternative is to
-        # import pkg_resources which slows down the SDK a lot.
-        try:
-            version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
-            # It's probably a release candidate, we assume it's fine.
-            pass
-        else:
-            if version < (0, 10):
-                raise DidNotEnable("Flask 0.10 or newer is required.")
+        version = parse_version(FLASK_VERSION)
+
+        if version is None:
+            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
+
+        if version < (0, 10):
+            raise DidNotEnable("Flask 0.10 or newer is required.")
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
@@ -173,7 +172,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def json(self):
         # type: () -> Any
-        return self.request.get_json()
+        return self.request.get_json(silent=True)
 
     def size_of_file(self, file):
         # type: (FileStorage) -> int
@@ -261,6 +260,5 @@ def _add_user_to_event(event):
 
         try:
             user_info.setdefault("username", user.username)
-            user_info.setdefault("username", user.email)
         except Exception:
             pass

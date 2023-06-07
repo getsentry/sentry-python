@@ -15,3 +15,7 @@ extend-ignore =
   # is a worse version of and conflicts with B902 (first argument of a classmethod should be named cls)
   N804,
 extend-exclude=checkouts,lol*
+exclude =
+  # gRCP generated files
+  grpc_test_service_pb2.py
+  grpc_test_service_pb2_grpc.py

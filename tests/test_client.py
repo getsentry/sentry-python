@@ -22,8 +22,14 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
+from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -291,8 +297,48 @@ def test_ignore_errors(sentry_init, capture_events):
     pytest.raises(EventCapturedError, lambda: e(ValueError()))
 
 
-def test_with_locals_enabled(sentry_init, capture_events):
-    sentry_init(with_locals=True)
+def test_with_locals_deprecation_enabled(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(with_locals=True)
+
+        client = Hub.current.client
+        assert "with_locals" not in client.options
+        assert "include_local_variables" in client.options
+        assert client.options["include_local_variables"]
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        )
+
+
+def test_with_locals_deprecation_disabled(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(with_locals=False)
+
+        client = Hub.current.client
+        assert "with_locals" not in client.options
+        assert "include_local_variables" in client.options
+        assert not client.options["include_local_variables"]
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        )
+
+
+def test_include_local_variables_deprecation(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(include_local_variables=False)
+
+        client = Hub.current.client
+        assert "with_locals" not in client.options
+        assert "include_local_variables" in client.options
+        assert not client.options["include_local_variables"]
+
+        fake_warning.assert_not_called()
+
+
+def test_include_local_variables_enabled(sentry_init, capture_events):
+    sentry_init(include_local_variables=True)
     events = capture_events()
     try:
         1 / 0
@@ -307,8 +353,8 @@ def test_with_locals_enabled(sentry_init, capture_events):
     )
 
 
-def test_with_locals_disabled(sentry_init, capture_events):
-    sentry_init(with_locals=False)
+def test_include_local_variables_disabled(sentry_init, capture_events):
+    sentry_init(include_local_variables=False)
     events = capture_events()
     try:
         1 / 0
@@ -321,6 +367,38 @@ def test_with_locals_disabled(sentry_init, capture_events):
         "vars" not in frame
         for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
     )
+
+
+def test_include_source_context_enabled(sentry_init, capture_events):
+    sentry_init(include_source_context=True)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "post_context" in frame
+    assert "pre_context" in frame
+    assert "context_line" in frame
+
+
+def test_include_source_context_disabled(sentry_init, capture_events):
+    sentry_init(include_source_context=False)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "post_context" not in frame
+    assert "pre_context" not in frame
+    assert "context_line" not in frame
 
 
 @pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])
@@ -372,7 +450,7 @@ def test_attach_stacktrace_enabled(sentry_init, capture_events):
 
 
 def test_attach_stacktrace_enabled_no_locals(sentry_init, capture_events):
-    sentry_init(attach_stacktrace=True, with_locals=False)
+    sentry_init(attach_stacktrace=True, include_local_variables=False)
     events = capture_events()
 
     def foo():
@@ -401,7 +479,6 @@ def test_attach_stacktrace_in_app(sentry_init, capture_events):
     pytest_frames = [f for f in frames if f["module"].startswith("_pytest")]
     assert pytest_frames
     assert all(f["in_app"] is False for f in pytest_frames)
-    assert any(f["in_app"] for f in frames)
 
 
 def test_attach_stacktrace_disabled(sentry_init, capture_events):
@@ -845,7 +922,7 @@ def test_init_string_types(dsn, sentry_init):
     )
 
 
-def test_envelope_types():
+def test_sending_events_with_tracing():
     """
     Tests for calling the right transport method (capture_event vs
     capture_envelope) from the SDK client for different data types.
@@ -861,8 +938,56 @@ def test_envelope_types():
         def capture_event(self, event):
             events.append(event)
 
-    with Hub(Client(traces_sample_rate=1.0, transport=CustomTransport())):
-        event_id = capture_message("hello")
+    with Hub(Client(enable_tracing=True, transport=CustomTransport())):
+        try:
+            1 / 0
+        except Exception:
+            event_id = capture_exception()
+
+        # Assert error events get passed in via capture_envelope
+        assert not events
+        envelope = envelopes.pop()
+        (item,) = envelope.items
+        assert item.data_category == "error"
+        assert item.headers.get("type") == "event"
+        assert item.get_event()["event_id"] == event_id
+
+        with start_transaction(name="foo"):
+            pass
+
+        # Assert transactions get passed in via capture_envelope
+        assert not events
+        envelope = envelopes.pop()
+
+        (item,) = envelope.items
+        assert item.data_category == "transaction"
+        assert item.headers.get("type") == "transaction"
+
+    assert not envelopes
+    assert not events
+
+
+def test_sending_events_with_no_tracing():
+    """
+    Tests for calling the right transport method (capture_event vs
+    capture_envelope) from the SDK client for different data types.
+    """
+
+    envelopes = []
+    events = []
+
+    class CustomTransport(Transport):
+        def capture_envelope(self, envelope):
+            envelopes.append(envelope)
+
+        def capture_event(self, event):
+            events.append(event)
+
+    with Hub(Client(enable_tracing=False, transport=CustomTransport())):
+        try:
+            1 / 0
+        except Exception:
+            event_id = capture_exception()
 
         # Assert error events get passed in via capture_event
         assert not envelopes
@@ -876,11 +1001,7 @@ def test_envelope_types():
 
         # Assert transactions get passed in via capture_envelope
         assert not events
-        envelope = envelopes.pop()
-
-        (item,) = envelope.items
-        assert item.data_category == "transaction"
-        assert item.headers.get("type") == "transaction"
+        assert not envelopes
 
     assert not envelopes
     assert not events

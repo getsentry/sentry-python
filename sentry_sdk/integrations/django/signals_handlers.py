@@ -4,11 +4,12 @@ from __future__ import absolute_import
 from django.dispatch import Signal
 
 from sentry_sdk import Hub
-from sentry_sdk._types import MYPY
+from sentry_sdk._functools import wraps
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import List
@@ -25,8 +26,8 @@ def _get_receiver_name(receiver):
     elif hasattr(
         receiver, "func"
     ):  # certain functions (like partials) dont have a name
-        if hasattr(receiver, "func") and hasattr(receiver.func, "__name__"):  # type: ignore
-            name = "partial(<function " + receiver.func.__name__ + ">)"  # type: ignore
+        if hasattr(receiver, "func") and hasattr(receiver.func, "__name__"):
+            name = "partial(<function " + receiver.func.__name__ + ">)"
 
     if (
         name == ""
@@ -42,6 +43,7 @@ def _get_receiver_name(receiver):
 def patch_signals():
     # type: () -> None
     """Patch django signal receivers to create a span"""
+    from sentry_sdk.integrations.django import DjangoIntegration
 
     old_live_receivers = Signal._live_receivers
 
@@ -52,6 +54,7 @@ def patch_signals():
 
         def sentry_receiver_wrapper(receiver):
             # type: (Callable[..., Any]) -> Callable[..., Any]
+            @wraps(receiver)
             def wrapper(*args, **kwargs):
                 # type: (Any, Any) -> Any
                 signal_name = _get_receiver_name(receiver)
@@ -64,8 +67,10 @@ def patch_signals():
 
             return wrapper
 
-        for idx, receiver in enumerate(receivers):
-            receivers[idx] = sentry_receiver_wrapper(receiver)
+        integration = hub.get_integration(DjangoIntegration)
+        if integration and integration.signals_spans:
+            for idx, receiver in enumerate(receivers):
+                receivers[idx] = sentry_receiver_wrapper(receiver)
 
         return receivers
 

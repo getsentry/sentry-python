@@ -3,10 +3,10 @@ import inspect
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.tracing import NoOpSpan
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
@@ -16,7 +16,14 @@ if MYPY:
     from typing import ContextManager
     from typing import Union
 
-    from sentry_sdk._types import Event, Hint, Breadcrumb, BreadcrumbHint, ExcInfo
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        Breadcrumb,
+        BreadcrumbHint,
+        ExcInfo,
+        MeasurementUnit,
+    )
     from sentry_sdk.tracing import Span, Transaction
 
     T = TypeVar("T")
@@ -45,6 +52,8 @@ __all__ = [
     "set_extra",
     "set_user",
     "set_level",
+    "set_measurement",
+    "get_current_span",
 ]
 
 
@@ -213,3 +222,22 @@ def start_transaction(
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
     return Hub.current.start_transaction(transaction, **kwargs)
+
+
+def set_measurement(name, value, unit=""):
+    # type: (str, float, MeasurementUnit) -> None
+    transaction = Hub.current.scope.transaction
+    if transaction is not None:
+        transaction.set_measurement(name, value, unit)
+
+
+def get_current_span(hub=None):
+    # type: (Optional[Hub]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    if hub is None:
+        hub = Hub.current
+
+    current_span = hub.scope.span
+    return current_span

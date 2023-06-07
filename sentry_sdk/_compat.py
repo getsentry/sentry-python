@@ -1,8 +1,8 @@
 import sys
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
     from typing import Any
@@ -16,6 +16,7 @@ PY2 = sys.version_info[0] == 2
 PY33 = sys.version_info[0] == 3 and sys.version_info[1] >= 3
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
+PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
 
 if PY2:
     import urlparse
@@ -26,6 +27,7 @@ if PY2:
     number_types = (int, long, float)  # noqa
     int_types = (int, long)  # noqa
     iteritems = lambda x: x.iteritems()  # noqa: B301
+    binary_sequence_types = (bytearray, memoryview)
 
     def implements_str(cls):
         # type: (T) -> T
@@ -44,6 +46,7 @@ else:
     number_types = (int, float)  # type: Tuple[type, type]
     int_types = (int,)
     iteritems = lambda x: x.items()
+    binary_sequence_types = (bytes, bytearray, memoryview)
 
     def implements_str(x):
         # type: (T) -> T

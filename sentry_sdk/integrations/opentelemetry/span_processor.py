@@ -24,11 +24,11 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk.utils import Dsn
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-from urllib3.util import parse_url as urlparse  # type: ignore
+from urllib3.util import parse_url as urlparse
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Union
@@ -96,6 +96,14 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         # type: (OTelSpan, SpanContext) -> None
         hub = Hub.current
         if not hub:
+            return
+
+        if not hub.client or (hub.client and not hub.client.dsn):
+            return
+
+        try:
+            _ = Dsn(hub.client.dsn or "")
+        except Exception:
             return
 
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
@@ -217,7 +225,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
         trace_data["parent_sampled"] = (
-            sentry_trace_data[2] if sentry_trace_data else None
+            sentry_trace_data["parent_sampled"] if sentry_trace_data else None
         )
 
         baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
