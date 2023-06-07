@@ -12,7 +12,6 @@ except ImportError:
 
 @pytest.mark.parametrize("sampled", [True, False, None])
 def test_to_traceparent(sentry_init, sampled):
-
     transaction = Transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",

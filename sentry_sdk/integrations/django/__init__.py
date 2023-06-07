@@ -475,7 +475,6 @@ def _got_request_exception(request=None, **kwargs):
     hub = Hub.current
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
-
         if request is not None and integration.transaction_style == "url":
             with hub.configure_scope() as scope:
                 _attempt_resolve_again(request, scope, integration.transaction_style)
@@ -504,7 +503,7 @@ class DjangoRequestExtractor(RequestExtractor):
         ]
 
         clean_cookies = {}  # type: Dict[str, Union[str, AnnotatedValue]]
-        for (key, val) in self.request.COOKIES.items():
+        for key, val in self.request.COOKIES.items():
             if key in privacy_cookies:
                 clean_cookies[key] = SENSITIVE_DATA_SUBSTITUTE
             else:

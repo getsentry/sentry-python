@@ -69,7 +69,6 @@ def patch_app_init() -> None:
     old__init__ = Starlite.__init__
 
     def injection_wrapper(self: "Starlite", *args: "Any", **kwargs: "Any") -> None:
-
         after_exception = kwargs.pop("after_exception", [])
         kwargs.update(
             after_exception=[
