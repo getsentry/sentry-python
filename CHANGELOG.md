@@ -16,7 +16,7 @@ By: @mgaligniana (#1773)
 
 - Better version parsing in integrations (#2152) by @antonpirker
 
-  We now properly support all integration versions that conform to [PEP 440](https://peps.python.org/pep-0440/). This replaces our faulty version parser that wouldn't accept versions such as `2.0.0rc1` or `2.0.5.post1`.
+  We now properly support all integration versions that conform to [PEP 440](https://peps.python.org/pep-0440/). This replaces our naïve version parsing that wouldn't accept versions such as `2.0.0rc1` or `2.0.5.post1`.
 
 - Align HTTP status code as span data field `http.response.status_code` (#2113) by @antonpirker
 - Do not encode cached value to determine size (#2143) by @sentrivana
