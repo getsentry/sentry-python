@@ -93,7 +93,7 @@ def _install_httpx_async_client():
             op=OP.HTTP_CLIENT,
             description="%s %s" % (request.method, parsed_url.url),
         ) as span:
-            if parsed_url is None:
+            if parsed_url is not None:
                 span.set_data(SPANDATA.HTTP_METHOD, request.method)
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
