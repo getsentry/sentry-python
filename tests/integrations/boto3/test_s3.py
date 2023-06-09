@@ -69,7 +69,6 @@ def test_streaming(sentry_init, capture_events):
         "http.method": "GET",
         "aws.request.url": "https://bucket.s3.amazonaws.com/foo.pdf",
         "http.fragment": "",
-        "http.method": "GET",
         "http.query": "",
     }
 
