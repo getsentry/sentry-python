@@ -90,11 +90,10 @@ def _install_httplib():
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (method, parsed_url.url),
+            description="%s %s" % (method, parsed_url.url if parsed_url else "<url>"),
         )
 
         span.set_data(SPANDATA.HTTP_METHOD, method)
-
         if parsed_url is not None:
             span.set_data("url", parsed_url.url)
             span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)

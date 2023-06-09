@@ -48,10 +48,11 @@ def _install_httpx_client():
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (request.method, parsed_url.url),
+            description="%s %s"
+            % (request.method, parsed_url.url if parsed_url else "<url>"),
         ) as span:
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
-                span.set_data(SPANDATA.HTTP_METHOD, request.method)
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
@@ -91,10 +92,11 @@ def _install_httpx_async_client():
 
         with hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (request.method, parsed_url.url),
+            description="%s %s"
+            % (request.method, parsed_url.url if parsed_url else "<url>"),
         ) as span:
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
-                span.set_data(SPANDATA.HTTP_METHOD, request.method)
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
