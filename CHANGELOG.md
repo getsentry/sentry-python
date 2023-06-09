@@ -12,7 +12,7 @@ By: @mgaligniana (#1773)
 
 - Fix `parse_url` (#2161) by @sentrivana and @antonpirker
 
-  Our URL sanitization used in multiple integrations broke with the recent Python security update. If you started seeing `ValueError`s that say `"'Filtered' does not appear to be an IPv4 or IPv6 address"`, this release fixes that. See [the original issue](https://github.com/getsentry/sentry-python/issues/2160) for more context.
+  Our URL sanitization used in multiple integrations broke with the recent Python security update. If you started seeing `ValueError`s with `"'Filtered' does not appear to be an IPv4 or IPv6 address"`, this release fixes that. See [the original issue](https://github.com/getsentry/sentry-python/issues/2160) for more context.
 
 - Better version parsing in integrations (#2152) by @antonpirker
 
