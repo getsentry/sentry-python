@@ -69,6 +69,7 @@ setup(
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "grpcio": ["grpcio>=1.21.1"],
         "loguru": ["loguru>=0.5"],
+        "clickhouse-driver": ["clickhouse-driver>=0.2.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
