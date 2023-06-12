@@ -213,12 +213,9 @@ class Scope(object):
         if self._propagation_context is None:
             return None
 
-        sampled = 0
-
-        traceparent = "%s-%s-%s" % (
+        traceparent = "%s-%s" % (
             self._propagation_context["trace_id"],
             self._propagation_context["span_id"],
-            sampled,
         )
         return traceparent
 
