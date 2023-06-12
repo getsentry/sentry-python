@@ -11,6 +11,7 @@ from copy import deepcopy
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -160,18 +161,15 @@ class SentryAsgiMiddleware:
                         processor = partial(self.event_processor, asgi_scope=scope)
                         sentry_scope.add_event_processor(processor)
 
-                        ty = scope["type"]
+                    ty = scope["type"]
 
-                        if ty in ("http", "websocket"):
-                            headers = self._get_headers(scope)
-
-                            sentry_scope.generate_propagation_context(headers)
-                            transaction = Transaction.continue_from_headers(
-                                headers,
-                                op="{}.server".format(ty),
-                            )
-                        else:
-                            transaction = Transaction(op=OP.HTTP_SERVER)
+                    if ty in ("http", "websocket"):
+                        transaction = continue_trace(
+                            self._get_headers(scope),
+                            op="{}.server".format(ty),
+                        )
+                    else:
+                        transaction = Transaction(op=OP.HTTP_SERVER)
 
                     transaction.name = _DEFAULT_TRANSACTION_NAME
                     transaction.source = TRANSACTION_SOURCE_ROUTE

@@ -9,6 +9,7 @@ from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
     has_tracing_enabled,
+    normalize_incoming_data,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -123,37 +124,20 @@ class Scope(object):
         self.clear()
         self.generate_propagation_context()
 
-    def _normalize_incoming_data(self, incoming_data):
-        # type: (Dict[str, Any]) -> Dict[str, Any]
-        """
-        Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
-        """
-        data = {}
-        for k, v in incoming_data.items():
-            if k.startswith("HTTP_"):
-                k = k[5:]
-
-            # TODO: when loading from environment like described in RFC-0071 also trim `SENTRY_TRACING_` prefix.
-
-            k = k.replace("_", "-").lower()
-            data[k] = v
-
-        return data
-
     def _extract_propagation_context(self, data):
         # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
         context = {}  # type: Dict[str, Any]
-        normalized_data = self._normalize_incoming_data(data)
+        normalized_data = normalize_incoming_data(data)
 
-        if normalized_data.get(BAGGAGE_HEADER_NAME):
+        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
+        if baggage_header:
             context["dynamic_sampling_context"] = Baggage.from_incoming_header(
-                normalized_data.get(BAGGAGE_HEADER_NAME)
+                baggage_header
             ).dynamic_sampling_context()
 
-        if normalized_data.get(SENTRY_TRACE_HEADER_NAME):
-            sentrytrace_data = extract_sentrytrace_data(
-                normalized_data.get(SENTRY_TRACE_HEADER_NAME)
-            )
+        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        if sentry_trace_header:
+            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
             if sentrytrace_data is not None:
                 context.update(sentrytrace_data)
 
@@ -170,6 +154,7 @@ class Scope(object):
         return {
             "trace_id": uuid.uuid4().hex,
             "span_id": uuid.uuid4().hex[16:],
+            "parent_span_id": None,
             "dynamic_sampling_context": None,
         }
 
@@ -193,15 +178,11 @@ class Scope(object):
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
         """
-        if self._propagation_context is None:
-            return None
-
-        if self._propagation_context.get("dynamic_sampling_context") is None:
-            baggage = Baggage.from_options(self)
-            if baggage is not None:
-                self._propagation_context[
-                    "dynamic_sampling_context"
-                ] = baggage.dynamic_sampling_context()
+        baggage = self.get_baggage()
+        if baggage is not None:
+            self._propagation_context[
+                "dynamic_sampling_context"
+            ] = baggage.dynamic_sampling_context()
 
         return self._propagation_context["dynamic_sampling_context"]
 
@@ -218,6 +199,16 @@ class Scope(object):
             self._propagation_context["span_id"],
         )
         return traceparent
+
+    def get_baggage(self):
+        # type: () -> Optional[Baggage]
+        if self._propagation_context is None:
+            return None
+
+        if self._propagation_context.get("dynamic_sampling_context") is None:
+            return Baggage.from_options(self)
+
+        return None
 
     def get_trace_context(self):
         # type: () -> Any
