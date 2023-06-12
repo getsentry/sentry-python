@@ -10,16 +10,22 @@ By: @mgaligniana (#1773)
 
 ### Various fixes & improvements
 
-- Fix `parse_url` (#2161) by @sentrivana
-- test: Fix using unittest.mock whenever available (#1926) by @mgorny
-- build(deps): bump sphinx from 5.3.0 to 7.0.1 (#2112) by @dependabot
-- build(deps): bump black from 22.12.0 to 23.3.0 (#1984) by @dependabot
-- build(deps): bump mypy from 1.2.0 to 1.3.0 (#2110) by @dependabot
-- Fix 2.7 `common` tests (#2145) by @sentrivana
+- Fix `parse_url` (#2161) by @sentrivana and @antonpirker
+
+  Our URL sanitization used in multiple integrations broke with the recent Python security update. If you started seeing `ValueError`s with `"'Filtered' does not appear to be an IPv4 or IPv6 address"`, this release fixes that. See [the original issue](https://github.com/getsentry/sentry-python/issues/2160) for more context.
+
 - Better version parsing in integrations (#2152) by @antonpirker
+
+  We now properly support all integration versions that conform to [PEP 440](https://peps.python.org/pep-0440/). This replaces our naïve version parsing that wouldn't accept versions such as `2.0.0rc1` or `2.0.5.post1`.
+
 - Align HTTP status code as span data field `http.response.status_code` (#2113) by @antonpirker
-- build(deps): bump actions/stale from 6 to 8 (#1978) by @dependabot
 - Do not encode cached value to determine size (#2143) by @sentrivana
+- Fix using `unittest.mock` whenever available (#1926) by @mgorny
+- Fix 2.7 `common` tests (#2145) by @sentrivana
+- Bump `actions/stale` from `6` to `8` (#1978) by @dependabot
+- Bump `black` from `22.12.0` to `23.3.0` (#1984) by @dependabot
+- Bump `mypy` from `1.2.0` to `1.3.0` (#2110) by @dependabot
+- Bump `sphinx` from `5.3.0` to `7.0.1` (#2112) by @dependabot
 
 ## 1.25.0
 
