@@ -69,6 +69,24 @@ def test_sanitize_url(url, expected_result):
     assert parts == expected_parts
 
 
+def test_sanitize_url_and_split():
+    parts = sanitize_url(
+        "https://username:password@example.com?token=abc&sessionid=123&save=true",
+        split=True,
+    )
+
+    expected_query = sorted(
+        "token=[Filtered]&sessionid=[Filtered]&save=[Filtered]".split("&")
+    )
+    query = sorted(parts.query.split("&"))
+
+    assert parts.scheme == "https"
+    assert parts.netloc == "[Filtered]:[Filtered]@example.com"
+    assert query == expected_query
+    assert parts.path == ""
+    assert parts.fragment == ""
+
+
 @pytest.mark.parametrize(
     ("url", "sanitize", "expected_url", "expected_query", "expected_fragment"),
     [

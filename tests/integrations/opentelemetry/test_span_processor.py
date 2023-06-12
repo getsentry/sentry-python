@@ -1,7 +1,13 @@
 from datetime import datetime
-from mock import MagicMock
-import mock
 import time
+
+try:
+    from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
+except ImportError:
+    import mock
+    from mock import MagicMock  # python < 3.3
+
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
