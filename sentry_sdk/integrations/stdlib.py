@@ -9,6 +9,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     logger,
     safe_repr,
@@ -90,7 +91,8 @@ def _install_httplib():
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (method, parsed_url.url if parsed_url else "<url>"),
+            description="%s %s"
+            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
         )
 
         span.set_data(SPANDATA.HTTP_METHOD, method)

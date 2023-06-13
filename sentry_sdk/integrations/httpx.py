@@ -2,7 +2,12 @@ from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import should_propagate_trace
-from sentry_sdk.utils import capture_internal_exceptions, logger, parse_url
+from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
+    capture_internal_exceptions,
+    logger,
+    parse_url,
+)
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -49,7 +54,10 @@ def _install_httpx_client():
         with hub.start_span(
             op=OP.HTTP_CLIENT,
             description="%s %s"
-            % (request.method, parsed_url.url if parsed_url else "<url>"),
+            % (
+                request.method,
+                parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+            ),
         ) as span:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
@@ -93,7 +101,10 @@ def _install_httpx_async_client():
         with hub.start_span(
             op=OP.HTTP_CLIENT,
             description="%s %s"
-            % (request.method, parsed_url.url if parsed_url else "<url>"),
+            % (
+                request.method,
+                parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+            ),
         ) as span:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
