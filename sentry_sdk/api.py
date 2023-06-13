@@ -28,7 +28,6 @@ if TYPE_CHECKING:
         MeasurementUnit,
     )
     from sentry_sdk.tracing import Span
-    from sentry_sdk.tracing_utils import Baggage
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -58,8 +57,8 @@ __all__ = [
     "set_level",
     "set_measurement",
     "get_current_span",
-    "traceparent",
-    "baggage",
+    "get_traceparent",
+    "get_baggage",
     "continue_trace",
 ]
 
@@ -250,7 +249,7 @@ def get_current_span(hub=None):
     return current_span
 
 
-def traceparent():
+def get_traceparent():
     # type: () -> Optional[str]
     """
     Returns the traceparent either from the active span or from the scope.
@@ -263,18 +262,25 @@ def traceparent():
     return hub.scope.get_traceparent()
 
 
-def baggage():
-    # type: () -> Optional[Baggage]
+def get_baggage():
+    # type: () -> Optional[str]
     """
     Returns Baggage either from the active span or from the scope.
     """
-    # XXX: should this return the serialized baggage?
     hub = Hub.current
-    if hub.client is not None:
-        if has_tracing_enabled(hub.client.options) and hub.scope.span is not None:
-            return hub.scope.span.to_baggage()
+    if (
+        hub.client is not None
+        and has_tracing_enabled(hub.client.options)
+        and hub.scope.span is not None
+    ):
+        baggage = hub.scope.span.to_baggage()
+    else:
+        baggage = hub.scope.get_baggage()
 
-    return hub.scope.get_baggage()
+    if baggage is not None:
+        return baggage.serialize()
+
+    return None
 
 
 def continue_trace(environ_or_headers, op=None, name=None, source=None):

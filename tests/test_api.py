@@ -1,10 +1,10 @@
 from sentry_sdk import (
-    baggage,
     configure_scope,
     continue_trace,
+    get_baggage,
     get_current_span,
+    get_traceparent,
     start_transaction,
-    traceparent,
 )
 from sentry_sdk.hub import Hub
 
@@ -54,7 +54,7 @@ def test_traceparent_with_tracing(sentry_init):
             transaction.trace_id,
             transaction.span_id,
         )
-        assert traceparent() == expected_traceparent
+        assert get_traceparent() == expected_traceparent
 
 
 def test_traceparent_without_tracing(sentry_init):
@@ -65,34 +65,27 @@ def test_traceparent_without_tracing(sentry_init):
         propagation_context["trace_id"],
         propagation_context["span_id"],
     )
-    assert traceparent() == expected_traceparent
+    assert get_traceparent() == expected_traceparent
 
 
 def test_baggage_without_tracing(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
-    bag = baggage()
     propagation_context = Hub.current.scope._propagation_context
-    assert bag.sentry_items == {
-        "trace_id": propagation_context["trace_id"],
-        "release": "1.0.0",
-        "environment": "dev",
-    }
-    assert bag.third_party_items == ""
-    assert not bag.mutable
+    expected_baggage = (
+        "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
+            propagation_context["trace_id"]
+        )
+    )
+    assert get_baggage() == expected_baggage
 
 
 def test_baggage_with_tracing(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
-        bag = baggage()
-        assert bag.sentry_items == {
-            "trace_id": transaction.trace_id,
-            "release": "1.0.0",
-            "sample_rate": "1.0",
-            "environment": "dev",
-        }
-        assert bag.third_party_items == ""
-        assert not bag.mutable
+        expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0".format(
+            transaction.trace_id
+        )
+        assert get_baggage() == expected_baggage
 
 
 def test_continue_trace(sentry_init):
