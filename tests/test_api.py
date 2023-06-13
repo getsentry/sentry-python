@@ -46,7 +46,7 @@ def test_get_current_span_default_hub_with_transaction(sentry_init):
         assert get_current_span() == new_transaction
 
 
-def test_traceparent_with_tracing(sentry_init):
+def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
     with start_transaction() as transaction:
@@ -57,7 +57,7 @@ def test_traceparent_with_tracing(sentry_init):
         assert get_traceparent() == expected_traceparent
 
 
-def test_traceparent_without_tracing(sentry_init):
+def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
     propagation_context = Hub.current.scope._propagation_context
@@ -68,7 +68,7 @@ def test_traceparent_without_tracing(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
-def test_baggage_without_tracing(sentry_init):
+def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = Hub.current.scope._propagation_context
     expected_baggage = (
@@ -80,7 +80,7 @@ def test_baggage_without_tracing(sentry_init):
     assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
 
-def test_baggage_with_tracing(sentry_init):
+def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
         expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0".format(
