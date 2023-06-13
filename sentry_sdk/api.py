@@ -278,7 +278,7 @@ def baggage():
 
 
 def continue_trace(environ_or_headers, op=None, name=None, source=None):
-    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Optional[Transaction]
+    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
