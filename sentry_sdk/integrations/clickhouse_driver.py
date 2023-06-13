@@ -1,3 +1,5 @@
+from typing import ParamSpec, TypeVar, Callable
+
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -5,7 +7,7 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 
 try:
-    import clickhouse_driver
+    import clickhouse_driver  # type: ignore[import]
 
 except ImportError:
     raise DidNotEnable("clickhouse-driver not installed.")
@@ -18,7 +20,7 @@ class ClickhouseDriverIntegration(Integration):
     identifier = "clickhouse_driver"
 
     @staticmethod
-    def setup_once():
+    def setup_once() -> None:
         # Every query is done using the Connection's `send_query` function
         clickhouse_driver.connection.Connection.send_query = _wrap_start(
             clickhouse_driver.connection.Connection.send_query
@@ -39,11 +41,15 @@ class ClickhouseDriverIntegration(Integration):
         )
 
 
-def _wrap_start(f):
-    def _inner(*args, **kwargs):
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
+    def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
         hub = Hub.current
         if hub.get_integration(ClickhouseDriverIntegration) is None:
-            return
+            return f(*args, **kwargs)
         instance = args[0]
         query = args[1]
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
@@ -51,7 +57,7 @@ def _wrap_start(f):
 
         span = hub.start_span(op=OP.DB, description=query)
 
-        instance._sentry_span = span
+        instance._sentry_span = span  # type: ignore[attr-defined]
 
         span.set_data("query", query)
 
@@ -69,11 +75,11 @@ def _wrap_start(f):
     return _inner
 
 
-def _wrap_end(f):
-    def _inner_end(*args, **kwargs):
+def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
+    def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
         res = f(*args, **kwargs)
         instance = args[0]
-        span = instance.connection._sentry_span
+        span = instance.connection._sentry_span  # type: ignore[attr-defined]
 
         if span is not None:
             if res is not None:
@@ -89,11 +95,11 @@ def _wrap_end(f):
     return _inner_end
 
 
-def _wrap_send_data(f):
-    def _inner_send_data(*args, **kwargs):
+def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
+    def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
         instance = args[0]
         data = args[2]
-        span = instance.connection._sentry_span
+        span = instance.connection._sentry_span  # type: ignore[attr-defined]
 
         db_params = span._data.get("db.params", [])
         db_params.extend(data)
