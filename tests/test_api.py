@@ -76,7 +76,8 @@ def test_baggage_without_tracing(sentry_init):
             propagation_context["trace_id"]
         )
     )
-    assert get_baggage() == expected_baggage
+    # order not guaranteed in older python versions
+    assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
 
 def test_baggage_with_tracing(sentry_init):
@@ -85,7 +86,8 @@ def test_baggage_with_tracing(sentry_init):
         expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0".format(
             transaction.trace_id
         )
-        assert get_baggage() == expected_baggage
+        # order not guaranteed in older python versions
+        assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
 
 def test_continue_trace(sentry_init):
