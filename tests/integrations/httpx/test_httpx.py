@@ -8,6 +8,11 @@ from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 
 @pytest.mark.parametrize(
     "httpx_client",
@@ -225,3 +230,30 @@ def test_option_trace_propagation_targets(
         assert "sentry-trace" in request_headers
     else:
         assert "sentry-trace" not in request_headers
+
+
+@pytest.mark.tests_internal_exceptions
+def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
+    sentry_init(integrations=[HttpxIntegration()])
+
+    httpx_client = httpx.Client()
+    url = "http://example.com"
+    responses.add(responses.GET, url, status=200)
+
+    events = capture_events()
+    with mock.patch(
+        "sentry_sdk.integrations.httpx.parse_url",
+        side_effect=ValueError,
+    ):
+        response = httpx_client.get(url)
+
+    assert response.status_code == 200
+    capture_message("Testing!")
+
+    (event,) = events
+    assert event["breadcrumbs"]["values"][0]["data"] == {
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
+        "reason": "OK",
+        # no url related data
+    }
