@@ -178,6 +178,9 @@ class Scope(object):
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
         """
+        if self._propagation_context is None:
+            return None
+
         baggage = self.get_baggage()
         if baggage is not None:
             self._propagation_context[
