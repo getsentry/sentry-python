@@ -36,8 +36,8 @@ __all__ = [  # noqa
     "set_level",
     "set_measurement",
     "get_current_span",
-    "traceparent",
-    "baggage",
+    "get_traceparent",
+    "get_baggage",
     "continue_trace",
 ]
 
