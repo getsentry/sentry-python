@@ -144,3 +144,20 @@ def test_no_trimming_if_request_bodies_is_always(body_normalizer):
     result = body_normalizer(data, request_bodies="always")
 
     assert result == data
+
+
+def test_max_string_length_default(body_normalizer):
+    data = {"key": "a" * 2000}
+
+    result = body_normalizer(data)
+
+    assert len(result["key"]) == 1024  # fallback max length
+
+
+def test_max_string_length(body_normalizer):
+    data = {"key": "a" * 2000}
+
+    max_string_length = 2000
+    result = body_normalizer(data, max_string_length=max_string_length)
+
+    assert len(result["key"]) == max_string_length

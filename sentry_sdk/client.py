@@ -286,7 +286,10 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["include_local_variables"]
+                                self.options["max_string_length"],
+                                include_local_variables=self.options[
+                                    "include_local_variables"
+                                ],
                             ),
                             "crashed": False,
                             "current": True,

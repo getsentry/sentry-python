@@ -468,6 +468,7 @@ def iter_stacks(tb):
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
+    max_length,  # type: int
     loader=None,  # type: Optional[Any]
     module=None,  # type: Optional[str]
 ):
@@ -496,11 +497,12 @@ def get_lines_from_file(
 
     try:
         pre_context = [
-            strip_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+            strip_string(line.strip("\r\n"), max_length=max_length)
+            for line in source[lower_bound:lineno]
         ]
-        context_line = strip_string(source[lineno].strip("\r\n"))
+        context_line = strip_string(source[lineno].strip("\r\n"), max_length=max_length)
         post_context = [
-            strip_string(line.strip("\r\n"))
+            strip_string(line.strip("\r\n"), max_length=max_length)
             for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
@@ -512,6 +514,7 @@ def get_lines_from_file(
 def get_source_context(
     frame,  # type: FrameType
     tb_lineno,  # type: int
+    max_string_length,  # type: int
 ):
     # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
@@ -528,7 +531,9 @@ def get_source_context(
         loader = None
     lineno = tb_lineno - 1
     if lineno is not None and abs_path:
-        return get_lines_from_file(abs_path, lineno, loader, module)
+        return get_lines_from_file(
+            abs_path, lineno, max_string_length, loader=loader, module=module
+        )
     return [], None, []
 
 
@@ -602,7 +607,11 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(
-    frame, tb_lineno=None, include_local_variables=True, include_source_context=True
+    frame,
+    tb_lineno=None,
+    include_local_variables=True,
+    include_source_context=True,
+    max_string_length=None,
 ):
     # type: (FrameType, Optional[int], bool, bool) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
@@ -630,7 +639,7 @@ def serialize_frame(
 
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
-            frame, tb_lineno
+            frame, tb_lineno, max_string_length
         )
 
     if include_local_variables:
@@ -639,7 +648,9 @@ def serialize_frame(
     return rv
 
 
-def current_stacktrace(include_local_variables=True, include_source_context=True):
+def current_stacktrace(
+    max_string_length, include_local_variables=True, include_source_context=True
+):
     # type: (bool, bool) -> Any
     __tracebackhide__ = True
     frames = []
@@ -652,6 +663,7 @@ def current_stacktrace(include_local_variables=True, include_source_context=True
                     f,
                     include_local_variables=include_local_variables,
                     include_source_context=include_source_context,
+                    max_string_length=max_string_length,
                 )
             )
         f = f.f_back
@@ -724,9 +736,11 @@ def single_exception_from_error_tuple(
     if client_options is None:
         include_local_variables = True
         include_source_context = True
+        max_string_length = MAX_STRING_LENGTH  # fallback
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
+        max_string_length = client_options["max_string_length"]
 
     frames = [
         serialize_frame(
@@ -734,6 +748,7 @@ def single_exception_from_error_tuple(
             tb_lineno=tb.tb_lineno,
             include_local_variables=include_local_variables,
             include_source_context=include_source_context,
+            max_string_length=max_string_length,
         )
         for tb in iter_stacks(tb)
     ]
@@ -819,9 +834,7 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
-        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
-    )
+    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     if should_supress_context:
         # Add direct cause.
         # The field `__cause__` is set when raised with the exception (using the `from` keyword).
@@ -1082,7 +1095,6 @@ def _is_in_project_root(abs_path, project_root):
 
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
-    # TODO: read max_length from config
     if not value:
         return value
 
