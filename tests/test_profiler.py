@@ -15,6 +15,7 @@ from sentry_sdk.profiler import (
     ThreadScheduler,
     extract_frame,
     extract_stack,
+    frame_id,
     get_current_thread_id,
     get_frame_name,
     setup_profiler,
@@ -444,7 +445,7 @@ def test_get_frame_name(frame, frame_name):
 def test_extract_frame(get_frame, function):
     cwd = os.getcwd()
     frame = get_frame()
-    extracted_frame = extract_frame(frame, cwd)
+    extracted_frame = extract_frame(frame_id(frame), frame, cwd)
 
     # the abs_path should be equal toe the normalized path of the co_filename
     assert extracted_frame["abs_path"] == os.path.normpath(frame.f_code.co_filename)

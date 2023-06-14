@@ -3,6 +3,7 @@ import re
 import sys
 
 from sentry_sdk.utils import (
+    Components,
     is_valid_sample_rate,
     logger,
     match_regex_list,
@@ -69,22 +70,126 @@ def test_sanitize_url(url, expected_result):
     assert parts == expected_parts
 
 
-def test_sanitize_url_and_split():
-    parts = sanitize_url(
-        "https://username:password@example.com?token=abc&sessionid=123&save=true",
-        split=True,
-    )
+@pytest.mark.parametrize(
+    ("url", "expected_result"),
+    [
+        (
+            "http://localhost:8000",
+            Components(
+                scheme="http", netloc="localhost:8000", path="", query="", fragment=""
+            ),
+        ),
+        (
+            "http://example.com",
+            Components(
+                scheme="http", netloc="example.com", path="", query="", fragment=""
+            ),
+        ),
+        (
+            "https://example.com",
+            Components(
+                scheme="https", netloc="example.com", path="", query="", fragment=""
+            ),
+        ),
+        (
+            "example.com?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="",
+                netloc="",
+                path="example.com",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "http://example.com?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="http",
+                netloc="example.com",
+                path="",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "https://example.com?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="https",
+                netloc="example.com",
+                path="",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "http://localhost:8000/?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="http",
+                netloc="localhost:8000",
+                path="/",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "ftp://username:password@ftp.example.com:9876/bla/blub#foo",
+            Components(
+                scheme="ftp",
+                netloc="[Filtered]:[Filtered]@ftp.example.com:9876",
+                path="/bla/blub",
+                query="",
+                fragment="foo",
+            ),
+        ),
+        (
+            "https://username:password@example.com/bla/blub?token=abc&sessionid=123&save=true#fragment",
+            Components(
+                scheme="https",
+                netloc="[Filtered]:[Filtered]@example.com",
+                path="/bla/blub",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="fragment",
+            ),
+        ),
+        (
+            "bla/blub/foo",
+            Components(
+                scheme="", netloc="", path="bla/blub/foo", query="", fragment=""
+            ),
+        ),
+        (
+            "bla/blub/foo?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="",
+                netloc="",
+                path="bla/blub/foo",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "/bla/blub/foo/?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="",
+                netloc="",
+                path="/bla/blub/foo/",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+    ],
+)
+def test_sanitize_url_and_split(url, expected_result):
+    sanitized_url = sanitize_url(url, split=True)
+    # sort query because old Python versions (<3.6) don't preserve order
+    query = sorted(sanitized_url.query.split("&"))
+    expected_query = sorted(expected_result.query.split("&"))
 
-    expected_query = sorted(
-        "token=[Filtered]&sessionid=[Filtered]&save=[Filtered]".split("&")
-    )
-    query = sorted(parts.query.split("&"))
-
-    assert parts.scheme == "https"
-    assert parts.netloc == "[Filtered]:[Filtered]@example.com"
+    assert sanitized_url.scheme == expected_result.scheme
+    assert sanitized_url.netloc == expected_result.netloc
     assert query == expected_query
-    assert parts.path == ""
-    assert parts.fragment == ""
+    assert sanitized_url.path == expected_result.path
+    assert sanitized_url.fragment == expected_result.fragment
 
 
 @pytest.mark.parametrize(
