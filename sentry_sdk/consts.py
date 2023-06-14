@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
-
+DEFAULT_MAX_STRING_LENGTH = 1024
 MATCH_ALL = r".*"
 
 
@@ -197,7 +197,7 @@ class ClientConstructor(object):
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_string_length=1024,  # type: int
+        max_string_length=DEFAULT_MAX_STRING_LENGTH,  # type: int
     ):
         # type: (...) -> None
         pass

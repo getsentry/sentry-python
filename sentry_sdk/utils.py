@@ -50,6 +50,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import DEFAULT_MAX_STRING_LENGTH
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -75,7 +76,7 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
-MAX_STRING_LENGTH = 1024
+
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
@@ -736,7 +737,7 @@ def single_exception_from_error_tuple(
     if client_options is None:
         include_local_variables = True
         include_source_context = True
-        max_string_length = MAX_STRING_LENGTH  # fallback
+        max_string_length = DEFAULT_MAX_STRING_LENGTH  # fallback
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
@@ -1099,8 +1100,7 @@ def strip_string(value, max_length=None):
         return value
 
     if max_length is None:
-        # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
-        max_length = MAX_STRING_LENGTH
+        max_length = DEFAULT_MAX_STRING_LENGTH
 
     length = len(value.encode("utf-8"))
 
