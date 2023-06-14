@@ -397,7 +397,7 @@ def serialize(event, **kwargs):
         if is_span_description:
             return obj
 
-        return _flatten_annotated(strip_string(obj, max_string_length))
+        return _flatten_annotated(strip_string(obj, max_length=max_string_length))
 
     #
     # Start of serialize() function

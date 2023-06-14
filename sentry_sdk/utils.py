@@ -515,7 +515,7 @@ def get_lines_from_file(
 def get_source_context(
     frame,  # type: FrameType
     tb_lineno,  # type: int
-    max_string_length,  # type: int
+    max_string_length=None,  # type: Optional[int]
 ):
     # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
@@ -650,7 +650,7 @@ def serialize_frame(
 
 
 def current_stacktrace(
-    max_string_length, include_local_variables=True, include_source_context=True
+    include_local_variables=True, include_source_context=True, max_string_length=None
 ):
     # type: (bool, bool) -> Any
     __tracebackhide__ = True

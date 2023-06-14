@@ -205,10 +205,10 @@ class EventHandler(_BaseHandler):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                client_options["max_string_length"],
                                 include_local_variables=client_options[
                                     "include_local_variables"
                                 ],
+                                max_string_length=client_options["max_string_length"],
                             ),
                             "crashed": False,
                             "current": True,
