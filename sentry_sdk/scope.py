@@ -168,9 +168,17 @@ class Scope(object):
 
             if context is not None:
                 self._propagation_context = context
+                logger.debug(
+                    "[Tracing] Extracted propagation context from incoming data: %s",
+                    self._propagation_context,
+                )
 
         if self._propagation_context is None:
             self._propagation_context = self._create_new_propagation_context()
+            logger.debug(
+                "[Tracing] Create new propagation context: %s",
+                self._propagation_context,
+            )
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
@@ -224,6 +232,7 @@ class Scope(object):
         trace_context = {
             "trace_id": self._propagation_context["trace_id"],
             "span_id": self._propagation_context["span_id"],
+            "parent_span_id": self._propagation_context["parent_span_id"],
             "dynamic_sampling_context": self.get_dynamic_sampling_context(),
         }  # type: Dict[str, Any]
 
