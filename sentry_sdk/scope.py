@@ -137,21 +137,16 @@ class Scope(object):
 
         false_values = [
             "false",
-            "False",
-            "FALSE",
             "no",
-            "No",
-            "NO",
+            "off",
             "n",
             "0",
-            "off",
-            "Off",
-            "OFF",
         ]
 
-        use_environment = (
-            False if os.environ.get("SENTRY_USE_ENVIRONMENT") in false_values else True
-        )
+        sentry_use_environment = (
+            os.environ.get("SENTRY_USE_ENVIRONMENT") or ""
+        ).lower()
+        use_environment = False if sentry_use_environment in false_values else True
         if use_environment:
             incoming_trace_information = {}
 
