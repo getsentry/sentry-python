@@ -374,7 +374,7 @@ def _get_humanized_interval(seconds):
             interval = int(seconds / divider)
             return (interval, unit)
 
-    return (1, "minute")
+    return (int(seconds), "second")
 
 
 def _get_monitor_config(celery_schedule, app):
@@ -398,6 +398,12 @@ def _get_monitor_config(celery_schedule, app):
         (schedule_value, schedule_unit) = _get_humanized_interval(
             celery_schedule.seconds
         )
+
+        if schedule_unit == "second":
+            logger.warning(
+                "Intervals shorter than one minute are not supported by Sentry Crons."
+            )
+            return {}
 
     else:
         logger.warning(
