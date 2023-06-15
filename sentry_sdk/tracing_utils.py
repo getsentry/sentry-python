@@ -387,8 +387,6 @@ def normalize_incoming_data(incoming_data):
         if k.startswith("HTTP_"):
             k = k[5:]
 
-        # TODO: when loading from environment like described in RFC-0071 also trim `SENTRY_TRACING_` prefix.
-
         k = k.replace("_", "-").lower()
         data[k] = v
 
