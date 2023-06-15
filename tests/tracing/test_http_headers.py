@@ -22,7 +22,7 @@ def test_to_traceparent(sampled):
     traceparent = transaction.to_traceparent()
 
     parts = traceparent.split("-")
-    assert parts[0] == "12312012123120121231201212312012"  # trace id
+    assert parts[0] == "12312012123120121231201212312012"  # trace_id
     assert parts[1] == transaction.span_id  # parent_span_id
     if sampled is None:
         assert len(parts) == 2
