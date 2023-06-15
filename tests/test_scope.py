@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -214,44 +215,43 @@ if __name__ == "__main__":
     ],
 )
 def test_propagate_trace_via_env_vars(env, excepted_trace_id):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        with open(os.path.devnull, "w+") as null:
-            # Write python script to temp directory
-            main_py = os.path.join(tmpdir, "main.py")
-            with open(main_py, "w") as f:
-                f.write(CODE_FOR_TEST_SCRIPT)
+    tmpdir = tempfile.mkdtemp()
 
-            # Set new environment variables
-            new_env = os.environ.copy()
-            new_env.update(env)
+    with open(os.path.devnull, "w+") as null:
+        # Write python script to temp directory
+        main_py = os.path.join(tmpdir, "main.py")
+        with open(main_py, "w") as f:
+            f.write(CODE_FOR_TEST_SCRIPT)
 
-            # Call script and capture output
-            with subprocess.Popen(
-                ["python", main_py],
-                env=new_env,
-                stdout=subprocess.PIPE,
-                stderr=null,
-                stdin=null,
-            ) as proc:
+        # Set new environment variables
+        new_env = os.environ.copy()
+        new_env.update(env)
 
-                output = proc.stdout.read().strip().decode("utf-8")
-                events = []
-                envelopes = []
+        # Call script and capture output
+        with subprocess.Popen(
+            ["python", main_py],
+            env=new_env,
+            stdout=subprocess.PIPE,
+            stderr=null,
+            stdin=null,
+        ) as proc:
 
-                for line in output.splitlines():
-                    if line.startswith("EVENT: "):
-                        line = line[len("EVENT: ") :]
-                        events.append(json.loads(line))
-                    elif line.startswith("ENVELOPE: "):
-                        line = line[len("ENVELOPE: ") :]
-                        envelopes.append(json.loads(line))
+            output = proc.stdout.read().strip().decode("utf-8")
+            events = []
+            envelopes = []
 
-                if excepted_trace_id:
-                    assert (
-                        events[0]["contexts"]["trace"]["trace_id"] == excepted_trace_id
-                    )
-                else:
-                    # A new trace was started
-                    assert (
-                        events[0]["contexts"]["trace"]["trace_id"] != excepted_trace_id
-                    )
+            for line in output.splitlines():
+                if line.startswith("EVENT: "):
+                    line = line[len("EVENT: ") :]
+                    events.append(json.loads(line))
+                elif line.startswith("ENVELOPE: "):
+                    line = line[len("ENVELOPE: ") :]
+                    envelopes.append(json.loads(line))
+
+            if excepted_trace_id:
+                assert events[0]["contexts"]["trace"]["trace_id"] == excepted_trace_id
+            else:
+                # A new trace was started
+                assert events[0]["contexts"]["trace"]["trace_id"] != excepted_trace_id
+
+    shutil.rmtree(tmpdir)
