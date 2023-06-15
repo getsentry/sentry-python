@@ -3,10 +3,11 @@ from __future__ import absolute_import
 import weakref
 from sentry_sdk.consts import OP
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -65,7 +66,7 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                transaction = Transaction.continue_from_headers(
+                transaction = continue_trace(
                     job.meta.get("_sentry_trace_headers") or {},
                     op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
@@ -107,9 +108,10 @@ class RqIntegration(Integration):
             # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    hub.iter_trace_propagation_headers()
-                )
+                if hub.scope.span is not None:
+                    job.meta["_sentry_trace_headers"] = dict(
+                        hub.iter_trace_propagation_headers()
+                    )
 
             return old_enqueue_job(self, job, **kwargs)
 
