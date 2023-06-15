@@ -179,11 +179,6 @@ class Scope(object):
             if sentrytrace_data is not None:
                 context.update(sentrytrace_data)
 
-        if normalized_data.get(BAGGAGE_HEADER_NAME):
-            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
-                normalized_data.get(BAGGAGE_HEADER_NAME)
-            ).dynamic_sampling_context()
-
         only_baggage_no_sentry_trace = (
             "dynamic_sampling_context" in context and "trace_id" not in context
         )
