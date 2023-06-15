@@ -765,6 +765,25 @@ def test_tracing_error(sentry_init, capture_events, app):
     assert exception["type"] == "ZeroDivisionError"
 
 
+def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        with app.test_client() as client:
+            response = client.get("/error")
+            assert response.status_code == 500
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+
+
 def test_class_based_views(sentry_init, app, capture_events):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()

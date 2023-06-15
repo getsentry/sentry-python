@@ -36,6 +36,9 @@ __all__ = [  # noqa
     "set_level",
     "set_measurement",
     "get_current_span",
+    "get_traceparent",
+    "get_baggage",
+    "continue_trace",
 ]
 
 # Initialize the debug support after everything is loaded

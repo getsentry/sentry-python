@@ -1,20 +1,34 @@
 from copy import copy
 from collections import deque
 from itertools import chain
+import uuid
 
+from sentry_sdk.attachments import Attachment
 from sentry_sdk._functools import wraps
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    extract_sentrytrace_data,
+    has_tracing_enabled,
+    normalize_incoming_data,
+)
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    Transaction,
+)
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
-from sentry_sdk.tracing import Transaction
-from sentry_sdk.attachments import Attachment
+
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Iterator
     from typing import Optional
     from typing import Deque
     from typing import List
     from typing import Callable
+    from typing import Tuple
     from typing import TypeVar
 
     from sentry_sdk._types import (
@@ -96,6 +110,7 @@ class Scope(object):
         "_attachments",
         "_force_auto_session_tracking",
         "_profile",
+        "_propagation_context",
     )
 
     def __init__(self):
@@ -104,7 +119,139 @@ class Scope(object):
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
+        self._propagation_context = None  # type: Optional[Dict[str, Any]]
+
         self.clear()
+        self.generate_propagation_context()
+
+    def _extract_propagation_context(self, data):
+        # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
+        context = {}  # type: Dict[str, Any]
+        normalized_data = normalize_incoming_data(data)
+
+        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
+        if baggage_header:
+            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
+                baggage_header
+            ).dynamic_sampling_context()
+
+        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        if sentry_trace_header:
+            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
+            if sentrytrace_data is not None:
+                context.update(sentrytrace_data)
+
+        if context:
+            if not context.get("span_id"):
+                context["span_id"] = uuid.uuid4().hex[16:]
+
+            return context
+
+        return None
+
+    def _create_new_propagation_context(self):
+        # type: () -> Dict[str, Any]
+        return {
+            "trace_id": uuid.uuid4().hex,
+            "span_id": uuid.uuid4().hex[16:],
+            "parent_span_id": None,
+            "dynamic_sampling_context": None,
+        }
+
+    def generate_propagation_context(self, incoming_data=None):
+        # type: (Optional[Dict[str, str]]) -> None
+        """
+        Populates `_propagation_context`. Either from `incoming_data` or with a new propagation context.
+        """
+        if incoming_data:
+            context = self._extract_propagation_context(incoming_data)
+
+            if context is not None:
+                self._propagation_context = context
+                logger.debug(
+                    "[Tracing] Extracted propagation context from incoming data: %s",
+                    self._propagation_context,
+                )
+
+        if self._propagation_context is None:
+            self._propagation_context = self._create_new_propagation_context()
+            logger.debug(
+                "[Tracing] Create new propagation context: %s",
+                self._propagation_context,
+            )
+
+    def get_dynamic_sampling_context(self):
+        # type: () -> Optional[Dict[str, str]]
+        """
+        Returns the Dynamic Sampling Context from the Propagation Context.
+        If not existing, creates a new one.
+        """
+        if self._propagation_context is None:
+            return None
+
+        baggage = self.get_baggage()
+        if baggage is not None:
+            self._propagation_context[
+                "dynamic_sampling_context"
+            ] = baggage.dynamic_sampling_context()
+
+        return self._propagation_context["dynamic_sampling_context"]
+
+    def get_traceparent(self):
+        # type: () -> Optional[str]
+        """
+        Returns the Sentry "sentry-trace" header (aka the traceparent) from the Propagation Context.
+        """
+        if self._propagation_context is None:
+            return None
+
+        traceparent = "%s-%s" % (
+            self._propagation_context["trace_id"],
+            self._propagation_context["span_id"],
+        )
+        return traceparent
+
+    def get_baggage(self):
+        # type: () -> Optional[Baggage]
+        if self._propagation_context is None:
+            return None
+
+        if self._propagation_context.get("dynamic_sampling_context") is None:
+            return Baggage.from_options(self)
+
+        return None
+
+    def get_trace_context(self):
+        # type: () -> Any
+        """
+        Returns the Sentry "trace" context from the Propagation Context.
+        """
+        if self._propagation_context is None:
+            return None
+
+        trace_context = {
+            "trace_id": self._propagation_context["trace_id"],
+            "span_id": self._propagation_context["span_id"],
+            "parent_span_id": self._propagation_context["parent_span_id"],
+            "dynamic_sampling_context": self.get_dynamic_sampling_context(),
+        }  # type: Dict[str, Any]
+
+        return trace_context
+
+    def iter_headers(self):
+        # type: () -> Iterator[Tuple[str, str]]
+        """
+        Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
+        """
+        if self._propagation_context is not None:
+            traceparent = self.get_traceparent()
+            if traceparent is not None:
+                yield SENTRY_TRACE_HEADER_NAME, traceparent
+
+            dsc = self.get_dynamic_sampling_context()
+            if dsc is not None:
+                baggage = Baggage(dsc).serialize()
+                yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
         # type: () -> None
@@ -128,6 +275,8 @@ class Scope(object):
         self._force_auto_session_tracking = None  # type: Optional[bool]
 
         self._profile = None  # type: Optional[Profile]
+
+        self._propagation_context = None
 
     @_attr_setter
     def level(self, value):
@@ -366,6 +515,7 @@ class Scope(object):
         self,
         event,  # type: Event
         hint,  # type: Hint
+        options=None,  # type: Optional[Dict[str, Any]]
     ):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
@@ -415,10 +565,13 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
-        if self._span is not None:
-            contexts = event.setdefault("contexts", {})
-            if not contexts.get("trace"):
+        contexts = event.setdefault("contexts", {})
+
+        if has_tracing_enabled(options):
+            if self._span is not None:
                 contexts["trace"] = self._span.get_trace_context()
+        else:
+            contexts["trace"] = self.get_trace_context()
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:
@@ -464,6 +617,8 @@ class Scope(object):
             self._attachments.extend(scope._attachments)
         if scope._profile:
             self._profile = scope._profile
+        if scope._propagation_context:
+            self._propagation_context = scope._propagation_context
 
     def update_from_kwargs(
         self,
@@ -506,6 +661,7 @@ class Scope(object):
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+        rv._propagation_context = self._propagation_context
 
         rv._should_capture = self._should_capture
         rv._span = self._span

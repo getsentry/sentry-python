@@ -14,7 +14,6 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
 
-
 try:
     from rest_framework.decorators import api_view
     from rest_framework.response import Response
@@ -45,10 +44,17 @@ except ImportError:
 
 
 import sentry_sdk
+from sentry_sdk import capture_message
 
 
 @csrf_exempt
 def view_exc(request):
+    1 / 0
+
+
+@csrf_exempt
+def view_exc_with_msg(request):
+    capture_message("oops")
     1 / 0
 
 

@@ -86,8 +86,14 @@ def celery(init_celery):
 
 @pytest.fixture(
     params=[
-        lambda task, x, y: (task.delay(x, y), {"args": [x, y], "kwargs": {}}),
-        lambda task, x, y: (task.apply_async((x, y)), {"args": [x, y], "kwargs": {}}),
+        lambda task, x, y: (
+            task.delay(x, y),
+            {"args": [x, y], "kwargs": {}},
+        ),
+        lambda task, x, y: (
+            task.apply_async((x, y)),
+            {"args": [x, y], "kwargs": {}},
+        ),
         lambda task, x, y: (
             task.apply_async(args=(x, y)),
             {"args": [x, y], "kwargs": {}},
@@ -107,7 +113,8 @@ def celery_invocation(request):
     return request.param
 
 
-def test_simple(capture_events, celery, celery_invocation):
+def test_simple_with_performance(capture_events, init_celery, celery_invocation):
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -115,24 +122,59 @@ def test_simple(capture_events, celery, celery_invocation):
         foo = 42  # noqa
         return x / y
 
-    with start_transaction() as transaction:
+    with start_transaction(op="unit test transaction") as transaction:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-    (event,) = events
+    (_, error_event, _, _) = events
 
-    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert event["contexts"]["trace"]["span_id"] != transaction.span_id
-    assert event["transaction"] == "dummy_task"
-    assert "celery_task_id" in event["tags"]
-    assert event["extra"]["celery-job"] == dict(
+    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert error_event["contexts"]["trace"]["span_id"] != transaction.span_id
+    assert error_event["transaction"] == "dummy_task"
+    assert "celery_task_id" in error_event["tags"]
+    assert error_event["extra"]["celery-job"] == dict(
         task_name="dummy_task", **expected_context
     )
 
-    (exception,) = event["exception"]["values"]
+    (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "celery"
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+
+
+def test_simple_without_performance(capture_events, init_celery, celery_invocation):
+    celery = init_celery(traces_sample_rate=None)
+    events = capture_events()
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        foo = 42  # noqa
+        return x / y
+
+    with configure_scope() as scope:
+        celery_invocation(dummy_task, 1, 2)
+        _, expected_context = celery_invocation(dummy_task, 1, 0)
+
+        (error_event,) = events
+
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == scope._propagation_context["trace_id"]
+        )
+        assert (
+            error_event["contexts"]["trace"]["span_id"]
+            != scope._propagation_context["span_id"]
+        )
+        assert error_event["transaction"] == "dummy_task"
+        assert "celery_task_id" in error_event["tags"]
+        assert error_event["extra"]["celery-job"] == dict(
+            task_name="dummy_task", **expected_context
+        )
+
+        (exception,) = error_event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
+        assert exception["mechanism"]["type"] == "celery"
+        assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])

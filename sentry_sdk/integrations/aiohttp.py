@@ -1,6 +1,7 @@
 import sys
 import weakref
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
@@ -11,7 +12,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -101,7 +102,7 @@ class AioHttpIntegration(Integration):
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
-                    transaction = Transaction.continue_from_headers(
+                    transaction = continue_trace(
                         request.headers,
                         op=OP.HTTP_SERVER,
                         # If this transaction name makes it to the UI, AIOHTTP's
