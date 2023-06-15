@@ -350,12 +350,24 @@ class Span(object):
 
     def to_traceparent(self):
         # type: () -> str
-        sampled = ""
         if self.sampled is True:
             sampled = "1"
-        if self.sampled is False:
+        elif self.sampled is False:
             sampled = "0"
-        return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        if self.containing_transaction:
+            return self.containing_transaction.get_baggage()
+        return None
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None

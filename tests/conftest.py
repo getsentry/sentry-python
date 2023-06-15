@@ -69,7 +69,7 @@ def internal_exceptions(request, monkeypatch):
 
     @request.addfinalizer
     def _():
-        # rerasise the errors so that this just acts as a pass-through (that
+        # reraise the errors so that this just acts as a pass-through (that
         # happens to keep track of the errors which pass through it)
         for e in errors:
             reraise(*e)

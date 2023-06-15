@@ -377,5 +377,23 @@ def should_propagate_trace(hub, url):
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
+def normalize_incoming_data(incoming_data):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    """
+    Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
+    """
+    data = {}
+    for k, v in incoming_data.items():
+        if k.startswith("HTTP_"):
+            k = k[5:]
+
+        # TODO: when loading from environment like described in RFC-0071 also trim `SENTRY_TRACING_` prefix.
+
+        k = k.replace("_", "-").lower()
+        data[k] = v
+
+    return data
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES

@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import sys
 import time
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
 from sentry_sdk._functools import wraps
@@ -10,7 +11,7 @@ from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -207,10 +208,8 @@ def _wrap_tracer(task, f):
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
             with capture_internal_exceptions():
-                headers = args[3].get("headers") or {}
-                scope.generate_propagation_context(headers)
-                transaction = Transaction.continue_from_headers(
-                    headers,
+                transaction = continue_trace(
+                    args[3].get("headers") or {},
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
                     source=TRANSACTION_SOURCE_TASK,
