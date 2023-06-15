@@ -383,14 +383,12 @@ def normalize_incoming_data(incoming_data):
     Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
     """
     data = {}
-    for k, v in incoming_data.items():
-        if k.startswith("HTTP_"):
-            k = k[5:]
+    for key, value in incoming_data.items():
+        if key.startswith("HTTP_"):
+            key = key[5:]
 
-        # TODO: when loading from environment like described in RFC-0071 also trim `SENTRY_TRACING_` prefix.
-
-        k = k.replace("_", "-").lower()
-        data[k] = v
+        key = key.replace("_", "-").lower()
+        data[key] = value
 
     return data
 
