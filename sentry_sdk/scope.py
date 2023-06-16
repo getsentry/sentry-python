@@ -151,13 +151,13 @@ class Scope(object):
             incoming_trace_information = {}
 
             if os.environ.get("SENTRY_TRACE"):
-                incoming_trace_information[SENTRY_TRACE_HEADER_NAME] = os.environ.get(
-                    "SENTRY_TRACE"
+                incoming_trace_information[SENTRY_TRACE_HEADER_NAME] = (
+                    os.environ.get("SENTRY_TRACE") or ""
                 )
 
             if os.environ.get("SENTRY_BAGGAGE"):
-                incoming_trace_information[BAGGAGE_HEADER_NAME] = os.environ.get(
-                    "SENTRY_BAGGAGE"
+                incoming_trace_information[BAGGAGE_HEADER_NAME] = (
+                    os.environ.get("SENTRY_BAGGAGE") or ""
                 )
 
         return incoming_trace_information or None
