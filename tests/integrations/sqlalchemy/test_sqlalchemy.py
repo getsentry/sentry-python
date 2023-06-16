@@ -7,10 +7,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 from sentry_sdk import capture_message, start_transaction, configure_scope
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import DEFAULT_MAX_STRING_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
-from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
+from sentry_sdk.utils import json_dumps
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -167,7 +167,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     )
     events = capture_events()
 
-    long_str = "x" * (MAX_STRING_LENGTH + 10)
+    long_str = "x" * (DEFAULT_MAX_STRING_LENGTH + 10)
 
     with configure_scope() as scope:
 
@@ -201,7 +201,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     assert description.endswith("SELECT 98 UNION SELECT 99")
 
     # Smoke check that truncation of other fields has not changed.
-    assert len(event["message"]) == MAX_STRING_LENGTH
+    assert len(event["message"]) == DEFAULT_MAX_STRING_LENGTH
 
     # The _meta for other truncated fields should be there as well.
     assert event["_meta"]["message"] == {
