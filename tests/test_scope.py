@@ -233,7 +233,6 @@ def test_propagate_trace_via_env_vars(env, excepted_trace_id):
             stderr=null,
             stdin=null,
         ) as proc:
-
             output = proc.stdout.read().strip().decode("utf-8")
             events = []
             envelopes = []
