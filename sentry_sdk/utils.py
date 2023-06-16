@@ -469,7 +469,7 @@ def iter_stacks(tb):
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
-    max_length,  # type: int
+    max_length=None,  # type: Optional[int]
     loader=None,  # type: Optional[Any]
     module=None,  # type: Optional[str]
 ):
@@ -614,7 +614,7 @@ def serialize_frame(
     include_source_context=True,
     max_string_length=None,
 ):
-    # type: (FrameType, Optional[int], bool, bool) -> Dict[str, Any]
+    # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -650,9 +650,11 @@ def serialize_frame(
 
 
 def current_stacktrace(
-    include_local_variables=True, include_source_context=True, max_string_length=None
+    include_local_variables=True,  # type: bool
+    include_source_context=True,  # type: bool
+    max_string_length=None,  # type: Optional[int]
 ):
-    # type: (bool, bool) -> Any
+    # type: (...) -> Dict[str, Any]
     __tracebackhide__ = True
     frames = []
 
