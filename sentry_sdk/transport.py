@@ -451,7 +451,7 @@ class HttpTransport(Transport):
                     from urllib3.contrib.socks import SOCKSProxyManager  # type: ignore
                 except ImportError:
                     logger.warning(
-                        "You have configured a SOCKS proxy (%s) but PySocks is not installed. Please add PySocks to your dependencies.",
+                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
                         proxy,
                     )
 
