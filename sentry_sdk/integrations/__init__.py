@@ -67,6 +67,7 @@ _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.redis.RedisIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.boto3.Boto3Integration",
+    "sentry_sdk.integrations.httpx.HttpxIntegration",
 )
 
 
