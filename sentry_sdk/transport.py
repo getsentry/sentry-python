@@ -448,7 +448,7 @@ class HttpTransport(Transport):
                 try:
                     # defer this import because it will otherwise raise a warning
                     # at import time if pysocks is not installed
-                    from urllib3.contrib.socks import SOCKSProxyManager  # type: ignore
+                    from urllib3.contrib.socks import SOCKSProxyManager
                 except ImportError:
                     use_socks_proxy = False
                     logger.warning(
