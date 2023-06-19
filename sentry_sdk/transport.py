@@ -441,11 +441,18 @@ class HttpTransport(Transport):
             if proxy_headers:
                 opts["proxy_headers"] = proxy_headers
 
-            if proxy.startswith("socks"):
-                # defer this import because it will otherwise raise a warning
-                # at import time if pysocks is not installed
-                from urllib3.contrib.socks import SOCKSProxyManager  # type: ignore
+            use_socks_proxy = False
 
+            if proxy.startswith("socks"):
+                use_socks_proxy = True
+                try:
+                    # defer this import because it will otherwise raise a warning
+                    # at import time if pysocks is not installed
+                    from urllib3.contrib.socks import SOCKSProxyManager  # type: ignore
+                except ImportError:
+                    use_socks_proxy = False
+
+            if use_socks_proxy:
                 return SOCKSProxyManager(proxy, **opts)
             else:
                 return urllib3.ProxyManager(proxy, **opts)
