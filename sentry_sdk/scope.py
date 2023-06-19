@@ -1,20 +1,34 @@
 from copy import copy
 from collections import deque
 from itertools import chain
+import uuid
 
-from sentry_sdk._functools import wraps
-from sentry_sdk._types import MYPY
-from sentry_sdk.utils import logger, capture_internal_exceptions
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.attachments import Attachment
+from sentry_sdk._functools import wraps
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    extract_sentrytrace_data,
+    has_tracing_enabled,
+    normalize_incoming_data,
+)
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    Transaction,
+)
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.utils import logger, capture_internal_exceptions
 
-if MYPY:
+
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Iterator
     from typing import Optional
     from typing import Deque
     from typing import List
     from typing import Callable
+    from typing import Tuple
     from typing import TypeVar
 
     from sentry_sdk._types import (
@@ -27,6 +41,7 @@ if MYPY:
         Type,
     )
 
+    from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
     from sentry_sdk.session import Session
 
@@ -81,6 +96,7 @@ class Scope(object):
         # note that for legacy reasons, _transaction is the transaction *name*,
         # not a Transaction object (the object is stored in _span)
         "_transaction",
+        "_transaction_info",
         "_user",
         "_tags",
         "_contexts",
@@ -93,6 +109,8 @@ class Scope(object):
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
+        "_profile",
+        "_propagation_context",
     )
 
     def __init__(self):
@@ -101,7 +119,139 @@ class Scope(object):
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
+        self._propagation_context = None  # type: Optional[Dict[str, Any]]
+
         self.clear()
+        self.generate_propagation_context()
+
+    def _extract_propagation_context(self, data):
+        # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
+        context = {}  # type: Dict[str, Any]
+        normalized_data = normalize_incoming_data(data)
+
+        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
+        if baggage_header:
+            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
+                baggage_header
+            ).dynamic_sampling_context()
+
+        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        if sentry_trace_header:
+            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
+            if sentrytrace_data is not None:
+                context.update(sentrytrace_data)
+
+        if context:
+            if not context.get("span_id"):
+                context["span_id"] = uuid.uuid4().hex[16:]
+
+            return context
+
+        return None
+
+    def _create_new_propagation_context(self):
+        # type: () -> Dict[str, Any]
+        return {
+            "trace_id": uuid.uuid4().hex,
+            "span_id": uuid.uuid4().hex[16:],
+            "parent_span_id": None,
+            "dynamic_sampling_context": None,
+        }
+
+    def generate_propagation_context(self, incoming_data=None):
+        # type: (Optional[Dict[str, str]]) -> None
+        """
+        Populates `_propagation_context`. Either from `incoming_data` or with a new propagation context.
+        """
+        if incoming_data:
+            context = self._extract_propagation_context(incoming_data)
+
+            if context is not None:
+                self._propagation_context = context
+                logger.debug(
+                    "[Tracing] Extracted propagation context from incoming data: %s",
+                    self._propagation_context,
+                )
+
+        if self._propagation_context is None:
+            self._propagation_context = self._create_new_propagation_context()
+            logger.debug(
+                "[Tracing] Create new propagation context: %s",
+                self._propagation_context,
+            )
+
+    def get_dynamic_sampling_context(self):
+        # type: () -> Optional[Dict[str, str]]
+        """
+        Returns the Dynamic Sampling Context from the Propagation Context.
+        If not existing, creates a new one.
+        """
+        if self._propagation_context is None:
+            return None
+
+        baggage = self.get_baggage()
+        if baggage is not None:
+            self._propagation_context[
+                "dynamic_sampling_context"
+            ] = baggage.dynamic_sampling_context()
+
+        return self._propagation_context["dynamic_sampling_context"]
+
+    def get_traceparent(self):
+        # type: () -> Optional[str]
+        """
+        Returns the Sentry "sentry-trace" header (aka the traceparent) from the Propagation Context.
+        """
+        if self._propagation_context is None:
+            return None
+
+        traceparent = "%s-%s" % (
+            self._propagation_context["trace_id"],
+            self._propagation_context["span_id"],
+        )
+        return traceparent
+
+    def get_baggage(self):
+        # type: () -> Optional[Baggage]
+        if self._propagation_context is None:
+            return None
+
+        if self._propagation_context.get("dynamic_sampling_context") is None:
+            return Baggage.from_options(self)
+
+        return None
+
+    def get_trace_context(self):
+        # type: () -> Any
+        """
+        Returns the Sentry "trace" context from the Propagation Context.
+        """
+        if self._propagation_context is None:
+            return None
+
+        trace_context = {
+            "trace_id": self._propagation_context["trace_id"],
+            "span_id": self._propagation_context["span_id"],
+            "parent_span_id": self._propagation_context["parent_span_id"],
+            "dynamic_sampling_context": self.get_dynamic_sampling_context(),
+        }  # type: Dict[str, Any]
+
+        return trace_context
+
+    def iter_headers(self):
+        # type: () -> Iterator[Tuple[str, str]]
+        """
+        Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
+        """
+        if self._propagation_context is not None:
+            traceparent = self.get_traceparent()
+            if traceparent is not None:
+                yield SENTRY_TRACE_HEADER_NAME, traceparent
+
+            dsc = self.get_dynamic_sampling_context()
+            if dsc is not None:
+                baggage = Baggage(dsc).serialize()
+                yield BAGGAGE_HEADER_NAME, baggage
 
     def clear(self):
         # type: () -> None
@@ -109,6 +259,7 @@ class Scope(object):
         self._level = None  # type: Optional[str]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
+        self._transaction_info = {}  # type: Dict[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
@@ -122,6 +273,10 @@ class Scope(object):
         self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]
         self._force_auto_session_tracking = None  # type: Optional[bool]
+
+        self._profile = None  # type: Optional[Profile]
+
+        self._propagation_context = None
 
     @_attr_setter
     def level(self, value):
@@ -162,7 +317,10 @@ class Scope(object):
     def transaction(self, value):
         # type: (Any) -> None
         # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
-        """When set this forces a specific transaction name to be set."""
+        """When set this forces a specific transaction name to be set.
+
+        Deprecated: use set_transaction_name instead."""
+
         # XXX: the docstring above is misleading. The implementation of
         # apply_to_event prefers an existing value of event.transaction over
         # anything set in the scope.
@@ -172,9 +330,26 @@ class Scope(object):
         # Without breaking version compatibility, we could make the setter set a
         # transaction name or transaction (self._span) depending on the type of
         # the value argument.
+
+        logger.warning(
+            "Assigning to scope.transaction directly is deprecated: use scope.set_transaction_name() instead."
+        )
         self._transaction = value
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
+
+    def set_transaction_name(self, name, source=None):
+        # type: (str, Optional[str]) -> None
+        """Set the transaction name and optionally the transaction source."""
+        self._transaction = name
+
+        if self._span and self._span.containing_transaction:
+            self._span.containing_transaction.name = name
+            if source:
+                self._span.containing_transaction.source = source
+
+        if source:
+            self._transaction_info["source"] = source
 
     @_attr_setter
     def user(self, value):
@@ -205,6 +380,17 @@ class Scope(object):
             transaction = span
             if transaction.name:
                 self._transaction = transaction.name
+
+    @property
+    def profile(self):
+        # type: () -> Optional[Profile]
+        return self._profile
+
+    @profile.setter
+    def profile(self, profile):
+        # type: (Optional[Profile]) -> None
+
+        self._profile = profile
 
     def set_tag(
         self,
@@ -329,13 +515,14 @@ class Scope(object):
         self,
         event,  # type: Event
         hint,  # type: Hint
+        options=None,  # type: Optional[Dict[str, Any]]
     ):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
 
-        def _drop(event, cause, ty):
-            # type: (Dict[str, Any], Any, str) -> Optional[Any]
-            logger.info("%s (%s) dropped event (%s)", ty, cause, event)
+        def _drop(cause, ty):
+            # type: (Any, str) -> Optional[Any]
+            logger.info("%s (%s) dropped event", ty, cause)
             return None
 
         is_transaction = event.get("type") == "transaction"
@@ -363,6 +550,9 @@ class Scope(object):
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
+        if event.get("transaction_info") is None and self._transaction_info is not None:
+            event["transaction_info"] = self._transaction_info
+
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
@@ -375,17 +565,20 @@ class Scope(object):
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
-        if self._span is not None:
-            contexts = event.setdefault("contexts", {})
-            if not contexts.get("trace"):
+        contexts = event.setdefault("contexts", {})
+
+        if has_tracing_enabled(options):
+            if self._span is not None:
                 contexts["trace"] = self._span.get_trace_context()
+        else:
+            contexts["trace"] = self.get_trace_context()
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    return _drop(event, error_processor, "error processor")
+                    return _drop(error_processor, "error processor")
                 event = new_event
 
         for event_processor in chain(global_event_processors, self._event_processors):
@@ -393,7 +586,7 @@ class Scope(object):
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
-                return _drop(event, event_processor, "event processor")
+                return _drop(event_processor, "event processor")
             event = new_event
 
         return event
@@ -406,6 +599,8 @@ class Scope(object):
             self._fingerprint = scope._fingerprint
         if scope._transaction is not None:
             self._transaction = scope._transaction
+        if scope._transaction_info is not None:
+            self._transaction_info.update(scope._transaction_info)
         if scope._user is not None:
             self._user = scope._user
         if scope._tags:
@@ -420,6 +615,10 @@ class Scope(object):
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
+        if scope._profile:
+            self._profile = scope._profile
+        if scope._propagation_context:
+            self._propagation_context = scope._propagation_context
 
     def update_from_kwargs(
         self,
@@ -452,6 +651,7 @@ class Scope(object):
         rv._name = self._name
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
+        rv._transaction_info = dict(self._transaction_info)
         rv._user = self._user
 
         rv._tags = dict(self._tags)
@@ -461,12 +661,15 @@ class Scope(object):
         rv._breadcrumbs = copy(self._breadcrumbs)
         rv._event_processors = list(self._event_processors)
         rv._error_processors = list(self._error_processors)
+        rv._propagation_context = self._propagation_context
 
         rv._should_capture = self._should_capture
         rv._span = self._span
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = list(self._attachments)
+
+        rv._profile = self._profile
 
         return rv
 

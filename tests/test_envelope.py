@@ -1,15 +1,7 @@
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.session import Session
 from sentry_sdk import capture_event
-from sentry_sdk.tracing_utils import compute_tracestate_value
 import sentry_sdk.client
-
-import pytest
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def generate_transaction_item():
@@ -26,16 +18,15 @@ def generate_transaction_item():
                 "parent_span_id": None,
                 "description": "<OrganizationContext>",
                 "op": "greeting.sniff",
-                "tracestate": compute_tracestate_value(
-                    {
-                        "trace_id": "12312012123120121231201212312012",
-                        "environment": "dogpark",
-                        "release": "off.leash.park",
-                        "public_key": "dogsarebadatkeepingsecrets",
-                        "user": {"id": 12312013, "segment": "bigs"},
-                        "transaction": "/interactions/other-dogs/new-dog",
-                    }
-                ),
+                "dynamic_sampling_context": {
+                    "trace_id": "12312012123120121231201212312012",
+                    "sample_rate": "1.0",
+                    "environment": "dogpark",
+                    "release": "off.leash.park",
+                    "public_key": "dogsarebadatkeepingsecrets",
+                    "user_segment": "bigs",
+                    "transaction": "/interactions/other-dogs/new-dog",
+                },
             }
         },
         "spans": [
@@ -88,25 +79,16 @@ def test_add_and_get_session():
             assert item.payload.json == expected.to_json()
 
 
-# TODO (kmclb) remove this parameterization once tracestate is a real feature
-@pytest.mark.parametrize("tracestate_enabled", [True, False])
-def test_envelope_headers(
-    sentry_init, capture_envelopes, monkeypatch, tracestate_enabled
-):
+def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
     monkeypatch.setattr(
         sentry_sdk.client,
         "format_timestamp",
         lambda x: "2012-11-21T12:31:12.415908Z",
     )
 
-    monkeypatch.setattr(
-        sentry_sdk.client,
-        "has_tracestate_enabled",
-        mock.Mock(return_value=tracestate_enabled),
-    )
-
     sentry_init(
         dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+        traces_sample_rate=1.0,
     )
     envelopes = capture_envelopes()
 
@@ -114,24 +96,19 @@ def test_envelope_headers(
 
     assert len(envelopes) == 1
 
-    if tracestate_enabled:
-        assert envelopes[0].headers == {
-            "event_id": "15210411201320122115110420122013",
-            "sent_at": "2012-11-21T12:31:12.415908Z",
-            "trace": {
-                "trace_id": "12312012123120121231201212312012",
-                "environment": "dogpark",
-                "release": "off.leash.park",
-                "public_key": "dogsarebadatkeepingsecrets",
-                "user": {"id": 12312013, "segment": "bigs"},
-                "transaction": "/interactions/other-dogs/new-dog",
-            },
-        }
-    else:
-        assert envelopes[0].headers == {
-            "event_id": "15210411201320122115110420122013",
-            "sent_at": "2012-11-21T12:31:12.415908Z",
-        }
+    assert envelopes[0].headers == {
+        "event_id": "15210411201320122115110420122013",
+        "sent_at": "2012-11-21T12:31:12.415908Z",
+        "trace": {
+            "trace_id": "12312012123120121231201212312012",
+            "sample_rate": "1.0",
+            "environment": "dogpark",
+            "release": "off.leash.park",
+            "public_key": "dogsarebadatkeepingsecrets",
+            "user_segment": "bigs",
+            "transaction": "/interactions/other-dogs/new-dog",
+        },
+    }
 
 
 def test_envelope_with_sized_items():
@@ -141,15 +118,15 @@ def test_envelope_with_sized_items():
     """
     envelope_raw = (
         b'{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n'
-        + b'{"type":"type1","length":4 }\n1234\n'
-        + b'{"type":"type2","length":4 }\nabcd\n'
-        + b'{"type":"type3","length":0}\n\n'
-        + b'{"type":"type4","length":4 }\nab12\n'
+        b'{"type":"type1","length":4 }\n1234\n'
+        b'{"type":"type2","length":4 }\nabcd\n'
+        b'{"type":"type3","length":0}\n\n'
+        b'{"type":"type4","length":4 }\nab12\n'
     )
     envelope_raw_eof_terminated = envelope_raw[:-1]
 
-    for envelope_raw in (envelope_raw, envelope_raw_eof_terminated):
-        actual = Envelope.deserialize(envelope_raw)
+    for envelope in (envelope_raw, envelope_raw_eof_terminated):
+        actual = Envelope.deserialize(envelope)
 
         items = [item for item in actual]
 
@@ -177,15 +154,15 @@ def test_envelope_with_implicitly_sized_items():
     """
     envelope_raw = (
         b'{"event_id":"9ec79c33ec9942ab8353589fcb2e04dc"}\n'
-        + b'{"type":"type1"}\n1234\n'
-        + b'{"type":"type2"}\nabcd\n'
-        + b'{"type":"type3"}\n\n'
-        + b'{"type":"type4"}\nab12\n'
+        b'{"type":"type1"}\n1234\n'
+        b'{"type":"type2"}\nabcd\n'
+        b'{"type":"type3"}\n\n'
+        b'{"type":"type4"}\nab12\n'
     )
     envelope_raw_eof_terminated = envelope_raw[:-1]
 
-    for envelope_raw in (envelope_raw, envelope_raw_eof_terminated):
-        actual = Envelope.deserialize(envelope_raw)
+    for envelope in (envelope_raw, envelope_raw_eof_terminated):
+        actual = Envelope.deserialize(envelope)
         assert actual.headers["event_id"] == "9ec79c33ec9942ab8353589fcb2e04dc"
 
         items = [item for item in actual]

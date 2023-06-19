@@ -4,19 +4,21 @@ from inspect import isawaitable
 
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    parse_version,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Optional
@@ -50,15 +52,15 @@ except AttributeError:
 
 class SanicIntegration(Integration):
     identifier = "sanic"
-    version = (0, 0)  # type: Tuple[int, ...]
+    version = None
 
     @staticmethod
     def setup_once():
         # type: () -> None
 
-        try:
-            SanicIntegration.version = tuple(map(int, SANIC_VERSION.split(".")))
-        except (TypeError, ValueError):
+        SanicIntegration.version = parse_version(SANIC_VERSION)
+
+        if SanicIntegration.version is None:
             raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
 
         if SanicIntegration.version < (0, 8):
@@ -191,7 +193,9 @@ async def _set_transaction(request, route, **kwargs):
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
                 route_name = route.name.replace(request.app.name, "").strip(".")
-                scope.transaction = route_name
+                scope.set_transaction_name(
+                    route_name, source=TRANSACTION_SOURCE_COMPONENT
+                )
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
@@ -222,7 +226,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
         finally:
             # As mentioned in previous comment in _startup, this can be removed
             # after https://github.com/sanic-org/sanic/issues/2297 is resolved
-            if SanicIntegration.version == (21, 9):
+            if SanicIntegration.version and SanicIntegration.version == (21, 9):
                 await _hub_exit(request)
 
     return sentry_wrapped_error_handler
@@ -268,9 +272,14 @@ def _legacy_router_get(self, *args):
                         # Format: app_name.route_name
                         sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
-                    scope.transaction = sanic_route
+                    scope.set_transaction_name(
+                        sanic_route, source=TRANSACTION_SOURCE_COMPONENT
+                    )
                 else:
-                    scope.transaction = rv[0].__name__
+                    scope.set_transaction_name(
+                        rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
+                    )
+
     return rv
 
 

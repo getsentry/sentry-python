@@ -5,10 +5,13 @@ from datetime import datetime
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.tracing import Span, Transaction
+from sentry_sdk.profiler import Profile
+from sentry_sdk.tracing import NoOpSpan, Span, Transaction
 from sentry_sdk.session import Session
+from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -16,9 +19,9 @@ from sentry_sdk.utils import (
     ContextVar,
 )
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Union
     from typing import Any
     from typing import Optional
@@ -96,6 +99,20 @@ class _InitGuard(object):
             c.close()
 
 
+def _check_python_deprecations():
+    # type: () -> None
+    version = sys.version_info[:2]
+
+    if version == (3, 4) or version == (3, 5):
+        logger.warning(
+            "sentry-sdk 2.0.0 will drop support for Python %s.",
+            "{}.{}".format(*version),
+        )
+        logger.warning(
+            "Please upgrade to the latest version to continue receiving upgrades and bugfixes."
+        )
+
+
 def _init(*args, **kwargs):
     # type: (*Optional[str], **Any) -> ContextManager[Any]
     """Initializes the SDK and optionally integrations.
@@ -104,22 +121,22 @@ def _init(*args, **kwargs):
     """
     client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
+    _check_python_deprecations()
     rv = _InitGuard(client)
     return rv
 
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
     #
     # Use `ClientConstructor` to define the argument types of `init` and
     # `ContextManager[Any]` to tell static analyzers about the return type.
 
-    class init(ClientConstructor, ContextManager[Any]):  # noqa: N801
+    class init(ClientConstructor, _InitGuard):  # noqa: N801
         pass
-
 
 else:
     # Alias `init` for actual usage. Go through the lambda indirection to throw
@@ -207,7 +224,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     # Mypy doesn't pick up on the metaclass.
 
-    if MYPY:
+    if TYPE_CHECKING:
         current = None  # type: Hub
         main = None  # type: Hub
 
@@ -306,14 +323,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(
-        self,
-        event,  # type: Event
-        hint=None,  # type: Optional[Hint]
-        scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_event(self, event, hint=None, scope=None, **scope_args):
+        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
         """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
         client, top_scope = self._stack[-1]
         scope = _update_scope(top_scope, scope, scope_args)
@@ -325,14 +336,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return rv
         return None
 
-    def capture_message(
-        self,
-        message,  # type: str
-        level=None,  # type: Optional[str]
-        scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_message(self, message, level=None, scope=None, **scope_args):
+        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """Captures a message.  The message is just a string.  If no level
         is provided the default level is `info`.
 
@@ -346,13 +351,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             {"message": message, "level": level}, scope=scope, **scope_args
         )
 
-    def capture_exception(
-        self,
-        error=None,  # type: Optional[Union[BaseException, ExcInfo]]
-        scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_exception(self, error=None, scope=None, **scope_args):
+        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
@@ -387,13 +387,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(
-        self,
-        crumb=None,  # type: Optional[Breadcrumb]
-        hint=None,  # type: Optional[BreadcrumbHint]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> None
+    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
+        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """
         Adds a breadcrumb.
 
@@ -433,12 +428,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
-    def start_span(
-        self,
-        span=None,  # type: Optional[Span]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Span
+    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (Optional[Span], str, Any) -> Span
         """
         Create and start timing a new span whose parent is the currently active
         span or transaction, if any. The return value is a span instance,
@@ -450,6 +441,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use `start_transaction` to start a new
         transaction when one is not already in progress.
         """
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before
         # start_transaction existed, to allow for a smoother transition.
@@ -478,11 +474,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return Span(**kwargs)
 
     def start_transaction(
-        self,
-        transaction=None,  # type: Optional[Transaction]
-        **kwargs  # type: Any
+        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (...) -> Transaction
+        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -505,6 +499,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
         """
+        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
         custom_sampling_context = kwargs.pop("custom_sampling_context", {})
 
         # if we haven't been given a transaction, make one
@@ -521,6 +520,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
+        profile = Profile(transaction, hub=self)
+        profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
         if transaction.sampled:
@@ -532,7 +534,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return transaction
 
     @overload
-    def push_scope(  # noqa: F811
+    def push_scope(
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
@@ -546,7 +548,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         pass
 
     def push_scope(  # noqa
-        self, callback=None  # type: Optional[Callable[[Scope], None]]
+        self,
+        callback=None,  # type: Optional[Callable[[Scope], None]]
+        continue_trace=True,  # type: bool
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
         """
@@ -564,7 +568,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
 
         client, scope = self._stack[-1]
-        new_layer = (client, copy.copy(scope))
+
+        new_scope = copy.copy(scope)
+
+        if continue_trace:
+            new_scope.generate_propagation_context()
+
+        new_layer = (client, new_scope)
         self._stack.append(new_layer)
 
         return _ScopeManager(self)
@@ -581,7 +591,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return rv
 
     @overload
-    def configure_scope(  # noqa: F811
+    def configure_scope(
         self, callback=None  # type: Optional[None]
     ):
         # type: (...) -> ContextManager[Scope]
@@ -595,8 +605,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         pass
 
     def configure_scope(  # noqa
-        self, callback=None  # type: Optional[Callable[[Scope], None]]
-    ):  # noqa
+        self,
+        callback=None,  # type: Optional[Callable[[Scope], None]]
+        continue_trace=True,  # type: bool
+    ):
         # type: (...) -> Optional[ContextManager[Scope]]
 
         """
@@ -608,6 +620,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
 
         client, scope = self._stack[-1]
+
+        if continue_trace:
+            scope.generate_propagation_context()
+
         if callback is not None:
             if client is not None:
                 callback(scope)
@@ -690,18 +706,32 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        span = span or self.scope.span
-        if not span:
-            return
-
         client = self._stack[-1][0]
-
         propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:
             return
 
-        for header in span.iter_headers():
-            yield header
+        span = span or self.scope.span
+
+        if client and has_tracing_enabled(client.options) and span is not None:
+            for header in span.iter_headers():
+                yield header
+        else:
+            for header in self.scope.iter_headers():
+                yield header
+
+    def trace_propagation_meta(self, span=None):
+        # type: (Optional[Span]) -> str
+        """
+        Return meta tags which should be injected into the HTML template
+        to allow propagation of trace data.
+        """
+        meta = ""
+
+        for name, content in self.iter_trace_propagation_headers(span):
+            meta += '<meta name="%s" content="%s">' % (name, content)
+
+        return meta
 
 
 GLOBAL_HUB = Hub()

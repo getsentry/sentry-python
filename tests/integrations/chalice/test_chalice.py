@@ -4,6 +4,7 @@ from chalice import Chalice, BadRequestError
 from chalice.local import LambdaContext, LocalGateway
 
 from sentry_sdk.integrations.chalice import ChaliceIntegration
+from sentry_sdk import capture_message
 
 from pytest_chalice.handlers import RequestHandler
 
@@ -40,6 +41,16 @@ def app(sentry_init):
     @app.route("/badrequest")
     def badrequest():
         raise BadRequestError("bad-request")
+
+    @app.route("/message")
+    def hi():
+        capture_message("hi")
+        return {"status": "ok"}
+
+    @app.route("/message/{message_id}")
+    def hi_with_id(message_id):
+        capture_message("hi again")
+        return {"status": "ok"}
 
     LocalGateway._generate_lambda_context = _generate_lambda_context
 
@@ -109,3 +120,28 @@ def test_bad_reques(client: RequestHandler) -> None:
             ("Message", "BadRequestError: bad-request"),
         ]
     )
+
+
+@pytest.mark.parametrize(
+    "url,expected_transaction,expected_source",
+    [
+        ("/message", "api_handler", "component"),
+        ("/message/123456", "api_handler", "component"),
+    ],
+)
+def test_transaction(
+    app,
+    client: RequestHandler,
+    capture_events,
+    url,
+    expected_transaction,
+    expected_source,
+):
+    events = capture_events()
+
+    response = client.get(url)
+    assert response.status_code == 200
+
+    (event,) = events
+    assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}

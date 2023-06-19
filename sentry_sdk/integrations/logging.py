@@ -14,9 +14,9 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk._compat import iteritems
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from logging import LogRecord
     from typing import Any
     from typing import Dict
@@ -24,6 +24,16 @@ if MYPY:
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
+LOGGING_TO_EVENT_LEVEL = {
+    logging.NOTSET: "notset",
+    logging.DEBUG: "debug",
+    logging.INFO: "info",
+    logging.WARN: "warning",  # WARN is same a WARNING
+    logging.WARNING: "warning",
+    logging.ERROR: "error",
+    logging.FATAL: "fatal",
+    logging.CRITICAL: "fatal",  # CRITICAL is same as FATAL
+}
 
 # Capturing events from those loggers causes recursion errors. We cannot allow
 # the user to unconditionally create events from those loggers under any
@@ -78,7 +88,7 @@ class LoggingIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        old_callhandlers = logging.Logger.callHandlers  # type: ignore
+        old_callhandlers = logging.Logger.callHandlers
 
         def sentry_patched_callhandlers(self, record):
             # type: (Any, LogRecord) -> Any
@@ -97,73 +107,61 @@ class LoggingIntegration(Integration):
         logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
 
-def _can_record(record):
-    # type: (LogRecord) -> bool
-    """Prevents ignored loggers from recording"""
-    for logger in _IGNORED_LOGGERS:
-        if fnmatch(record.name, logger):
-            return False
-    return True
-
-
-def _breadcrumb_from_record(record):
-    # type: (LogRecord) -> Dict[str, Any]
-    return {
-        "type": "log",
-        "level": _logging_to_event_level(record.levelname),
-        "category": record.name,
-        "message": record.message,
-        "timestamp": datetime.datetime.utcfromtimestamp(record.created),
-        "data": _extra_from_record(record),
-    }
-
-
-def _logging_to_event_level(levelname):
-    # type: (str) -> str
-    return {"critical": "fatal"}.get(levelname.lower(), levelname.lower())
-
-
-COMMON_RECORD_ATTRS = frozenset(
-    (
-        "args",
-        "created",
-        "exc_info",
-        "exc_text",
-        "filename",
-        "funcName",
-        "levelname",
-        "levelno",
-        "linenno",
-        "lineno",
-        "message",
-        "module",
-        "msecs",
-        "msg",
-        "name",
-        "pathname",
-        "process",
-        "processName",
-        "relativeCreated",
-        "stack",
-        "tags",
-        "thread",
-        "threadName",
-        "stack_info",
+class _BaseHandler(logging.Handler, object):
+    COMMON_RECORD_ATTRS = frozenset(
+        (
+            "args",
+            "created",
+            "exc_info",
+            "exc_text",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "linenno",
+            "lineno",
+            "message",
+            "module",
+            "msecs",
+            "msg",
+            "name",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack",
+            "tags",
+            "thread",
+            "threadName",
+            "stack_info",
+        )
     )
-)
+
+    def _can_record(self, record):
+        # type: (LogRecord) -> bool
+        """Prevents ignored loggers from recording"""
+        for logger in _IGNORED_LOGGERS:
+            if fnmatch(record.name, logger):
+                return False
+        return True
+
+    def _logging_to_event_level(self, record):
+        # type: (LogRecord) -> str
+        return LOGGING_TO_EVENT_LEVEL.get(
+            record.levelno, record.levelname.lower() if record.levelname else ""
+        )
+
+    def _extra_from_record(self, record):
+        # type: (LogRecord) -> Dict[str, None]
+        return {
+            k: v
+            for k, v in iteritems(vars(record))
+            if k not in self.COMMON_RECORD_ATTRS
+            and (not isinstance(k, str) or not k.startswith("_"))
+        }
 
 
-def _extra_from_record(record):
-    # type: (LogRecord) -> Dict[str, None]
-    return {
-        k: v
-        for k, v in iteritems(vars(record))
-        if k not in COMMON_RECORD_ATTRS
-        and (not isinstance(k, str) or not k.startswith("_"))
-    }
-
-
-class EventHandler(logging.Handler, object):
+class EventHandler(_BaseHandler):
     """
     A logging handler that emits Sentry events for each log record
 
@@ -178,7 +176,7 @@ class EventHandler(logging.Handler, object):
 
     def _emit(self, record):
         # type: (LogRecord) -> None
-        if not _can_record(record):
+        if not self._can_record(record):
             return
 
         hub = Hub.current
@@ -207,7 +205,7 @@ class EventHandler(logging.Handler, object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                client_options["with_locals"]
+                                client_options["include_local_variables"]
                             ),
                             "crashed": False,
                             "current": True,
@@ -220,7 +218,7 @@ class EventHandler(logging.Handler, object):
 
         hint["log_record"] = record
 
-        event["level"] = _logging_to_event_level(record.levelname)
+        event["level"] = self._logging_to_event_level(record)
         event["logger"] = record.name
 
         # Log records from `warnings` module as separate issues
@@ -243,7 +241,7 @@ class EventHandler(logging.Handler, object):
                 "params": record.args,
             }
 
-        event["extra"] = _extra_from_record(record)
+        event["extra"] = self._extra_from_record(record)
 
         hub.capture_event(event, hint=hint)
 
@@ -252,7 +250,7 @@ class EventHandler(logging.Handler, object):
 SentryHandler = EventHandler
 
 
-class BreadcrumbHandler(logging.Handler, object):
+class BreadcrumbHandler(_BaseHandler):
     """
     A logging handler that records breadcrumbs for each log record.
 
@@ -267,9 +265,20 @@ class BreadcrumbHandler(logging.Handler, object):
 
     def _emit(self, record):
         # type: (LogRecord) -> None
-        if not _can_record(record):
+        if not self._can_record(record):
             return
 
         Hub.current.add_breadcrumb(
-            _breadcrumb_from_record(record), hint={"log_record": record}
+            self._breadcrumb_from_record(record), hint={"log_record": record}
         )
+
+    def _breadcrumb_from_record(self, record):
+        # type: (LogRecord) -> Dict[str, Any]
+        return {
+            "type": "log",
+            "level": self._logging_to_event_level(record),
+            "category": record.name,
+            "message": record.message,
+            "timestamp": datetime.datetime.utcfromtimestamp(record.created),
+            "data": self._extra_from_record(record),
+        }

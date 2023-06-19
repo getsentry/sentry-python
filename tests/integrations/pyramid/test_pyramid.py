@@ -1,8 +1,6 @@
 import json
 import logging
-import pkg_resources
 import pytest
-
 from io import BytesIO
 
 import pyramid.testing
@@ -12,18 +10,33 @@ from pyramid.response import Response
 
 from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 from werkzeug.test import Client
 
 
-PYRAMID_VERSION = tuple(
-    map(int, pkg_resources.get_distribution("pyramid").version.split("."))
-)
+try:
+    from importlib.metadata import version
+
+    PYRAMID_VERSION = tuple(map(int, version("pyramid").split(".")))
+
+except ImportError:
+    # < py3.8
+    import pkg_resources
+
+    PYRAMID_VERSION = tuple(
+        map(int, pkg_resources.get_distribution("pyramid").version.split("."))
+    )
 
 
 def hi(request):
     capture_message("hi")
     return Response("hi")
+
+
+def hi_with_id(request):
+    capture_message("hi with id")
+    return Response("hi with id")
 
 
 @pytest.fixture
@@ -32,6 +45,8 @@ def pyramid_config():
     try:
         config.add_route("hi", "/message")
         config.add_view(hi, route_name="hi")
+        config.add_route("hi_with_id", "/message/{message_id}")
+        config.add_view(hi_with_id, route_name="hi_with_id")
         yield config
     finally:
         pyramid.testing.tearDown()
@@ -82,20 +97,23 @@ def test_view_exceptions(
     (event,) = events
     (breadcrumb,) = event["breadcrumbs"]["values"]
     assert breadcrumb["message"] == "hi2"
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
+    # Checking only the last value in the exceptions list,
+    # because Pyramid >= 1.9 returns a chained exception and before just a single exception
+    assert event["exception"]["values"][-1]["mechanism"]["type"] == "pyramid"
+    assert event["exception"]["values"][-1]["type"] == "ZeroDivisionError"
 
 
 def test_has_context(route, get_client, sentry_init, capture_events):
     sentry_init(integrations=[PyramidIntegration()])
     events = capture_events()
 
-    @route("/message/{msg}")
+    @route("/context_message/{msg}")
     def hi2(request):
         capture_message(request.matchdict["msg"])
         return Response("hi")
 
     client = get_client()
-    client.get("/message/yoo")
+    client.get("/context_message/yoo")
 
     (event,) = events
     assert event["message"] == "yoo"
@@ -104,26 +122,38 @@ def test_has_context(route, get_client, sentry_init, capture_events):
         "headers": {"Host": "localhost"},
         "method": "GET",
         "query_string": "",
-        "url": "http://localhost/message/yoo",
+        "url": "http://localhost/context_message/yoo",
     }
     assert event["transaction"] == "hi2"
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction",
-    [("route_name", "hi"), ("route_pattern", "/message")],
+    "url,transaction_style,expected_transaction,expected_source",
+    [
+        ("/message", "route_name", "hi", "component"),
+        ("/message", "route_pattern", "/message", "route"),
+        ("/message/123456", "route_name", "hi_with_id", "component"),
+        ("/message/123456", "route_pattern", "/message/{message_id}", "route"),
+    ],
 )
 def test_transaction_style(
-    sentry_init, get_client, capture_events, transaction_style, expected_transaction
+    sentry_init,
+    get_client,
+    capture_events,
+    url,
+    transaction_style,
+    expected_transaction,
+    expected_source,
 ):
     sentry_init(integrations=[PyramidIntegration(transaction_style=transaction_style)])
 
     events = capture_events()
     client = get_client()
-    client.get("/message")
+    client.get(url)
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
 
 
 def test_large_json_request(sentry_init, capture_events, route, get_client):
@@ -146,9 +176,9 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]["bar"]) == 512
+    assert len(event["request"]["data"]["foo"]["bar"]) == 1024
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -173,6 +203,31 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
     assert event["request"]["data"] == data
 
 
+def test_json_not_truncated_if_request_bodies_is_always(
+    sentry_init, capture_events, route, get_client
+):
+    sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
+
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+
+    @route("/")
+    def index(request):
+        assert request.json == data
+        assert request.text == json.dumps(data)
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    client.post("/", content_type="application/json", data=json.dumps(data))
+
+    (event,) = events
+    assert event["request"]["data"] == data
+
+
 def test_files_and_form(sentry_init, capture_events, route, get_client):
     sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
 
@@ -190,13 +245,11 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
 
     (event,) = events
     assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {"len": 2000, "rem": [["!limit", "x", 509, 512]]}
+        "": {"len": 2000, "rem": [["!limit", "x", 1021, 1024]]}
     }
-    assert len(event["request"]["data"]["foo"]) == 512
+    assert len(event["request"]["data"]["foo"]) == 1024
 
-    assert event["_meta"]["request"]["data"]["file"] == {
-        "": {"len": 0, "rem": [["!raw", "x", 0, 0]]}
-    }
+    assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
 
 

@@ -1,12 +1,19 @@
 from __future__ import absolute_import
 
 import weakref
+from sentry_sdk.consts import OP
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import Transaction
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    format_timestamp,
+    parse_version,
+)
 
 try:
     from rq.queue import Queue
@@ -16,9 +23,9 @@ try:
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any, Callable, Dict
 
     from sentry_sdk._types import EventProcessor
@@ -34,9 +41,9 @@ class RqIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(map(int, RQ_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
+        version = parse_version(RQ_VERSION)
+
+        if version is None:
             raise DidNotEnable("Unparsable RQ version: {}".format(RQ_VERSION))
 
         if version < (0, 6):
@@ -59,10 +66,11 @@ class RqIntegration(Integration):
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                transaction = Transaction.continue_from_headers(
+                transaction = continue_trace(
                     job.meta.get("_sentry_trace_headers") or {},
-                    op="rq.task",
+                    op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
+                    source=TRANSACTION_SOURCE_TASK,
                 )
 
                 with capture_internal_exceptions():
@@ -100,9 +108,10 @@ class RqIntegration(Integration):
             # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    hub.iter_trace_propagation_headers()
-                )
+                if hub.scope.span is not None:
+                    job.meta["_sentry_trace_headers"] = dict(
+                        hub.iter_trace_propagation_headers()
+                    )
 
             return old_enqueue_job(self, job, **kwargs)
 
@@ -126,6 +135,11 @@ def _make_event_processor(weak_job):
                     "kwargs": job.kwargs,
                     "description": job.description,
                 }
+
+                if job.enqueued_at:
+                    extra["rq-job"]["enqueued_at"] = format_timestamp(job.enqueued_at)
+                if job.started_at:
+                    extra["rq-job"]["started_at"] = format_timestamp(job.started_at)
 
         if "exc_info" in hint:
             with capture_internal_exceptions():

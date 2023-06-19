@@ -1,5 +1,1047 @@
 # Changelog
 
+## 1.25.1
+
+### Django update (ongoing)
+
+Collections of improvements to our Django integration.
+
+By: @mgaligniana (#1773)
+
+### Various fixes & improvements
+
+- Fix `parse_url` (#2161) by @sentrivana and @antonpirker
+
+  Our URL sanitization used in multiple integrations broke with the recent Python security update. If you started seeing `ValueError`s with `"'Filtered' does not appear to be an IPv4 or IPv6 address"`, this release fixes that. See [the original issue](https://github.com/getsentry/sentry-python/issues/2160) for more context.
+
+- Better version parsing in integrations (#2152) by @antonpirker
+
+  We now properly support all integration versions that conform to [PEP 440](https://peps.python.org/pep-0440/). This replaces our naïve version parsing that wouldn't accept versions such as `2.0.0rc1` or `2.0.5.post1`.
+
+- Align HTTP status code as span data field `http.response.status_code` (#2113) by @antonpirker
+- Do not encode cached value to determine size (#2143) by @sentrivana
+- Fix using `unittest.mock` whenever available (#1926) by @mgorny
+- Fix 2.7 `common` tests (#2145) by @sentrivana
+- Bump `actions/stale` from `6` to `8` (#1978) by @dependabot
+- Bump `black` from `22.12.0` to `23.3.0` (#1984) by @dependabot
+- Bump `mypy` from `1.2.0` to `1.3.0` (#2110) by @dependabot
+- Bump `sphinx` from `5.3.0` to `7.0.1` (#2112) by @dependabot
+
+## 1.25.0
+
+### Various fixes & improvements
+
+- Support urllib3>=2.0.0 (#2148) by @asottile-sentry
+
+  We're now supporting urllib3's new major version, 2.0.0. If you encounter issues (e.g. some of your dependencies not supporting the new urllib3 version yet) you might consider pinning the urllib3 version to `<2.0.0` manually in your project. Check out the [the urllib3 migration guide](https://urllib3.readthedocs.io/en/latest/v2-migration-guide.html#migrating-as-an-application-developer) for details.
+
+- Auto-retry tests on failure (#2134) by @sentrivana
+- Correct `importlib.metadata` check in `test_modules` (#2149) by @asottile-sentry
+- Fix distribution name normalization (PEP-0503) (#2144) by @rominf
+- Fix `functions_to_trace` typing (#2141) by @rcmarron
+
+## 1.24.0
+
+### Various fixes & improvements
+
+- **New:** Celery Beat exclude tasks option (#2130) by @antonpirker
+
+  You can exclude Celery Beat tasks from being auto-instrumented. To do this, add a list of tasks you want to exclude as option `exclude_beat_tasks` when creating `CeleryIntegration`. The list can contain simple strings with the full task name, as specified in the Celery Beat schedule, or regular expressions to match multiple tasks.
+
+  For more information, see the documentation for [Crons](https://docs.sentry.io/platforms/python/guides/celery/crons/) for more information.
+
+  Usage:
+
+  ```python
+      exclude_beat_tasks = [
+          "some-task-a",
+          "payment-check-.*",
+      ]
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              CeleryIntegration(
+                  monitor_beat_tasks=True,
+                  exclude_beat_tasks=exclude_beat_tasks,
+              ),
+          ],
+      )
+  ```
+
+  In this example the task `some-task-a` and all tasks with a name starting with `payment-check-` will be ignored.
+
+- **New:** Add support for **ExceptionGroups** (#2025) by @antonpirker
+
+  _Note:_ If running Self-Hosted Sentry, you should wait to adopt this SDK update until after updating to the 23.6.0 (est. June 2023) release of Sentry. Updating early will not break anything, but you will not get the full benefit of the Exception Groups improvements to issue grouping that were added to the Sentry backend.
+
+- Prefer `importlib.metadata` over `pkg_resources` if available (#2081) by @sentrivana
+- Work with a copy of request, vars in the event (#2125) by @sentrivana
+- Pinned version of dependency that broke the build (#2133) by @antonpirker
+
+## 1.23.1
+
+### Various fixes & improvements
+
+- Disable Django Cache spans by default. (#2120) by @antonpirker
+
+## 1.23.0
+
+### Various fixes & improvements
+
+- **New:** Add `loguru` integration (#1994) by @PerchunPak
+
+  Check [the documentation](https://docs.sentry.io/platforms/python/configuration/integrations/loguru/) for more information.
+
+  Usage:
+
+  ```python
+  from loguru import logger
+  import sentry_sdk
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      integrations=[
+          LoguruIntegration(),
+      ],
+  )
+
+  logger.debug("I am ignored")
+  logger.info("I am a breadcrumb")
+  logger.error("I am an event", extra=dict(bar=43))
+  logger.exception("An exception happened")
+  ```
+
+  - An error event with the message `"I am an event"` will be created.
+  - `"I am a breadcrumb"` will be attached as a breadcrumb to that event.
+  - `bar` will end up in the `extra` attributes of that event.
+  - `"An exception happened"` will send the current exception from `sys.exc_info()` with the stack trace to Sentry. If there's no exception, the current stack will be attached.
+  - The debug message `"I am ignored"` will not be captured by Sentry. To capture it, set `level` to `DEBUG` or lower in `LoguruIntegration`.
+
+- Do not truncate request body if `request_bodies` is `"always"` (#2092) by @sentrivana
+- Fixed Celery headers for Beat auto-instrumentation (#2102) by @antonpirker
+- Add `db.operation` to Redis and MongoDB spans (#2089) by @antonpirker
+- Make sure we're importing `redis` the library (#2106) by @sentrivana
+- Add `include_source_context` option (#2020) by @farhat-nawaz and @sentrivana
+- Import `Markup` from `markupsafe` (#2047) by @rco-ableton
+- Fix `__qualname__` missing attribute in asyncio integration (#2105) by @sl0thentr0py
+- Remove relay extension from AWS Layer (#2068) by @sl0thentr0py
+- Add a note about `pip freeze` to the bug template (#2103) by @sentrivana
+
+## 1.22.2
+
+### Various fixes & improvements
+
+- Fix: Django caching spans when using keyword arguments (#2086) by @antonpirker
+- Fix: Duration in Celery Beat tasks monitoring (#2087) by @antonpirker
+- Fix: Docstrings of SPANDATA (#2084) by @antonpirker
+
+## 1.22.1
+
+### Various fixes & improvements
+
+- Fix: Handle a list of keys (not just a single key) in Django cache spans (#2082) by @antonpirker
+
+## 1.22.0
+
+### Various fixes & improvements
+
+- Add `cache.hit` and `cache.item_size` to Django (#2057) by @antonpirker
+
+  _Note:_ This will add spans for all requests to the caches configured in Django. This will probably add some overhead to your server an also add multiple spans to your performance waterfall diagrams. If you do not want this, you can disable this feature in the DjangoIntegration:
+
+  ```python
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[
+          DjangoIntegration(cache_spans=False),
+      ]
+  )
+  ```
+
+- Use `http.method` instead of `method` (#2054) by @AbhiPrasad
+- Handle non-int `exc.status_code` in Starlette (#2075) by @sentrivana
+- Handle SQLAlchemy `engine.name` being bytes (#2074) by @sentrivana
+- Fix `KeyError` in `capture_checkin` if SDK is not initialized (#2073) by @antonpirker
+- Use `functools.wrap` for `ThreadingIntegration` patches to fix attributes (#2080) by @EpicWink
+- Pin `urllib3` to <2.0.0 for now (#2069) by @sl0thentr0py
+
+## 1.21.1
+
+### Various fixes & improvements
+
+- Do not send monitor_config when unset (#2058) by @evanpurkhiser
+- Add `db.system` span data (#2040, #2042) by @antonpirker
+- Fix memory leak in profiling (#2049) by @Zylphrex
+- Fix crash loop when returning none in before_send (#2045) by @sentrivana
+
+## 1.21.0
+
+### Various fixes & improvements
+
+- Better handling of redis span/breadcrumb data (#2033) by @antonpirker
+
+  _Note:_ With this release we will limit the description of redis db spans and the data in breadcrumbs represting redis db operations to 1024 characters.
+
+  This can can lead to truncated data. If you do not want this there is a new parameter `max_data_size` in `RedisIntegration`. You can set this to `None` for disabling trimming.
+
+  Example for **disabling** trimming of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=None),
+    ]
+  )
+  ```
+
+  Example for custom trim size of redis commands in spans or breadcrumbs:
+
+  ```python
+  sentry_sdk.init(
+    integrations=[
+      RedisIntegration(max_data_size=50),
+    ]
+  )`
+
+  ```
+
+- Add `db.system` to redis and SQLAlchemy db spans (#2037, #2038, #2039) (#2037) by @AbhiPrasad
+- Upgraded linting tooling (#2026) by @antonpirker
+- Made code more resilient. (#2031) by @antonpirker
+
+## 1.20.0
+
+### Various fixes & improvements
+
+- Send all events to /envelope endpoint when tracing is enabled (#2009) by @antonpirker
+
+  _Note:_ If you’re self-hosting Sentry 9, you need to stay in the previous version of the SDK or update your self-hosted to at least 20.6.0
+
+- Profiling: Remove profile context from SDK (#2013) by @Zylphrex
+- Profiling: Additionl performance improvements to the profiler (#1991) by @Zylphrex
+- Fix: Celery Beat monitoring without restarting the Beat process (#2001) by @antonpirker
+- Fix: Using the Codecov uploader instead of deprecated python package (#2011) by @antonpirker
+- Fix: Support for Quart (#2003)` (#2003) by @antonpirker
+
+## 1.19.1
+
+### Various fixes & improvements
+
+- Make auto monitoring beat update support Celery 4 and 5 (#1989) by @antonpirker
+
+## 1.19.0
+
+### Various fixes & improvements
+
+- **New:** [Celery Beat](https://docs.celeryq.dev/en/stable/userguide/periodic-tasks.html) auto monitoring (#1967) by @antonpirker
+
+  The CeleryIntegration can now also monitor your Celery Beat scheduled tasks automatically using the new [Crons](https://blog.sentry.io/2023/01/04/cron-job-monitoring-beta-because-scheduled-jobs-fail-too/) feature of Sentry.
+
+  To learn more see our [Celery Beat Auto Discovery](https://docs.sentry.io/platforms/python/guides/celery/crons/) documentation.
+
+  Usage:
+
+  ```python
+  from celery import Celery, signals
+  from celery.schedules import crontab
+
+  import sentry_sdk
+  from sentry_sdk.integrations.celery import CeleryIntegration
+
+
+  app = Celery('tasks', broker='...')
+  app.conf.beat_schedule = {
+      'set-in-beat-schedule': {
+          'task': 'tasks.some_important_task',
+          'schedule': crontab(...),
+      },
+  }
+
+
+  @signals.celeryd_init.connect
+  def init_sentry(**kwargs):
+      sentry_sdk.init(
+          dsn='...',
+          integrations=[CeleryIntegration(monitor_beat_tasks=True)],  # 👈 here
+          environment="local.dev.grace",
+          release="v1.0",
+      )
+  ```
+
+  This will auto detect all schedules tasks in your `beat_schedule` and will monitor them with Sentry [Crons](https://blog.sentry.io/2023/01/04/cron-job-monitoring-beta-because-scheduled-jobs-fail-too/).
+
+- **New:** [gRPC](https://grpc.io/) integration (#1911) by @hossein-raeisi
+
+  The [gRPC](https://grpc.io/) integration instruments all incoming requests and outgoing unary-unary, unary-stream grpc requests using grpcio channels.
+
+  To learn more see our [gRPC Integration](https://docs.sentry.io/platforms/python/configuration/integrations/grpc/) documentation.
+
+  On the server:
+
+  ```python
+  import grpc
+  from sentry_sdk.integrations.grpc.server import ServerInterceptor
+
+
+  server = grpc.server(
+      thread_pool=...,
+      interceptors=[ServerInterceptor()],
+  )
+  ```
+
+  On the client:
+
+  ```python
+  import grpc
+  from sentry_sdk.integrations.grpc.client import ClientInterceptor
+
+
+  with grpc.insecure_channel("example.com:12345") as channel:
+      channel = grpc.intercept_channel(channel, *[ClientInterceptor()])
+
+  ```
+
+- **New:** socket integration (#1911) by @hossein-raeisi
+
+  Use this integration to create spans for DNS resolves (`socket.getaddrinfo()`) and connection creations (`socket.create_connection()`).
+
+  To learn more see our [Socket Integration](https://docs.sentry.io/platforms/python/configuration/integrations/socket/) documentation.
+
+  Usage:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.socket import SocketIntegration
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      integrations=[
+          SocketIntegration(),
+      ],
+  )
+  ```
+
+- Fix: Do not trim span descriptions. (#1983) by @antonpirker
+
+## 1.18.0
+
+### Various fixes & improvements
+
+- **New:** Implement `EventScrubber` (#1943) by @sl0thentr0py
+
+  To learn more see our [Scrubbing Sensitive Data](https://docs.sentry.io/platforms/python/data-management/sensitive-data/#event-scrubber) documentation.
+
+  Add a new `EventScrubber` class that scrubs certain potentially sensitive interfaces with a `DEFAULT_DENYLIST`. The default scrubber is automatically run if `send_default_pii = False`:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.scrubber import EventScrubber
+  sentry_sdk.init(
+      # ...
+      send_default_pii=False,
+      event_scrubber=EventScrubber(),  # this is set by default
+  )
+  ```
+
+  You can also pass in a custom `denylist` to the `EventScrubber` class and filter additional fields that you want.
+
+  ```python
+  from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
+  # custom denylist
+  denylist = DEFAULT_DENYLIST + ["my_sensitive_var"]
+  sentry_sdk.init(
+      # ...
+      send_default_pii=False,
+      event_scrubber=EventScrubber(denylist=denylist),
+  )
+  ```
+
+- **New:** Added new `functions_to_trace` option for central way of performance instrumentation (#1960) by @antonpirker
+
+  To learn more see our [Tracing Options](https://docs.sentry.io/platforms/python/configuration/options/#functions-to-trace) documentation.
+
+  An optional list of functions that should be set up for performance monitoring. For each function in the list, a span will be created when the function is executed.
+
+  ```python
+  functions_to_trace = [
+      {"qualified_name": "tests.test_basics._hello_world_counter"},
+      {"qualified_name": "time.sleep"},
+      {"qualified_name": "collections.Counter.most_common"},
+  ]
+
+  sentry_sdk.init(
+      # ...
+      traces_sample_rate=1.0,
+      functions_to_trace=functions_to_trace,
+  )
+  ```
+
+- Updated denylist to include other widely used cookies/headers (#1972) by @antonpirker
+- Forward all `sentry-` baggage items (#1970) by @cleptric
+- Update OSS licensing (#1973) by @antonpirker
+- Profiling: Handle non frame types in profiler (#1965) by @Zylphrex
+- Tests: Bad arq dependency in tests (#1966) by @Zylphrex
+- Better naming (#1962) by @antonpirker
+
+## 1.17.0
+
+### Various fixes & improvements
+
+- **New:** Monitor Celery Beat tasks with Sentry [Cron Monitoring](https://docs.sentry.io/product/crons/).
+
+  With this feature you can make sure that your Celery beat tasks run at the right time and see if they where successful or not.
+
+  > **Warning**
+  > Cron Monitoring is currently in beta. Beta features are still in-progress and may have bugs. We recognize the irony.
+  > If you have any questions or feedback, please email us at crons-feedback@sentry.io, reach out via Discord (#cronjobs), or open an issue.
+
+  Usage:
+
+  ```python
+  # File: tasks.py
+
+  from celery import Celery, signals
+  from celery.schedules import crontab
+
+  import sentry_sdk
+  from sentry_sdk.crons import monitor
+  from sentry_sdk.integrations.celery import CeleryIntegration
+
+
+  # 1. Setup your Celery beat configuration
+
+  app = Celery('mytasks', broker='redis://localhost:6379/0')
+  app.conf.beat_schedule = {
+      'set-in-beat-schedule': {
+          'task': 'tasks.tell_the_world',
+          'schedule': crontab(hour='10', minute='15'),
+          'args': ("in beat_schedule set", ),
+      },
+  }
+
+
+  # 2. Initialize Sentry either in `celeryd_init` or `beat_init` signal.
+
+  #@signals.celeryd_init.connect
+  @signals.beat_init.connect
+  def init_sentry(**kwargs):
+      sentry_sdk.init(
+          dsn='...',
+          integrations=[CeleryIntegration()],
+          environment="local.dev.grace",
+          release="v1.0.7-a1",
+      )
+
+
+  # 3. Link your Celery task to a Sentry Cron Monitor
+
+  @app.task
+  @monitor(monitor_slug='3b861d62-ff82-4aa0-9cd6-b2b6403bd0cf')
+  def tell_the_world(msg):
+      print(msg)
+  ```
+
+- **New:** Add decorator for Sentry tracing (#1089) by @ynouri
+
+  This allows you to use a decorator to setup custom performance instrumentation.
+
+  To learn more see [Custom Instrumentation](https://docs.sentry.io/platforms/python/performance/instrumentation/custom-instrumentation/).
+
+  Usage: Just add the new decorator to your function, and a span will be created for it:
+
+  ```python
+  import sentry_sdk
+
+  @sentry_sdk.trace
+  def my_complex_function():
+    # do stuff
+    ...
+  ```
+
+- Make Django signals tracing optional (#1929) by @antonpirker
+
+  See the [Django Guide](https://docs.sentry.io/platforms/python/guides/django) to learn more.
+
+- Deprecated `with_locals` in favor of `include_local_variables` (#1924) by @antonpirker
+- Added top level API to get current span (#1954) by @antonpirker
+- Profiling: Add profiler options to init (#1947) by @Zylphrex
+- Profiling: Set active thread id for quart (#1830) by @Zylphrex
+- Fix: Update `get_json` function call for werkzeug 2.1.0+ (#1939) by @michielderoos
+- Fix: Returning the tasks result. (#1931) by @antonpirker
+- Fix: Rename MYPY to TYPE_CHECKING (#1934) by @untitaker
+- Fix: Fix type annotation for ignore_errors in sentry_sdk.init() (#1928) by @tiangolo
+- Tests: Start a real http server instead of mocking libs (#1938) by @antonpirker
+
+## 1.16.0
+
+### Various fixes & improvements
+
+- **New:** Add [arq](https://arq-docs.helpmanual.io/) Integration (#1872) by @Zhenay
+
+  This integration will create performance spans when arq jobs will be enqueued and when they will be run.
+  It will also capture errors in jobs and will link them to the performance spans.
+
+  Usage:
+
+  ```python
+  import asyncio
+
+  from httpx import AsyncClient
+  from arq import create_pool
+  from arq.connections import RedisSettings
+
+  import sentry_sdk
+  from sentry_sdk.integrations.arq import ArqIntegration
+  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[ArqIntegration()],
+  )
+
+  async def download_content(ctx, url):
+      session: AsyncClient = ctx['session']
+      response = await session.get(url)
+      print(f'{url}: {response.text:.80}...')
+      return len(response.text)
+
+  async def startup(ctx):
+      ctx['session'] = AsyncClient()
+
+  async def shutdown(ctx):
+      await ctx['session'].aclose()
+
+  async def main():
+      with sentry_sdk.start_transaction(name="testing_arq_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+          redis = await create_pool(RedisSettings())
+          for url in ('https://facebook.com', 'https://microsoft.com', 'https://github.com', "asdf"
+                      ):
+              await redis.enqueue_job('download_content', url)
+
+  class WorkerSettings:
+      functions = [download_content]
+      on_startup = startup
+      on_shutdown = shutdown
+
+  if __name__ == '__main__':
+      asyncio.run(main())
+  ```
+
+- Update of [Falcon](https://falconframework.org/) Integration (#1733) by @bartolootrit
+- Adding [Cloud Resource Context](https://docs.sentry.io/platforms/python/configuration/integrations/cloudresourcecontext/) integration (#1882) by @antonpirker
+- Profiling: Use the transaction timestamps to anchor the profile (#1898) by @Zylphrex
+- Profiling: Add debug logs to profiling (#1883) by @Zylphrex
+- Profiling: Start profiler thread lazily (#1903) by @Zylphrex
+- Fixed checks for structured http data (#1905) by @antonpirker
+- Make `set_measurement` public api and remove experimental status (#1909) by @sl0thentr0py
+- Add `trace_propagation_targets` option (#1916) by @antonpirker
+- Add `enable_tracing` to default traces_sample_rate to 1.0 (#1900) by @sl0thentr0py
+- Remove deprecated `tracestate` (#1907) by @sl0thentr0py
+- Sanitize URLs in Span description and breadcrumbs (#1876) by @antonpirker
+- Mechanism should default to true unless set explicitly (#1889) by @sl0thentr0py
+- Better setting of in-app in stack frames (#1894) by @antonpirker
+- Add workflow to test gevent (#1870) by @Zylphrex
+- Updated outdated HTTPX test matrix (#1917) by @antonpirker
+- Switch to MIT license (#1908) by @cleptric
+
+## 1.15.0
+
+### Various fixes & improvements
+
+- New: Add [Huey](https://huey.readthedocs.io/en/latest/) Integration (#1555) by @Zhenay
+
+  This integration will create performance spans when Huey tasks will be enqueued and when they will be executed.
+
+  Usage:
+
+  Task definition in `demo.py`:
+
+  ```python
+  import time
+
+  from huey import SqliteHuey, crontab
+
+  import sentry_sdk
+  from sentry_sdk.integrations.huey import HueyIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[
+          HueyIntegration(),
+      ],
+      traces_sample_rate=1.0,
+  )
+
+  huey = SqliteHuey(filename='/tmp/demo.db')
+
+  @huey.task()
+  def add_numbers(a, b):
+      return a + b
+  ```
+
+  Running the tasks in `run.py`:
+
+  ```python
+  from demo import add_numbers, flaky_task, nightly_backup
+
+  import sentry_sdk
+  from sentry_sdk.integrations.huey import HueyIntegration
+  from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
+
+
+  def main():
+      sentry_sdk.init(
+          dsn="...",
+          integrations=[
+              HueyIntegration(),
+          ],
+          traces_sample_rate=1.0,
+      )
+
+      with sentry_sdk.start_transaction(name="testing_huey_tasks", source=TRANSACTION_SOURCE_COMPONENT):
+          r = add_numbers(1, 2)
+
+  if __name__ == "__main__":
+      main()
+  ```
+
+- Profiling: Do not send single sample profiles (#1879) by @Zylphrex
+- Profiling: Add additional test coverage for profiler (#1877) by @Zylphrex
+- Profiling: Always use builtin time.sleep (#1869) by @Zylphrex
+- Profiling: Defaul in_app decision to None (#1855) by @Zylphrex
+- Profiling: Remove use of threading.Event (#1864) by @Zylphrex
+- Profiling: Enable profiling on all transactions (#1797) by @Zylphrex
+- FastAPI: Fix check for Starlette in FastAPI integration (#1868) by @antonpirker
+- Flask: Do not overwrite default for username with email address in FlaskIntegration (#1873) by @homeworkprod
+- Tests: Add py3.11 to test-common (#1871) by @Zylphrex
+- Fix: Don't log whole event in before_send / event_processor drops (#1863) by @sl0thentr0py
+
+## 1.14.0
+
+### Various fixes & improvements
+
+- Add `before_send_transaction` (#1840) by @antonpirker
+
+  Adds a hook (similar to `before_send`) that is called for all transaction events (performance releated data).
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+
+    def strip_sensitive_data(event, hint):
+        # modify event here (or return `None` if you want to drop the event entirely)
+        return event
+
+    sentry_sdk.init(
+        # ...
+        before_send_transaction=strip_sensitive_data,
+    )
+  ```
+
+  See also: https://docs.sentry.io/platforms/python/configuration/filtering/#using-platformidentifier-namebefore-send-transaction-
+
+- Django: Always remove values of Django session related cookies. (#1842) by @antonpirker
+- Profiling: Enable profiling for ASGI frameworks (#1824) by @Zylphrex
+- Profiling: Better gevent support (#1822) by @Zylphrex
+- Profiling: Add profile context to transaction (#1860) by @Zylphrex
+- Profiling: Use co_qualname in python 3.11 (#1831) by @Zylphrex
+- OpenTelemetry: fix Use dict for sentry-trace context instead of tuple (#1847) by @AbhiPrasad
+- OpenTelemetry: fix extra dependency (#1825) by @bernardotorres
+- OpenTelemetry: fix NoOpSpan updates scope (#1834) by @Zylphrex
+- OpenTelemetry: Make sure to noop when there is no DSN (#1852) by @antonpirker
+- FastAPI: Fix middleware being patched multiple times (#1841) by @JohnnyDeuss
+- Starlette: Avoid import of pkg_resource with Starlette integration (#1836) by @mgu
+- Removed code coverage target (#1862) by @antonpirker
+
+## 1.13.0
+
+### Various fixes & improvements
+
+- Add Starlite integration (#1748) by @gazorby
+
+  Adding support for the [Starlite](https://starlite-api.github.io/starlite/1.48/) framework. Unhandled errors are captured. Performance spans for Starlite middleware are also captured. Thanks @gazorby for the great work!
+
+  Usage:
+
+  ```python
+  from starlite import Starlite, get
+
+  import sentry_sdk
+  from sentry_sdk.integrations.starlite import StarliteIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      traces_sample_rate=1.0,
+      integrations=[
+          StarliteIntegration(),
+      ],
+  )
+
+  @get("/")
+  def hello_world() -> dict[str, str]:
+      """Keeping the tradition alive with hello world."""
+      bla = 1/0  # causing an error
+      return {"hello": "world"}
+
+  app = Starlite(route_handlers=[hello_world])
+  ```
+
+- Profiling: Remove sample buffer from profiler (#1791) by @Zylphrex
+- Profiling: Performance tweaks to profile sampler (#1789) by @Zylphrex
+- Add span for Django SimpleTemplateResponse rendering (#1818) by @chdsbd
+- Use @wraps for Django Signal receivers (#1815) by @meanmail
+- Add enqueued_at and started_at to rq job extra (#1024) by @kruvasyan
+- Remove sanic v22 pin (#1819) by @sl0thentr0py
+- Add support for `byterray` and `memoryview` built-in types (#1833) by @Tarty
+- Handle `"rc"` in SQLAlchemy version. (#1812) by @peterschutt
+- Doc: Use .venv (not .env) as a virtual env location in CONTRIBUTING.md (#1790) by @tonyo
+- Auto publish to internal pypi on release (#1823) by @asottile-sentry
+- Added Python 3.11 to test suite (#1795) by @antonpirker
+- Update test/linting dependencies (#1801) by @antonpirker
+- Deps: bump sphinx from 5.2.3 to 5.3.0 (#1686) by @dependabot
+
+## 1.12.1
+
+### Various fixes & improvements
+
+- Link errors to OTel spans (#1787) by @antonpirker
+
+## 1.12.0
+
+### Basic OTel support
+
+This adds support to automatically integrate OpenTelemetry performance tracing with Sentry.
+
+See the documentation on how to set it up:
+https://docs.sentry.io/platforms/python/performance/instrumentation/opentelemetry/
+
+Give it a try and let us know if you have any feedback or problems with using it.
+
+By: @antonpirker (#1772, #1766, #1765)
+
+### Various fixes & improvements
+
+- Tox Cleanup (#1749) by @antonpirker
+- CI: Fix Github action checks (#1780) by @Zylphrex
+- Profiling: Introduce active thread id on scope (#1764) by @Zylphrex
+- Profiling: Eagerly hash stack for profiles (#1755) by @Zylphrex
+- Profiling: Resolve inherited method class names (#1756) by @Zylphrex
+
+## 1.11.1
+
+### Various fixes & improvements
+
+- Move set_transaction_name out of event processor in fastapi/starlette (#1751) by @sl0thentr0py
+- Expose proxy_headers as top level config and use in ProxyManager: https://docs.sentry.io/platforms/python/configuration/options/#proxy-headers (#1746) by @sl0thentr0py
+
+## 1.11.0
+
+### Various fixes & improvements
+
+- Fix signals problem on sentry.io (#1732) by @antonpirker
+- Fix reading FastAPI request body twice. (#1724) by @antonpirker
+- ref(profiling): Do not error if already setup (#1731) by @Zylphrex
+- ref(profiling): Use sleep scheduler by default (#1729) by @Zylphrex
+- feat(profiling): Extract more frame info (#1702) by @Zylphrex
+- Update actions/upload-artifact to v3.1.1 (#1718) by @mattgauntseo-sentry
+- Performance optimizations (#1725) by @antonpirker
+- feat(pymongo): add PyMongo integration (#1590) by @Agalin
+- Move relay to port 5333 to avoid collisions (#1716) by @sl0thentr0py
+- fix(utils): strip_string() checks text length counting bytes not chars (#1711) by @mgaligniana
+- chore: remove jira workflow (#1707) by @vladanpaunovic
+- build(deps): bump checkouts/data-schemas from `a214fbc` to `20ff3b9` (#1703) by @dependabot
+- perf(profiling): Tune the sample profile generation code for performance (#1694) by @Zylphrex
+
+## 1.10.1
+
+### Various fixes & improvements
+
+- Bug fixes for FastAPI and Sentry SDK 1.10.0 (#1699) by @antonpirker
+- The wrapped receive() did not return anything. (#1698) by @antonpirker
+
+## 1.10.0
+
+### Various fixes & improvements
+
+- Unified naming for span ops (#1661) by @antonpirker
+
+  We have unified the strings of our span operations. See https://develop.sentry.dev/sdk/performance/span-operations/
+
+  **WARNING**: If you have Sentry Dashboards or Sentry Discover queries that use `transaction.op` in their fields, conditions, aggregates or columns this change could potentially break your Dashboards/Discover setup.
+  Here is a list of the changes we made to the `op`s. Please adjust your dashboards and Discover queries accordingly:
+
+  | Old operation (`op`)     | New Operation (`op`)   |
+  | ------------------------ | ---------------------- |
+  | `asgi.server`            | `http.server`          |
+  | `aws.request`            | `http.client`          |
+  | `aws.request.stream`     | `http.client.stream`   |
+  | `celery.submit`          | `queue.submit.celery`  |
+  | `celery.task`            | `queue.task.celery`    |
+  | `django.middleware`      | `middleware.django`    |
+  | `django.signals`         | `event.django`         |
+  | `django.template.render` | `template.render`      |
+  | `django.view`            | `view.render`          |
+  | `http`                   | `http.client`          |
+  | `redis`                  | `db.redis`             |
+  | `rq.task`                | `queue.task.rq`        |
+  | `serverless.function`    | `function.aws`         |
+  | `serverless.function`    | `function.gcp`         |
+  | `starlette.middleware`   | `middleware.starlette` |
+
+- Include framework in SDK name (#1662) by @antonpirker
+- Asyncio integration (#1671) by @antonpirker
+- Add exception handling to Asyncio Integration (#1695) by @antonpirker
+- Fix asyncio task factory (#1689) by @antonpirker
+- Have instrumentation for ASGI middleware receive/send callbacks. (#1673) by @antonpirker
+- Use Django internal ASGI handling from Channels version 4.0.0. (#1688) by @antonpirker
+- fix(integrations): Fix http putrequest when url is None (#1693) by @MattFlower
+- build(deps): bump checkouts/data-schemas from `f0a57f2` to `a214fbc` (#1627) by @dependabot
+- build(deps): bump flake8-bugbear from 22.9.11 to 22.9.23 (#1637) by @dependabot
+- build(deps): bump sphinx from 5.1.1 to 5.2.3 (#1653) by @dependabot
+- build(deps): bump actions/stale from 5 to 6 (#1638) by @dependabot
+- build(deps): bump black from 22.8.0 to 22.10.0 (#1670) by @dependabot
+- Remove unused node setup from ci. (#1681) by @antonpirker
+- Check for Decimal is in_valid_sample_rate (#1672) by @Arvind2222
+- Add session for aiohttp integration (#1605) by @denys-pidlisnyi
+- feat(profiling): Extract qualified name for each frame (#1669) by @Zylphrex
+- feat(profiling): Attach thread metadata to profiles (#1660) by @Zylphrex
+- ref(profiling): Rename profiling frame keys (#1680) by @Zylphrex
+- fix(profiling): get_frame_name only look at arguments (#1684) by @Zylphrex
+- fix(profiling): Need to sample profile correctly (#1679) by @Zylphrex
+- fix(profiling): Race condition spawning multiple profiling threads (#1676) by @Zylphrex
+- tests(profiling): Add basic profiling tests (#1677) by @Zylphrex
+- tests(profiling): Add tests for thread schedulers (#1683) by @Zylphrex
+
+## 1.9.10
+
+### Various fixes & improvements
+
+- Use content-length header in ASGI instead of reading request body (#1646, #1631, #1595, #1573) (#1649) by @antonpirker
+- Added newer Celery versions to test suite (#1655) by @antonpirker
+- Django 4.x support (#1632) by @antonpirker
+- Cancel old CI runs when new one is started. (#1651) by @antonpirker
+- Increase max string size for desc (#1647) by @k-fish
+- Pin Sanic version for CI (#1650) by @antonpirker
+- Fix for partial signals in old Django and old Python versions. (#1641) by @antonpirker
+- Convert profile output to the sample format (#1611) by @phacops
+- Dynamically adjust profiler sleep time (#1634) by @Zylphrex
+
+## 1.9.9
+
+### Django update (ongoing)
+
+- Instrument Django Signals so they show up in "Performance" view (#1526) by @BeryJu
+- include other Django enhancements brought up by the community
+
+### Various fixes & improvements
+
+- fix(profiling): Profiler mode type hints (#1633) by @Zylphrex
+- New ASGIMiddleware tests (#1600) by @antonpirker
+- build(deps): bump mypy from 0.961 to 0.971 (#1517) by @dependabot
+- build(deps): bump black from 22.3.0 to 22.8.0 (#1596) by @dependabot
+- build(deps): bump sphinx from 5.0.2 to 5.1.1 (#1524) by @dependabot
+- ref: upgrade linters to flake8 5.x (#1610) by @asottile-sentry
+- feat(profiling): Introduce different profiler schedulers (#1616) by @Zylphrex
+- fix(profiling): Check transaction sampled status before profiling (#1624) by @Zylphrex
+- Wrap Baggage ser/deser in capture_internal_exceptions (#1630) by @sl0thentr0py
+- Faster Tests (DjangoCon) (#1602) by @antonpirker
+- feat(profiling): Add support for profiles_sample_rate (#1613) by @Zylphrex
+- feat(profiling): Support for multithreaded profiles (#1570) by @Zylphrex
+
+## 1.9.8
+
+### Various fixes & improvements
+
+- Baggage creation for head of trace (#1589) by @sl0thentr0py
+  - The SDK now also generates new baggage entries for dynamic sampling when it is the first (head) SDK in the pipeline.
+
+## 1.9.7
+
+### Various fixes & improvements
+
+- Let SentryAsgiMiddleware work with Starlette and FastAPI integrations (#1594) by @antonpirker
+
+**Note:** The last version 1.9.6 introduced a breaking change where projects that used Starlette or FastAPI
+and had manually setup `SentryAsgiMiddleware` could not start. This versions fixes this behaviour.
+With this version if you have a manual `SentryAsgiMiddleware` setup and are using Starlette or FastAPI
+everything just works out of the box.
+
+Sorry for any inconveniences the last version might have brought to you.
+
+We can do better and in the future we will do our best to not break your code again.
+
+## 1.9.6
+
+### Various fixes & improvements
+
+- Auto-enable Starlette and FastAPI (#1533) by @antonpirker
+- Add more version constraints (#1574) by @isra17
+- Fix typo in starlette attribute check (#1566) by @sl0thentr0py
+
+## 1.9.5
+
+### Various fixes & improvements
+
+- fix(redis): import redis pipeline using full path (#1565) by @olksdr
+- Fix side effects for parallel tests (#1554) by @sl0thentr0py
+
+## 1.9.4
+
+### Various fixes & improvements
+
+- Remove TRANSACTION_SOURCE_UNKNOWN and default to CUSTOM (#1558) by @sl0thentr0py
+- feat(redis): Add instrumentation for redis pipeline (#1543) by @jjbayer
+- Handle no release when uploading profiles (#1548) by @szokeasaurusrex
+
+## 1.9.3
+
+### Various fixes & improvements
+
+- Wrap StarletteRequestExtractor in capture_internal_exceptions (#1551) by @sl0thentr0py
+
+## 1.9.2
+
+### Various fixes & improvements
+
+- chore: remove quotes (#1545) by @vladanpaunovic
+
+## 1.9.1
+
+### Various fixes & improvements
+
+- Fix FastAPI issues (#1532) ( #1514) (#1532) by @antonpirker
+- Add deprecation warning for 3.4, 3.5 (#1541) by @sl0thentr0py
+- Fast tests (#1504) by @antonpirker
+- Replace Travis CI badge with GitHub Actions badge (#1538) by @153957
+- chore(deps): update urllib3 minimum version with environment markers (#1312) by @miketheman
+- Update Flask and Quart integrations (#1520) by @pgjones
+- chore: Remove ancient examples from tracing prototype (#1528) by @sl0thentr0py
+- fix(django): Send correct "url" transaction source if Django resolver fails to resolve (#1525) by @sl0thentr0py
+
+## 1.9.0
+
+### Various fixes & improvements
+
+- feat(profiler): Add experimental profiler under experiments.enable_profiling (#1481) by @szokeasaurusrex
+- Fixed problem with broken response and python-multipart (#1516) by @antonpirker
+
+## 1.8.0
+
+### Various fixes & improvements
+
+- feat(starlette): add Starlette integration (#1441) by @sl0thentr0py
+  **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the Starlette integration.
+  Usage:
+
+  ```python
+  from starlette.applications import Starlette
+
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[StarletteIntegration()],
+  )
+
+  app = Starlette(debug=True, routes=[...])
+  ```
+
+- feat(fastapi): add FastAPI integration (#829) by @antonpirker
+
+  **Important:** Remove manual usage of `SentryAsgiMiddleware`! This is now done by the FastAPI integration.
+
+  Usage:
+
+  ```python
+  from fastapi import FastAPI
+
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+  from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+  sentry_sdk.init(
+      dsn="...",
+      integrations=[StarletteIntegration(), FastApiIntegration()],
+  )
+
+  app = FastAPI()
+  ```
+
+  Yes, you have to add both, the `StarletteIntegration` **AND** the `FastApiIntegration`!
+
+- fix: avoid sending empty Baggage header (#1507) by @intgr
+- fix: properly freeze Baggage object (#1508) by @intgr
+- docs: fix simple typo, collecter | collector (#1505) by @timgates42
+
+## 1.7.2
+
+### Various fixes & improvements
+
+- feat(transactions): Transaction Source (#1490) by @antonpirker
+- Removed (unused) sentry_timestamp header (#1494) by @antonpirker
+
+## 1.7.1
+
+### Various fixes & improvements
+
+- Skip malformed baggage items (#1491) by @robyoung
+
+## 1.7.0
+
+### Various fixes & improvements
+
+- feat(tracing): Dynamic Sampling Context / Baggage continuation (#1485) by @sl0thentr0py
+
+  The SDK now propagates the [W3C Baggage Header](https://www.w3.org/TR/baggage/) from
+  incoming transactions to outgoing requests.
+  It also extracts Sentry specific [sampling information](https://develop.sentry.dev/sdk/performance/dynamic-sampling-context/)
+  and adds it to the transaction headers to enable Dynamic Sampling in the product.
+
+## 1.6.0
+
+### Various fixes & improvements
+
+- Fix Deployment (#1474) by @antonpirker
+- Serverless V2 (#1450) by @antonpirker
+- Use logging levelno instead of levelname. Levelnames can be overridden (#1449) by @rrauenza
+
+## 1.5.12
+
+### Various fixes & improvements
+
+- feat(measurements): Add experimental set_measurement api on transaction (#1359) by @sl0thentr0py
+- fix: Remove incorrect usage from flask helper example (#1434) by @BYK
+
+## 1.5.11
+
+### Various fixes & improvements
+
+- chore: Bump mypy and fix abstract ContextManager typing (#1421) by @sl0thentr0py
+- chore(issues): add link to Sentry support (#1420) by @vladanpaunovic
+- fix: replace git.io links with redirect targets (#1412) by @asottile-sentry
+- ref: Update error verbose for sentry init (#1361) by @targhs
+- fix(sessions): Update session also for non sampled events and change filter order (#1394) by @adinauer
+
+## 1.5.10
+
+### Various fixes & improvements
+
+- Remove Flask version contraint (#1395) by @antonpirker
+- Change ordering of event drop mechanisms (#1390) by @adinauer
+
+## 1.5.9
+
+### Various fixes & improvements
+
+- fix(sqlalchemy): Use context instead of connection in sqlalchemy integration (#1388) by @sl0thentr0py
+- Update correct test command in contributing docs (#1377) by @targhs
+- Update black (#1379) by @antonpirker
+- build(deps): bump sphinx from 4.1.1 to 4.5.0 (#1376) by @dependabot
+- fix: Auto-enabling Redis and Pyramid integration (#737) by @untitaker
+- feat(testing): Add pytest-watch (#853) by @lobsterkatie
+- Treat x-api-key header as sensitive (#1236) by @simonschmidt
+- fix: Remove obsolete MAX_FORMAT_PARAM_LENGTH (#1375) by @blueyed
+
 ## 1.5.8
 
 ### Various fixes & improvements

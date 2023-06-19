@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import io
-import urllib3  # type: ignore
+import urllib3
 import certifi
 import gzip
 import time
@@ -13,9 +13,9 @@ from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dump
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -26,7 +26,7 @@ if MYPY:
     from typing import Union
     from typing import DefaultDict
 
-    from urllib3.poolmanager import PoolManager  # type: ignore
+    from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event, EndpointType
@@ -156,6 +156,7 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            proxy_headers=options["proxy_headers"],
         )
 
         from sentry_sdk import Hub
@@ -185,7 +186,7 @@ class HttpTransport(Transport):
         self._discarded_events[data_category, reason] += quantity
 
     def _update_rate_limits(self, response):
-        # type: (urllib3.HTTPResponse) -> None
+        # type: (urllib3.BaseHTTPResponse) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
@@ -420,6 +421,7 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
         proxy = None
@@ -436,6 +438,9 @@ class HttpTransport(Transport):
         opts = self._get_pool_options(ca_certs)
 
         if proxy:
+            if proxy_headers:
+                opts["proxy_headers"] = proxy_headers
+
             if proxy.startswith("socks"):
                 # defer this import because it will otherwise raise a warning
                 # at import time if pysocks is not installed

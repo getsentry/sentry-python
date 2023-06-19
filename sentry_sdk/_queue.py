@@ -1,14 +1,74 @@
 """
-A fork of Python 3.6's stdlib queue with Lock swapped out for RLock to avoid a
-deadlock while garbage collecting.
+A fork of Python 3.6's stdlib queue (found in Pythons 'cpython/Lib/queue.py')
+with Lock swapped out for RLock to avoid a deadlock while garbage collecting.
 
-See
+https://github.com/python/cpython/blob/v3.6.12/Lib/queue.py
+
+
+See also
 https://codewithoutrules.com/2017/08/16/concurrency-python/
 https://bugs.python.org/issue14976
 https://github.com/sqlalchemy/sqlalchemy/blob/4eb747b61f0c1b1c25bdee3856d7195d10a0c227/lib/sqlalchemy/queue.py#L1
 
 We also vendor the code to evade eventlet's broken monkeypatching, see
 https://github.com/getsentry/sentry-python/pull/484
+
+
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Python Software Foundation;
+
+All Rights Reserved
+
+
+PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+--------------------------------------------
+
+1. This LICENSE AGREEMENT is between the Python Software Foundation
+("PSF"), and the Individual or Organization ("Licensee") accessing and
+otherwise using this software ("Python") in source or binary form and
+its associated documentation.
+
+2. Subject to the terms and conditions of this License Agreement, PSF hereby
+grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+analyze, test, perform and/or display publicly, prepare derivative works,
+distribute, and otherwise use Python alone or in any derivative version,
+provided, however, that PSF's License Agreement and PSF's notice of copyright,
+i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Python Software Foundation;
+All Rights Reserved" are retained in Python alone or in any derivative version
+prepared by Licensee.
+
+3. In the event Licensee prepares a derivative work that is based on
+or incorporates Python or any part thereof, and wants to make
+the derivative work available to others as provided herein, then
+Licensee hereby agrees to include in any such work a brief summary of
+the changes made to Python.
+
+4. PSF is making Python available to Licensee on an "AS IS"
+basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+INFRINGE ANY THIRD PARTY RIGHTS.
+
+5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+6. This License Agreement will automatically terminate upon a material
+breach of its terms and conditions.
+
+7. Nothing in this License Agreement shall be deemed to create any
+relationship of agency, partnership, or joint venture between PSF and
+Licensee.  This License Agreement does not grant permission to use PSF
+trademarks or trade name in a trademark sense to endorse or promote
+products or services of Licensee, or any third party.
+
+8. By copying, installing or otherwise using Python, Licensee
+agrees to be bound by the terms and conditions of this License
+Agreement.
+
 """
 
 import threading
@@ -16,20 +76,20 @@ import threading
 from collections import deque
 from time import time
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
-__all__ = ["Empty", "Full", "Queue"]
+__all__ = ["EmptyError", "FullError", "Queue"]
 
 
-class Empty(Exception):
+class EmptyError(Exception):
     "Exception raised by Queue.get(block=0)/get_nowait()."
     pass
 
 
-class Full(Exception):
+class FullError(Exception):
     "Exception raised by Queue.put(block=0)/put_nowait()."
     pass
 
@@ -134,16 +194,16 @@ class Queue(object):
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until a free slot is available. If 'timeout' is
         a non-negative number, it blocks at most 'timeout' seconds and raises
-        the Full exception if no free slot was available within that time.
+        the FullError exception if no free slot was available within that time.
         Otherwise ('block' is false), put an item on the queue if a free slot
-        is immediately available, else raise the Full exception ('timeout'
+        is immediately available, else raise the FullError exception ('timeout'
         is ignored in that case).
         """
         with self.not_full:
             if self.maxsize > 0:
                 if not block:
                     if self._qsize() >= self.maxsize:
-                        raise Full()
+                        raise FullError()
                 elif timeout is None:
                     while self._qsize() >= self.maxsize:
                         self.not_full.wait()
@@ -154,7 +214,7 @@ class Queue(object):
                     while self._qsize() >= self.maxsize:
                         remaining = endtime - time()
                         if remaining <= 0.0:
-                            raise Full
+                            raise FullError()
                         self.not_full.wait(remaining)
             self._put(item)
             self.unfinished_tasks += 1
@@ -166,15 +226,15 @@ class Queue(object):
         If optional args 'block' is true and 'timeout' is None (the default),
         block if necessary until an item is available. If 'timeout' is
         a non-negative number, it blocks at most 'timeout' seconds and raises
-        the Empty exception if no item was available within that time.
+        the EmptyError exception if no item was available within that time.
         Otherwise ('block' is false), return an item if one is immediately
-        available, else raise the Empty exception ('timeout' is ignored
+        available, else raise the EmptyError exception ('timeout' is ignored
         in that case).
         """
         with self.not_empty:
             if not block:
                 if not self._qsize():
-                    raise Empty()
+                    raise EmptyError()
             elif timeout is None:
                 while not self._qsize():
                     self.not_empty.wait()
@@ -185,7 +245,7 @@ class Queue(object):
                 while not self._qsize():
                     remaining = endtime - time()
                     if remaining <= 0.0:
-                        raise Empty()
+                        raise EmptyError()
                     self.not_empty.wait(remaining)
             item = self._get()
             self.not_full.notify()
@@ -195,7 +255,7 @@ class Queue(object):
         """Put an item into the queue without blocking.
 
         Only enqueue the item if a free slot is immediately available.
-        Otherwise raise the Full exception.
+        Otherwise raise the FullError exception.
         """
         return self.put(item, block=False)
 
@@ -203,7 +263,7 @@ class Queue(object):
         """Remove and return an item from the queue without blocking.
 
         Only get an item if one is immediately available. Otherwise
-        raise the Empty exception.
+        raise the EmptyError exception.
         """
         return self.get(block=False)
 

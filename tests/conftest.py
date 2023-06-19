@@ -1,5 +1,7 @@
-import os
 import json
+import os
+import socket
+from threading import Thread
 
 import pytest
 import jsonschema
@@ -14,10 +16,23 @@ try:
 except ImportError:
     eventlet = None
 
+try:
+    # Python 2
+    import BaseHTTPServer
+
+    HTTPServer = BaseHTTPServer.HTTPServer
+    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
+except Exception:
+    # Python 3
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
 import sentry_sdk
-from sentry_sdk._compat import reraise, string_types, iteritems
-from sentry_sdk.transport import Transport
+from sentry_sdk._compat import iteritems, reraise, string_types
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.integrations import _installed_integrations  # noqa: F401
+from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.transport import Transport
 from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
@@ -39,7 +54,6 @@ except ImportError:
     def benchmark():
         return lambda x: x()
 
-
 else:
     del pytest_benchmark
 
@@ -55,7 +69,7 @@ def internal_exceptions(request, monkeypatch):
 
     @request.addfinalizer
     def _():
-        # rerasise the errors so that this just acts as a pass-through (that
+        # reraise the errors so that this just acts as a pass-through (that
         # happens to keep track of the errors which pass through it)
         for e in errors:
             reraise(*e)
@@ -143,11 +157,11 @@ def monkeypatch_test_transport(monkeypatch, validate_event_schema):
 
     def check_envelope(envelope):
         with capture_internal_exceptions():
-            # Assert error events are sent without envelope to server, for compat.
-            # This does not apply if any item in the envelope is an attachment.
-            if not any(x.type == "attachment" for x in envelope.items):
-                assert not any(item.data_category == "error" for item in envelope.items)
-                assert not any(item.get_event() is not None for item in envelope.items)
+            # There used to be a check here for errors are not sent in envelopes.
+            # We changed the behaviour to send errors in envelopes when tracing is enabled.
+            # This is checked in test_client.py::test_sending_events_with_tracing
+            # and test_client.py::test_sending_events_with_no_tracing
+            pass
 
     def inner(client):
         monkeypatch.setattr(
@@ -164,6 +178,17 @@ def validate_event_schema(tmpdir):
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
     return inner
+
+
+@pytest.fixture
+def reset_integrations():
+    """
+    Use with caution, sometimes we really need to start
+    with a clean slate to ensure monkeypatching works well,
+    but this also means some other stuff will be monkeypatched twice.
+    """
+    global _installed_integrations
+    _installed_integrations.clear()
 
 
 @pytest.fixture
@@ -286,20 +311,21 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         monkeypatch.setattr(test_client.transport, "capture_event", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
-        return EventStreamReader(events_r)
+        return EventStreamReader(events_r, events_w)
 
     return inner
 
 
 class EventStreamReader(object):
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, read_file, write_file):
+        self.read_file = read_file
+        self.write_file = write_file
 
     def read_event(self):
-        return json.loads(self.file.readline().decode("utf-8"))
+        return json.loads(self.read_file.readline().decode("utf-8"))
 
     def read_flush(self):
-        assert self.file.readline() == b"flush\n"
+        assert self.read_file.readline() == b"flush\n"
 
 
 # scope=session ensures that fixture is run earlier
@@ -389,7 +415,7 @@ def string_containing_matcher():
             try:
                 # the `unicode` type only exists in python 2, so if this blows up,
                 # we must be in py3 and have the `bytes` type
-                self.valid_types = (str, unicode)  # noqa
+                self.valid_types = (str, unicode)
             except NameError:
                 self.valid_types = (str, bytes)
 
@@ -543,3 +569,36 @@ def object_described_by_matcher():
             return not self.__eq__(test_obj)
 
     return ObjectDescribedBy
+
+
+@pytest.fixture
+def teardown_profiling():
+    yield
+    teardown_profiler()
+
+
+class MockServerRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):  # noqa: N802
+        # Process an HTTP GET request and return a response with an HTTP 200 status.
+        self.send_response(200)
+        self.end_headers()
+        return
+
+
+def get_free_port():
+    s = socket.socket(socket.AF_INET, type=socket.SOCK_STREAM)
+    s.bind(("localhost", 0))
+    _, port = s.getsockname()
+    s.close()
+    return port
+
+
+def create_mock_http_server():
+    # Start a mock server to test outgoing http requests
+    mock_server_port = get_free_port()
+    mock_server = HTTPServer(("localhost", mock_server_port), MockServerRequestHandler)
+    mock_server_thread = Thread(target=mock_server.serve_forever)
+    mock_server_thread.setDaemon(True)
+    mock_server_thread.start()
+
+    return mock_server_port

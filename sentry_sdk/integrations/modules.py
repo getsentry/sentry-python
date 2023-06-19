@@ -4,9 +4,9 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Tuple
@@ -18,15 +18,30 @@ if MYPY:
 _installed_modules = None
 
 
+def _normalize_module_name(name):
+    # type: (str) -> str
+    return name.lower()
+
+
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
-        import pkg_resources
-    except ImportError:
-        return
+        from importlib.metadata import distributions, version
 
-    for info in pkg_resources.working_set:
-        yield info.key, info.version
+        for dist in distributions():
+            yield _normalize_module_name(dist.metadata["Name"]), version(
+                dist.metadata["Name"]
+            )
+
+    except ImportError:
+        # < py3.8
+        try:
+            import pkg_resources
+        except ImportError:
+            return
+
+        for info in pkg_resources.working_set:
+            yield _normalize_module_name(info.key), info.version
 
 
 def _get_installed_modules():

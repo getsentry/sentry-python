@@ -1,23 +1,24 @@
 from __future__ import absolute_import
 
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.scope import Scope
+from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, SOURCE_FOR_STYLE
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    parse_version,
+)
 
-from sentry_sdk._types import MYPY
-
-if MYPY:
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Any
-    from typing import Dict
-    from werkzeug.datastructures import ImmutableMultiDict
-    from werkzeug.datastructures import FileStorage
-    from typing import Union
-    from typing import Callable
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Union
 
     from sentry_sdk._types import EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
 try:
@@ -26,19 +27,15 @@ except ImportError:
     flask_login = None
 
 try:
-    from flask import (  # type: ignore
-        Markup,
-        Request,
-        Flask,
-        _request_ctx_stack,
-        _app_ctx_stack,
-        __version__ as FLASK_VERSION,
-    )
+    from flask import Flask, Request  # type: ignore
+    from flask import __version__ as FLASK_VERSION
+    from flask import request as flask_request
     from flask.signals import (
         before_render_template,
         got_request_exception,
         request_started,
     )
+    from markupsafe import Markup
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
@@ -53,7 +50,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 class FlaskIntegration(Integration):
     identifier = "flask"
 
-    transaction_style = None
+    transaction_style = ""
 
     def __init__(self, transaction_style="endpoint"):
         # type: (str) -> None
@@ -68,16 +65,13 @@ class FlaskIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        # This version parsing is absolutely naive but the alternative is to
-        # import pkg_resources which slows down the SDK a lot.
-        try:
-            version = tuple(map(int, FLASK_VERSION.split(".")[:3]))
-        except (ValueError, TypeError):
-            # It's probably a release candidate, we assume it's fine.
-            pass
-        else:
-            if version < (0, 10):
-                raise DidNotEnable("Flask 0.10 or newer is required.")
+        version = parse_version(FLASK_VERSION)
+
+        if version is None:
+            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
+
+        if version < (0, 10):
+            raise DidNotEnable("Flask 0.10 or newer is required.")
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
@@ -94,7 +88,7 @@ class FlaskIntegration(Integration):
                 environ, start_response
             )
 
-        Flask.__call__ = sentry_patched_wsgi_app  # type: ignore
+        Flask.__call__ = sentry_patched_wsgi_app
 
 
 def _add_sentry_trace(sender, template, context, **extra):
@@ -106,35 +100,44 @@ def _add_sentry_trace(sender, template, context, **extra):
     sentry_span = Hub.current.scope.span
     context["sentry_trace"] = (
         Markup(
-            '<meta name="sentry-trace" content="%s" />'
-            % (sentry_span.to_traceparent(),)
+            '<meta name="%s" content="%s" />'
+            % (
+                SENTRY_TRACE_HEADER_NAME,
+                sentry_span.to_traceparent(),
+            )
         )
         if sentry_span
         else ""
     )
 
 
-def _request_started(sender, **kwargs):
+def _set_transaction_name_and_source(scope, transaction_style, request):
+    # type: (Scope, str, Request) -> None
+    try:
+        name_for_style = {
+            "url": request.url_rule.rule,
+            "endpoint": request.url_rule.endpoint,
+        }
+        scope.set_transaction_name(
+            name_for_style[transaction_style],
+            source=SOURCE_FOR_STYLE[transaction_style],
+        )
+    except Exception:
+        pass
+
+
+def _request_started(app, **kwargs):
     # type: (Flask, **Any) -> None
     hub = Hub.current
     integration = hub.get_integration(FlaskIntegration)
     if integration is None:
         return
 
-    app = _app_ctx_stack.top.app
     with hub.configure_scope() as scope:
-        request = _request_ctx_stack.top.request
-
-        # Set the transaction name here, but rely on WSGI middleware to actually
-        # start the transaction
-        try:
-            if integration.transaction_style == "endpoint":
-                scope.transaction = request.url_rule.endpoint
-            elif integration.transaction_style == "url":
-                scope.transaction = request.url_rule.rule
-        except Exception:
-            pass
-
+        # Set the transaction name and source here,
+        # but rely on WSGI middleware to actually start the transaction
+        request = flask_request._get_current_object()
+        _set_transaction_name_and_source(scope, integration.transaction_style, request)
         evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
@@ -169,7 +172,7 @@ class FlaskRequestExtractor(RequestExtractor):
 
     def json(self):
         # type: () -> Any
-        return self.request.get_json()
+        return self.request.get_json(silent=True)
 
     def size_of_file(self, file):
         # type: (FileStorage) -> int
@@ -257,6 +260,5 @@ def _add_user_to_event(event):
 
         try:
             user_info.setdefault("username", user.username)
-            user_info.setdefault("username", user.email)
         except Exception:
             pass

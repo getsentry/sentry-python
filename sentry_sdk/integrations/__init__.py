@@ -6,9 +6,9 @@ from threading import Lock
 from sentry_sdk._compat import iteritems
 from sentry_sdk.utils import logger
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Iterator
@@ -54,6 +54,8 @@ def _generate_default_integrations_iterator(integrations, auto_enabling_integrat
 _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.django.DjangoIntegration",
     "sentry_sdk.integrations.flask.FlaskIntegration",
+    "sentry_sdk.integrations.starlette.StarletteIntegration",
+    "sentry_sdk.integrations.fastapi.FastApiIntegration",
     "sentry_sdk.integrations.bottle.BottleIntegration",
     "sentry_sdk.integrations.falcon.FalconIntegration",
     "sentry_sdk.integrations.sanic.SanicIntegration",
@@ -62,6 +64,8 @@ _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
+    "sentry_sdk.integrations.redis.RedisIntegration",
+    "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.boto3.Boto3Integration",
 )
 
@@ -144,7 +148,7 @@ def setup_integrations(
     return integrations
 
 
-class DidNotEnable(Exception):
+class DidNotEnable(Exception):  # noqa: N818
     """
     The integration could not be enabled due to a trivial user error like
     `flask` not being installed for the `FlaskIntegration`.
