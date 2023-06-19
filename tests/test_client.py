@@ -252,14 +252,18 @@ def test_proxy(monkeypatch, testcase):
         monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
     if testcase.get("env_no_proxy") is not None:
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
+
     kwargs = {}
+
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
     if testcase["arg_https_proxy"] is not None:
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
     if testcase.get("arg_proxy_headers") is not None:
         kwargs["proxy_headers"] = testcase["arg_proxy_headers"]
+
     client = Client(testcase["dsn"], **kwargs)
+
     if testcase["expected_proxy_scheme"] is None:
         assert client.transport._pool.proxy is None
     else:
@@ -267,6 +271,77 @@ def test_proxy(monkeypatch, testcase):
 
         if testcase.get("arg_proxy_headers") is not None:
             assert client.transport._pool.proxy_headers == testcase["arg_proxy_headers"]
+
+
+@pytest.mark.parametrize(
+    "testcase",
+    [
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.poolmanager.ProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks4a://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks4://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks5h://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks5://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks4a://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks4://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks5h://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks5://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+    ],
+)
+def test_socks_proxy(testcase):
+    kwargs = {}
+
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+
+    client = Client(testcase["dsn"], **kwargs)
+    assert str(type(client.transport._pool)) == testcase["expected_proxy_class"]
 
 
 def test_simple_transport(sentry_init):
