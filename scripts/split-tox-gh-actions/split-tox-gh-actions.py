@@ -105,6 +105,7 @@ def main(fail_on_changes):
     template = f.readlines()
     f.close()
 
+    print("foo")
     print("Read tox.ini")
     config = configparser.ConfigParser()
     config.read(TOX_FILE)
