@@ -55,6 +55,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
 
     steps:
       - uses: actions/checkout@v3
@@ -110,6 +111,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: postgres
 
     steps:
       - uses: actions/checkout@v3

@@ -72,20 +72,25 @@ def write_yaml_file(
     py27_supported = "2.7" in py_versions
 
     test_loc = template.index("{{ test }}\n")
-    test_snippet = open(TEMPLATE_SNIPPET_TEST, "r").readlines()
+    f = open(TEMPLATE_SNIPPET_TEST, "r")
+    test_snippet = f.readlines()
     template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
+    f.close()
 
     test_py27_loc = template.index("{{ test_py27 }}\n")
     if py27_supported:
-        test_py27_snippet = open(TEMPLATE_SNIPPET_TEST_PY27, "r").readlines()
+        f = open(TEMPLATE_SNIPPET_TEST_PY27, "r")
+        test_py27_snippet = f.readlines()
         template = (
             template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
         )
+        f.close()
 
         py_versions.remove("2.7")
     else:
         template.pop(test_py27_loc)
 
+    py27_test_part = False
     for template_line in template:
         if template_line.strip() == "{{ strategy_matrix }}":
             m = MATRIX_DEFINITION
@@ -97,7 +102,14 @@ def write_yaml_file(
         elif template_line.strip() == "{{ services }}":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
-                out += "".join(f.readlines())
+                lines = [
+                    line.replace(
+                        "{{ postgres_host }}",
+                        "postgres" if py27_test_part else "localhost",
+                    )
+                    for line in f.readlines()
+                ]
+                out += "".join(lines)
                 f.close()
 
         elif template_line.strip() == "{{ check_needs }}":
@@ -111,6 +123,9 @@ def write_yaml_file(
                 out += CHECK_PY27
 
         else:
+            if template_line.strip() == "test-py27:":
+                py27_test_part = True
+
             out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template
