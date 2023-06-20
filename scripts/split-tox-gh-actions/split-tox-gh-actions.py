@@ -143,7 +143,7 @@ def main(fail_on_changes):
     if fail_on_changes:
         old_hash = get_yaml_files_hash()
 
-    print("Read GitHub actions config file templates")
+    print("Read GitHub actions config file template")
     f = open(TEMPLATE_FILE, "r")
     template = f.readlines()
     f.close()
