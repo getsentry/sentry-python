@@ -26,8 +26,9 @@ OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 TEMPLATE_DIR = Path(__file__).resolve().parent
 TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
-TEMPLATE_FILE_PY27 = TEMPLATE_DIR / "ci-yaml-py27.txt"
 TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
+TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
+TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = ["django"]
 
@@ -43,6 +44,20 @@ MATRIX_DEFINITION = """
         os: [ubuntu-20.04]
 """
 
+CHECK_NEEDS = """\
+    needs: test
+"""
+CHECK_NEEDS_PY27 = """\
+    needs: [test, test-py27]
+"""
+
+CHECK_PY27 = """\
+      - name: Check for 2.7 failures
+        if: contains(needs.test-py27.result, 'failure')
+        run: |
+          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
+"""
+
 
 def write_yaml_file(
     template,
@@ -52,34 +67,57 @@ def write_yaml_file(
     """Write the YAML configuration file for one framework to disk."""
     # render template for print
     out = ""
-    for template_line in template:
-        if template_line == "{{ strategy_matrix }}\n":
-            py_versions = [f'"{py.replace("py", "")}"' for py in python_versions]
 
+    py_versions = [py.replace("py", "") for py in python_versions]
+    py27_supported = "2.7" in py_versions
+
+    test_loc = template.index("{{ test }}\n")
+    test_snippet = open(TEMPLATE_SNIPPET_TEST, "r").readlines()
+    template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
+
+    test_py27_loc = template.index("{{ test_py27 }}\n")
+    if py27_supported:
+        test_py27_snippet = open(TEMPLATE_SNIPPET_TEST_PY27, "r").readlines()
+        template = (
+            template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
+        )
+
+        py_versions.remove("2.7")
+    else:
+        template.pop(test_py27_loc)
+
+    for template_line in template:
+        if template_line.strip() == "{{ strategy_matrix }}":
             m = MATRIX_DEFINITION
             m = m.replace("{{ framework }}", current_framework).replace(
-                "{{ python-version }}", ",".join(py_versions)
+                "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions])
             )
             out += m
 
-        elif template_line == "{{ services }}\n":
+        elif template_line.strip() == "{{ services }}":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
                 out += "".join(f.readlines())
                 f.close()
 
+        elif template_line.strip() == "{{ check_needs }}":
+            if py27_supported:
+                out += CHECK_NEEDS_PY27
+            else:
+                out += CHECK_NEEDS
+
+        elif template_line.strip() == "{{ check_py27 }}":
+            if py27_supported:
+                out += CHECK_PY27
+
         else:
             out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template
-    suffix = ""
-    if python_versions == ["py2.7"]:
-        suffix = "-py27"
-
     if current_framework == "common":
-        outfile_name = OUT_DIR / f"test-{current_framework}{suffix}.yml"
+        outfile_name = OUT_DIR / f"test-{current_framework}.yml"
     else:
-        outfile_name = OUT_DIR / f"test-integration-{current_framework}{suffix}.yml"
+        outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
 
     print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
@@ -108,9 +146,6 @@ def main(fail_on_changes):
     print("Read GitHub actions config file templates")
     f = open(TEMPLATE_FILE, "r")
     template = f.readlines()
-    f.close()
-    f = open(TEMPLATE_FILE_PY27, "r")
-    template_py27 = f.readlines()
     f.close()
 
     print("Read tox.ini")
@@ -148,10 +183,7 @@ def main(fail_on_changes):
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
-        versions = python_versions[framework]
-        write_yaml_file(template, framework, [v for v in versions if v != "py2.7"])
-        if "py2.7" in versions:
-            write_yaml_file(template_py27, framework, ["py2.7"])
+        write_yaml_file(template, framework, python_versions[framework])
 
     if fail_on_changes:
         new_hash = get_yaml_files_hash()
