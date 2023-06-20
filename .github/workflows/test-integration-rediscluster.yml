@@ -72,8 +72,7 @@ jobs:
   test-py27:
     name: rediscluster, python 2.7, ubuntu-20.04
     runs-on: ubuntu-20.04
-    container:
-      image: python:2.7
+    container: python:2.7
     timeout-minutes: 30
 
     steps:
