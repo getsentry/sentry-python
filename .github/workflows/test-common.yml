@@ -68,6 +68,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+
   test-py27:
     name: common, python 2.7, ubuntu-20.04
     runs-on: ubuntu-20.04
