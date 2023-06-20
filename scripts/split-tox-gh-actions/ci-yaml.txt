@@ -23,47 +23,13 @@ env:
     ${{ github.workspace }}/dist-serverless
 
 jobs:
-  test:
-    name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-{{ strategy_matrix }}
-{{ services }}
+{{ test }}
 
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-
-      - name: Test {{ framework }}
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 15
-          max_attempts: 2
-          retry_wait_seconds: 5
-          shell: bash
-          command: |
-            set -x # print commands that are executed
-            coverage erase
-
-            # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-            coverage combine .coverage* &&
-            coverage xml -i
-
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
+{{ test_py27 }}
 
   check_required_tests:
     name: All {{ framework }} tests passed or skipped
-    needs: test
+{{ check_needs }}
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
@@ -71,4 +37,5 @@ jobs:
       - name: Check for failures
         if: contains(needs.test.result, 'failure')
         run: |
-          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+{{ check_py27 }}
