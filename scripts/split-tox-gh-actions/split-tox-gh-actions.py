@@ -42,6 +42,11 @@ MATRIX_DEFINITION = """
         os: [ubuntu-20.04]
 """
 
+PY27_DOCKER_IMAGE = """\
+    container:
+      image: python:2.7
+"""
+
 
 def write_yaml_file(
     template,
@@ -51,15 +56,21 @@ def write_yaml_file(
     """Write the YAML configuration file for one framework to disk."""
     # render template for print
     out = ""
+
+    py_versions = [py.replace("py", "") for py in python_versions]
+    py_versions_str = [f'"{py}"' for py in py_versions]
+
     for template_line in template:
         if template_line == "{{ strategy_matrix }}\n":
-            py_versions = [f'"{py.replace("py", "")}"' for py in python_versions]
-
             m = MATRIX_DEFINITION
             m = m.replace("{{ framework }}", current_framework).replace(
-                "{{ python-version }}", ",".join(py_versions)
+                "{{ python-version }}", ",".join(py_versions_str)
             )
             out += m
+
+        elif template_line == "{{ container }}\n":
+            if "2.7" in py_versions:
+                out += PY27_DOCKER_IMAGE
 
         elif template_line == "{{ services }}\n":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:

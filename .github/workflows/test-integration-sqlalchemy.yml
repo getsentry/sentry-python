@@ -27,6 +27,8 @@ jobs:
     name: sqlalchemy, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    container:
+      image: python:2.7
 
     strategy:
       fail-fast: false
