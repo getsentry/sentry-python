@@ -126,7 +126,7 @@ try:
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
         "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
-        "HOST": "localhost",
+        "HOST": "postgres",
         "PORT": 5432,
     }
 except (ImportError, KeyError):
