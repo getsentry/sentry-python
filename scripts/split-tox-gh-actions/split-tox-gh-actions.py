@@ -44,7 +44,7 @@ MATRIX_DEFINITION = """
 
 PY27_DOCKER_IMAGE = """\
     container:
-      image: python:2.7
+      image: python:2.7.18-buster
 """
 
 
