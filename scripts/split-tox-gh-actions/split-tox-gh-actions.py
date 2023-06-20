@@ -26,6 +26,7 @@ OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 TEMPLATE_DIR = Path(__file__).resolve().parent
 TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
+TEMPLATE_FILE_PY27 = TEMPLATE_DIR / "ci-yaml-py27.txt"
 TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = ["django"]
@@ -71,10 +72,14 @@ def write_yaml_file(
             out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template
+    suffix = ""
+    if python_versions == ["py2.7"]:
+        suffix = "-py27"
+
     if current_framework == "common":
-        outfile_name = OUT_DIR / f"test-{current_framework}.yml"
+        outfile_name = OUT_DIR / f"test-{current_framework}{suffix}.yml"
     else:
-        outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
+        outfile_name = OUT_DIR / f"test-integration-{current_framework}{suffix}.yml"
 
     print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
@@ -100,9 +105,12 @@ def main(fail_on_changes):
     if fail_on_changes:
         old_hash = get_yaml_files_hash()
 
-    print("Read GitHub actions config file template")
+    print("Read GitHub actions config file templates")
     f = open(TEMPLATE_FILE, "r")
     template = f.readlines()
+    f.close()
+    f = open(TEMPLATE_FILE_PY27, "r")
+    template_py27 = f.readlines()
     f.close()
 
     print("Read tox.ini")
@@ -140,7 +148,10 @@ def main(fail_on_changes):
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
-        write_yaml_file(template, framework, python_versions[framework])
+        versions = python_versions[framework]
+        write_yaml_file(template, framework, [v for v in versions if v != "py2.7"])
+        if "py2.7" in versions:
+            write_yaml_file(template_py27, framework, ["py2.7"])
 
     if fail_on_changes:
         new_hash = get_yaml_files_hash()

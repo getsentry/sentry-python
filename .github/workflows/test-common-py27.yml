@@ -1,4 +1,4 @@
-name: Test redis
+name: Test common py2.7
 
 on:
   push:
@@ -24,31 +24,19 @@ env:
 
 jobs:
   test:
-    name: redis, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: common, python 2.7, ubuntu-20.04
+    runs-on: ubuntu-20.04
+    container: python:2.7
     timeout-minutes: 30
-
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8","3.9"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
 
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
 
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
 
-      - name: Test redis
+      - name: Test common
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 15
@@ -60,7 +48,7 @@ jobs:
             coverage erase
 
             # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            ./scripts/runtox.sh "py2.7-common" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
 
@@ -70,7 +58,7 @@ jobs:
           files: coverage.xml
 
   check_required_tests:
-    name: All redis tests passed or skipped
+    name: All common tests passed or skipped
     needs: test
     # Always run this, even if a dependent job failed
     if: always()
