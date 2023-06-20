@@ -2,12 +2,12 @@ import io
 import json
 import mimetypes
 
-from sentry_sdk._compat import text_type
-from sentry_sdk._types import MYPY
+from sentry_sdk._compat import text_type, PY2
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.session import Session
 from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Optional
     from typing import Union
@@ -16,6 +16,14 @@ if MYPY:
     from typing import Iterator
 
     from sentry_sdk._types import Event, EventDataCategory
+
+
+def parse_json(data):
+    # type: (Union[bytes, text_type]) -> Any
+    # on some python 3 versions this needs to be bytes
+    if not PY2 and isinstance(data, bytes):
+        data = data.decode("utf-8", "replace")
+    return json.loads(data)
 
 
 class Envelope(object):
@@ -53,6 +61,18 @@ class Envelope(object):
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
+
+    def add_profile(
+        self, profile  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
+
+    def add_checkin(
+        self, checkin  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=checkin), type="check_in"))
 
     def add_session(
         self, session  # type: Union[Session, Any]
@@ -114,7 +134,7 @@ class Envelope(object):
         cls, f  # type: Any
     ):
         # type: (...) -> Envelope
-        headers = json.loads(f.readline())
+        headers = parse_json(f.readline())
         items = []
         while 1:
             item = Item.deserialize_from(f)
@@ -236,6 +256,10 @@ class Item(object):
             return "transaction"
         elif ty == "event":
             return "error"
+        elif ty == "client_report":
+            return "internal"
+        elif ty == "profile":
+            return "profile"
         else:
             return "default"
 
@@ -284,14 +308,19 @@ class Item(object):
         line = f.readline().rstrip()
         if not line:
             return None
-        headers = json.loads(line)
-        length = headers["length"]
-        payload = f.read(length)
-        if headers.get("type") in ("event", "transaction"):
-            rv = cls(headers=headers, payload=PayloadRef(json=json.loads(payload)))
+        headers = parse_json(line)
+        length = headers.get("length")
+        if length is not None:
+            payload = f.read(length)
+            f.readline()
+        else:
+            # if no length was specified we need to read up to the end of line
+            # and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)
+            payload = f.readline().rstrip(b"\n")
+        if headers.get("type") in ("event", "transaction", "metric_buckets"):
+            rv = cls(headers=headers, payload=PayloadRef(json=parse_json(payload)))
         else:
             rv = cls(headers=headers, payload=payload)
-        f.readline()
         return rv
 
     @classmethod

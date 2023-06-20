@@ -1,19 +1,21 @@
 from __future__ import print_function
 
 import io
-import urllib3  # type: ignore
+import urllib3
 import certifi
 import gzip
+import time
 
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -22,8 +24,9 @@ if MYPY:
     from typing import Tuple
     from typing import Type
     from typing import Union
+    from typing import DefaultDict
 
-    from urllib3.poolmanager import PoolManager  # type: ignore
+    from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event, EndpointType
@@ -92,6 +95,18 @@ class Transport(object):
         """Forcefully kills the transport."""
         pass
 
+    def record_lost_event(
+        self,
+        reason,  # type: str
+        data_category=None,  # type: Optional[str]
+        item=None,  # type: Optional[Item]
+    ):
+        # type: (...) -> None
+        """This increments a counter for event loss by reason and
+        data category.
+        """
+        return None
+
     def __del__(self):
         # type: () -> None
         try:
@@ -126,25 +141,52 @@ class HttpTransport(Transport):
 
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
-        self.options = options
+        self.options = options  # type: Dict[str, Any]
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()
+        self._discarded_events = defaultdict(
+            int
+        )  # type: DefaultDict[Tuple[str, str], int]
+        self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            proxy_headers=options["proxy_headers"],
         )
 
         from sentry_sdk import Hub
 
         self.hub_cls = Hub
 
+    def record_lost_event(
+        self,
+        reason,  # type: str
+        data_category=None,  # type: Optional[str]
+        item=None,  # type: Optional[Item]
+    ):
+        # type: (...) -> None
+        if not self.options["send_client_reports"]:
+            return
+
+        quantity = 1
+        if item is not None:
+            data_category = item.data_category
+            if data_category == "attachment":
+                # quantity of 0 is actually 1 as we do not want to count
+                # empty attachments as actually empty.
+                quantity = len(item.get_bytes()) or 1
+        elif data_category is None:
+            raise TypeError("data category not provided")
+
+        self._discarded_events[data_category, reason] += quantity
+
     def _update_rate_limits(self, response):
-        # type: (urllib3.HTTPResponse) -> None
+        # type: (urllib3.BaseHTTPResponse) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
@@ -167,8 +209,18 @@ class HttpTransport(Transport):
         body,  # type: bytes
         headers,  # type: Dict[str, str]
         endpoint_type="store",  # type: EndpointType
+        envelope=None,  # type: Optional[Envelope]
     ):
         # type: (...) -> None
+
+        def record_loss(reason):
+            # type: (str) -> None
+            if envelope is None:
+                self.record_lost_event(reason, data_category="error")
+            else:
+                for item in envelope.items:
+                    self.record_lost_event(reason, item=item)
+
         headers.update(
             {
                 "User-Agent": str(self._auth.client),
@@ -184,6 +236,7 @@ class HttpTransport(Transport):
             )
         except Exception:
             self.on_dropped_event("network")
+            record_loss("network_error")
             raise
 
         try:
@@ -191,7 +244,9 @@ class HttpTransport(Transport):
 
             if response.status == 429:
                 # if we hit a 429.  Something was rate limited but we already
-                # acted on this in `self._update_rate_limits`.
+                # acted on this in `self._update_rate_limits`.  Note that we
+                # do not want to record event loss here as we will have recorded
+                # an outcome in relay already.
                 self.on_dropped_event("status_429")
                 pass
 
@@ -202,12 +257,50 @@ class HttpTransport(Transport):
                     response.data,
                 )
                 self.on_dropped_event("status_{}".format(response.status))
+                record_loss("network_error")
         finally:
             response.close()
 
     def on_dropped_event(self, reason):
         # type: (str) -> None
-        pass
+        return None
+
+    def _fetch_pending_client_report(self, force=False, interval=60):
+        # type: (bool, int) -> Optional[Item]
+        if not self.options["send_client_reports"]:
+            return None
+
+        if not (force or self._last_client_report_sent < time.time() - interval):
+            return None
+
+        discarded_events = self._discarded_events
+        self._discarded_events = defaultdict(int)
+        self._last_client_report_sent = time.time()
+
+        if not discarded_events:
+            return None
+
+        return Item(
+            PayloadRef(
+                json={
+                    "timestamp": time.time(),
+                    "discarded_events": [
+                        {"reason": reason, "category": category, "quantity": quantity}
+                        for (
+                            (category, reason),
+                            quantity,
+                        ) in discarded_events.items()
+                    ],
+                }
+            ),
+            type="client_report",
+        )
+
+    def _flush_client_reports(self, force=False):
+        # type: (bool) -> None
+        client_report = self._fetch_pending_client_report(force=force, interval=60)
+        if client_report is not None:
+            self.capture_envelope(Envelope(items=[client_report]))
 
     def _check_disabled(self, category):
         # type: (str) -> bool
@@ -225,6 +318,7 @@ class HttpTransport(Transport):
 
         if self._check_disabled("error"):
             self.on_dropped_event("self_rate_limits")
+            self.record_lost_event("ratelimit_backoff", data_category="error")
             return None
 
         body = io.BytesIO()
@@ -254,11 +348,30 @@ class HttpTransport(Transport):
         # type: (...) -> None
 
         # remove all items from the envelope which are over quota
-        envelope.items[:] = [
-            x for x in envelope.items if not self._check_disabled(x.data_category)
-        ]
+        new_items = []
+        for item in envelope.items:
+            if self._check_disabled(item.data_category):
+                if item.data_category in ("transaction", "error", "default"):
+                    self.on_dropped_event("self_rate_limits")
+                self.record_lost_event("ratelimit_backoff", item=item)
+            else:
+                new_items.append(item)
+
+        # Since we're modifying the envelope here make a copy so that others
+        # that hold references do not see their envelope modified.
+        envelope = Envelope(headers=envelope.headers, items=new_items)
+
         if not envelope.items:
             return None
+
+        # since we're already in the business of sending out an envelope here
+        # check if we have one pending for the stats session envelopes so we
+        # can attach it to this enveloped scheduled for sending.  This will
+        # currently typically attach the client report to the most recent
+        # session update.
+        client_report_item = self._fetch_pending_client_report(interval=30)
+        if client_report_item is not None:
+            envelope.items.append(client_report_item)
 
         body = io.BytesIO()
         with gzip.GzipFile(fileobj=body, mode="w") as f:
@@ -271,6 +384,7 @@ class HttpTransport(Transport):
             self.parsed_dsn.project_id,
             self.parsed_dsn.host,
         )
+
         self._send_request(
             body.getvalue(),
             headers={
@@ -278,6 +392,7 @@ class HttpTransport(Transport):
                 "Content-Encoding": "gzip",
             },
             endpoint_type="envelope",
+            envelope=envelope,
         )
         return None
 
@@ -306,6 +421,7 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
         proxy = None
@@ -322,7 +438,27 @@ class HttpTransport(Transport):
         opts = self._get_pool_options(ca_certs)
 
         if proxy:
-            return urllib3.ProxyManager(proxy, **opts)
+            if proxy_headers:
+                opts["proxy_headers"] = proxy_headers
+
+            if proxy.startswith("socks"):
+                use_socks_proxy = True
+                try:
+                    # Check if PySocks depencency is available
+                    from urllib3.contrib.socks import SOCKSProxyManager
+                except ImportError:
+                    use_socks_proxy = False
+                    logger.warning(
+                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
+                        proxy,
+                    )
+
+                if use_socks_proxy:
+                    return SOCKSProxyManager(proxy, **opts)
+                else:
+                    return urllib3.PoolManager(**opts)
+            else:
+                return urllib3.ProxyManager(proxy, **opts)
         else:
             return urllib3.PoolManager(**opts)
 
@@ -337,9 +473,11 @@ class HttpTransport(Transport):
             with hub:
                 with capture_internal_exceptions():
                     self._send_event(event)
+                    self._flush_client_reports()
 
         if not self._worker.submit(send_event_wrapper):
             self.on_dropped_event("full_queue")
+            self.record_lost_event("queue_overflow", data_category="error")
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -352,9 +490,12 @@ class HttpTransport(Transport):
             with hub:
                 with capture_internal_exceptions():
                     self._send_envelope(envelope)
+                    self._flush_client_reports()
 
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
+            for item in envelope.items:
+                self.record_lost_event("queue_overflow", item=item)
 
     def flush(
         self,
@@ -363,7 +504,9 @@ class HttpTransport(Transport):
     ):
         # type: (...) -> None
         logger.debug("Flushing HTTP transport")
+
         if timeout > 0:
+            self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
 
     def kill(self):

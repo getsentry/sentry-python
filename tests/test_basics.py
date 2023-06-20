@@ -1,5 +1,7 @@
-import os
 import logging
+import os
+import sys
+import time
 
 import pytest
 
@@ -10,13 +12,20 @@ from sentry_sdk import (
     capture_event,
     capture_exception,
     capture_message,
+    start_transaction,
     add_breadcrumb,
     last_event_id,
     Hub,
 )
-
+from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import (  # noqa: F401
+    add_global_event_processor,
+    global_event_processors,
+)
+from sentry_sdk.utils import get_sdk_name
+from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
 def test_processors(sentry_init, capture_events):
@@ -43,16 +52,22 @@ def test_processors(sentry_init, capture_events):
 
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
+    REDIS = 12  # noqa: N806
 
     sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
+        # Ignore redis in the test case, because it is installed as a
+        # dependency for running tests, and therefore always enabled.
+        if _AUTO_ENABLING_INTEGRATIONS[REDIS] == import_string:
+            continue
+
         assert any(
             record.message.startswith(
                 "Did not import default integration {}:".format(import_string)
             )
             for record in caplog.records
-        )
+        ), "Problem with checking auto enabling {}".format(import_string)
 
 
 def test_event_id(sentry_init, capture_events):
@@ -71,10 +86,105 @@ def test_event_id(sentry_init, capture_events):
     assert last_event_id() == event_id
     assert Hub.current.last_event_id() == event_id
 
+    new_event_id = Hub.current.capture_event({"type": "transaction"})
+    assert new_event_id is not None
+    assert new_event_id != event_id
+    assert Hub.current.last_event_id() == event_id
 
-def test_option_callback(sentry_init, capture_events):
+
+def test_generic_mechanism(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "generic"
+    assert event["exception"]["values"][0]["mechanism"]["handled"]
+
+
+def test_option_before_send(sentry_init, capture_events):
+    def before_send(event, hint):
+        event["extra"] = {"before_send_called": True}
+        return event
+
+    def do_this():
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    sentry_init(before_send=before_send)
+    events = capture_events()
+
+    do_this()
+
+    (event,) = events
+    assert event["extra"] == {"before_send_called": True}
+
+
+def test_option_before_send_discard(sentry_init, capture_events):
+    def before_send_discard(event, hint):
+        return None
+
+    def do_this():
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    sentry_init(before_send=before_send_discard)
+    events = capture_events()
+
+    do_this()
+
+    assert len(events) == 0
+
+
+def test_option_before_send_transaction(sentry_init, capture_events):
+    def before_send_transaction(event, hint):
+        assert event["type"] == "transaction"
+        event["extra"] = {"before_send_transaction_called": True}
+        return event
+
+    sentry_init(
+        before_send_transaction=before_send_transaction,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    transaction = start_transaction(name="foo")
+    transaction.finish()
+
+    (event,) = events
+    assert event["transaction"] == "foo"
+    assert event["extra"] == {"before_send_transaction_called": True}
+
+
+def test_option_before_send_transaction_discard(sentry_init, capture_events):
+    def before_send_transaction_discard(event, hint):
+        return None
+
+    sentry_init(
+        before_send_transaction=before_send_transaction_discard,
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    transaction = start_transaction(name="foo")
+    transaction.finish()
+
+    assert len(events) == 0
+
+
+def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     drop_events = False
     drop_breadcrumbs = False
+    reports = []
+
+    def record_lost_event(reason, data_category=None, item=None):
+        reports.append((reason, data_category))
 
     def before_send(event, hint):
         assert isinstance(hint["exc_info"][1], ValueError)
@@ -91,6 +201,10 @@ def test_option_callback(sentry_init, capture_events):
     sentry_init(before_send=before_send, before_breadcrumb=before_breadcrumb)
     events = capture_events()
 
+    monkeypatch.setattr(
+        Hub.current.client.transport, "record_lost_event", record_lost_event
+    )
+
     def do_this():
         add_breadcrumb(message="Hello", hint={"foo": 42})
         try:
@@ -101,8 +215,10 @@ def test_option_callback(sentry_init, capture_events):
     do_this()
     drop_breadcrumbs = True
     do_this()
+    assert not reports
     drop_events = True
     do_this()
+    assert reports == [("before_send", "error")]
 
     normal, no_crumbs = events
 
@@ -112,6 +228,32 @@ def test_option_callback(sentry_init, capture_events):
     assert crumb["message"] == "Hello"
     assert crumb["data"] == {"foo": "bar"}
     assert crumb["type"] == "default"
+
+
+@pytest.mark.parametrize(
+    "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
+    [
+        (None, None, False, None),
+        (False, 0.0, False, 0.0),
+        (False, 1.0, False, 1.0),
+        (None, 1.0, True, 1.0),
+        (True, 1.0, True, 1.0),
+        (None, 0.0, True, 0.0),  # We use this as - it's configured but turned off
+        (True, 0.0, True, 0.0),  # We use this as - it's configured but turned off
+        (True, None, True, 1.0),
+    ],
+)
+def test_option_enable_tracing(
+    sentry_init,
+    enable_tracing,
+    traces_sample_rate,
+    tracing_enabled,
+    updated_traces_sample_rate,
+):
+    sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
+    options = Hub.current.client.options
+    assert has_tracing_enabled(options) is tracing_enabled
+    assert options["traces_sample_rate"] == updated_traces_sample_rate
 
 
 def test_breadcrumb_arguments(sentry_init, capture_events):
@@ -356,3 +498,189 @@ def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
     (event,) = events
     assert event["level"] == "info"
     assert event["extra"]["foo"] == "bar"
+
+
+def test_dedupe_event_processor_drop_records_client_report(
+    sentry_init, capture_events, capture_client_reports
+):
+    """
+    DedupeIntegration internally has an event_processor that filters duplicate exceptions.
+    We want a duplicate exception to be captured only once and the drop being recorded as
+    a client report.
+    """
+    sentry_init()
+    events = capture_events()
+    reports = capture_client_reports()
+
+    try:
+        raise ValueError("aha!")
+    except Exception:
+        try:
+            capture_exception()
+            reraise(*sys.exc_info())
+        except Exception:
+            capture_exception()
+
+    (event,) = events
+    (report,) = reports
+
+    assert event["level"] == "error"
+    assert "exception" in event
+    assert report == ("event_processor", "error")
+
+
+def test_event_processor_drop_records_client_report(
+    sentry_init, capture_events, capture_client_reports
+):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+    reports = capture_client_reports()
+
+    global global_event_processors
+
+    @add_global_event_processor
+    def foo(event, hint):
+        return None
+
+    capture_message("dropped")
+
+    with start_transaction(name="dropped"):
+        pass
+
+    assert len(events) == 0
+    assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+
+    global_event_processors.pop()
+
+
+@pytest.mark.parametrize(
+    "installed_integrations, expected_name",
+    [
+        # integrations with own name
+        (["django"], "sentry.python.django"),
+        (["flask"], "sentry.python.flask"),
+        (["fastapi"], "sentry.python.fastapi"),
+        (["bottle"], "sentry.python.bottle"),
+        (["falcon"], "sentry.python.falcon"),
+        (["quart"], "sentry.python.quart"),
+        (["sanic"], "sentry.python.sanic"),
+        (["starlette"], "sentry.python.starlette"),
+        (["chalice"], "sentry.python.chalice"),
+        (["serverless"], "sentry.python.serverless"),
+        (["pyramid"], "sentry.python.pyramid"),
+        (["tornado"], "sentry.python.tornado"),
+        (["aiohttp"], "sentry.python.aiohttp"),
+        (["aws_lambda"], "sentry.python.aws_lambda"),
+        (["gcp"], "sentry.python.gcp"),
+        (["beam"], "sentry.python.beam"),
+        (["asgi"], "sentry.python.asgi"),
+        (["wsgi"], "sentry.python.wsgi"),
+        # integrations without name
+        (["argv"], "sentry.python"),
+        (["atexit"], "sentry.python"),
+        (["boto3"], "sentry.python"),
+        (["celery"], "sentry.python"),
+        (["dedupe"], "sentry.python"),
+        (["excepthook"], "sentry.python"),
+        (["executing"], "sentry.python"),
+        (["modules"], "sentry.python"),
+        (["pure_eval"], "sentry.python"),
+        (["redis"], "sentry.python"),
+        (["rq"], "sentry.python"),
+        (["sqlalchemy"], "sentry.python"),
+        (["stdlib"], "sentry.python"),
+        (["threading"], "sentry.python"),
+        (["trytond"], "sentry.python"),
+        (["logging"], "sentry.python"),
+        (["gnu_backtrace"], "sentry.python"),
+        (["httpx"], "sentry.python"),
+        # precedence of frameworks
+        (["flask", "django", "celery"], "sentry.python.django"),
+        (["fastapi", "flask", "redis"], "sentry.python.flask"),
+        (["bottle", "fastapi", "httpx"], "sentry.python.fastapi"),
+        (["falcon", "bottle", "logging"], "sentry.python.bottle"),
+        (["quart", "falcon", "gnu_backtrace"], "sentry.python.falcon"),
+        (["sanic", "quart", "sqlalchemy"], "sentry.python.quart"),
+        (["starlette", "sanic", "rq"], "sentry.python.sanic"),
+        (["chalice", "starlette", "modules"], "sentry.python.starlette"),
+        (["serverless", "chalice", "pure_eval"], "sentry.python.chalice"),
+        (["pyramid", "serverless", "modules"], "sentry.python.serverless"),
+        (["tornado", "pyramid", "executing"], "sentry.python.pyramid"),
+        (["aiohttp", "tornado", "dedupe"], "sentry.python.tornado"),
+        (["aws_lambda", "aiohttp", "boto3"], "sentry.python.aiohttp"),
+        (["gcp", "aws_lambda", "atexit"], "sentry.python.aws_lambda"),
+        (["beam", "gcp", "argv"], "sentry.python.gcp"),
+        (["asgi", "beam", "stdtlib"], "sentry.python.beam"),
+        (["wsgi", "asgi", "boto3"], "sentry.python.asgi"),
+        (["wsgi", "celery", "redis"], "sentry.python.wsgi"),
+    ],
+)
+def test_get_sdk_name(installed_integrations, expected_name):
+    assert get_sdk_name(installed_integrations) == expected_name
+
+
+def _hello_world(word):
+    return "Hello, {}".format(word)
+
+
+def test_functions_to_trace(sentry_init, capture_events):
+    functions_to_trace = [
+        {"qualified_name": "tests.test_basics._hello_world"},
+        {"qualified_name": "time.sleep"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        time.sleep(0)
+
+        for word in ["World", "You"]:
+            _hello_world(word)
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 3
+    assert event["spans"][0]["description"] == "time.sleep"
+    assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
+    assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
+
+
+class WorldGreeter:
+    def __init__(self, word):
+        self.word = word
+
+    def greet(self, new_word=None):
+        return "Hello, {}".format(new_word if new_word else self.word)
+
+
+def test_functions_to_trace_with_class(sentry_init, capture_events):
+    functions_to_trace = [
+        {"qualified_name": "tests.test_basics.WorldGreeter.greet"},
+    ]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=functions_to_trace,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="something"):
+        wg = WorldGreeter("World")
+        wg.greet()
+        wg.greet("You")
+
+    assert len(events) == 1
+
+    (event,) = events
+
+    assert len(event["spans"]) == 2
+    assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
+    assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"

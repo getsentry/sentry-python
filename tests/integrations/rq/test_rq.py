@@ -1,5 +1,6 @@
 import pytest
 from fakeredis import FakeStrictRedis
+from sentry_sdk import configure_scope, start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
 
 import rq
@@ -58,13 +59,18 @@ def test_basic(sentry_init, capture_events):
     assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert event["extra"]["rq-job"] == {
-        "args": [],
-        "description": "tests.integrations.rq.test_rq.crashing_job(foo=42)",
-        "func": "tests.integrations.rq.test_rq.crashing_job",
-        "job_id": event["extra"]["rq-job"]["job_id"],
-        "kwargs": {"foo": 42},
-    }
+
+    extra = event["extra"]["rq-job"]
+    assert extra["args"] == []
+    assert extra["kwargs"] == {"foo": 42}
+    assert extra["description"] == "tests.integrations.rq.test_rq.crashing_job(foo=42)"
+    assert extra["func"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert "job_id" in extra
+    assert "enqueued_at" in extra
+
+    # older versions don't persist started_at correctly
+    if tuple(map(int, rq.VERSION.split("."))) >= (0, 9):
+        assert "started_at" in extra
 
 
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
@@ -88,7 +94,6 @@ def test_transport_shutdown(sentry_init, capture_events_forksafe):
 def test_transaction_with_error(
     sentry_init, capture_events, DictionaryContaining  # noqa:N803
 ):
-
     sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
@@ -101,7 +106,7 @@ def test_transaction_with_error(
     error_event, envelope = events
 
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
-    assert error_event["contexts"]["trace"]["op"] == "rq.task"
+    assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
     assert (
         error_event["exception"]["values"][0]["value"]
@@ -121,6 +126,71 @@ def test_transaction_with_error(
     )
 
 
+def test_error_has_trace_context_if_tracing_disabled(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[RqIntegration()])
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+
+
+def test_tracing_enabled(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    with start_transaction(op="rq transaction") as transaction:
+        queue.enqueue(crashing_job, foo=None)
+        worker.work(burst=True)
+
+    error_event, envelope, _ = events
+
+    assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+
+    assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
+
+
+def test_tracing_disabled(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[RqIntegration()])
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    with configure_scope() as scope:
+        queue.enqueue(crashing_job, foo=None)
+        worker.work(burst=True)
+
+        (error_event,) = events
+
+        assert (
+            error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+        )
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == scope._propagation_context["trace_id"]
+        )
+
+
 def test_transaction_no_error(
     sentry_init, capture_events, DictionaryContaining  # noqa:N803
 ):
@@ -136,7 +206,7 @@ def test_transaction_no_error(
     envelope = events[0]
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "rq.task"
+    assert envelope["contexts"]["trace"]["op"] == "queue.task.rq"
     assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
     assert envelope["extra"]["rq-job"] == DictionaryContaining(
         {

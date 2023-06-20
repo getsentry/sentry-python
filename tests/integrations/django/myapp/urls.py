@@ -28,6 +28,14 @@ from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
+    path("view-exc-with-msg", views.view_exc_with_msg, name="view_exc_with_msg"),
+    path("cached-view", views.cached_view, name="cached_view"),
+    path("not-cached-view", views.not_cached_view, name="not_cached_view"),
+    path(
+        "view-with-cached-template-fragment",
+        views.view_with_cached_template_fragment,
+        name="view_with_cached_template_fragment",
+    ),
     path(
         "read-body-and-view-exc",
         views.read_body_and_view_exc,
@@ -47,6 +55,7 @@ urlpatterns = [
     path("template-exc", views.template_exc, name="template_exc"),
     path("template-test", views.template_test, name="template_test"),
     path("template-test2", views.template_test2, name="template_test2"),
+    path("postgres-select", views.postgres_select, name="postgres_select"),
     path(
         "permission-denied-exc",
         views.permission_denied_exc,
@@ -57,6 +66,7 @@ urlpatterns = [
         views.csrf_hello_not_exempt,
         name="csrf_hello_not_exempt",
     ),
+    path("sync/thread_ids", views.thread_ids_sync, name="thread_ids_sync"),
 ]
 
 # async views
@@ -65,6 +75,11 @@ if views.async_message is not None:
 
 if views.my_async_view is not None:
     urlpatterns.append(path("my_async_view", views.my_async_view, name="my_async_view"))
+
+if views.thread_ids_async is not None:
+    urlpatterns.append(
+        path("async/thread_ids", views.thread_ids_async, name="thread_ids_async")
+    )
 
 # rest framework
 try:
@@ -79,6 +94,9 @@ try:
         )
     )
     urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
+    urlpatterns.append(
+        path("rest-json-response", views.rest_json_response, name="rest_json_response")
+    )
     urlpatterns.append(
         path(
             "rest-permission-denied-exc",

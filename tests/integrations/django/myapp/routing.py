@@ -1,11 +1,18 @@
 import channels
-
-from channels.http import AsgiHandler
 from channels.routing import ProtocolTypeRouter
 
-if channels.__version__ < "3.0.0":
-    channels_handler = AsgiHandler
-else:
-    channels_handler = AsgiHandler()
+try:
+    from channels.http import AsgiHandler
 
-application = ProtocolTypeRouter({"http": channels_handler})
+    if channels.__version__ < "3.0.0":
+        django_asgi_app = AsgiHandler
+    else:
+        django_asgi_app = AsgiHandler()
+
+except ModuleNotFoundError:
+    # Since channels 4.0 ASGI handling is done by Django itself
+    from django.core.asgi import get_asgi_application
+
+    django_asgi_app = get_asgi_application()
+
+application = ProtocolTypeRouter({"http": django_asgi_app})

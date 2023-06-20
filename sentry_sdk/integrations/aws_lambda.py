@@ -1,10 +1,12 @@
+import sys
+from copy import deepcopy
 from datetime import datetime, timedelta
 from os import environ
-import sys
 
+from sentry_sdk.api import continue_trace
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.tracing import Transaction
-from sentry_sdk._compat import reraise
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -14,10 +16,10 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk._compat import reraise
+from sentry_sdk._types import TYPE_CHECKING
 
-from sentry_sdk._types import MYPY
-
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
     from typing import Callable
@@ -138,8 +140,12 @@ def _wrap_handler(handler):
             # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
             if headers is None:
                 headers = {}
-            transaction = Transaction.continue_from_headers(
-                headers, op="serverless.function", name=aws_context.function_name
+
+            transaction = continue_trace(
+                headers,
+                op=OP.FUNCTION_AWS,
+                name=aws_context.function_name,
+                source=TRANSACTION_SOURCE_COMPONENT,
             )
             with hub.start_transaction(
                 transaction,
@@ -284,11 +290,13 @@ def get_lambda_bootstrap():
     # Python 3.7: If the bootstrap module is *already imported*, it is the
     # one we actually want to use (no idea what's in __main__)
     #
-    # On Python 3.8 bootstrap is also importable, but will be the same file
+    # Python 3.8: bootstrap is also importable, but will be the same file
     # as __main__ imported under a different name:
     #
     #     sys.modules['__main__'].__file__ == sys.modules['bootstrap'].__file__
     #     sys.modules['__main__'] is not sys.modules['bootstrap']
+    #
+    # Python 3.9: bootstrap is in __main__.awslambdaricmain
     #
     # On container builds using the `aws-lambda-python-runtime-interface-client`
     # (awslamdaric) module, bootstrap is located in sys.modules['__main__'].bootstrap
@@ -297,10 +305,18 @@ def get_lambda_bootstrap():
     if "bootstrap" in sys.modules:
         return sys.modules["bootstrap"]
     elif "__main__" in sys.modules:
-        if hasattr(sys.modules["__main__"], "bootstrap"):
+        module = sys.modules["__main__"]
+        # python3.9 runtime
+        if hasattr(module, "awslambdaricmain") and hasattr(
+            module.awslambdaricmain, "bootstrap"
+        ):
+            return module.awslambdaricmain.bootstrap
+        elif hasattr(module, "bootstrap"):
             # awslambdaric python module in container builds
-            return sys.modules["__main__"].bootstrap  # type: ignore
-        return sys.modules["__main__"]
+            return module.bootstrap
+
+        # python3.8 runtime
+        return module
     else:
         return None
 
@@ -364,9 +380,9 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
             if aws_event.get("body", None):
                 # Unfortunately couldn't find a way to get structured body from AWS
                 # event. Meaning every body is unstructured to us.
-                request["data"] = AnnotatedValue("", {"rem": [["!raw", "x", 0, 0]]})
+                request["data"] = AnnotatedValue.removed_because_raw_data()
 
-        sentry_event["request"] = request
+        sentry_event["request"] = deepcopy(request)
 
         return sentry_event
 

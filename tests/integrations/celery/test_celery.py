@@ -5,11 +5,13 @@ import pytest
 pytest.importorskip("celery")
 
 from sentry_sdk import Hub, configure_scope, start_transaction
-from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
+
 from sentry_sdk._compat import text_type
 
 from celery import Celery, VERSION
 from celery.bin import worker
+from celery.signals import task_success
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -84,8 +86,14 @@ def celery(init_celery):
 
 @pytest.fixture(
     params=[
-        lambda task, x, y: (task.delay(x, y), {"args": [x, y], "kwargs": {}}),
-        lambda task, x, y: (task.apply_async((x, y)), {"args": [x, y], "kwargs": {}}),
+        lambda task, x, y: (
+            task.delay(x, y),
+            {"args": [x, y], "kwargs": {}},
+        ),
+        lambda task, x, y: (
+            task.apply_async((x, y)),
+            {"args": [x, y], "kwargs": {}},
+        ),
         lambda task, x, y: (
             task.apply_async(args=(x, y)),
             {"args": [x, y], "kwargs": {}},
@@ -105,7 +113,8 @@ def celery_invocation(request):
     return request.param
 
 
-def test_simple(capture_events, celery, celery_invocation):
+def test_simple_with_performance(capture_events, init_celery, celery_invocation):
+    celery = init_celery(traces_sample_rate=1.0)
     events = capture_events()
 
     @celery.task(name="dummy_task")
@@ -113,24 +122,59 @@ def test_simple(capture_events, celery, celery_invocation):
         foo = 42  # noqa
         return x / y
 
-    with start_transaction() as transaction:
+    with start_transaction(op="unit test transaction") as transaction:
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-    (event,) = events
+    (_, error_event, _, _) = events
 
-    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert event["contexts"]["trace"]["span_id"] != transaction.span_id
-    assert event["transaction"] == "dummy_task"
-    assert "celery_task_id" in event["tags"]
-    assert event["extra"]["celery-job"] == dict(
+    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert error_event["contexts"]["trace"]["span_id"] != transaction.span_id
+    assert error_event["transaction"] == "dummy_task"
+    assert "celery_task_id" in error_event["tags"]
+    assert error_event["extra"]["celery-job"] == dict(
         task_name="dummy_task", **expected_context
     )
 
-    (exception,) = event["exception"]["values"]
+    (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
     assert exception["mechanism"]["type"] == "celery"
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+
+
+def test_simple_without_performance(capture_events, init_celery, celery_invocation):
+    celery = init_celery(traces_sample_rate=None)
+    events = capture_events()
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        foo = 42  # noqa
+        return x / y
+
+    with configure_scope() as scope:
+        celery_invocation(dummy_task, 1, 2)
+        _, expected_context = celery_invocation(dummy_task, 1, 0)
+
+        (error_event,) = events
+
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == scope._propagation_context["trace_id"]
+        )
+        assert (
+            error_event["contexts"]["trace"]["span_id"]
+            != scope._propagation_context["span_id"]
+        )
+        assert error_event["transaction"] == "dummy_task"
+        assert "celery_task_id" in error_event["tags"]
+        assert error_event["extra"]["celery-job"] == dict(
+            task_name="dummy_task", **expected_context
+        )
+
+        (exception,) = error_event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
+        assert exception["mechanism"]["type"] == "celery"
+        assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
@@ -155,9 +199,11 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
     execution_event, submission_event = events
-
     assert execution_event["transaction"] == "dummy_task"
+    assert execution_event["transaction_info"] == {"source": "task"}
+
     assert submission_event["transaction"] == "submission"
+    assert submission_event["transaction_info"] == {"source": "custom"}
 
     assert execution_event["type"] == submission_event["type"] == "transaction"
     assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
@@ -171,14 +217,14 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
-            u"description": u"dummy_task",
-            u"op": "celery.submit",
-            u"parent_span_id": submission_event["contexts"]["trace"]["span_id"],
-            u"same_process_as_parent": True,
-            u"span_id": submission_event["spans"][0]["span_id"],
-            u"start_timestamp": submission_event["spans"][0]["start_timestamp"],
-            u"timestamp": submission_event["spans"][0]["timestamp"],
-            u"trace_id": text_type(transaction.trace_id),
+            "description": "dummy_task",
+            "op": "queue.submit.celery",
+            "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
+            "same_process_as_parent": True,
+            "span_id": submission_event["spans"][0]["span_id"],
+            "start_timestamp": submission_event["spans"][0]["start_timestamp"],
+            "timestamp": submission_event["spans"][0]["timestamp"],
+            "trace_id": text_type(transaction.trace_id),
         }
     ]
 
@@ -311,6 +357,8 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
+# TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
+@pytest.mark.skip
 @pytest.mark.forked
 def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
@@ -338,8 +386,12 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
     submit_transaction = events.read_event()
     assert submit_transaction["type"] == "transaction"
     assert submit_transaction["transaction"] == "submit_celery"
-    (span,) = submit_transaction["spans"]
-    assert span["op"] == "celery.submit"
+
+    assert len(
+        submit_transaction["spans"]
+    ), 4  # Because redis integration was auto enabled
+    span = submit_transaction["spans"][0]
+    assert span["op"] == "queue.submit.celery"
     assert span["description"] == "dummy_task"
 
     event = events.read_event()
@@ -407,3 +459,51 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
         # passed as args or as kwargs, so make this generic
         DictionaryContaining({"celery_job": dict(task="dog_walk", **args_kwargs)})
     )
+
+
+def test_abstract_task(capture_events, celery, celery_invocation):
+    events = capture_events()
+
+    class AbstractTask(celery.Task):
+        abstract = True
+
+        def __call__(self, *args, **kwargs):
+            try:
+                return self.run(*args, **kwargs)
+            except ZeroDivisionError:
+                return None
+
+    @celery.task(name="dummy_task", base=AbstractTask)
+    def dummy_task(x, y):
+        return x / y
+
+    with start_transaction():
+        celery_invocation(dummy_task, 1, 0)
+
+    assert not events
+
+
+def test_task_headers(celery):
+    """
+    Test that the headers set in the Celery Beat auto-instrumentation are passed to the celery signal handlers
+    """
+    sentry_crons_setup = {
+        "sentry-monitor-slug": "some-slug",
+        "sentry-monitor-config": {"some": "config"},
+        "sentry-monitor-check-in-id": "123abc",
+    }
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        return x + y
+
+    def crons_task_success(sender, **kwargs):
+        headers = _get_headers(sender)
+        assert headers == sentry_crons_setup
+
+    task_success.connect(crons_task_success)
+
+    # This is how the Celery Beat auto-instrumentation starts a task
+    # in the monkey patched version of `apply_async`
+    # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
+    dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)

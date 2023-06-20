@@ -152,7 +152,9 @@ def test_monkey_patch_signature(f, args, kwargs):
 
 
 class _OutputProcessor(OutputProcessor):
-    def process_outputs(self, windowed_input_element, results):
+    def process_outputs(
+        self, windowed_input_element, results, watermark_estimator=None
+    ):
         print(windowed_input_element)
         try:
             for result in results:

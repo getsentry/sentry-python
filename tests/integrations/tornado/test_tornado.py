@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from sentry_sdk import configure_scope, start_transaction
+from sentry_sdk import configure_scope, start_transaction, capture_message
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 from tornado.web import RequestHandler, Application, HTTPError
@@ -43,6 +43,12 @@ class CrashingHandler(RequestHandler):
     def post(self):
         with configure_scope() as scope:
             scope.set_tag("foo", "43")
+        1 / 0
+
+
+class CrashingWithMessageHandler(RequestHandler):
+    def get(self):
+        capture_message("hi")
         1 / 0
 
 
@@ -96,6 +102,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
         event["transaction"]
         == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
     )
+    assert event["transaction_info"] == {"source": "component"}
 
     with configure_scope() as scope:
         assert not scope._tags
@@ -129,6 +136,9 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
 
     assert client_tx["type"] == "transaction"
     assert client_tx["transaction"] == "client"
+    assert client_tx["transaction_info"] == {
+        "source": "custom"
+    }  # because this is just the start_transaction() above.
 
     if server_error is not None:
         assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
@@ -136,6 +146,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
             server_error["transaction"]
             == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
+        assert server_error["transaction_info"] == {"source": "component"}
 
     if code == 200:
         assert (
@@ -148,6 +159,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
             == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
 
+    assert server_tx["transaction_info"] == {"source": "component"}
     assert server_tx["type"] == "transaction"
 
     request = server_tx["request"]
@@ -286,3 +298,145 @@ def test_json(tornado_testcase, sentry_init, capture_events):
     assert exception["value"] == "[]"
     assert event
     assert event["request"]["data"] == {"foo": {"bar": 42}}
+
+
+def test_error_has_new_trace_context_performance_enabled(
+    tornado_testcase, sentry_init, capture_events
+):
+    """
+    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
+    client.fetch("/hi")
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_new_trace_context_performance_disabled(
+    tornado_testcase, sentry_init, capture_events
+):
+    """
+    Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=None,  # this is the default, just added for clarity
+    )
+    events = capture_events()
+
+    client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
+    client.fetch("/hi")
+
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_existing_trace_context_performance_enabled(
+    tornado_testcase, sentry_init, capture_events
+):
+    """
+    Check if an 'trace' context is added to errros and transactions
+    from the incoming 'sentry-trace' header when performance monitoring is enabled.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    headers = {"sentry-trace": sentry_trace_header}
+
+    client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
+    client.fetch("/hi", headers=headers)
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+
+def test_error_has_existing_trace_context_performance_disabled(
+    tornado_testcase, sentry_init, capture_events
+):
+    """
+    Check if an 'trace' context is added to errros and transactions
+    from the incoming 'sentry-trace' header when performance monitoring is disabled.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=None,  # this is the default, just added for clarity
+    )
+    events = capture_events()
+
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    headers = {"sentry-trace": sentry_trace_header}
+
+    client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
+    client.fetch("/hi", headers=headers)
+
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )

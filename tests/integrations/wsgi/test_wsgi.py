@@ -1,8 +1,13 @@
+import sys
+
 from werkzeug.test import Client
+
 import pytest
 
 import sentry_sdk
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from collections import Counter
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -136,6 +141,8 @@ def test_transaction_with_error(
     assert error_event["transaction"] == "generic WSGI request"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
+    assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert (
         error_event["exception"]["values"][0]["value"]
         == "Fetch aborted. The ball was not returned."
@@ -176,8 +183,139 @@ def test_transaction_no_error(
     )
 
 
+def test_has_trace_if_performance_enabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(Exception):
+        client.get("http://dogs.are.great/sit/stay/rollover/")
+
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_has_trace_if_performance_disabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init()
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(Exception):
+        client.get("http://dogs.are.great/sit/stay/rollover/")
+
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+
+def test_trace_from_headers_if_performance_enabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(Exception):
+        client.get(
+            "http://dogs.are.great/sit/stay/rollover/",
+            headers={"sentry-trace": sentry_trace_header},
+        )
+
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+def test_trace_from_headers_if_performance_disabled(
+    sentry_init,
+    capture_events,
+):
+    def dogpark(environ, start_response):
+        capture_message("Attempting to fetch the ball")
+        raise Exception("Fetch aborted. The ball was not returned.")
+
+    sentry_init()
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(Exception):
+        client.get(
+            "http://dogs.are.great/sit/stay/rollover/",
+            headers={"sentry-trace": sentry_trace_header},
+        )
+
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
 def test_traces_sampler_gets_correct_values_in_sampling_context(
-    sentry_init, DictionaryContaining, ObjectDescribedBy  # noqa:N803
+    sentry_init,
+    DictionaryContaining,  # noqa:N803
 ):
     def app(environ, start_response):
         start_response("200 OK", [])
@@ -219,7 +357,6 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
 
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
-
     app = SentryWsgiMiddleware(app)
     envelopes = capture_envelopes()
 
@@ -236,3 +373,76 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
     aggregates = sess_event["aggregates"]
     assert len(aggregates) == 1
     assert aggregates[0]["exited"] == 1
+
+
+def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
+    """
+    Test for correct session aggregates in auto session tracking.
+    """
+
+    def sample_app(environ, start_response):
+        if environ["REQUEST_URI"] != "/dogs/are/great/":
+            1 / 0
+
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    traces_sampler = mock.Mock(return_value=True)
+    sentry_init(send_default_pii=True, traces_sampler=traces_sampler)
+    app = SentryWsgiMiddleware(sample_app)
+    envelopes = capture_envelopes()
+    assert len(envelopes) == 0
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+    client.get("/dogs/are/great/")
+    try:
+        client.get("/trigger/an/error/")
+    except ZeroDivisionError:
+        pass
+
+    sentry_sdk.flush()
+
+    count_item_types = Counter()
+    for envelope in envelopes:
+        count_item_types[envelope.items[0].type] += 1
+
+    assert count_item_types["transaction"] == 3
+    assert count_item_types["event"] == 1
+    assert count_item_types["sessions"] == 1
+    assert len(envelopes) == 5
+
+    session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
+    assert session_aggregates[0]["exited"] == 2
+    assert session_aggregates[0]["crashed"] == 1
+    assert len(session_aggregates) == 1
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
+)
+@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+def test_profile_sent(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    def test_app(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"profiles_sample_rate": 1.0},
+    )
+    app = SentryWsgiMiddleware(test_app)
+    envelopes = capture_envelopes()
+
+    client = Client(app)
+    client.get("/")
+
+    envelopes = [envelope for envelope in envelopes]
+    assert len(envelopes) == 1
+
+    profiles = [item for item in envelopes[0].items if item.type == "profile"]
+    assert len(profiles) == 1

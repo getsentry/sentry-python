@@ -1,12 +1,13 @@
 import json
+from copy import deepcopy
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type, iteritems
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     import sentry_sdk
 
     from typing import Any
@@ -21,6 +22,7 @@ SENSITIVE_ENV_KEYS = (
     "HTTP_SET_COOKIE",
     "HTTP_COOKIE",
     "HTTP_AUTHORIZATION",
+    "HTTP_X_API_KEY",
     "HTTP_X_FORWARDED_FOR",
     "HTTP_X_REAL_IP",
 )
@@ -38,8 +40,8 @@ def request_body_within_bounds(client, content_length):
     bodies = client.options["request_bodies"]
     return not (
         bodies == "never"
-        or (bodies == "small" and content_length > 10 ** 3)
-        or (bodies == "medium" and content_length > 10 ** 4)
+        or (bodies == "small" and content_length > 10**3)
+        or (bodies == "medium" and content_length > 10**4)
     )
 
 
@@ -63,26 +65,20 @@ class RequestExtractor(object):
             request_info["cookies"] = dict(self.cookies())
 
         if not request_body_within_bounds(client, content_length):
-            data = AnnotatedValue(
-                "",
-                {"rem": [["!config", "x", 0, content_length]], "len": content_length},
-            )
+            data = AnnotatedValue.removed_because_over_size_limit()
         else:
             parsed_body = self.parsed_body()
             if parsed_body is not None:
                 data = parsed_body
             elif self.raw_data():
-                data = AnnotatedValue(
-                    "",
-                    {"rem": [["!raw", "x", 0, content_length]], "len": content_length},
-                )
+                data = AnnotatedValue.removed_because_raw_data()
             else:
                 data = None
 
         if data is not None:
             request_info["data"] = data
 
-        event["request"] = request_info
+        event["request"] = deepcopy(request_info)
 
     def content_length(self):
         # type: () -> int
@@ -109,11 +105,8 @@ class RequestExtractor(object):
         files = self.files()
         if form or files:
             data = dict(iteritems(form))
-            for k, v in iteritems(files):
-                size = self.size_of_file(v)
-                data[k] = AnnotatedValue(
-                    "", {"len": size, "rem": [["!raw", "x", 0, size]]}
-                )
+            for key, _ in iteritems(files):
+                data[key] = AnnotatedValue.removed_because_raw_data()
 
             return data
 
@@ -174,7 +167,7 @@ def _filter_headers(headers):
         k: (
             v
             if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
-            else AnnotatedValue("", {"rem": [["!config", "x", 0, len(v)]]})
+            else AnnotatedValue.removed_because_over_size_limit()
         )
         for k, v in iteritems(headers)
     }

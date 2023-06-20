@@ -8,20 +8,20 @@ from sentry_sdk.utils import (
     capture_internal_exception,
     disable_capture_event,
     format_timestamp,
-    json_dumps,
     safe_repr,
     strip_string,
 )
+from sentry_sdk._compat import (
+    text_type,
+    PY2,
+    string_types,
+    number_types,
+    iteritems,
+    binary_sequence_types,
+)
+from sentry_sdk._types import TYPE_CHECKING
 
-import sentry_sdk.utils
-
-from sentry_sdk._compat import text_type, PY2, string_types, number_types, iteritems
-
-from sentry_sdk._types import MYPY
-
-if MYPY:
-    from datetime import timedelta
-
+if TYPE_CHECKING:
     from types import TracebackType
 
     from typing import Any
@@ -30,7 +30,6 @@ if MYPY:
     from typing import Dict
     from typing import List
     from typing import Optional
-    from typing import Tuple
     from typing import Type
     from typing import Union
 
@@ -47,7 +46,7 @@ if PY2:
     # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
     from collections import Mapping, Sequence, Set
 
-    serializable_str_types = string_types
+    serializable_str_types = string_types + binary_sequence_types
 
 else:
     # New in 3.3
@@ -55,7 +54,7 @@ else:
     from collections.abc import Mapping, Sequence, Set
 
     # Bytes are technically not strings in Python 3, but we can serialize them
-    serializable_str_types = (str, bytes)
+    serializable_str_types = string_types + binary_sequence_types
 
 
 # Maximum length of JSON-serialized event payloads that can be safely sent
@@ -66,11 +65,13 @@ else:
 # Can be overwritten if wanting to send more bytes, e.g. with a custom server.
 # When changing this, keep in mind that events may be a little bit larger than
 # this value due to attached metadata, so keep the number conservative.
-MAX_EVENT_BYTES = 10 ** 6
+MAX_EVENT_BYTES = 10**6
 
+# Maximum depth and breadth of databags. Excess data will be trimmed. If
+# request_bodies is "always", request bodies won't be trimmed.
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
-CYCLE_MARKER = u"<cyclic>"
+CYCLE_MARKER = "<cyclic>"
 
 
 global_repr_processors = []  # type: List[ReprProcessor]
@@ -113,12 +114,13 @@ class Memo(object):
         self._ids.pop(id(self._objs.pop()), None)
 
 
-def serialize(event, smart_transaction_trimming=False, **kwargs):
-    # type: (Event, bool, **Any) -> Event
+def serialize(event, **kwargs):
+    # type: (Event, **Any) -> Event
     memo = Memo()
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
-    span_description_bytes = []  # type: List[int]
+
+    keep_request_bodies = kwargs.pop("request_bodies", None) == "always"  # type: bool
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -184,10 +186,11 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             if rv in (True, None):
                 return rv
 
-            p0 = path[0]
-            if p0 == "request" and path[1] == "data":
-                return True
+            is_request_body = _is_request_body()
+            if is_request_body in (True, None):
+                return is_request_body
 
+            p0 = path[0]
             if p0 == "breadcrumbs" and path[1] == "values":
                 path[2]
                 return True
@@ -200,13 +203,24 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
 
         return False
 
+    def _is_request_body():
+        # type: () -> Optional[bool]
+        try:
+            if path[0] == "request" and path[1] == "data":
+                return True
+        except IndexError:
+            return None
+
+        return False
+
     def _serialize_node(
         obj,  # type: Any
         is_databag=None,  # type: Optional[bool]
+        is_request_body=None,  # type: Optional[bool]
         should_repr_strings=None,  # type: Optional[bool]
         segment=None,  # type: Optional[Segment]
-        remaining_breadth=None,  # type: Optional[int]
-        remaining_depth=None,  # type: Optional[int]
+        remaining_breadth=None,  # type: Optional[Union[int, float]]
+        remaining_depth=None,  # type: Optional[Union[int, float]]
     ):
         # type: (...) -> Any
         if segment is not None:
@@ -220,6 +234,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 return _serialize_node_impl(
                     obj,
                     is_databag=is_databag,
+                    is_request_body=is_request_body,
                     should_repr_strings=should_repr_strings,
                     remaining_depth=remaining_depth,
                     remaining_breadth=remaining_breadth,
@@ -228,7 +243,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
             capture_internal_exception(sys.exc_info())
 
             if is_databag:
-                return u"<failed to serialize, use init(debug=True) to see error logs>"
+                return "<failed to serialize, use init(debug=True) to see error logs>"
 
             return None
         finally:
@@ -244,19 +259,34 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
         return obj
 
     def _serialize_node_impl(
-        obj, is_databag, should_repr_strings, remaining_depth, remaining_breadth
+        obj,
+        is_databag,
+        is_request_body,
+        should_repr_strings,
+        remaining_depth,
+        remaining_breadth,
     ):
-        # type: (Any, Optional[bool], Optional[bool], Optional[int], Optional[int]) -> Any
+        # type: (Any, Optional[bool], Optional[bool], Optional[bool], Optional[Union[float, int]], Optional[Union[float, int]]) -> Any
+        if isinstance(obj, AnnotatedValue):
+            should_repr_strings = False
         if should_repr_strings is None:
             should_repr_strings = _should_repr_strings()
 
         if is_databag is None:
             is_databag = _is_databag()
 
-        if is_databag and remaining_depth is None:
-            remaining_depth = MAX_DATABAG_DEPTH
-        if is_databag and remaining_breadth is None:
-            remaining_breadth = MAX_DATABAG_BREADTH
+        if is_request_body is None:
+            is_request_body = _is_request_body()
+
+        if is_databag:
+            if is_request_body and keep_request_bodies:
+                remaining_depth = float("inf")
+                remaining_breadth = float("inf")
+            else:
+                if remaining_depth is None:
+                    remaining_depth = MAX_DATABAG_DEPTH
+                if remaining_breadth is None:
+                    remaining_breadth = MAX_DATABAG_BREADTH
 
         obj = _flatten_annotated(obj)
 
@@ -273,6 +303,8 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 if result is not NotImplemented:
                     return _flatten_annotated(result)
 
+        sentry_repr = getattr(type(obj), "__sentry_repr__", None)
+
         if obj is None or isinstance(obj, (bool, number_types)):
             if should_repr_strings or (
                 isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))
@@ -280,6 +312,9 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                 return safe_repr(obj)
             else:
                 return obj
+
+        elif callable(sentry_repr):
+            return sentry_repr(obj)
 
         elif isinstance(obj, datetime):
             return (
@@ -307,6 +342,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                     segment=str_k,
                     should_repr_strings=should_repr_strings,
                     is_databag=is_databag,
+                    is_request_body=is_request_body,
                     remaining_depth=remaining_depth - 1
                     if remaining_depth is not None
                     else None,
@@ -333,6 +369,7 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
                         segment=i,
                         should_repr_strings=should_repr_strings,
                         is_databag=is_databag,
+                        is_request_body=is_request_body,
                         remaining_depth=remaining_depth - 1
                         if remaining_depth is not None
                         else None,
@@ -345,119 +382,29 @@ def serialize(event, smart_transaction_trimming=False, **kwargs):
         if should_repr_strings:
             obj = safe_repr(obj)
         else:
-            if isinstance(obj, bytes):
+            if isinstance(obj, bytes) or isinstance(obj, bytearray):
                 obj = obj.decode("utf-8", "replace")
 
             if not isinstance(obj, string_types):
                 obj = safe_repr(obj)
 
-        # Allow span descriptions to be longer than other strings.
-        #
-        # For database auto-instrumented spans, the description contains
-        # potentially long SQL queries that are most useful when not truncated.
-        # Because arbitrarily large events may be discarded by the server as a
-        # protection mechanism, we dynamically limit the description length
-        # later in _truncate_span_descriptions.
-        if (
-            smart_transaction_trimming
-            and len(path) == 3
-            and path[0] == "spans"
-            and path[-1] == "description"
-        ):
-            span_description_bytes.append(len(obj))
+        is_span_description = (
+            len(path) == 3 and path[0] == "spans" and path[-1] == "description"
+        )
+        if is_span_description:
             return obj
+
         return _flatten_annotated(strip_string(obj))
 
-    def _truncate_span_descriptions(serialized_event, event, excess_bytes):
-        # type: (Event, Event, int) -> None
-        """
-        Modifies serialized_event in-place trying to remove excess_bytes from
-        span descriptions. The original event is used read-only to access the
-        span timestamps (represented as RFC3399-formatted strings in
-        serialized_event).
-
-        It uses heuristics to prioritize preserving the description of spans
-        that might be the most interesting ones in terms of understanding and
-        optimizing performance.
-        """
-        # When truncating a description, preserve a small prefix.
-        min_length = 10
-
-        def shortest_duration_longest_description_first(args):
-            # type: (Tuple[int, Span]) -> Tuple[timedelta, int]
-            i, serialized_span = args
-            span = event["spans"][i]
-            now = datetime.utcnow()
-            start = span.get("start_timestamp") or now
-            end = span.get("timestamp") or now
-            duration = end - start
-            description = serialized_span.get("description") or ""
-            return (duration, -len(description))
-
-        # Note: for simplicity we sort spans by exact duration and description
-        # length. If ever needed, we could have a more involved heuristic, e.g.
-        # replacing exact durations with "buckets" and/or looking at other span
-        # properties.
-        path.append("spans")
-        for i, span in sorted(
-            enumerate(serialized_event.get("spans") or []),
-            key=shortest_duration_longest_description_first,
-        ):
-            description = span.get("description") or ""
-            if len(description) <= min_length:
-                continue
-            excess_bytes -= len(description) - min_length
-            path.extend([i, "description"])
-            # Note: the last time we call strip_string we could preserve a few
-            # more bytes up to a total length of MAX_EVENT_BYTES. Since that's
-            # not strictly required, we leave it out for now for simplicity.
-            span["description"] = _flatten_annotated(
-                strip_string(description, max_length=min_length)
-            )
-            del path[-2:]
-            del meta_stack[len(path) + 1 :]
-
-            if excess_bytes <= 0:
-                break
-        path.pop()
-        del meta_stack[len(path) + 1 :]
-
+    #
+    # Start of serialize() function
+    #
     disable_capture_event.set(True)
     try:
-        rv = _serialize_node(event, **kwargs)
-        if meta_stack and isinstance(rv, dict):
-            rv["_meta"] = meta_stack[0]
+        serialized_event = _serialize_node(event, **kwargs)
+        if meta_stack and isinstance(serialized_event, dict):
+            serialized_event["_meta"] = meta_stack[0]
 
-        sum_span_description_bytes = sum(span_description_bytes)
-        if smart_transaction_trimming and sum_span_description_bytes > 0:
-            span_count = len(event.get("spans") or [])
-            # This is an upper bound of how many bytes all descriptions would
-            # consume if the usual string truncation in _serialize_node_impl
-            # would have taken place, not accounting for the metadata attached
-            # as event["_meta"].
-            descriptions_budget_bytes = span_count * sentry_sdk.utils.MAX_STRING_LENGTH
-
-            # If by not truncating descriptions we ended up with more bytes than
-            # per the usual string truncation, check if the event is too large
-            # and we need to truncate some descriptions.
-            #
-            # This is guarded with an if statement to avoid JSON-encoding the
-            # event unnecessarily.
-            if sum_span_description_bytes > descriptions_budget_bytes:
-                original_bytes = len(json_dumps(rv))
-                excess_bytes = original_bytes - MAX_EVENT_BYTES
-                if excess_bytes > 0:
-                    # Event is too large, will likely be discarded by the
-                    # server. Trim it down before sending.
-                    _truncate_span_descriptions(rv, event, excess_bytes)
-
-                    # Span descriptions truncated, set or reset _meta.
-                    #
-                    # We run the same code earlier because we want to account
-                    # for _meta when calculating original_bytes, the number of
-                    # bytes in the JSON-encoded event.
-                    if meta_stack and isinstance(rv, dict):
-                        rv["_meta"] = meta_stack[0]
-        return rv
+        return serialized_event
     finally:
         disable_capture_event.set(False)

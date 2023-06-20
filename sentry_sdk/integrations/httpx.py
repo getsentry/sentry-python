@@ -1,9 +1,17 @@
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.tracing_utils import should_propagate_trace
+from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
+    capture_internal_exceptions,
+    logger,
+    parse_url,
+)
 
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
 
@@ -39,18 +47,38 @@ def _install_httpx_client():
         if hub.get_integration(HttpxIntegration) is None:
             return real_send(self, request, **kwargs)
 
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(str(request.url), sanitize=False)
+
         with hub.start_span(
-            op="http", description="%s %s" % (request.method, request.url)
+            op=OP.HTTP_CLIENT,
+            description="%s %s"
+            % (
+                request.method,
+                parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+            ),
         ) as span:
-            span.set_data("method", request.method)
-            span.set_data("url", str(request.url))
-            for key, value in hub.iter_trace_propagation_headers():
-                request.headers[key] = value
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            if parsed_url is not None:
+                span.set_data("url", parsed_url.url)
+                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+            if should_propagate_trace(hub, str(request.url)):
+                for key, value in hub.iter_trace_propagation_headers():
+                    logger.debug(
+                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                            key=key, value=value, url=request.url
+                        )
+                    )
+                    request.headers[key] = value
+
             rv = real_send(self, request, **kwargs)
 
-            span.set_data("status_code", rv.status_code)
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
+
             return rv
 
     Client.send = send
@@ -66,18 +94,38 @@ def _install_httpx_async_client():
         if hub.get_integration(HttpxIntegration) is None:
             return await real_send(self, request, **kwargs)
 
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(str(request.url), sanitize=False)
+
         with hub.start_span(
-            op="http", description="%s %s" % (request.method, request.url)
+            op=OP.HTTP_CLIENT,
+            description="%s %s"
+            % (
+                request.method,
+                parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+            ),
         ) as span:
-            span.set_data("method", request.method)
-            span.set_data("url", str(request.url))
-            for key, value in hub.iter_trace_propagation_headers():
-                request.headers[key] = value
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            if parsed_url is not None:
+                span.set_data("url", parsed_url.url)
+                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+            if should_propagate_trace(hub, str(request.url)):
+                for key, value in hub.iter_trace_propagation_headers():
+                    logger.debug(
+                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                            key=key, value=value, url=request.url
+                        )
+                    )
+                    request.headers[key] = value
+
             rv = await real_send(self, request, **kwargs)
 
-            span.set_data("status_code", rv.status_code)
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
+
             return rv
 
     AsyncClient.send = send

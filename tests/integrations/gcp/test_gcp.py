@@ -81,6 +81,9 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         transport=TestTransport,
         integrations=[GcpIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
+        # excepthook -> dedupe -> event_processor client report gets added
+        # which we don't really care about for these tests
+        send_client_reports=False,
         **extra_init_args
     )
 
@@ -90,9 +93,8 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 @pytest.fixture
 def run_cloud_function():
     def inner(code, subprocess_kwargs=()):
-
-        event = []
-        envelope = []
+        events = []
+        envelopes = []
         return_value = None
 
         # STEP : Create a zip of cloud function
@@ -130,23 +132,25 @@ def run_cloud_function():
                 print("GCP:", line)
                 if line.startswith("EVENT: "):
                     line = line[len("EVENT: ") :]
-                    event = json.loads(line)
+                    events.append(json.loads(line))
                 elif line.startswith("ENVELOPE: "):
                     line = line[len("ENVELOPE: ") :]
-                    envelope = json.loads(line)
+                    envelopes.append(json.loads(line))
                 elif line.startswith("RETURN VALUE: "):
                     line = line[len("RETURN VALUE: ") :]
                     return_value = json.loads(line)
                 else:
                     continue
 
-        return envelope, event, return_value
+            stream.close()
+
+        return envelopes, events, return_value
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    _, events, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -163,16 +167,17 @@ def test_handled_exception(run_cloud_function):
         """
         )
     )
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert events[0]["level"] == "error"
+    (exception,) = events[0]["exception"]["values"]
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
 
 
 def test_unhandled_exception(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    _, events, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -190,16 +195,17 @@ def test_unhandled_exception(run_cloud_function):
         """
         )
     )
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert events[0]["level"] == "error"
+    (exception,) = events[0]["exception"]["values"]
 
     assert exception["type"] == "ZeroDivisionError"
     assert exception["value"] == "division by zero"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
 
 
 def test_timeout_error(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    _, events, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -217,19 +223,20 @@ def test_timeout_error(run_cloud_function):
         """
         )
     )
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert events[0]["level"] == "error"
+    (exception,) = events[0]["exception"]["values"]
 
     assert exception["type"] == "ServerlessTimeoutWarning"
     assert (
         exception["value"]
         == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
     )
-    assert exception["mechanism"] == {"type": "threading", "handled": False}
+    assert exception["mechanism"]["type"] == "threading"
+    assert not exception["mechanism"]["handled"]
 
 
 def test_performance_no_error(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    envelopes, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -247,14 +254,15 @@ def test_performance_no_error(run_cloud_function):
         )
     )
 
-    assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
-    assert envelope["transaction"].startswith("Google Cloud function")
-    assert envelope["transaction"] in envelope["request"]["url"]
+    assert envelopes[0]["type"] == "transaction"
+    assert envelopes[0]["contexts"]["trace"]["op"] == "function.gcp"
+    assert envelopes[0]["transaction"].startswith("Google Cloud function")
+    assert envelopes[0]["transaction_info"] == {"source": "component"}
+    assert envelopes[0]["transaction"] in envelopes[0]["request"]["url"]
 
 
 def test_performance_error(run_cloud_function):
-    envelope, event, return_value = run_cloud_function(
+    envelopes, events, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -272,16 +280,18 @@ def test_performance_error(run_cloud_function):
         )
     )
 
-    assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "serverless.function"
-    assert envelope["transaction"].startswith("Google Cloud function")
-    assert envelope["transaction"] in envelope["request"]["url"]
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    assert envelopes[0]["level"] == "error"
+    (exception,) = envelopes[0]["exception"]["values"]
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
-    assert exception["mechanism"] == {"type": "gcp", "handled": False}
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
+
+    assert envelopes[1]["type"] == "transaction"
+    assert envelopes[1]["contexts"]["trace"]["op"] == "function.gcp"
+    assert envelopes[1]["transaction"].startswith("Google Cloud function")
+    assert envelopes[1]["transaction"] in envelopes[0]["request"]["url"]
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
@@ -361,3 +371,184 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
     assert return_value["AssertionError raised"] is False
+
+
+def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    """
+    envelopes, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+    (msg_event, error_event, transaction_event) = envelopes
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
+    """
+    _, events, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=None),  # this is the default, just added for clarity
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_existing_trace_context_performance_enabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions
+    from the incoming 'sentry-trace' header when performance monitoring is enabled.
+    """
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    envelopes, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers"])
+        event = GCPEvent(headers={"sentry-trace": "%s"})
+
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+            % sentry_trace_header
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+    (msg_event, error_event, transaction_event) = envelopes
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+
+def test_error_has_existing_trace_context_performance_disabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions
+    from the incoming 'sentry-trace' header when performance monitoring is disabled.
+    """
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    _, events, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers"])
+        event = GCPEvent(headers={"sentry-trace": "%s"})
+
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+            % sentry_trace_header
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=None),  # this is the default, just added for clarity
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )

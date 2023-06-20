@@ -3,7 +3,7 @@ import random
 import pytest
 
 from sentry_sdk import Hub, start_span, start_transaction
-from sentry_sdk.tracing import Transaction, _is_valid_sample_rate
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
 
 try:
@@ -50,38 +50,6 @@ def test_no_double_sampling(sentry_init, capture_events):
     assert len(events) == 1
 
 
-@pytest.mark.parametrize(
-    "rate",
-    [0.0, 0.1231, 1.0, True, False],
-)
-def test_accepts_valid_sample_rate(rate):
-    with mock.patch.object(logger, "warning", mock.Mock()):
-        result = _is_valid_sample_rate(rate)
-        assert logger.warning.called is False
-        assert result is True
-
-
-@pytest.mark.parametrize(
-    "rate",
-    [
-        "dogs are great",  # wrong type
-        (0, 1),  # wrong type
-        {"Maisey": "Charllie"},  # wrong type
-        [True, True],  # wrong type
-        {0.2012},  # wrong type
-        float("NaN"),  # wrong type
-        None,  # wrong type
-        -1.121,  # wrong value
-        1.231,  # wrong value
-    ],
-)
-def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
-    with mock.patch.object(logger, "warning", mock.Mock()):
-        result = _is_valid_sample_rate(rate)
-        logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
-        assert result is False
-
-
 @pytest.mark.parametrize("sampling_decision", [True, False])
 def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
     sentry_init, sampling_decision
@@ -108,7 +76,6 @@ def test_uses_traces_sample_rate_correctly(
     sentry_init(traces_sample_rate=traces_sample_rate)
 
     with mock.patch.object(random, "random", return_value=0.5):
-
         transaction = start_transaction(name="dogpark")
         assert transaction.sampled is expected_decision
 
@@ -125,7 +92,6 @@ def test_uses_traces_sampler_return_value_correctly(
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
     with mock.patch.object(random, "random", return_value=0.5):
-
         transaction = start_transaction(name="dogpark")
         assert transaction.sampled is expected_decision
 
@@ -231,7 +197,9 @@ def test_passes_parent_sampling_decision_in_sampling_context(
         )
     )
 
-    transaction = Transaction.from_traceparent(sentry_trace_header, name="dogpark")
+    transaction = Transaction.continue_from_headers(
+        headers={"sentry-trace": sentry_trace_header}, name="dogpark"
+    )
     spy = mock.Mock(wraps=transaction)
     start_transaction(transaction=spy)
 
@@ -281,3 +249,61 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
         transaction = start_transaction(name="dogpark")
         logger.warning.assert_any_call(StringContaining("Given sample rate is invalid"))
         assert transaction.sampled is False
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate,sampled_output,reports_output",
+    [
+        (None, False, []),
+        (0.0, False, [("sample_rate", "transaction")]),
+        (1.0, True, []),
+    ],
+)
+def test_records_lost_event_only_if_traces_sample_rate_enabled(
+    sentry_init, traces_sample_rate, sampled_output, reports_output, monkeypatch
+):
+    reports = []
+
+    def record_lost_event(reason, data_category=None, item=None):
+        reports.append((reason, data_category))
+
+    sentry_init(traces_sample_rate=traces_sample_rate)
+
+    monkeypatch.setattr(
+        Hub.current.client.transport, "record_lost_event", record_lost_event
+    )
+
+    transaction = start_transaction(name="dogpark")
+    assert transaction.sampled is sampled_output
+    transaction.finish()
+
+    assert reports == reports_output
+
+
+@pytest.mark.parametrize(
+    "traces_sampler,sampled_output,reports_output",
+    [
+        (None, False, []),
+        (lambda _x: 0.0, False, [("sample_rate", "transaction")]),
+        (lambda _x: 1.0, True, []),
+    ],
+)
+def test_records_lost_event_only_if_traces_sampler_enabled(
+    sentry_init, traces_sampler, sampled_output, reports_output, monkeypatch
+):
+    reports = []
+
+    def record_lost_event(reason, data_category=None, item=None):
+        reports.append((reason, data_category))
+
+    sentry_init(traces_sampler=traces_sampler)
+
+    monkeypatch.setattr(
+        Hub.current.client.transport, "record_lost_event", record_lost_event
+    )
+
+    transaction = start_transaction(name="dogpark")
+    assert transaction.sampled is sampled_output
+    transaction.finish()
+
+    assert reports == reports_output
