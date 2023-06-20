@@ -55,7 +55,7 @@ CHECK_PY27 = """\
       - name: Check for 2.7 failures
         if: contains(needs.test-py27.result, 'failure')
         run: |
-          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
 """
 
 
@@ -65,9 +65,6 @@ def write_yaml_file(
     python_versions,
 ):
     """Write the YAML configuration file for one framework to disk."""
-    # render template for print
-    out = ""
-
     py_versions = [py.replace("py", "") for py in python_versions]
     py27_supported = "2.7" in py_versions
 
@@ -90,6 +87,7 @@ def write_yaml_file(
     else:
         template.pop(test_py27_loc)
 
+    out = ""
     py27_test_part = False
     for template_line in template:
         if template_line.strip() == "{{ strategy_matrix }}":

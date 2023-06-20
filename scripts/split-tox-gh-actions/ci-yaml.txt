@@ -37,5 +37,5 @@ jobs:
       - name: Check for failures
         if: contains(needs.test.result, 'failure')
         run: |
-          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
 {{ check_py27 }}
