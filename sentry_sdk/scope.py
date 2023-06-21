@@ -146,7 +146,7 @@ class Scope(object):
         sentry_use_environment = (
             os.environ.get("SENTRY_USE_ENVIRONMENT") or ""
         ).lower()
-        use_environment = False if sentry_use_environment in false_values else True
+        use_environment = sentry_use_environment not in false_values
         if use_environment:
             incoming_trace_information = {}
 
