@@ -824,7 +824,7 @@ def trace(func=None):
     # type: (Any) -> Any
     """
     Decorator to start a child span under the existing current transaction.
-    If there is no current transaction, than nothing will be traced.
+    If there is no current transaction, then nothing will be traced.
 
     Usage:
         import sentry_sdk

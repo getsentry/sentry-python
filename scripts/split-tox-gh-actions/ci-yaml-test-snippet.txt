@@ -1,0 +1,37 @@
+  test:
+    name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+{{ strategy_matrix }}
+{{ services }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+
+      - name: Test {{ framework }}
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          retry_wait_seconds: 5
+          shell: bash
+          command: |
+            set -x # print commands that are executed
+            coverage erase
+
+            # Run tests
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            coverage combine .coverage* &&
+            coverage xml -i
+
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
