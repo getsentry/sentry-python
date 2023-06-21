@@ -378,7 +378,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         # This exception only gets thrown when transaction_style is `function_name`
         # So we don't check here what style is configured
         if hasattr(urlconf, "handler404"):
-            handler = getattr(urlconf, "handler404")
+            handler = urlconf.handler404
             scope.transaction = transaction_from_function(
                 getattr(handler, "view_class", handler)
             )
