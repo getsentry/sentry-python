@@ -2,6 +2,8 @@ import sys
 
 from sentry_sdk._types import TYPE_CHECKING
 
+from sentry_sdk.consts import FALSE_VALUES
+
 if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
@@ -82,7 +84,7 @@ def check_thread_support():
     if "threads" in opt:
         return
 
-    if str(opt.get("enable-threads", "0")).lower() in ("false", "off", "no", "0"):
+    if str(opt.get("enable-threads", "0")).lower() in FALSE_VALUES:
         from warnings import warn
 
         warn(

@@ -20,6 +20,8 @@ from sentry_sdk.tracing import (
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
+from sentry_sdk.consts import FALSE_VALUES
+
 
 if TYPE_CHECKING:
     from typing import Any
@@ -135,18 +137,10 @@ class Scope(object):
         """
         incoming_trace_information = None
 
-        false_values = [
-            "false",
-            "no",
-            "off",
-            "n",
-            "0",
-        ]
-
         sentry_use_environment = (
             os.environ.get("SENTRY_USE_ENVIRONMENT") or ""
         ).lower()
-        use_environment = sentry_use_environment not in false_values
+        use_environment = sentry_use_environment not in FALSE_VALUES
         if use_environment:
             incoming_trace_information = {}
 
