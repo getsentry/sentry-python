@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>sentry-python - Sentry SDK for Python &#8212; sentry-python 1.25.1 documentation</title>
+    <title>sentry-python - Sentry SDK for Python &#8212; sentry-python 1.26.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
     <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
@@ -85,6 +85,11 @@ visit the <a class="reference external" href="https://github.com/getsentry/sentr
 <li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.clear"><code class="docutils literal notranslate"><span class="pre">Scope.clear()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.clear_breadcrumbs"><code class="docutils literal notranslate"><span class="pre">Scope.clear_breadcrumbs()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.fingerprint"><code class="docutils literal notranslate"><span class="pre">Scope.fingerprint</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.generate_propagation_context"><code class="docutils literal notranslate"><span class="pre">Scope.generate_propagation_context()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.get_dynamic_sampling_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_dynamic_sampling_context()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.get_trace_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_trace_context()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.get_traceparent"><code class="docutils literal notranslate"><span class="pre">Scope.get_traceparent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.iter_headers"><code class="docutils literal notranslate"><span class="pre">Scope.iter_headers()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.level"><code class="docutils literal notranslate"><span class="pre">Scope.level</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.remove_context"><code class="docutils literal notranslate"><span class="pre">Scope.remove_context()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="api.html#sentry_sdk.Scope.remove_extra"><code class="docutils literal notranslate"><span class="pre">Scope.remove_extra()</span></code></a></li>
@@ -113,8 +118,11 @@ visit the <a class="reference external" href="https://github.com/getsentry/sentr
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.capture_exception"><code class="docutils literal notranslate"><span class="pre">capture_exception()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.capture_message"><code class="docutils literal notranslate"><span class="pre">capture_message()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.configure_scope"><code class="docutils literal notranslate"><span class="pre">configure_scope()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.continue_trace"><code class="docutils literal notranslate"><span class="pre">continue_trace()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.flush"><code class="docutils literal notranslate"><span class="pre">flush()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.get_baggage"><code class="docutils literal notranslate"><span class="pre">get_baggage()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.get_current_span"><code class="docutils literal notranslate"><span class="pre">get_current_span()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.get_traceparent"><code class="docutils literal notranslate"><span class="pre">get_traceparent()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.last_event_id"><code class="docutils literal notranslate"><span class="pre">last_event_id()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.push_scope"><code class="docutils literal notranslate"><span class="pre">push_scope()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="api.html#sentry_sdk.set_context"><code class="docutils literal notranslate"><span class="pre">set_context()</span></code></a></li>
