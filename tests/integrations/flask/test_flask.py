@@ -28,6 +28,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.flask as flask_sentry
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
 login_manager = LoginManager()
@@ -447,6 +448,32 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     assert not event["request"]["data"]["file"]
 
 
+def test_json_not_truncated_if_request_bodies_is_always(
+    sentry_init, capture_events, app
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
+
+    data = {
+        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
+    }
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert request.get_json() == data
+        assert request.get_data() == json.dumps(data).encode("ascii")
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    (event,) = events
+    assert event["request"]["data"] == data
+
+
 @pytest.mark.parametrize(
     "integrations",
     [
@@ -738,6 +765,25 @@ def test_tracing_error(sentry_init, capture_events, app):
     assert exception["type"] == "ZeroDivisionError"
 
 
+def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        with app.test_client() as client:
+            response = client.get("/error")
+            assert response.status_code == 500
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+
+
 def test_class_based_views(sentry_init, app, capture_events):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
@@ -789,3 +835,26 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
         response = client.get("/")
         assert response.status_code == 200
         assert response.data == b"hi"
+
+
+def test_request_not_modified_by_reference(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/", methods=["POST"])
+    def index():
+        logging.critical("oops")
+        assert request.get_json() == {"password": "ohno"}
+        assert request.headers["Authorization"] == "Bearer ohno"
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    client.post(
+        "/", json={"password": "ohno"}, headers={"Authorization": "Bearer ohno"}
+    )
+
+    (event,) = events
+
+    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["headers"]["Authorization"] == "[Filtered]"

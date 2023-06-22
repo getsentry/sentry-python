@@ -76,7 +76,6 @@ def test_uses_traces_sample_rate_correctly(
     sentry_init(traces_sample_rate=traces_sample_rate)
 
     with mock.patch.object(random, "random", return_value=0.5):
-
         transaction = start_transaction(name="dogpark")
         assert transaction.sampled is expected_decision
 
@@ -93,7 +92,6 @@ def test_uses_traces_sampler_return_value_correctly(
     sentry_init(traces_sampler=mock.Mock(return_value=traces_sampler_return_value))
 
     with mock.patch.object(random, "random", return_value=0.5):
-
         transaction = start_transaction(name="dogpark")
         assert transaction.sampled is expected_decision
 

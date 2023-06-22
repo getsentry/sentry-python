@@ -24,7 +24,6 @@ import pytest
 def test_string_containing(
     test_string, expected_result, StringContaining  # noqa: N803
 ):
-
     assert (test_string == StringContaining("dogs")) is expected_result
 
 
@@ -49,7 +48,6 @@ def test_string_containing(
 def test_dictionary_containing(
     test_dict, expected_result, DictionaryContaining  # noqa: N803
 ):
-
     assert (
         test_dict == DictionaryContaining({"dogs": "yes", "cats": "maybe"})
     ) is expected_result
@@ -98,7 +96,6 @@ def test_object_described_by(
     attrs_only_result,
     ObjectDescribedBy,  # noqa: N803
 ):
-
     assert (
         test_obj == ObjectDescribedBy(type=Dog, attrs={"name": "Maisey", "age": 7})
     ) is type_and_attrs_result

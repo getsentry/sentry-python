@@ -49,7 +49,6 @@ def patch_views():
         integration = hub.get_integration(DjangoIntegration)
 
         if integration is not None and integration.middleware_spans:
-
             if (
                 iscoroutinefunction is not None
                 and wrap_async_view is not None

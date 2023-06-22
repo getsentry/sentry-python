@@ -1,11 +1,12 @@
+import sys
+from copy import deepcopy
 from datetime import datetime, timedelta
 from os import environ
-import sys
-from sentry_sdk.consts import OP
 
+from sentry_sdk.api import continue_trace
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, Transaction
-from sentry_sdk._compat import reraise
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -15,7 +16,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-
+from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -139,7 +140,8 @@ def _wrap_handler(handler):
             # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
             if headers is None:
                 headers = {}
-            transaction = Transaction.continue_from_headers(
+
+            transaction = continue_trace(
                 headers,
                 op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
@@ -380,7 +382,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
                 # event. Meaning every body is unstructured to us.
                 request["data"] = AnnotatedValue.removed_because_raw_data()
 
-        sentry_event["request"] = request
+        sentry_event["request"] = deepcopy(request)
 
         return sentry_event
 

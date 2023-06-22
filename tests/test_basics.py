@@ -102,10 +102,8 @@ def test_generic_mechanism(sentry_init, capture_events):
         capture_exception()
 
     (event,) = events
-    assert event["exception"]["values"][0]["mechanism"] == {
-        "type": "generic",
-        "handled": True,
-    }
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "generic"
+    assert event["exception"]["values"][0]["mechanism"]["handled"]
 
 
 def test_option_before_send(sentry_init, capture_events):

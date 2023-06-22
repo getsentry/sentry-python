@@ -1,7 +1,6 @@
 # coding: utf-8
 import os
 import json
-import mock
 import pytest
 import subprocess
 import sys
@@ -26,6 +25,11 @@ from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -248,14 +252,18 @@ def test_proxy(monkeypatch, testcase):
         monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
     if testcase.get("env_no_proxy") is not None:
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
+
     kwargs = {}
+
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
     if testcase["arg_https_proxy"] is not None:
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
     if testcase.get("arg_proxy_headers") is not None:
         kwargs["proxy_headers"] = testcase["arg_proxy_headers"]
+
     client = Client(testcase["dsn"], **kwargs)
+
     if testcase["expected_proxy_scheme"] is None:
         assert client.transport._pool.proxy is None
     else:
@@ -263,6 +271,77 @@ def test_proxy(monkeypatch, testcase):
 
         if testcase.get("arg_proxy_headers") is not None:
             assert client.transport._pool.proxy_headers == testcase["arg_proxy_headers"]
+
+
+@pytest.mark.parametrize(
+    "testcase",
+    [
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.poolmanager.ProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks4a://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks4://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks5h://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks5://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks4a://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks4://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks5h://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks5://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+    ],
+)
+def test_socks_proxy(testcase):
+    kwargs = {}
+
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+
+    client = Client(testcase["dsn"], **kwargs)
+    assert str(type(client.transport._pool)) == testcase["expected_proxy_class"]
 
 
 def test_simple_transport(sentry_init):
@@ -363,6 +442,38 @@ def test_include_local_variables_disabled(sentry_init, capture_events):
         "vars" not in frame
         for frame in event["exception"]["values"][0]["stacktrace"]["frames"]
     )
+
+
+def test_include_source_context_enabled(sentry_init, capture_events):
+    sentry_init(include_source_context=True)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "post_context" in frame
+    assert "pre_context" in frame
+    assert "context_line" in frame
+
+
+def test_include_source_context_disabled(sentry_init, capture_events):
+    sentry_init(include_source_context=False)
+    events = capture_events()
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][0]
+    assert "post_context" not in frame
+    assert "pre_context" not in frame
+    assert "context_line" not in frame
 
 
 @pytest.mark.parametrize("integrations", [[], [ExecutingIntegration()]])

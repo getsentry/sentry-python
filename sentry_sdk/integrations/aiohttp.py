@@ -1,6 +1,7 @@
 import sys
 import weakref
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
@@ -11,10 +12,11 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -64,10 +66,10 @@ class AioHttpIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(map(int, AIOHTTP_VERSION.split(".")[:2]))
-        except (TypeError, ValueError):
-            raise DidNotEnable("AIOHTTP version unparsable: {}".format(AIOHTTP_VERSION))
+        version = parse_version(AIOHTTP_VERSION)
+
+        if version is None:
+            raise DidNotEnable("Unparsable AIOHTTP version: {}".format(AIOHTTP_VERSION))
 
         if version < (3, 4):
             raise DidNotEnable("AIOHTTP 3.4 or newer required.")
@@ -100,7 +102,7 @@ class AioHttpIntegration(Integration):
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
-                    transaction = Transaction.continue_from_headers(
+                    transaction = continue_trace(
                         request.headers,
                         op=OP.HTTP_SERVER,
                         # If this transaction name makes it to the UI, AIOHTTP's

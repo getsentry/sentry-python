@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import asyncio
 import functools
+from copy import deepcopy
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -389,7 +390,7 @@ def patch_request_response():
                                     request_info["cookies"] = info["cookies"]
                                 if "data" in info:
                                     request_info["data"] = info["data"]
-                            event["request"] = request_info
+                            event["request"] = deepcopy(request_info)
 
                             return event
 
@@ -435,7 +436,7 @@ def patch_request_response():
                             if cookies:
                                 request_info["cookies"] = cookies
 
-                            event["request"] = request_info
+                            event["request"] = deepcopy(request_info)
 
                             return event
 
