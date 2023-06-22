@@ -45,6 +45,14 @@ DEFAULT_MAX_BREADCRUMBS = 100
 
 MATCH_ALL = r".*"
 
+FALSE_VALUES = [
+    "false",
+    "no",
+    "off",
+    "n",
+    "0",
+]
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
