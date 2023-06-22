@@ -54,6 +54,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
         "Accept-Encoding": "gzip, deflate",
         "Host": host,
         "User-Agent": request["headers"]["User-Agent"],
+        "baggage": mock.ANY,
         "sentry-trace": mock.ANY,
     }
 
@@ -373,11 +374,13 @@ async def test_trace_from_headers_if_performance_enabled(
 
     events = capture_events()
 
-    trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
-
+    # The aiohttp_client is instrumented so will generate the sentry-trace header and add request.
+    # Get the sentry-trace header from the request so we can later compare with transaction events.
     client = await aiohttp_client(app)
-    resp = await client.get("/", headers={"sentry-trace": sentry_trace_header})
+    resp = await client.get("/")
+    sentry_trace_header = resp.request_info.headers.get("sentry-trace")
+    trace_id = sentry_trace_header.split("-")[0]
+
     assert resp.status == 500
 
     msg_event, error_event, transaction_event = events
@@ -411,11 +414,13 @@ async def test_trace_from_headers_if_performance_disabled(
 
     events = capture_events()
 
-    trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
-
+    # The aiohttp_client is instrumented so will generate the sentry-trace header and add request.
+    # Get the sentry-trace header from the request so we can later compare with transaction events.
     client = await aiohttp_client(app)
-    resp = await client.get("/", headers={"sentry-trace": sentry_trace_header})
+    resp = await client.get("/")
+    sentry_trace_header = resp.request_info.headers.get("sentry-trace")
+    trace_id = sentry_trace_header.split("-")[0]
+
     assert resp.status == 500
 
     msg_event, error_event = events
