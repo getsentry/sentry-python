@@ -62,9 +62,12 @@ def test_get_otel_context():
 
 def test_get_trace_data_with_span_and_trace():
     otel_span = MagicMock()
-    otel_span.context = MagicMock()
-    otel_span.context.trace_id = int("1234567890abcdef1234567890abcdef", 16)
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
     otel_span.parent = None
 
     parent_context = {}
@@ -80,9 +83,12 @@ def test_get_trace_data_with_span_and_trace():
 
 def test_get_trace_data_with_span_and_trace_and_parent():
     otel_span = MagicMock()
-    otel_span.context = MagicMock()
-    otel_span.context.trace_id = int("1234567890abcdef1234567890abcdef", 16)
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
     otel_span.parent = MagicMock()
     otel_span.parent.span_id = int("abcdef1234567890", 16)
 
@@ -99,9 +105,12 @@ def test_get_trace_data_with_span_and_trace_and_parent():
 
 def test_get_trace_data_with_sentry_trace():
     otel_span = MagicMock()
-    otel_span.context = MagicMock()
-    otel_span.context.trace_id = int("1234567890abcdef1234567890abcdef", 16)
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
     otel_span.parent = MagicMock()
     otel_span.parent.span_id = int("abcdef1234567890", 16)
 
@@ -144,9 +153,12 @@ def test_get_trace_data_with_sentry_trace():
 
 def test_get_trace_data_with_sentry_trace_and_baggage():
     otel_span = MagicMock()
-    otel_span.context = MagicMock()
-    otel_span.context.trace_id = int("1234567890abcdef1234567890abcdef", 16)
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
     otel_span.parent = MagicMock()
     otel_span.parent.span_id = int("abcdef1234567890", 16)
 
@@ -263,9 +275,12 @@ def test_on_start_transaction():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.start_time = time.time_ns()
-    otel_span.context = MagicMock()
-    otel_span.context.trace_id = int("1234567890abcdef1234567890abcdef", 16)
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
     otel_span.parent = MagicMock()
     otel_span.parent.span_id = int("abcdef1234567890", 16)
 
@@ -305,9 +320,12 @@ def test_on_start_child():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.start_time = time.time_ns()
-    otel_span.context = MagicMock()
-    otel_span.context.trace_id = int("1234567890abcdef1234567890abcdef", 16)
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
     otel_span.parent = MagicMock()
     otel_span.parent.span_id = int("abcdef1234567890", 16)
 
@@ -351,8 +369,12 @@ def test_on_end_no_sentry_span():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.end_time = time.time_ns()
-    otel_span.context = MagicMock()
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
 
     span_processor = SentrySpanProcessor()
     span_processor.otel_span_map = {}
@@ -372,8 +394,12 @@ def test_on_end_sentry_transaction():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.end_time = time.time_ns()
-    otel_span.context = MagicMock()
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
 
     fake_sentry_span = MagicMock(spec=Transaction)
     fake_sentry_span.set_context = MagicMock()
@@ -398,8 +424,12 @@ def test_on_end_sentry_span():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.end_time = time.time_ns()
-    otel_span.context = MagicMock()
-    otel_span.context.span_id = int("1234567890abcdef", 16)
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
 
     fake_sentry_span = MagicMock(spec=Span)
     fake_sentry_span.set_context = MagicMock()
@@ -425,7 +455,6 @@ def test_link_trace_context_to_error_event():
     """
     fake_client = MagicMock()
     fake_client.options = {"instrumenter": "otel"}
-    fake_client
 
     current_hub = MagicMock()
     current_hub.client = fake_client
