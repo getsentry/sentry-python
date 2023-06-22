@@ -104,9 +104,10 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
 
         setter.set(carrier, SENTRY_TRACE_HEADER_NAME, sentry_span.to_traceparent())
 
-        baggage = sentry_span.containing_transaction.get_baggage()
-        if baggage:
-            setter.set(carrier, BAGGAGE_HEADER_NAME, baggage.serialize())
+        if sentry_span.containing_transaction:
+            baggage = sentry_span.containing_transaction.get_baggage()
+            if baggage:
+                setter.set(carrier, BAGGAGE_HEADER_NAME, baggage.serialize())
 
     @property
     def fields(self):
