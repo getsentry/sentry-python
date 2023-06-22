@@ -430,6 +430,7 @@ async def test_trace_from_headers_if_performance_disabled(
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
+@pytest.mark.asyncio
 async def test_crumb_capture(
     sentry_init, aiohttp_raw_server, aiohttp_client, loop, capture_events
 ):
@@ -461,13 +462,16 @@ async def test_crumb_capture(
         assert crumb["category"] == "httplib"
         assert crumb["data"] == {
             "url": "http://127.0.0.1:{}/".format(raw_server.port),
-            "method": "GET",
-            "status_code": 200,
+            "http.fragment": "",
+            "http.method": "GET",
+            "http.query": "",
+            "http.response.status_code": 200,
             "reason": "OK",
             "extra": "foo",
         }
 
 
+@pytest.mark.asyncio
 async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
     sentry_init(
         integrations=[AioHttpIntegration()],
