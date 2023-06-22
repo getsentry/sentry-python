@@ -32,6 +32,7 @@ from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.monitor import Monitor
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -211,6 +212,7 @@ class _Client(object):
             self.transport = make_transport(self.options)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
+            self.monitor = Monitor()
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
@@ -571,6 +573,7 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            self.monitor.kill()
             self.transport.kill()
             self.transport = None
 
