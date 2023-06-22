@@ -3,7 +3,7 @@ import weakref
 
 from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -13,10 +13,12 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
+    parse_url,
     parse_version,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
@@ -38,8 +40,7 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
     from aiohttp.abc import AbstractMatchInfo
-    from aiohttp import TraceRequestStartParams
-    from aiohttp import TraceRequestEndParams
+    from aiohttp import TraceRequestStartParams, TraceRequestEndParams
     from types import SimpleNamespace
     from typing import Any
     from typing import Dict
@@ -53,52 +54,6 @@ if TYPE_CHECKING:
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
-
-
-def create_trace_config():
-    # type: () -> TraceConfig
-    async def on_request_start(session, trace_config_ctx, params):
-        # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
-        hub = Hub.current
-        if hub.get_integration(AioHttpIntegration) is None:
-            return
-
-        method = params.method.upper()
-        request_url = str(params.url)
-
-        span = hub.start_span(
-            op=OP.HTTP_CLIENT, description="%s %s" % (method, request_url)
-        )
-        span.set_data("method", method)
-        span.set_data("url", request_url)
-
-        for key, value in hub.iter_trace_propagation_headers(span):
-            logger.debug(
-                "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                    key=key, value=value, url=params.url
-                )
-            )
-            params.headers[key] = value
-
-        trace_config_ctx.span = span
-
-    async def on_request_end(session, trace_config_ctx, params):
-        # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
-        if trace_config_ctx.span is None:
-            return
-
-        span = trace_config_ctx.span
-        span.set_data("status_code", int(params.response.status))
-        span.set_http_status(int(params.response.status))
-        span.set_data("reason", params.response.reason)
-        span.finish()
-
-    trace_config = TraceConfig()
-
-    trace_config.on_request_start.append(on_request_start)
-    trace_config.on_request_end.append(on_request_end)
-
-    return trace_config
 
 
 class AioHttpIntegration(Integration):
@@ -231,6 +186,57 @@ class AioHttpIntegration(Integration):
             return old_client_session_init(*args, **kwargs)
 
         ClientSession.__init__ = init
+
+
+def create_trace_config():
+    # type: () -> TraceConfig
+    async def on_request_start(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
+        hub = Hub.current
+        if hub.get_integration(AioHttpIntegration) is None:
+            return
+
+        method = params.method.upper()
+
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(str(params.url), sanitize=False)
+
+        span = hub.start_span(
+            op=OP.HTTP_CLIENT, description="%s %s" % (method, parsed_url)
+        )
+        span.set_data(SPANDATA.HTTP_METHOD, method)
+        span.set_data("url", parsed_url)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        if should_propagate_trace(hub, parsed_url):
+            for key, value in hub.iter_trace_propagation_headers(span):
+                logger.debug(
+                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                        key=key, value=value, url=params.url
+                    )
+                )
+                params.headers[key] = value
+
+        trace_config_ctx.span = span
+
+    async def on_request_end(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
+        if trace_config_ctx.span is None:
+            return
+
+        span = trace_config_ctx.span
+        span.set_http_status(int(params.response.status))
+        span.set_data("reason", params.response.reason)
+        span.finish()
+
+    trace_config = TraceConfig()
+
+    trace_config.on_request_start.append(on_request_start)
+    trace_config.on_request_end.append(on_request_end)
+
+    return trace_config
 
 
 def _make_request_processor(weak_request):
