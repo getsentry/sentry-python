@@ -3,6 +3,7 @@ import time
 from threading import Thread, Lock
 
 import sentry_sdk
+from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -22,6 +23,8 @@ class Monitor(object):
         # type: (int) -> None
         self.interval = interval  # type: int
         self._healthy = True
+        self._downsample_factor = 1  # type: int
+
         self._thread = None  # type: Optional[Thread]
         self._thread_lock = Lock()
         self._thread_for_pid = None  # type: Optional[int]
@@ -42,6 +45,7 @@ class Monitor(object):
                     time.sleep(self.interval)
                     if self._running:
                         self.check_health()
+                        self._set_downsample_factor()
 
             thread = Thread(name=self.name, target=_thread)
             thread.daemon = True
@@ -60,6 +64,14 @@ class Monitor(object):
             return transport._is_rate_limited()
         return False
 
+    def _set_downsample_factor(self):
+        # type: () -> None
+        if self._healthy:
+            self._downsample_factor = 1
+        else:
+            self._downsample_factor *= 2
+            logger.debug("monitor health check negative, downsampling with a factor of %d", self._downsample_factor)
+
     def check_health(self):
         # type: () -> None
         """
@@ -69,10 +81,16 @@ class Monitor(object):
         """
         if self._is_transport_rate_limited():
             self._healthy = False
+        else:
+            self._healthy = True
 
     def is_healthy(self):
         # type: () -> bool
         return self._healthy
+
+    def downsample_factor(self):
+        # type: () -> int
+        return self._downsample_factor
 
     def kill(self):
         # type: () -> None
