@@ -595,9 +595,12 @@ class Transaction(Span):
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
             if client.transport and has_tracing_enabled(client.options):
-                client.transport.record_lost_event(
-                    "sample_rate", data_category="transaction"
-                )
+                if client.monitor and client.monitor.downsample_factor() > 1:
+                    reason = "backpressure"
+                else:
+                    reason = "sample_rate"
+
+                client.transport.record_lost_event(reason, data_category="transaction")
 
             return None
 
@@ -749,9 +752,12 @@ class Transaction(Span):
 
         self.sample_rate = float(sample_rate)
 
+        if client.monitor:
+            self.sample_rate /= client.monitor.downsample_factor()
+
         # if the function returned 0 (or false), or if `traces_sample_rate` is
         # 0, it's a sign the transaction should be dropped
-        if not sample_rate:
+        if not self.sample_rate:
             logger.debug(
                 "[Tracing] Discarding {transaction_description} because {reason}".format(
                     transaction_description=transaction_description,
@@ -768,7 +774,7 @@ class Transaction(Span):
         # Now we roll the dice. random.random is inclusive of 0, but not of 1,
         # so strict < is safe here. In case sample_rate is a boolean, cast it
         # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = random.random() < float(sample_rate)
+        self.sampled = random.random() < self.sample_rate
 
         if self.sampled:
             logger.debug(
@@ -780,7 +786,7 @@ class Transaction(Span):
             logger.debug(
                 "[Tracing] Discarding {transaction_description} because it's not included in the random sample (sampling rate = {sample_rate})".format(
                     transaction_description=transaction_description,
-                    sample_rate=float(sample_rate),
+                    sample_rate=self.sample_rate,
                 )
             )
 

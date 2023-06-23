@@ -70,7 +70,10 @@ class Monitor(object):
             self._downsample_factor = 1
         else:
             self._downsample_factor *= 2
-            logger.debug("monitor health check negative, downsampling with a factor of %d", self._downsample_factor)
+            logger.debug(
+                "monitor health check negative, downsampling with a factor of %d",
+                self._downsample_factor,
+            )
 
     def check_health(self):
         # type: () -> None
