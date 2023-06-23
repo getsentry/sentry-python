@@ -11,7 +11,7 @@ from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -158,14 +158,29 @@ def _wrap_apply_async(f):
                         # Note: kwargs can contain headers=None, so no setdefault!
                         # Unsure which backend though.
                         kwarg_headers = kwargs.get("headers") or {}
+                        existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
                         kwarg_headers.update(headers)
+                        if existing_baggage:
+                            kwarg_headers[BAGGAGE_HEADER_NAME] = "{},{}".format(
+                                existing_baggage, headers[BAGGAGE_HEADER_NAME]
+                            )
 
                         # https://github.com/celery/celery/issues/4875
                         #
                         # Need to setdefault the inner headers too since other
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
-                        kwarg_headers.setdefault("headers", {}).update(headers)
+                        kwarg_headers.setdefault("headers", {})
+                        existing_baggage = kwarg_headers["headers"].get(
+                            BAGGAGE_HEADER_NAME
+                        )
+                        kwarg_headers["headers"].update(headers)
+                        if existing_baggage:
+                            kwarg_headers["headers"][
+                                BAGGAGE_HEADER_NAME
+                            ] = "{},{}".format(
+                                existing_baggage, headers[BAGGAGE_HEADER_NAME]
+                            )
 
                         # Add the Sentry options potentially added in `sentry_apply_entry`
                         # to the headers (done when auto-instrumenting Celery Beat tasks)
