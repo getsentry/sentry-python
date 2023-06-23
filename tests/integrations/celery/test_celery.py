@@ -359,7 +359,7 @@ def test_retry(celery, capture_events):
 # TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
 @pytest.mark.skip
 @pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
+def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
@@ -513,7 +513,7 @@ def test_baggage_propagation(init_celery):
     with start_transaction() as transaction:
         result = dummy_task.apply_async(
             args=(1, 0),
-            headers={"baggage": "custom=value", "headers": {"baggage": "custom=value"}},
+            headers={"baggage": "custom=value"},
         ).get()
 
         assert sorted(result["baggage"].split(",")) == sorted(
