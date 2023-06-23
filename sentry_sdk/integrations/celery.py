@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import sys
 import time
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
 from sentry_sdk._functools import wraps
@@ -10,7 +11,7 @@ from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -207,7 +208,7 @@ def _wrap_tracer(task, f):
             # Celery task objects are not a thing to be trusted. Even
             # something such as attribute access can fail.
             with capture_internal_exceptions():
-                transaction = Transaction.continue_from_headers(
+                transaction = continue_trace(
                     args[3].get("headers") or {},
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
@@ -374,7 +375,7 @@ def _get_humanized_interval(seconds):
             interval = int(seconds / divider)
             return (interval, unit)
 
-    return (1, "minute")
+    return (int(seconds), "second")
 
 
 def _get_monitor_config(celery_schedule, app):
@@ -398,6 +399,12 @@ def _get_monitor_config(celery_schedule, app):
         (schedule_value, schedule_unit) = _get_humanized_interval(
             celery_schedule.seconds
         )
+
+        if schedule_unit == "second":
+            logger.warning(
+                "Intervals shorter than one minute are not supported by Sentry Crons."
+            )
+            return {}
 
     else:
         logger.warning(
@@ -440,24 +447,27 @@ def _patch_beat_apply_entry():
 
         monitor_config = _get_monitor_config(celery_schedule, app)
 
-        headers = schedule_entry.options.pop("headers", {})
-        headers.update(
-            {
-                "sentry-monitor-slug": monitor_name,
-                "sentry-monitor-config": monitor_config,
-            }
-        )
+        is_supported_schedule = bool(monitor_config)
+        if is_supported_schedule:
+            headers = schedule_entry.options.pop("headers", {})
+            headers.update(
+                {
+                    "sentry-monitor-slug": monitor_name,
+                    "sentry-monitor-config": monitor_config,
+                }
+            )
 
-        check_in_id = capture_checkin(
-            monitor_slug=monitor_name,
-            monitor_config=monitor_config,
-            status=MonitorStatus.IN_PROGRESS,
-        )
-        headers.update({"sentry-monitor-check-in-id": check_in_id})
+            check_in_id = capture_checkin(
+                monitor_slug=monitor_name,
+                monitor_config=monitor_config,
+                status=MonitorStatus.IN_PROGRESS,
+            )
+            headers.update({"sentry-monitor-check-in-id": check_in_id})
 
-        # Set the Sentry configuration in the options of the ScheduleEntry.
-        # Those will be picked up in `apply_async` and added to the headers.
-        schedule_entry.options["headers"] = headers
+            # Set the Sentry configuration in the options of the ScheduleEntry.
+            # Those will be picked up in `apply_async` and added to the headers.
+            schedule_entry.options["headers"] = headers
+
         return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry

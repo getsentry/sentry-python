@@ -1353,8 +1353,8 @@ def from_base64(base64_string):
 Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
 
 
-def sanitize_url(url, remove_authority=True, remove_query_values=True):
-    # type: (str, bool, bool) -> str
+def sanitize_url(url, remove_authority=True, remove_query_values=True, split=False):
+    # type: (str, bool, bool, bool) -> Union[str, Components]
     """
     Removes the authority and query parameter values from a given URL.
     """
@@ -1383,17 +1383,18 @@ def sanitize_url(url, remove_authority=True, remove_query_values=True):
     else:
         query_string = parsed_url.query
 
-    safe_url = urlunsplit(
-        Components(
-            scheme=parsed_url.scheme,
-            netloc=netloc,
-            query=query_string,
-            path=parsed_url.path,
-            fragment=parsed_url.fragment,
-        )
+    components = Components(
+        scheme=parsed_url.scheme,
+        netloc=netloc,
+        query=query_string,
+        path=parsed_url.path,
+        fragment=parsed_url.fragment,
     )
 
-    return safe_url
+    if split:
+        return components
+    else:
+        return urlunsplit(components)
 
 
 ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
@@ -1406,20 +1407,25 @@ def parse_url(url, sanitize=True):
     parameters will be sanitized to remove sensitive data. The autority (username and password)
     in the URL will always be removed.
     """
-    url = sanitize_url(url, remove_authority=True, remove_query_values=sanitize)
+    parsed_url = sanitize_url(
+        url, remove_authority=True, remove_query_values=sanitize, split=True
+    )
 
-    parsed_url = urlsplit(url)
     base_url = urlunsplit(
         Components(
-            scheme=parsed_url.scheme,
-            netloc=parsed_url.netloc,
+            scheme=parsed_url.scheme,  # type: ignore
+            netloc=parsed_url.netloc,  # type: ignore
             query="",
-            path=parsed_url.path,
+            path=parsed_url.path,  # type: ignore
             fragment="",
         )
     )
 
-    return ParsedUrl(url=base_url, query=parsed_url.query, fragment=parsed_url.fragment)
+    return ParsedUrl(
+        url=base_url,
+        query=parsed_url.query,  # type: ignore
+        fragment=parsed_url.fragment,  # type: ignore
+    )
 
 
 def is_valid_sample_rate(rate, source):
@@ -1467,6 +1473,58 @@ def match_regex_list(item, regex_list=None, substring_matching=False):
             return True
 
     return False
+
+
+def parse_version(version):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    """
+    Parses a version string into a tuple of integers.
+    This uses the parsing loging from PEP 440:
+    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+    """
+    VERSION_PATTERN = r"""  # noqa: N806
+        v?
+        (?:
+            (?:(?P<epoch>[0-9]+)!)?                           # epoch
+            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+            (?P<pre>                                          # pre-release
+                [-_\.]?
+                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+                [-_\.]?
+                (?P<pre_n>[0-9]+)?
+            )?
+            (?P<post>                                         # post release
+                (?:-(?P<post_n1>[0-9]+))
+                |
+                (?:
+                    [-_\.]?
+                    (?P<post_l>post|rev|r)
+                    [-_\.]?
+                    (?P<post_n2>[0-9]+)?
+                )
+            )?
+            (?P<dev>                                          # dev release
+                [-_\.]?
+                (?P<dev_l>dev)
+                [-_\.]?
+                (?P<dev_n>[0-9]+)?
+            )?
+        )
+        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+    """
+
+    pattern = re.compile(
+        r"^\s*" + VERSION_PATTERN + r"\s*$",
+        re.VERBOSE | re.IGNORECASE,
+    )
+
+    try:
+        release = pattern.match(version).groupdict()["release"]  # type: ignore
+        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+    return release_tuple
 
 
 if PY37:

@@ -75,7 +75,6 @@ def test_orm_queries(sentry_init, capture_events):
     sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
 )
 def test_transactions(sentry_init, capture_events, render_span_tree):
-
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         _experiments={"record_sql_params": True},

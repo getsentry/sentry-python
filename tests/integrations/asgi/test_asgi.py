@@ -24,7 +24,7 @@ def asgi3_app():
             and "route" in scope
             and scope["route"] == "/trigger/error"
         ):
-            division_by_zero = 1 / 0  # noqa
+            1 / 0
 
         await send(
             {
@@ -59,7 +59,33 @@ def asgi3_app_with_error():
             }
         )
 
-        division_by_zero = 1 / 0  # noqa
+        1 / 0
+
+        await send(
+            {
+                "type": "http.response.body",
+                "body": b"Hello, world!",
+            }
+        )
+
+    return app
+
+
+@pytest.fixture
+def asgi3_app_with_error_and_msg():
+    async def app(scope, receive, send):
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [
+                    [b"content-type", b"text/plain"],
+                ],
+            }
+        )
+
+        capture_message("Let's try dividing by 0")
+        1 / 0
 
         await send(
             {
@@ -162,6 +188,126 @@ async def test_capture_transaction_with_error(
     assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
     assert transaction_event["transaction"] == error_event["transaction"]
     assert transaction_event["request"] == error_event["request"]
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_enabled(
+    sentry_init,
+    asgi3_app_with_error_and_msg,
+    capture_events,
+):
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/")
+
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == msg_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_has_trace_if_performance_disabled(
+    sentry_init,
+    asgi3_app_with_error_and_msg,
+    capture_events,
+):
+    sentry_init()
+    app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/")
+
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_enabled(
+    sentry_init,
+    asgi3_app_with_error_and_msg,
+    capture_events,
+):
+    sentry_init(traces_sample_rate=1.0)
+    app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/", headers={"sentry-trace": sentry_trace_header})
+
+    msg_event, error_event, transaction_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+async def test_trace_from_headers_if_performance_disabled(
+    sentry_init,
+    asgi3_app_with_error_and_msg,
+    capture_events,
+):
+    sentry_init()
+    app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    with pytest.raises(ZeroDivisionError):
+        async with TestClient(app) as client:
+            events = capture_events()
+            await client.get("/", headers={"sentry-trace": sentry_trace_header})
+
+    msg_event, error_event = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
 @minimum_python_36

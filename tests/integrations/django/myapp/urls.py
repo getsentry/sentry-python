@@ -28,6 +28,7 @@ from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
+    path("view-exc-with-msg", views.view_exc_with_msg, name="view_exc_with_msg"),
     path("cached-view", views.cached_view, name="cached_view"),
     path("not-cached-view", views.not_cached_view, name="not_cached_view"),
     path(

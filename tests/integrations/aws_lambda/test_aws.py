@@ -25,8 +25,6 @@ import pytest
 boto3 = pytest.importorskip("boto3")
 
 LAMBDA_PRELUDE = """
-from __future__ import print_function
-
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
 import sentry_sdk
 import json
@@ -106,7 +104,11 @@ def lambda_client():
 
 
 @pytest.fixture(
-    params=["python3.6", "python3.7", "python3.8", "python3.9", "python2.7"]
+    params=[
+        "python3.7",
+        "python3.8",
+        "python3.9",
+    ]
 )
 def lambda_runtime(request):
     return request.param
@@ -284,9 +286,6 @@ def test_request_data(run_lambda_function):
 
 
 def test_init_error(run_lambda_function, lambda_runtime):
-    if lambda_runtime == "python2.7":
-        pytest.skip("initialization error not supported on Python 2.7")
-
     envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + (
@@ -666,3 +665,139 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         assert response["Payload"]["errorMessage"] == "something went wrong"
 
         assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
+
+
+def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
+    envelopes, _, _ = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            sentry_sdk.capture_message("hi")
+            raise Exception("something went wrong")
+        """
+        ),
+        payload=b'{"foo": "bar"}',
+    )
+
+    (msg_event, error_event, transaction_event) = envelopes
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
+    _, events, _ = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=None) # this is the default, just added for clarity
+
+        def test_handler(event, context):
+            sentry_sdk.capture_message("hi")
+            raise Exception("something went wrong")
+        """
+        ),
+        payload=b'{"foo": "bar"}',
+    )
+
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_existing_trace_context_performance_enabled(run_lambda_function):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    envelopes, _, _ = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            sentry_sdk.capture_message("hi")
+            raise Exception("something went wrong")
+        """
+        ),
+        payload=b'{"sentry_trace": "%s"}' % sentry_trace_header.encode(),
+    )
+
+    (msg_event, error_event, transaction_event) = envelopes
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+
+def test_error_has_existing_trace_context_performance_disabled(run_lambda_function):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    _, events, _ = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=None)  # this is the default, just added for clarity
+
+        def test_handler(event, context):
+            sentry_sdk.capture_message("hi")
+            raise Exception("something went wrong")
+        """
+        ),
+        payload=b'{"sentry_trace": "%s"}' % sentry_trace_header.encode(),
+    )
+
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )

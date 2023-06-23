@@ -27,6 +27,8 @@ TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 TEMPLATE_DIR = Path(__file__).resolve().parent
 TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
 TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
+TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
+TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = ["django"]
 
@@ -42,6 +44,20 @@ MATRIX_DEFINITION = """
         os: [ubuntu-20.04]
 """
 
+CHECK_NEEDS = """\
+    needs: test
+"""
+CHECK_NEEDS_PY27 = """\
+    needs: [test, test-py27]
+"""
+
+CHECK_PY27 = """\
+      - name: Check for 2.7 failures
+        if: contains(needs.test-py27.result, 'failure')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+"""
+
 
 def write_yaml_file(
     template,
@@ -49,25 +65,65 @@ def write_yaml_file(
     python_versions,
 ):
     """Write the YAML configuration file for one framework to disk."""
-    # render template for print
-    out = ""
-    for template_line in template:
-        if template_line == "{{ strategy_matrix }}\n":
-            py_versions = [f'"{py.replace("py", "")}"' for py in python_versions]
+    py_versions = [py.replace("py", "") for py in python_versions]
+    py27_supported = "2.7" in py_versions
 
+    test_loc = template.index("{{ test }}\n")
+    f = open(TEMPLATE_SNIPPET_TEST, "r")
+    test_snippet = f.readlines()
+    template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
+    f.close()
+
+    test_py27_loc = template.index("{{ test_py27 }}\n")
+    if py27_supported:
+        f = open(TEMPLATE_SNIPPET_TEST_PY27, "r")
+        test_py27_snippet = f.readlines()
+        template = (
+            template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
+        )
+        f.close()
+
+        py_versions.remove("2.7")
+    else:
+        template.pop(test_py27_loc)
+
+    out = ""
+    py27_test_part = False
+    for template_line in template:
+        if template_line.strip() == "{{ strategy_matrix }}":
             m = MATRIX_DEFINITION
             m = m.replace("{{ framework }}", current_framework).replace(
-                "{{ python-version }}", ",".join(py_versions)
+                "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions])
             )
             out += m
 
-        elif template_line == "{{ services }}\n":
+        elif template_line.strip() == "{{ services }}":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
-                out += "".join(f.readlines())
+                lines = [
+                    line.replace(
+                        "{{ postgres_host }}",
+                        "postgres" if py27_test_part else "localhost",
+                    )
+                    for line in f.readlines()
+                ]
+                out += "".join(lines)
                 f.close()
 
+        elif template_line.strip() == "{{ check_needs }}":
+            if py27_supported:
+                out += CHECK_NEEDS_PY27
+            else:
+                out += CHECK_NEEDS
+
+        elif template_line.strip() == "{{ check_py27 }}":
+            if py27_supported:
+                out += CHECK_PY27
+
         else:
+            if template_line.strip() == "test-py27:":
+                py27_test_part = True
+
             out += template_line.replace("{{ framework }}", current_framework)
 
     # write rendered template

@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
 from sentry_sdk._compat import PY2
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
 
@@ -375,12 +376,24 @@ class Span(object):
 
     def to_traceparent(self):
         # type: () -> str
-        sampled = ""
         if self.sampled is True:
             sampled = "1"
-        if self.sampled is False:
+        elif self.sampled is False:
             sampled = "0"
-        return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        if self.containing_transaction:
+            return self.containing_transaction.get_baggage()
+        return None
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -396,7 +409,10 @@ class Span(object):
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_tag("http.status_code", str(http_status))
+        self.set_tag(
+            "http.status_code", str(http_status)
+        )  # we keep this for backwards compatability
+        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
 
         if http_status < 400:
             self.set_status("ok")
@@ -834,7 +850,7 @@ def trace(func=None):
     # type: (Any) -> Any
     """
     Decorator to start a child span under the existing current transaction.
-    If there is no current transaction, than nothing will be traced.
+    If there is no current transaction, then nothing will be traced.
 
     Usage:
         import sentry_sdk

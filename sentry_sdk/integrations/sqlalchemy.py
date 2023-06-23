@@ -1,13 +1,13 @@
 from __future__ import absolute_import
 
-import re
-
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import record_sql_queries
+
+from sentry_sdk.utils import parse_version
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -31,11 +31,9 @@ class SqlalchemyIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(
-                map(int, re.split("b|rc", SQLALCHEMY_VERSION)[0].split("."))
-            )
-        except (TypeError, ValueError):
+        version = parse_version(SQLALCHEMY_VERSION)
+
+        if version is None:
             raise DidNotEnable(
                 "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
             )
