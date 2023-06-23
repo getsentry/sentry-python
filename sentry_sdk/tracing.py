@@ -184,7 +184,7 @@ class Span(object):
         return self._span_id
 
     @span_id.setter
-    def span_id(self, value: str) -> None:
+    def span_id(self, value):
         # type: (str) -> None
         self._span_id = value
 
