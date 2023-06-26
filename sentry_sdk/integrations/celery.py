@@ -158,12 +158,16 @@ def _wrap_apply_async(f):
                         # Note: kwargs can contain headers=None, so no setdefault!
                         # Unsure which backend though.
                         kwarg_headers = kwargs.get("headers") or {}
+
                         existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
-                        kwarg_headers.update(headers)
+                        combined_baggage = existing_baggage
                         if existing_baggage:
-                            kwarg_headers[BAGGAGE_HEADER_NAME] = "{},{}".format(
-                                existing_baggage, headers[BAGGAGE_HEADER_NAME]
+                            combined_baggage += ",{}".format(
+                                headers[BAGGAGE_HEADER_NAME]
                             )
+
+                        kwarg_headers.update(headers)
+                        kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
                         # https://github.com/celery/celery/issues/4875
                         #
@@ -171,16 +175,8 @@ def _wrap_apply_async(f):
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {})
-                        existing_baggage = kwarg_headers["headers"].get(
-                            BAGGAGE_HEADER_NAME
-                        )
                         kwarg_headers["headers"].update(headers)
-                        if existing_baggage:
-                            kwarg_headers["headers"][
-                                BAGGAGE_HEADER_NAME
-                            ] = "{},{}".format(
-                                existing_baggage, headers[BAGGAGE_HEADER_NAME]
-                            )
+                        kwarg_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
 
                         # Add the Sentry options potentially added in `sentry_apply_entry`
                         # to the headers (done when auto-instrumenting Celery Beat tasks)
