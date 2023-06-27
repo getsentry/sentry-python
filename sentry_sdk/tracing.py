@@ -520,7 +520,7 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs,  # type: Any
+        **kwargs  # type: Any
     ):
         # type: (...) -> None
         # TODO: consider removing this in a future release.
