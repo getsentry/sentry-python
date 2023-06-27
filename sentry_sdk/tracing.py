@@ -239,7 +239,7 @@ class Span(object):
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs,
+            **kwargs
         )
 
         span_recorder = (
@@ -256,8 +256,12 @@ class Span(object):
         return self.start_child(**kwargs)
 
     @classmethod
-    def continue_from_environ(cls, environ, **kwargs):
-        # type: (Span, typing.Mapping[str, str], Any) -> Transaction
+    def continue_from_environ(
+        cls,
+        environ,  # type: typing.Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
         the 'sentry-trace' and 'baggage' headers from the environ (if any)
@@ -275,8 +279,12 @@ class Span(object):
         return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
 
     @classmethod
-    def continue_from_headers(cls, headers, **kwargs):
-        # type: (Span, typing.Mapping[str, str], Any) -> Transaction
+    def continue_from_headers(
+        cls,
+        headers,  # type: typing.Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
         """
         Create a transaction with the given params (including any data pulled from
         the 'sentry-trace' and 'baggage' headers).
@@ -325,8 +333,12 @@ class Span(object):
                 yield BAGGAGE_HEADER_NAME, baggage
 
     @classmethod
-    def from_traceparent(cls, traceparent, **kwargs):
-        # type: (Span, Optional[str], Any) -> Optional[Transaction]
+    def from_traceparent(
+        cls,
+        traceparent,  # type: Optional[str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Optional[Transaction]
         """
         DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
 
