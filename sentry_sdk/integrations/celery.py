@@ -161,7 +161,7 @@ def _wrap_apply_async(f):
 
                         existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
                         combined_baggage = existing_baggage
-                        if existing_baggage:
+                        if existing_baggage and headers[BAGGAGE_HEADER_NAME]:
                             combined_baggage += ",{}".format(
                                 headers[BAGGAGE_HEADER_NAME]
                             )
