@@ -4,12 +4,19 @@ import sys
 from datetime import datetime
 from contextlib import contextmanager
 
+from sentry_sdk.api import get_traceparent, get_baggage
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.profiler import Profile
-from sentry_sdk.tracing import NoOpSpan, Span, Transaction
+from sentry_sdk.tracing import (
+    NoOpSpan,
+    Span,
+    Transaction,
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import (
@@ -723,13 +730,26 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str
         """
-        Return meta tags which should be injected into the HTML template
-        to allow propagation of trace data.
+        Return meta tags which should be injected into HTML templates
+        to allow propagation of trace information.
         """
+        if span is None:
+            logger.warning(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            )
+
         meta = ""
 
-        for name, content in self.iter_trace_propagation_headers(span):
-            meta += '<meta name="%s" content="%s">' % (name, content)
+        sentry_trace = get_traceparent()
+        if sentry_trace is not None:
+            meta += '<meta name="%s" content="%s">' % (
+                SENTRY_TRACE_HEADER_NAME,
+                sentry_trace,
+            )
+
+        baggage = get_baggage()
+        if baggage is not None:
+            meta += '<meta name="%s" content="%s">' % (BAGGAGE_HEADER_NAME, baggage)
 
         return meta
 
