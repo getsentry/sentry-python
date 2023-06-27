@@ -26,6 +26,7 @@ def patch_views():
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
 
+    old_make_view_atomic = BaseHandler.make_view_atomic
     old_render = SimpleTemplateResponse.render
 
     def sentry_patched_render(self):
@@ -35,10 +36,6 @@ def patch_views():
             op=OP.VIEW_RESPONSE_RENDER, description="serialize response"
         ):
             return old_render(self)
-
-    SimpleTemplateResponse.render = sentry_patched_render
-
-    old_make_view_atomic = BaseHandler.make_view_atomic
 
     @_functools.wraps(old_make_view_atomic)
     def sentry_patched_make_view_atomic(self, *args, **kwargs):
@@ -66,6 +63,7 @@ def patch_views():
 
         return sentry_wrapped_callback
 
+    SimpleTemplateResponse.render = sentry_patched_render
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
 
 
