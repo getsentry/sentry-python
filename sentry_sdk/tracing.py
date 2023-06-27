@@ -130,7 +130,17 @@ class Span(object):
         start_timestamp=None,  # type: Optional[datetime]
     ):
         # type: (...) -> None
-        self.trace_id = trace_id or uuid.uuid4().hex
+        if trace_id:
+            self.trace_id = trace_id
+
+        elif hub:
+            traceparent = hub.get_traceparent()
+            if traceparent:
+                self.trace_id = traceparent.split("-")[0]
+
+        if not self.trace_id:
+            self.trace_id = uuid.uuid4().hex
+
         self.span_id = span_id or uuid.uuid4().hex[16:]
         self.parent_span_id = parent_span_id
         self.same_process_as_parent = same_process_as_parent
@@ -229,7 +239,7 @@ class Span(object):
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs
+            **kwargs,
         )
 
         span_recorder = (
@@ -246,12 +256,8 @@ class Span(object):
         return self.start_child(**kwargs)
 
     @classmethod
-    def continue_from_environ(
-        cls,
-        environ,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Transaction
+    def continue_from_environ(cls, environ, **kwargs):
+        # type: (Span, typing.Mapping[str, str], Any) -> Transaction
         """
         Create a Transaction with the given params, then add in data pulled from
         the 'sentry-trace' and 'baggage' headers from the environ (if any)
@@ -269,12 +275,8 @@ class Span(object):
         return Transaction.continue_from_headers(EnvironHeaders(environ), **kwargs)
 
     @classmethod
-    def continue_from_headers(
-        cls,
-        headers,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Transaction
+    def continue_from_headers(cls, headers, **kwargs):
+        # type: (Span, typing.Mapping[str, str], Any) -> Transaction
         """
         Create a transaction with the given params (including any data pulled from
         the 'sentry-trace' and 'baggage' headers).
@@ -323,12 +325,8 @@ class Span(object):
                 yield BAGGAGE_HEADER_NAME, baggage
 
     @classmethod
-    def from_traceparent(
-        cls,
-        traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Optional[Transaction]
+    def from_traceparent(cls, traceparent, **kwargs):
+        # type: (Span, Optional[str], Any) -> Optional[Transaction]
         """
         DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
 
@@ -510,7 +508,7 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> None
         # TODO: consider removing this in a future release.
