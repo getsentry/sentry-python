@@ -160,16 +160,18 @@ def _wrap_apply_async(f):
                         kwarg_headers = kwargs.get("headers") or {}
 
                         existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
-                        if existing_baggage:
+                        sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
+                        if sentry_baggage and existing_baggage:
                             combined_baggage = "{},{}".format(
                                 existing_baggage,
-                                headers[BAGGAGE_HEADER_NAME],
+                                sentry_baggage,
                             )
                         else:
-                            combined_baggage = headers[BAGGAGE_HEADER_NAME]
+                            combined_baggage = sentry_baggage or existing_baggage
 
                         kwarg_headers.update(headers)
-                        kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
+                        if combined_baggage:
+                            kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
                         # https://github.com/celery/celery/issues/4875
                         #
@@ -178,7 +180,10 @@ def _wrap_apply_async(f):
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {})
                         kwarg_headers["headers"].update(headers)
-                        kwarg_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
+                        if combined_baggage:
+                            kwarg_headers["headers"][
+                                BAGGAGE_HEADER_NAME
+                            ] = combined_baggage
 
                         # Add the Sentry options potentially added in `sentry_apply_entry`
                         # to the headers (done when auto-instrumenting Celery Beat tasks)
