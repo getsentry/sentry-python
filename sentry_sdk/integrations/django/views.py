@@ -30,9 +30,6 @@ def patch_views():
 
     def sentry_patched_render(self):
         # type: (SimpleTemplateResponse) -> Any
-        import ipdb
-
-        ipdb.set_trace()
         hub = Hub.current
         with hub.start_span(
             op=OP.VIEW_RESPONSE_RENDER, description="serialize response"
