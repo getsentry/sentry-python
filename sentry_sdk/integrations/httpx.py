@@ -77,9 +77,7 @@ def _install_httpx_client():
                         BAGGAGE_HEADER_NAME
                     ):
                         # do not overwrite any existing baggage, just append to it
-                        request.headers[key] = "{},{}".format(
-                            request.headers[key], value
-                        )
+                        request.headers[key] += "," + value
                     else:
                         request.headers[key] = value
 
