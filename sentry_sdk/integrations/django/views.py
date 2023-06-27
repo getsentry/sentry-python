@@ -18,9 +18,6 @@ try:
 except (ImportError, SyntaxError):
     wrap_async_view = None  # type: ignore
 
-_monkey_patch_index = 0
-_not_set = object()
-
 
 def patch_views():
     # type: () -> None
