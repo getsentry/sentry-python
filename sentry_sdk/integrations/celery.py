@@ -178,8 +178,7 @@ def _wrap_apply_async(f):
                         # Need to setdefault the inner headers too since other
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
-                        kwarg_headers.setdefault("headers", {})
-                        kwarg_headers["headers"].update(headers)
+                        kwarg_headers.setdefault("headers", {}).update(headers)
                         if combined_baggage:
                             kwarg_headers["headers"][
                                 BAGGAGE_HEADER_NAME
