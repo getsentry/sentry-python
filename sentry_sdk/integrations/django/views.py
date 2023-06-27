@@ -26,7 +26,6 @@ def patch_views():
     # type: () -> None
 
     from django.core.handlers.base import BaseHandler
-    from django.http import HttpResponse, HttpResponseBase
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -74,41 +73,6 @@ def patch_views():
         return sentry_wrapped_callback
 
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
-
-    old_http_response = HttpResponse
-
-    def sentry_patched_init(self, *args, **kwargs):
-        try:
-            original_content = args[0]
-            original_content = "xxxx" + original_content
-        except IndexError:
-            pass
-
-        return old_http_response.__init__(self, *args, **kwargs)
-
-    HttpResponse.__init__ = sentry_patched_init
-
-    # def monkey_patch(prop):
-    #     global _monkey_patch_index, _not_set
-    #     special_attr = "$_prop_monkey_patch_{}".format(_monkey_patch_index)
-    #     _monkey_patch_index += 1
-
-    #     def getter(self):
-    #         import ipdb
-
-    #         ipdb.set_trace()
-    #         value = getattr(self, special_attr, _not_set)
-    #         return prop.fget(self) if value is _not_set else value
-
-    #     def setter(self, value):
-    #         import ipdb
-
-    #         ipdb.set_trace()
-    #         setattr(self, special_attr, value)
-
-    #     return property(getter, setter)
-
-    # HttpResponse.content = monkey_patch(HttpResponse.content)
 
 
 def _wrap_sync_view(hub, callback):
