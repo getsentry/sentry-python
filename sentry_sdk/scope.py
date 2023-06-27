@@ -608,6 +608,8 @@ class Scope(object):
         if has_tracing_enabled(options):
             if self._span is not None:
                 contexts["trace"] = self._span.get_trace_context()
+            else:
+                contexts["trace"] = self.get_trace_context()
         else:
             contexts["trace"] = self.get_trace_context()
 
