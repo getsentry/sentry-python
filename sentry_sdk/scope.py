@@ -605,13 +605,14 @@ class Scope(object):
 
         contexts = event.setdefault("contexts", {})
 
-        if has_tracing_enabled(options):
-            if self._span is not None:
-                contexts["trace"] = self._span.get_trace_context()
+        if contexts.get("trace") is None:
+            if has_tracing_enabled(options):
+                if self._span is not None:
+                    contexts["trace"] = self._span.get_trace_context()
+                else:
+                    contexts["trace"] = self.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
-        else:
-            contexts["trace"] = self.get_trace_context()
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:
