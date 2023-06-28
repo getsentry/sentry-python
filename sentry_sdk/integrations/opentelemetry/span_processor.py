@@ -29,16 +29,15 @@ from sentry_sdk._types import TYPE_CHECKING
 from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Union
+    from typing import Any, Dict, Optional, Union
+
     from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
 
 
 def link_trace_context_to_error_event(event, otel_span_map):
-    # type: (Event, Dict[str, Union[Transaction, OTelSpan]]) -> Event
+    # type: (Event, Dict[str, Union[Transaction, SentrySpan]]) -> Event
     hub = Hub.current
     if not hub:
         return event
@@ -76,7 +75,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     """
 
     # The mapping from otel span ids to sentry spans
-    otel_span_map = {}  # type: Dict[str, Union[Transaction, OTelSpan]]
+    otel_span_map = {}  # type: Dict[str, Union[Transaction, SentrySpan]]
 
     def __new__(cls):
         # type: () -> SentrySpanProcessor
@@ -93,7 +92,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             return link_trace_context_to_error_event(event, self.otel_span_map)
 
     def on_start(self, otel_span, parent_context=None):
-        # type: (OTelSpan, SpanContext) -> None
+        # type: (OTelSpan, Optional[SpanContext]) -> None
         hub = Hub.current
         if not hub:
             return
@@ -109,7 +108,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
-        if not otel_span.context.is_valid:
+        if not otel_span.get_span_context().is_valid:
             return
 
         if self._is_sentry_span(hub, otel_span):
@@ -152,10 +151,11 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if hub.client and hub.client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
-        if not otel_span.context.is_valid:
+        span_context = otel_span.get_span_context()
+        if not span_context.is_valid:
             return
 
-        span_id = format_span_id(otel_span.context.span_id)
+        span_id = format_span_id(span_context.span_id)
         sentry_span = self.otel_span_map.pop(span_id, None)
         if not sentry_span:
             return
@@ -211,11 +211,12 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         Extracts tracing information from one OTel span and its parent OTel context.
         """
         trace_data = {}
+        span_context = otel_span.get_span_context()
 
-        span_id = format_span_id(otel_span.context.span_id)
+        span_id = format_span_id(span_context.span_id)
         trace_data["span_id"] = span_id
 
-        trace_id = format_trace_id(otel_span.context.trace_id)
+        trace_id = format_trace_id(span_context.trace_id)
         trace_data["trace_id"] = trace_id
 
         parent_span_id = (

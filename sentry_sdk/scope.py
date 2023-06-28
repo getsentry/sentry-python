@@ -1,6 +1,7 @@
 from copy import copy
 from collections import deque
 from itertools import chain
+import os
 import uuid
 
 from sentry_sdk.attachments import Attachment
@@ -18,6 +19,8 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
+
+from sentry_sdk.consts import FALSE_VALUES
 
 
 if TYPE_CHECKING:
@@ -122,7 +125,36 @@ class Scope(object):
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
         self.clear()
-        self.generate_propagation_context()
+
+        incoming_trace_information = self._load_trace_data_from_env()
+        self.generate_propagation_context(incoming_data=incoming_trace_information)
+
+    def _load_trace_data_from_env(self):
+        # type: () -> Optional[Dict[str, str]]
+        """
+        Load Sentry trace id and baggage from environment variables.
+        Can be disabled by setting SENTRY_USE_ENVIRONMENT to "false".
+        """
+        incoming_trace_information = None
+
+        sentry_use_environment = (
+            os.environ.get("SENTRY_USE_ENVIRONMENT") or ""
+        ).lower()
+        use_environment = sentry_use_environment not in FALSE_VALUES
+        if use_environment:
+            incoming_trace_information = {}
+
+            if os.environ.get("SENTRY_TRACE"):
+                incoming_trace_information[SENTRY_TRACE_HEADER_NAME] = (
+                    os.environ.get("SENTRY_TRACE") or ""
+                )
+
+            if os.environ.get("SENTRY_BAGGAGE"):
+                incoming_trace_information[BAGGAGE_HEADER_NAME] = (
+                    os.environ.get("SENTRY_BAGGAGE") or ""
+                )
+
+        return incoming_trace_information or None
 
     def _extract_propagation_context(self, data):
         # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
@@ -140,6 +172,12 @@ class Scope(object):
             sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
             if sentrytrace_data is not None:
                 context.update(sentrytrace_data)
+
+        only_baggage_no_sentry_trace = (
+            "dynamic_sampling_context" in context and "trace_id" not in context
+        )
+        if only_baggage_no_sentry_trace:
+            context.update(self._create_new_propagation_context())
 
         if context:
             if not context.get("span_id"):

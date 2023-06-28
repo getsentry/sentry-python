@@ -11,7 +11,7 @@ from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -158,7 +158,20 @@ def _wrap_apply_async(f):
                         # Note: kwargs can contain headers=None, so no setdefault!
                         # Unsure which backend though.
                         kwarg_headers = kwargs.get("headers") or {}
+
+                        existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
+                        sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
+
+                        combined_baggage = sentry_baggage or existing_baggage
+                        if sentry_baggage and existing_baggage:
+                            combined_baggage = "{},{}".format(
+                                existing_baggage,
+                                sentry_baggage,
+                            )
+
                         kwarg_headers.update(headers)
+                        if combined_baggage:
+                            kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
                         # https://github.com/celery/celery/issues/4875
                         #
@@ -166,6 +179,10 @@ def _wrap_apply_async(f):
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
                         kwarg_headers.setdefault("headers", {}).update(headers)
+                        if combined_baggage:
+                            kwarg_headers["headers"][
+                                BAGGAGE_HEADER_NAME
+                            ] = combined_baggage
 
                         # Add the Sentry options potentially added in `sentry_apply_entry`
                         # to the headers (done when auto-instrumenting Celery Beat tasks)
