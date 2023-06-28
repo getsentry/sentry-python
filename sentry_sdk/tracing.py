@@ -130,7 +130,17 @@ class Span(object):
         start_timestamp=None,  # type: Optional[datetime]
     ):
         # type: (...) -> None
-        self.trace_id = trace_id or uuid.uuid4().hex
+        if trace_id:
+            self.trace_id = trace_id
+        elif hub:
+            traceparent = hub.get_traceparent()
+            if traceparent:
+                self.trace_id = traceparent.split("-")[0]
+            else:
+                self.trace_id = uuid.uuid4().hex
+        else:
+            self.trace_id = uuid.uuid4().hex
+
         self.span_id = span_id or uuid.uuid4().hex[16:]
         self.parent_span_id = parent_span_id
         self.same_process_as_parent = same_process_as_parent
