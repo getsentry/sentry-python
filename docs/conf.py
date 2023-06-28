@@ -2,16 +2,16 @@
 
 import os
 import sys
-
 import typing
+from datetime import datetime
 
 # prevent circular imports
 import sphinx.builders.html
 import sphinx.builders.latex
 import sphinx.builders.texinfo
 import sphinx.builders.text
-import sphinx.ext.autodoc
-import urllib3.exceptions
+import sphinx.ext.autodoc  # noqa: F401
+import urllib3.exceptions  # noqa: F401
 
 typing.TYPE_CHECKING = True
 
@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "sentry-python"
-copyright = "2019, Sentry Team and Contributors"
+copyright = "2019-{}, Sentry Team and Contributors".format(datetime.now().year)
 author = "Sentry Team and Contributors"
 
 release = "1.26.0"
@@ -87,13 +87,15 @@ pygments_style = None
 
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 
-html_theme = "alabaster"
+html_theme = "shibuya"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further. For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    "github_url": "https://github.com/getsentry/sentry-python",
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -167,7 +169,7 @@ texinfo_documents = [
         "sentry-python Documentation",
         author,
         "sentry-python",
-        "One line description of project.",
+        "The official Sentry SDK for Python.",
         "Miscellaneous",
     )
 ]
