@@ -45,6 +45,14 @@ DEFAULT_MAX_BREADCRUMBS = 100
 
 MATCH_ALL = r".*"
 
+FALSE_VALUES = [
+    "false",
+    "no",
+    "off",
+    "n",
+    "0",
+]
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -220,4 +228,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.25.1"
+VERSION = "1.26.0"

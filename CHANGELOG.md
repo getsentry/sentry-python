@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.26.0
+
+### Various fixes & improvements
+
+- Tracing without performance (#2136) by @antonpirker
+- Load tracing information from environment (#2176) by @antonpirker
+- Auto-enable HTTPX integration if HTTPX installed (#2177) by @sentrivana
+- Support for SOCKS proxies (#1050) by @Roguelazer
+- Wrap `parse_url` calls in `capture_internal_exceptions` (#2162) by @sentrivana
+- Run 2.7 tests in CI again (#2181) by @sentrivana
+- Crons: Do not support sub-minute cron intervals (#2172) by @antonpirker
+- Profile: Add function name to profiler frame cache (#2164) by @Zylphrex
+- Dependencies: bump checkouts/data-schemas from `0ed3357` to `7fdde87` (#2165) by @dependabot
+- Update changelog (#2163) by @sentrivana
+
 ## 1.25.1
 
 ### Django update (ongoing)

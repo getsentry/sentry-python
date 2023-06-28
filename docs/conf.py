@@ -30,7 +30,7 @@ project = "sentry-python"
 copyright = "2019, Sentry Team and Contributors"
 author = "Sentry Team and Contributors"
 
-release = "1.25.1"
+release = "1.26.0"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 

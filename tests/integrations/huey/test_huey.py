@@ -118,6 +118,34 @@ def test_task_retry(capture_events, init_huey):
     assert len(huey) == 0
 
 
+@pytest.mark.parametrize("lock_name", ["lock.a", "lock.b"], ids=["locked", "unlocked"])
+def test_task_lock(capture_events, init_huey, lock_name):
+    huey = init_huey()
+
+    task_lock_name = "lock.a"
+    should_be_locked = task_lock_name == lock_name
+
+    @huey.task()
+    @huey.lock_task(task_lock_name)
+    def maybe_locked_task():
+        pass
+
+    events = capture_events()
+
+    with huey.lock_task(lock_name):
+        assert huey.is_locked(task_lock_name) == should_be_locked
+        result = execute_huey_task(huey, maybe_locked_task)
+
+    (event,) = events
+
+    assert event["transaction"] == "maybe_locked_task"
+    assert event["tags"]["huey_task_id"] == result.task.id
+    assert (
+        event["contexts"]["trace"]["status"] == "aborted" if should_be_locked else "ok"
+    )
+    assert len(huey) == 0
+
+
 def test_huey_enqueue(init_huey, capture_events):
     huey = init_huey()
 

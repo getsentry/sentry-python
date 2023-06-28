@@ -1,5 +1,6 @@
 import pytest
 from fakeredis import FakeStrictRedis
+from sentry_sdk import configure_scope, start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
 
 import rq
@@ -123,6 +124,71 @@ def test_transaction_with_error(
             "description": "tests.integrations.rq.test_rq.chew_up_shoes('Charlie', 'Katie', shoes='flip-flops')",
         }
     )
+
+
+def test_error_has_trace_context_if_tracing_disabled(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[RqIntegration()])
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+
+
+def test_tracing_enabled(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    with start_transaction(op="rq transaction") as transaction:
+        queue.enqueue(crashing_job, foo=None)
+        worker.work(burst=True)
+
+    error_event, envelope, _ = events
+
+    assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+
+    assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
+
+
+def test_tracing_disabled(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(integrations=[RqIntegration()])
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    with configure_scope() as scope:
+        queue.enqueue(crashing_job, foo=None)
+        worker.work(burst=True)
+
+        (error_event,) = events
+
+        assert (
+            error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+        )
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == scope._propagation_context["trace_id"]
+        )
 
 
 def test_transaction_no_error(
