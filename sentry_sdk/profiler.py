@@ -738,12 +738,16 @@ class Profile(object):
 
         if self.sampled is None or not self.sampled:
             if client.transport:
-                client.transport.record_lost_event("sample_rate", data_category="profile")
+                client.transport.record_lost_event(
+                    "sample_rate", data_category="profile"
+                )
             return False
 
         if self.unique_samples < PROFILE_MINIMUM_SAMPLES:
             if client.transport:
-                client.transport.record_lost_event("insufficient_data", data_category="profile")
+                client.transport.record_lost_event(
+                    "insufficient_data", data_category="profile"
+                )
             logger.debug("[Profiling] Discarding profile because insufficient samples.")
             return False
 
