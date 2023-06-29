@@ -587,5 +587,7 @@ def test_strip_string():
     assert stripped_text.value.count("a") == 1021  # + '...' is 1024
 
     # If text has unicode characters, it counts bytes and not number of characters.
-    text_with_unicode_character = "éê"
-    assert strip_string(text_with_unicode_character, max_length=2).value == "é..."
+    # fmt: off
+    text_with_unicode_character = u"éê"
+    assert strip_string(text_with_unicode_character, max_length=2).value == u"é..."
+    # fmt: on

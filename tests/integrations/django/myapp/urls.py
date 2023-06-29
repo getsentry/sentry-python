@@ -28,6 +28,14 @@ from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
+    path("view-exc-with-msg", views.view_exc_with_msg, name="view_exc_with_msg"),
+    path("cached-view", views.cached_view, name="cached_view"),
+    path("not-cached-view", views.not_cached_view, name="not_cached_view"),
+    path(
+        "view-with-cached-template-fragment",
+        views.view_with_cached_template_fragment,
+        name="view_with_cached_template_fragment",
+    ),
     path(
         "read-body-and-view-exc",
         views.read_body_and_view_exc,

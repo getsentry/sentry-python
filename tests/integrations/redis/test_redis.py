@@ -1,11 +1,14 @@
-import mock
-
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from fakeredis import FakeStrictRedis
 import pytest
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def test_basic(sentry_init, capture_events):
@@ -27,6 +30,7 @@ def test_basic(sentry_init, capture_events):
             "redis.key": "foobar",
             "redis.command": "GET",
             "redis.is_cluster": False,
+            "db.operation": "GET",
         },
         "timestamp": crumb["timestamp"],
         "type": "redis",
@@ -183,7 +187,6 @@ def test_data_truncation_custom(sentry_init, capture_events):
 
 
 def test_breadcrumbs(sentry_init, capture_events):
-
     sentry_init(
         integrations=[RedisIntegration(max_data_size=30)],
         send_default_pii=True,
@@ -207,6 +210,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         "type": "redis",
         "category": "redis",
         "data": {
+            "db.operation": "SET",
             "redis.is_cluster": False,
             "redis.command": "SET",
             "redis.key": "somekey1",
@@ -218,6 +222,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         "type": "redis",
         "category": "redis",
         "data": {
+            "db.operation": "SET",
             "redis.is_cluster": False,
             "redis.command": "SET",
             "redis.key": "somekey2",

@@ -105,11 +105,9 @@ def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
         "password": "[Filtered]",
     }
 
-    assert event["_meta"] == {
-        "extra": {"auth": {"": {"rem": [["!config", "s"]]}}},
-        "breadcrumbs": {
-            "values": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
-        },
+    assert event["_meta"]["extra"]["auth"] == {"": {"rem": [["!config", "s"]]}}
+    assert event["_meta"]["breadcrumbs"] == {
+        "values": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
     }
 
 
@@ -124,8 +122,8 @@ def test_span_data_scrubbing(sentry_init, capture_events):
 
     (event,) = events
     assert event["spans"][0]["data"] == {"password": "[Filtered]", "datafoo": "databar"}
-    assert event["_meta"] == {
-        "spans": {"0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}}
+    assert event["_meta"]["spans"] == {
+        "0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}
     }
 
 
@@ -153,3 +151,21 @@ def test_custom_denylist(sentry_init, capture_events):
     assert meta == {
         "my_sensitive_var": {"": {"rem": [["!config", "s"]]}},
     }
+
+
+def test_scrubbing_doesnt_affect_local_vars(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        password = "cat123"
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    (event,) = events
+
+    frames = event["exception"]["values"][0]["stacktrace"]["frames"]
+    (frame,) = frames
+    assert frame["vars"]["password"] == "[Filtered]"
+    assert password == "cat123"

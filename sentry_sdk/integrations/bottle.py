@@ -5,6 +5,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
     transaction_from_function,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -57,10 +58,10 @@ class BottleIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(map(int, BOTTLE_VERSION.replace("-dev", "").split(".")))
-        except (TypeError, ValueError):
-            raise DidNotEnable("Unparsable Bottle version: {}".format(version))
+        version = parse_version(BOTTLE_VERSION)
+
+        if version is None:
+            raise DidNotEnable("Unparsable Bottle version: {}".format(BOTTLE_VERSION))
 
         if version < (0, 12):
             raise DidNotEnable("Bottle 0.12 or newer required.")

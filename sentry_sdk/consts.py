@@ -45,37 +45,79 @@ DEFAULT_MAX_BREADCRUMBS = 100
 
 MATCH_ALL = r".*"
 
+FALSE_VALUES = [
+    "false",
+    "no",
+    "off",
+    "n",
+    "0",
+]
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
     OTEL = "otel"
 
 
-# See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
 class SPANDATA:
+    """
+    Additional information describing the type of the span.
+    See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
+    """
+
+    DB_OPERATION = "db.operation"
+    """
+    The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: findAndModify, HMSET, SELECT
+    """
+
     DB_SYSTEM = "db.system"
     """
     An identifier for the database management system (DBMS) product being used.
-    See: https://github.com/open-telemetry/opentelemetry-python/blob/e00306206ea25cf8549eca289e39e0b6ba2fa560/opentelemetry-semantic-conventions/src/opentelemetry/semconv/trace/__init__.py#L58
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: postgresql
     """
+
+    CACHE_HIT = "cache.hit"
+    """
+    A boolean indicating whether the requested data was found in the cache.
+    Example: true
+    """
+
+    CACHE_ITEM_SIZE = "cache.item_size"
+    """
+    The size of the requested data in bytes.
+    Example: 58
+    """
+
     HTTP_QUERY = "http.query"
     """
     The Query string present in the URL.
     Example: ?foo=bar&bar=baz
     """
+
     HTTP_FRAGMENT = "http.fragment"
     """
     The Fragments present in the URL.
     Example: #foo=bar
     """
+
     HTTP_METHOD = "http.method"
     """
     The HTTP method used.
     Example: GET
     """
 
+    HTTP_STATUS_CODE = "http.response.status_code"
+    """
+    The HTTP status code as an integer.
+    Example: 418
+    """
+
 
 class OP:
+    CACHE_GET_ITEM = "cache.get_item"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
@@ -157,10 +199,11 @@ class ClientConstructor(object):
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
         include_local_variables=True,  # type: Optional[bool]
+        include_source_context=True,  # type: Optional[bool]
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[str]  # noqa: B006
+        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
     ):
         # type: (...) -> None
@@ -185,4 +228,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.21.1"
+VERSION = "1.26.0"

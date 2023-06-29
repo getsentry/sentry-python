@@ -7,8 +7,10 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
+from django.template import Context, Template
 from django.template.response import TemplateResponse
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
 
@@ -42,11 +44,40 @@ except ImportError:
 
 
 import sentry_sdk
+from sentry_sdk import capture_message
 
 
 @csrf_exempt
 def view_exc(request):
     1 / 0
+
+
+@csrf_exempt
+def view_exc_with_msg(request):
+    capture_message("oops")
+    1 / 0
+
+
+@cache_page(60)
+def cached_view(request):
+    return HttpResponse("ok")
+
+
+def not_cached_view(request):
+    return HttpResponse("ok")
+
+
+def view_with_cached_template_fragment(request):
+    template = Template(
+        """{% load cache %}
+        Not cached content goes here.
+        {% cache 500 some_identifier %}
+            And here some cached content.
+        {% endcache %}
+        """
+    )
+    rendered = template.render(Context({}))
+    return HttpResponse(rendered)
 
 
 # This is a "class based view" as previously found in the sentry codebase. The

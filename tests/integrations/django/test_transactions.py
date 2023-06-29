@@ -24,6 +24,9 @@ example_url_conf = (
     url(r"^api/(?P<version>(v1|v2))/author/$", lambda x: ""),
     url(r"^report/", lambda x: ""),
     url(r"^example/", include(included_url_conf)),
+    url(
+        r"^(?P<slug>[$\\-_.+!*(),\\w//]+)/$", lambda x: ""
+    ),  # example of complex regex from django-cms
 )
 
 
@@ -51,6 +54,16 @@ def test_legacy_resolver_included_match():
     resolver = RavenResolver()
     result = resolver.resolve("/example/foo/bar/baz", example_url_conf)
     assert result == "/example/foo/bar/{param}"
+
+
+def test_complex_regex_from_django_cms():
+    """
+    Reference: https://github.com/getsentry/sentry-python/issues/1527
+    """
+
+    resolver = RavenResolver()
+    result = resolver.resolve("/,/", example_url_conf)
+    assert result == "/{slug}/"
 
 
 @pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")

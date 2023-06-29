@@ -93,7 +93,7 @@ class SessionFlusher(object):
 
             envelope.add_session(session)
 
-        for (attrs, states) in pending_aggregates.items():
+        for attrs, states in pending_aggregates.items():
             if len(envelope.items) == MAX_ENVELOPE_ITEMS:
                 self.capture_func(envelope)
                 envelope = Envelope()

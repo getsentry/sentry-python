@@ -1,13 +1,13 @@
 import weakref
 import contextlib
 from inspect import iscoroutinefunction
-from sentry_sdk.consts import OP
 
+from sentry_sdk.api import continue_trace
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
-    Transaction,
 )
 from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
@@ -108,13 +108,15 @@ def _handle_request_impl(self):
     weak_handler = weakref.ref(self)
 
     with Hub(hub) as hub:
+        headers = self.request.headers
+
         with hub.configure_scope() as scope:
             scope.clear_breadcrumbs()
             processor = _make_event_processor(weak_handler)
             scope.add_event_processor(processor)
 
-        transaction = Transaction.continue_from_headers(
-            self.request.headers,
+        transaction = continue_trace(
+            headers,
             op=OP.HTTP_SERVER,
             # Like with all other integrations, this is our
             # fallback transaction in case there is no route.

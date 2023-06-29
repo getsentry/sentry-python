@@ -1,5 +1,9 @@
-from mock import MagicMock
-import mock
+try:
+    from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
+except ImportError:
+    import mock  # python < 3.3
+    from mock import MagicMock
 
 from opentelemetry.context import get_current
 from opentelemetry.trace.propagation import get_current_span
@@ -135,7 +139,7 @@ def test_inject_empty_otel_span_map():
         is_remote=True,
     )
     span = MagicMock()
-    span.context = span_context
+    span.get_span_context.return_value = span_context
 
     with mock.patch(
         "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
@@ -166,7 +170,7 @@ def test_inject_sentry_span_no_baggage():
         is_remote=True,
     )
     span = MagicMock()
-    span.context = span_context
+    span.get_span_context.return_value = span_context
 
     sentry_span = MagicMock()
     sentry_span.to_traceparent = mock.Mock(
@@ -210,7 +214,7 @@ def test_inject_sentry_span_baggage():
         is_remote=True,
     )
     span = MagicMock()
-    span.context = span_context
+    span.get_span_context.return_value = span_context
 
     sentry_span = MagicMock()
     sentry_span.to_traceparent = mock.Mock(

@@ -7,9 +7,11 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 import asyncio
 import inspect
 import urllib
+from copy import deepcopy
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -162,7 +164,7 @@ class SentryAsgiMiddleware:
                     ty = scope["type"]
 
                     if ty in ("http", "websocket"):
-                        transaction = Transaction.continue_from_headers(
+                        transaction = continue_trace(
                             self._get_headers(scope),
                             op="{}.server".format(ty),
                         )
@@ -211,7 +213,7 @@ class SentryAsgiMiddleware:
 
         self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
 
-        event["request"] = request_info
+        event["request"] = deepcopy(request_info)
 
         return event
 
