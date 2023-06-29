@@ -484,15 +484,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (Optional[Span], str, Any) -> Span
         """
-        Create and start timing a new span whose parent is the currently active
-        span or transaction, if any. The return value is a span instance,
+        Start a span whose parent is the currently active span or transaction, if any.
+
+        The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
         typically used as a context manager to start and stop timing in a `with`
         block.
 
         Only spans contained in a transaction are sent to Sentry. Most
         integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use `start_transaction` to start a new
-        transaction when one is not already in progress.
+        for every incoming HTTP request. Use
+        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
+        one is not already in progress.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 

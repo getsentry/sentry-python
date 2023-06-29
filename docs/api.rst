@@ -7,3 +7,9 @@ Main API
 .. automodule:: sentry_sdk
     :members:
     :inherited-members:
+
+.. autoclass:: sentry_sdk.tracing.Span
+   :members:
+
+.. autoclass:: sentry_sdk.tracing.Transaction
+   :members:
