@@ -9,9 +9,19 @@ from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.profiler import Profile
-from sentry_sdk.tracing import NoOpSpan, Span, Transaction
+from sentry_sdk.tracing import (
+    NoOpSpan,
+    Span,
+    Transaction,
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
 from sentry_sdk.session import Session
-from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.tracing_utils import (
+    has_tracing_enabled,
+    normalize_incoming_data,
+)
+
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -533,6 +543,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return transaction
 
+    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+        """
+        Sets the propagation context from environment or headers and returns a transaction.
+        """
+        with self.configure_scope() as scope:
+            scope.generate_propagation_context(environ_or_headers)
+
+        transaction = Transaction.continue_from_headers(
+            normalize_incoming_data(environ_or_headers),
+            op=op,
+            name=name,
+            source=source,
+        )
+        return transaction
+
     @overload
     def push_scope(
         self, callback=None  # type: Optional[None]
@@ -699,6 +725,36 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
+    def get_traceparent(self):
+        # type: () -> Optional[str]
+        """
+        Returns the traceparent either from the active span or from the scope.
+        """
+        if self.client is not None:
+            if has_tracing_enabled(self.client.options) and self.scope.span is not None:
+                return self.scope.span.to_traceparent()
+
+        return self.scope.get_traceparent()
+
+    def get_baggage(self):
+        # type: () -> Optional[str]
+        """
+        Returns Baggage either from the active span or from the scope.
+        """
+        if (
+            self.client is not None
+            and has_tracing_enabled(self.client.options)
+            and self.scope.span is not None
+        ):
+            baggage = self.scope.span.to_baggage()
+        else:
+            baggage = self.scope.get_baggage()
+
+        if baggage is not None:
+            return baggage.serialize()
+
+        return None
+
     def iter_trace_propagation_headers(self, span=None):
         # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
         """
@@ -723,13 +779,26 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str
         """
-        Return meta tags which should be injected into the HTML template
-        to allow propagation of trace data.
+        Return meta tags which should be injected into HTML templates
+        to allow propagation of trace information.
         """
+        if span is None:
+            logger.warning(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            )
+
         meta = ""
 
-        for name, content in self.iter_trace_propagation_headers(span):
-            meta += '<meta name="%s" content="%s">' % (name, content)
+        sentry_trace = self.get_traceparent()
+        if sentry_trace is not None:
+            meta += '<meta name="%s" content="%s">' % (
+                SENTRY_TRACE_HEADER_NAME,
+                sentry_trace,
+            )
+
+        baggage = self.get_baggage()
+        if baggage is not None:
+            meta += '<meta name="%s" content="%s">' % (BAGGAGE_HEADER_NAME, baggage)
 
         return meta
 
