@@ -43,8 +43,13 @@ _ADDED_HANDLERS = (None, None)  # type: Tuple[Optional[int], Optional[int]]
 class LoguruIntegration(Integration):
     identifier = "loguru"
 
-    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL,
-                 breadcrumb_format=None, event_format=None):
+    def __init__(
+        self,
+        level=DEFAULT_LEVEL,
+        event_level=DEFAULT_EVENT_LEVEL,
+        breadcrumb_format=None,
+        event_format=None,
+    ):
         # type: (Optional[int], Optional[int]) -> None
         global _ADDED_HANDLERS
         breadcrumb_handler, event_handler = _ADDED_HANDLERS
@@ -58,14 +63,18 @@ class LoguruIntegration(Integration):
 
         if level is not None:
             breadcrumb_handler = logger.add(
-                LoguruBreadcrumbHandler(level=level), level=level,
-                format=DEFAULT_FORMAT if breadcrumb_format is None else breadcrumb_format
+                LoguruBreadcrumbHandler(level=level),
+                level=level,
+                format=DEFAULT_FORMAT
+                if breadcrumb_format is None
+                else breadcrumb_format,
             )
 
         if event_level is not None:
             event_handler = logger.add(
-                LoguruEventHandler(level=event_level), level=event_level,
-                format=DEFAULT_FORMAT if event_format is None else event_format
+                LoguruEventHandler(level=event_level),
+                level=event_level,
+                format=DEFAULT_FORMAT if event_format is None else event_format,
             )
 
         _ADDED_HANDLERS = (breadcrumb_handler, event_handler)

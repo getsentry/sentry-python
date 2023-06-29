@@ -83,7 +83,7 @@ def test_breadcrumb_format(sentry_init, capture_events):
             LoguruIntegration(
                 level=LoggingLevels.INFO.value,
                 event_level=None,
-                breadcrumb_format="{message}"
+                breadcrumb_format="{message}",
             )
         ],
         default_integrations=False,
@@ -103,7 +103,7 @@ def test_event_format(sentry_init, capture_events):
             LoguruIntegration(
                 level=None,
                 event_level=LoggingLevels.ERROR.value,
-                event_format="{message}"
+                event_format="{message}",
             )
         ],
         default_integrations=False,
