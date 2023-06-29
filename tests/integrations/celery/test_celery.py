@@ -265,9 +265,6 @@ def test_simple_no_propagation(capture_events, init_celery):
         dummy_task.delay()
 
     (event,) = events
-    import ipdb
-
-    ipdb.set_trace()
     assert event["contexts"]["trace"]["trace_id"] != transaction.trace_id
     assert event["transaction"] == "dummy_task"
     (exception,) = event["exception"]["values"]
