@@ -130,14 +130,16 @@ class Span(object):
         start_timestamp=None,  # type: Optional[datetime]
     ):
         # type: (...) -> None
+        import ipdb
+
+        ipdb.set_trace()
         if trace_id:
             self.trace_id = trace_id
         elif hub:
             traceparent = hub.get_traceparent()
-            if traceparent:
-                self.trace_id = traceparent.split("-")[0]
-            else:
-                self.trace_id = uuid.uuid4().hex
+            self.trace_id = (
+                traceparent.split("-")[0] if traceparent else uuid.uuid4().hex
+            )
         else:
             self.trace_id = uuid.uuid4().hex
 
