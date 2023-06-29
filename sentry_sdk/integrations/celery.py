@@ -333,6 +333,7 @@ def _capture_exception(task, exc_info):
         mechanism={"type": "celery", "handled": False},
     )
 
+    # TODO-anton: this is experimental and hacky. Should probably not end up in the final PR.
     if not integration.propagate_traces:
         # Disable trace propagation in events by setting an empty trace context.
         contexts = event.setdefault("contexts", {})

@@ -130,9 +130,6 @@ class Span(object):
         start_timestamp=None,  # type: Optional[datetime]
     ):
         # type: (...) -> None
-        import ipdb
-
-        ipdb.set_trace()
         if trace_id:
             self.trace_id = trace_id
         elif hub:
