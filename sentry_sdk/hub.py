@@ -495,6 +495,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         for every incoming HTTP request. Use
         :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
         one is not already in progress.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
@@ -553,6 +555,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
