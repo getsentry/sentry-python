@@ -50,6 +50,7 @@ if TYPE_CHECKING:
         Event,
         Hint,
         Breadcrumb,
+        BreadcrumbHint,
         ExcInfo,
     )
     from sentry_sdk.consts import ClientConstructor
@@ -417,12 +418,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def add_breadcrumb(
         self,
-        crumb=None,  # Optional[Breadcrumb]
-        hint=None,  # Optional[BreadcrumbHint]
-        timestamp=None,  # Optional[datetime.datetime]
-        type=None,  # Optional[str]
-        data=None,  # Optional[Dict[str, Any]]
-        **kwargs  # Any
+        crumb=None,  # type: Optional[Breadcrumb]
+        hint=None,  # type: Optional[BreadcrumbHint]
+        timestamp=None,  # type: Optional[datetime.datetime]
+        type=None,  # type: Optional[str]
+        data=None,  # type: Optional[Dict[str, Any]]
+        **kwargs  # type: Any
     ):
         # type: (...) -> None
         """
