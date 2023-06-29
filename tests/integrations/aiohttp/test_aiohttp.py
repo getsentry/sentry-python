@@ -526,12 +526,11 @@ async def test_outgoing_trace_headers_append_to_baggage(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
         trace_id="0123456789012345678901234567890",
-    ) as transaction:
+    ):
         client = await aiohttp_client(raw_server)
         resp = await client.get("/", headers={"bagGage": "custom=value"})
 
-        assert resp.request_info.headers[
-            "baggage"
-        ] == "custom=value,sentry-trace_id={trace_id},sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0".format(
-            trace_id=transaction.trace_id,
+        assert (
+            resp.request_info.headers["baggage"]
+            == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0"
         )
