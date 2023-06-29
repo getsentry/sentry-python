@@ -50,7 +50,6 @@ if TYPE_CHECKING:
         Event,
         Hint,
         Breadcrumb,
-        BreadcrumbHint,
         ExcInfo,
     )
     from sentry_sdk.consts import ClientConstructor
@@ -335,7 +334,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def capture_event(self, event, hint=None, scope=None, **scope_args):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
-        """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
+        """
+        Captures an event.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_event`.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+        """
         client, top_scope = self._stack[-1]
         scope = _update_scope(top_scope, scope, scope_args)
         if client is not None:
@@ -348,8 +354,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def capture_message(self, message, level=None, scope=None, **scope_args):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
-        """Captures a message.  The message is just a string.  If no level
-        is provided the default level is `info`.
+        """
+        Captures a message.
+
+        :param message: The string to send as the message.
+
+        :param level: If no level is provided, the default level is `info`.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -366,6 +381,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -397,15 +415,35 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
+    def add_breadcrumb(
+        self,
+        crumb=None,  # Optional[Breadcrumb]
+        hint=None,  # Optional[BreadcrumbHint]
+        timestamp=None,  # Optional[datetime.datetime]
+        type=None,  # Optional[str]
+        data=None,  # Optional[Dict[str, Any]]
+        **kwargs  # Any
+    ):
+        # type: (...) -> None
         """
         Adds a breadcrumb.
 
-        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
+        :param crumb: Dictionary with the data as the Sentry v7/v8 protocol expects.
 
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
+
+        :param timestamp: The timestamp associated with this breadcrumb. Defaults
+            to now if not provided.
+
+        :param type: The type of the breadcrumb. Will be set to "default" if
+            not provided.
+
+        :param data: Additional custom data to put on the breadcrumb.
+
+        :param kwargs: Adding any further keyword arguments will not result in
+            an error, but the breadcrumb will be dropped before arriving to
+            Sentry.
         """
         client, scope = self._stack[-1]
         if client is None:
@@ -413,6 +451,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return
 
         crumb = dict(crumb or ())  # type: Breadcrumb
+        crumb["timestamp"] = timestamp
+        crumb["type"] = type
+        crumb["data"] = data
         crumb.update(kwargs)
         if not crumb:
             return
