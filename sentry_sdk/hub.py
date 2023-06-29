@@ -452,8 +452,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return
 
         crumb = dict(crumb or ())  # type: Breadcrumb
-        crumb["timestamp"] = timestamp
-        crumb["type"] = type
+        if timestamp is not None:
+            crumb["timestamp"] = timestamp
+        if type is not None:
+            crumb["type"] = type
         if data is not None:
             crumb["data"] = data
         crumb.update(kwargs)
