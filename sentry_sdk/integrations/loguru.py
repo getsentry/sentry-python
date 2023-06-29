@@ -47,8 +47,8 @@ class LoguruIntegration(Integration):
         self,
         level=DEFAULT_LEVEL,
         event_level=DEFAULT_EVENT_LEVEL,
-        breadcrumb_format=None,
-        event_format=None,
+        breadcrumb_format=DEFAULT_FORMAT,
+        event_format=DEFAULT_FORMAT,
     ):
         # type: (Optional[int], Optional[int]) -> None
         global _ADDED_HANDLERS
@@ -65,16 +65,14 @@ class LoguruIntegration(Integration):
             breadcrumb_handler = logger.add(
                 LoguruBreadcrumbHandler(level=level),
                 level=level,
-                format=DEFAULT_FORMAT
-                if breadcrumb_format is None
-                else breadcrumb_format,
+                format=breadcrumb_format,
             )
 
         if event_level is not None:
             event_handler = logger.add(
                 LoguruEventHandler(level=event_level),
                 level=event_level,
-                format=DEFAULT_FORMAT if event_format is None else event_format,
+                format=event_format,
             )
 
         _ADDED_HANDLERS = (breadcrumb_handler, event_handler)
