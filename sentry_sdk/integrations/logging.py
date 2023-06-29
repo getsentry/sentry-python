@@ -269,8 +269,7 @@ class BreadcrumbHandler(_BaseHandler):
             return
 
         Hub.current.add_breadcrumb(
-            hint={"log_record": record},
-            **self._breadcrumb_from_record(record),
+            hint={"log_record": record}, **self._breadcrumb_from_record(record)
         )
 
     def _breadcrumb_from_record(self, record):
