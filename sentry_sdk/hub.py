@@ -420,7 +420,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self,
         crumb=None,  # type: Optional[Breadcrumb]
         hint=None,  # type: Optional[BreadcrumbHint]
-        timestamp=None,  # type: Optional[datetime.datetime]
+        timestamp=None,  # type: Optional[datetime]
         type=None,  # type: Optional[str]
         data=None,  # type: Optional[Dict[str, Any]]
         **kwargs  # type: Any
