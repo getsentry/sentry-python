@@ -310,10 +310,8 @@ def _capture_exception(task, exc_info):
     # type: (Any, ExcInfo) -> None
     hub = Hub.current
 
-    integration = hub.get_integration(CeleryIntegration)
-    if integration is None:
+    if hub.get_integration(CeleryIntegration) is None:
         return
-
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
         # ??? Doesn't map to anything
         _set_status(hub, "aborted")
@@ -332,12 +330,6 @@ def _capture_exception(task, exc_info):
         client_options=client.options,
         mechanism={"type": "celery", "handled": False},
     )
-
-    # TODO-anton: this is experimental and hacky. Should probably not end up in the final PR.
-    if not integration.propagate_traces:
-        # Disable trace propagation in events by setting an empty trace context.
-        contexts = event.setdefault("contexts", {})
-        contexts.setdefault("trace", {})
 
     hub.capture_event(event, hint=hint)
 
