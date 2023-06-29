@@ -50,7 +50,7 @@ class LoguruIntegration(Integration):
         breadcrumb_format=DEFAULT_FORMAT,
         event_format=DEFAULT_FORMAT,
     ):
-        # type: (Optional[int], Optional[int]) -> None
+        # type: (Optional[int], Optional[int], Optional[str], Optional[str]) -> None
         global _ADDED_HANDLERS
         breadcrumb_handler, event_handler = _ADDED_HANDLERS
 
