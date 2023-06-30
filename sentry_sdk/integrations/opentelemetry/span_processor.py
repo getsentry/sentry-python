@@ -162,6 +162,8 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_span.op = otel_span.name
 
+        self._update_span_with_otel_status(sentry_span, otel_span)
+
         if isinstance(sentry_span, Transaction):
             sentry_span.name = otel_span.name
             sentry_span.set_context(
@@ -233,6 +235,20 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         trace_data["baggage"] = baggage
 
         return trace_data
+
+    def _update_span_with_otel_status(self, sentry_span, otel_span):
+        # type: (SentrySpan, OTelSpan) -> None
+        """
+        Set the Sentry span status from the OTel span
+        """
+        if otel_span.status.is_unset:
+            return
+
+        if otel_span.status.is_ok:
+            sentry_span.set_status("ok")
+            return
+
+        sentry_span.set_status("internal_error")
 
     def _update_span_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
