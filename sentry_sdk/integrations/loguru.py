@@ -15,9 +15,8 @@ if TYPE_CHECKING:
     from typing import Optional, Tuple
 
 try:
-    from loguru import logger
+    from loguru import logger, FormatFunction
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
-    from loguru import FormatFunction
 except ImportError:
     raise DidNotEnable("LOGURU is not installed")
 
