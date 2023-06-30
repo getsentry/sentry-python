@@ -1,8 +1,6 @@
 import json
 import logging
-import pkg_resources
 import pytest
-
 from io import BytesIO
 
 import pyramid.testing
@@ -17,9 +15,18 @@ from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from werkzeug.test import Client
 
 
-PYRAMID_VERSION = tuple(
-    map(int, pkg_resources.get_distribution("pyramid").version.split("."))
-)
+try:
+    from importlib.metadata import version
+
+    PYRAMID_VERSION = tuple(map(int, version("pyramid").split(".")))
+
+except ImportError:
+    # < py3.8
+    import pkg_resources
+
+    PYRAMID_VERSION = tuple(
+        map(int, pkg_resources.get_distribution("pyramid").version.split("."))
+    )
 
 
 def hi(request):
@@ -90,7 +97,10 @@ def test_view_exceptions(
     (event,) = events
     (breadcrumb,) = event["breadcrumbs"]["values"]
     assert breadcrumb["message"] == "hi2"
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "pyramid"
+    # Checking only the last value in the exceptions list,
+    # because Pyramid >= 1.9 returns a chained exception and before just a single exception
+    assert event["exception"]["values"][-1]["mechanism"]["type"] == "pyramid"
+    assert event["exception"]["values"][-1]["type"] == "ZeroDivisionError"
 
 
 def test_has_context(route, get_client, sentry_init, capture_events):

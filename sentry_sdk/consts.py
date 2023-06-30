@@ -45,6 +45,14 @@ DEFAULT_MAX_BREADCRUMBS = 100
 
 MATCH_ALL = r".*"
 
+FALSE_VALUES = [
+    "false",
+    "no",
+    "off",
+    "n",
+    "0",
+]
+
 
 class INSTRUMENTER:
     SENTRY = "sentry"
@@ -99,6 +107,12 @@ class SPANDATA:
     """
     The HTTP method used.
     Example: GET
+    """
+
+    HTTP_STATUS_CODE = "http.response.status_code"
+    """
+    The HTTP status code as an integer.
+    Example: 418
     """
 
 
@@ -189,7 +203,7 @@ class ClientConstructor(object):
         trace_propagation_targets=[  # noqa: B006
             MATCH_ALL
         ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[str]  # noqa: B006
+        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
     ):
         # type: (...) -> None
@@ -214,4 +228,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.23.1"
+VERSION = "1.26.0"

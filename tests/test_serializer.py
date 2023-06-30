@@ -76,7 +76,9 @@ def test_bytes_serialization_repr(message_normalizer):
 def test_bytearray_serialization_decode(message_normalizer):
     binary = bytearray(b"abc123\x80\xf0\x9f\x8d\x95")
     result = message_normalizer(binary, should_repr_strings=False)
-    assert result == "abc123\ufffd\U0001f355"
+    # fmt: off
+    assert result == u"abc123\ufffd\U0001f355"
+    # fmt: on
 
 
 @pytest.mark.xfail(sys.version_info < (3,), reason="Known safe_repr bugs in Py2.7")

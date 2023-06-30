@@ -1,5 +1,5 @@
 pip  # always use newest pip
-mock # for testing under python < 3.3
+mock ; python_version<'3.3'
 pytest<7
 pytest-cov==2.8.1
 pytest-forked<=1.4.0
@@ -11,4 +11,5 @@ pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/
 executing
 asttokens
 responses
+pysocks
 ipdb

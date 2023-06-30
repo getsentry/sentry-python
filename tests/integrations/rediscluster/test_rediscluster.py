@@ -14,7 +14,6 @@ if hasattr(rediscluster, "StrictRedisCluster"):
 
 @pytest.fixture(autouse=True)
 def monkeypatch_rediscluster_classes(reset_integrations):
-
     try:
         pipeline_cls = rediscluster.pipeline.ClusterPipeline
     except AttributeError:

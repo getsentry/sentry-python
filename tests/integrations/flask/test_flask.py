@@ -765,6 +765,25 @@ def test_tracing_error(sentry_init, capture_events, app):
     assert exception["type"] == "ZeroDivisionError"
 
 
+def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        with app.test_client() as client:
+            response = client.get("/error")
+            assert response.status_code == 500
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+
+
 def test_class_based_views(sentry_init, app, capture_events):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
@@ -816,3 +835,26 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
         response = client.get("/")
         assert response.status_code == 200
         assert response.data == b"hi"
+
+
+def test_request_not_modified_by_reference(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    @app.route("/", methods=["POST"])
+    def index():
+        logging.critical("oops")
+        assert request.get_json() == {"password": "ohno"}
+        assert request.headers["Authorization"] == "Bearer ohno"
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    client.post(
+        "/", json={"password": "ohno"}, headers={"Authorization": "Bearer ohno"}
+    )
+
+    (event,) = events
+
+    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["headers"]["Authorization"] == "[Filtered]"

@@ -1,6 +1,13 @@
 import copy
+import os
+import pytest
 from sentry_sdk import capture_exception
 from sentry_sdk.scope import Scope
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 def test_copying():
@@ -62,3 +69,91 @@ def test_common_args():
     assert s2._extras == {"k": "v", "foo": "bar"}
     assert s2._tags == {"a": "b", "x": "y"}
     assert s2._contexts == {"os": {"name": "Blafasel"}, "device": {"a": "b"}}
+
+
+BAGGAGE_VALUE = (
+    "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+    "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+    "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+)
+
+SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
+
+
+@pytest.mark.parametrize(
+    "env,excepted_value",
+    [
+        (
+            {
+                "SENTRY_TRACE": SENTRY_TRACE_VALUE,
+            },
+            {
+                "sentry-trace": SENTRY_TRACE_VALUE,
+            },
+        ),
+        (
+            {
+                "SENTRY_BAGGAGE": BAGGAGE_VALUE,
+            },
+            {
+                "baggage": BAGGAGE_VALUE,
+            },
+        ),
+        (
+            {
+                "SENTRY_TRACE": SENTRY_TRACE_VALUE,
+                "SENTRY_BAGGAGE": BAGGAGE_VALUE,
+            },
+            {
+                "sentry-trace": SENTRY_TRACE_VALUE,
+                "baggage": BAGGAGE_VALUE,
+            },
+        ),
+        (
+            {
+                "SENTRY_USE_ENVIRONMENT": "",
+                "SENTRY_TRACE": SENTRY_TRACE_VALUE,
+                "SENTRY_BAGGAGE": BAGGAGE_VALUE,
+            },
+            {
+                "sentry-trace": SENTRY_TRACE_VALUE,
+                "baggage": BAGGAGE_VALUE,
+            },
+        ),
+        (
+            {
+                "SENTRY_USE_ENVIRONMENT": "True",
+                "SENTRY_TRACE": SENTRY_TRACE_VALUE,
+                "SENTRY_BAGGAGE": BAGGAGE_VALUE,
+            },
+            {
+                "sentry-trace": SENTRY_TRACE_VALUE,
+                "baggage": BAGGAGE_VALUE,
+            },
+        ),
+        (
+            {
+                "SENTRY_USE_ENVIRONMENT": "no",
+                "SENTRY_TRACE": SENTRY_TRACE_VALUE,
+                "SENTRY_BAGGAGE": BAGGAGE_VALUE,
+            },
+            None,
+        ),
+        (
+            {
+                "SENTRY_USE_ENVIRONMENT": "True",
+                "MY_OTHER_VALUE": "asdf",
+                "SENTRY_RELEASE": "1.0.0",
+            },
+            None,
+        ),
+    ],
+)
+def test_load_trace_data_from_env(env, excepted_value):
+    new_env = os.environ.copy()
+    new_env.update(env)
+
+    with mock.patch.dict(os.environ, new_env):
+        s = Scope()
+        incoming_trace_data = s._load_trace_data_from_env()
+        assert incoming_trace_data == excepted_value

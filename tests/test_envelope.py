@@ -88,6 +88,7 @@ def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
 
     sentry_init(
         dsn="https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+        traces_sample_rate=1.0,
     )
     envelopes = capture_envelopes()
 
