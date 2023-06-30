@@ -812,8 +812,7 @@ def test_sentry_trace_context(sentry_init, app, capture_events):
 
     @app.route("/")
     def index():
-        sentry_span = Hub.current.scope.span
-        capture_message(sentry_span.to_traceparent())
+        capture_message(Hub.current.get_traceparent())
         return render_template_string("{{ sentry_trace }}")
 
     with app.test_client() as client:
