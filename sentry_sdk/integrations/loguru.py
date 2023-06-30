@@ -15,7 +15,8 @@ if TYPE_CHECKING:
     from typing import Optional, Tuple
 
 try:
-    from loguru import logger, FormatFunction
+    import loguru
+    from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 except ImportError:
     raise DidNotEnable("LOGURU is not installed")
@@ -50,7 +51,7 @@ class LoguruIntegration(Integration):
         breadcrumb_format=DEFAULT_FORMAT,
         event_format=DEFAULT_FORMAT,
     ):
-        # type: (Optional[int], Optional[int], str | FormatFunction, str | FormatFunction) -> None
+        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction) -> None
         global _ADDED_HANDLERS
         breadcrumb_handler, event_handler = _ADDED_HANDLERS
 
