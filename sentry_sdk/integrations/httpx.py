@@ -1,3 +1,6 @@
+import json
+from urllib.parse import parse_qsl
+
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -5,15 +8,20 @@ from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
+    SentryGraphQLClientError,
     capture_internal_exceptions,
+    event_from_exception,
     logger,
     parse_url,
+    _get_graphql_operation_name,
+    _get_graphql_operation_type,
 )
-
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Dict, Tuple
+    from sentry_sdk._types import EventProcessor
 
 
 try:
@@ -86,6 +94,8 @@ def _install_httpx_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
+            _capture_graphql_errors(hub, request, rv)
+
             return rv
 
     Client.send = send
@@ -139,6 +149,86 @@ def _install_httpx_async_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
+            _capture_graphql_errors(hub, request, rv)
+
             return rv
 
     AsyncClient.send = send
+
+
+def _make_request_processor(request, response):
+    # type: (Request, Response) -> EventProcessor
+    def httpx_processor(
+        event,  # type: Dict[str, Any]
+        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+    ):
+        # type: (...) -> Dict[str, Any]
+        with capture_internal_exceptions():
+            request_info = event.setdefault("request", {})
+
+            parsed_url = parse_url(str(request.url), sanitize=False)
+            request_info["url"] = parsed_url.url
+            request_info["method"] = request.method
+            request_info["headers"] = _filter_headers(dict(request.headers))
+            request_info["query_string"] = parsed_url.query
+
+            if request.content:
+                try:
+                    request_info["data"] = json.loads(request.content)
+                except json.JSONDecodeError:
+                    pass
+
+            if response:
+                response_content = response.json()
+                contexts = event.setdefault("contexts", {})
+                response_context = contexts.setdefault("response", {})
+                response_context["data"] = response_content
+
+            if request.url.path == "/graphql":
+                request_info["api_target"] = "graphql"
+
+                query = request_info.get("data")
+                if request.method == "GET":
+                    query = dict(parse_qsl(request.url.query.decode()))
+
+                if query:
+                    operation_name = _get_graphql_operation_name(query)
+                    operation_type = _get_graphql_operation_type(query)
+                    event["fingerprint"] = [operation_name, operation_type, 200]
+                    event["exception"]["values"][0][
+                        "value"
+                    ] = "GraphQL request failed, name: {}, type: {}".format(
+                        operation_name, operation_type
+                    )
+
+        return event
+
+    return httpx_processor
+
+
+def _capture_graphql_errors(hub, request, response):
+    if (
+        request.url.path == "/graphql"
+        and request.method in ("GET", "POST")
+        and response.status_code == 200
+    ):
+        with hub.configure_scope() as scope:
+            scope.add_event_processor(_make_request_processor(request, response))
+
+            with capture_internal_exceptions():
+                response_content = response.json()
+                if isinstance(response_content, dict) and response_content.get(
+                    "errors"
+                ):
+                    try:
+                        raise SentryGraphQLClientError
+                    except SentryGraphQLClientError as ex:
+                        event, hint = event_from_exception(
+                            ex,
+                            client_options=hub.client.options if hub.client else None,
+                            mechanism={
+                                "type": HttpxIntegration.identifier,
+                                "handled": False,
+                            },
+                        )
+                    hub.capture_event(event, hint=hint)

@@ -1273,6 +1273,35 @@ class ServerlessTimeoutWarning(Exception):  # noqa: N818
     pass
 
 
+class SentryGraphQLClientError(Exception):
+    """Synthetic exception for GraphQL client errors."""
+
+    pass
+
+
+def _get_graphql_operation_name(query):
+    # type: (dict) -> str
+    if query.get("operationName"):
+        return query["operationName"]
+
+    query = query["query"].strip()
+
+    match = re.match(r"^[a-z]* +([a-zA-Z0-9]+) \(?.*\)? *\{", query)
+    if match:
+        return match.group(1)
+    return "anonymous"
+
+
+def _get_graphql_operation_type(query):
+    # type: (dict) -> str
+    query = query["query"].strip()
+    if query.startswith("mutation"):
+        return "mutation"
+    if query.startswith("subscription"):
+        return "subscription"
+    return "query"
+
+
 class TimeoutThread(threading.Thread):
     """Creates a Thread which runs (sleeps) for a time duration equal to
     waiting_time and raises a custom ServerlessTimeout exception.
