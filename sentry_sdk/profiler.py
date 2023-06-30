@@ -728,10 +728,26 @@ class Profile(object):
 
     def valid(self):
         # type: () -> bool
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+        if client is None:
+            return False
+
+        if not has_profiling_enabled(client.options):
+            return False
+
         if self.sampled is None or not self.sampled:
+            if client.transport:
+                client.transport.record_lost_event(
+                    "sample_rate", data_category="profile"
+                )
             return False
 
         if self.unique_samples < PROFILE_MINIMUM_SAMPLES:
+            if client.transport:
+                client.transport.record_lost_event(
+                    "insufficient_data", data_category="profile"
+                )
             logger.debug("[Profiling] Discarding profile because insufficient samples.")
             return False
 
