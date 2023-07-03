@@ -104,10 +104,10 @@ def enable_tracing_meta_tags():
             return original_content.fset(self, value)
 
         meta_tags = hub.trace_propagation_meta()
-        new_value = _ireplace(
+        value_with_meta_tags = _ireplace(
             "</head>", "%s\\g<matched_string>" % meta_tags, value, self.make_bytes
         )
-        return original_content.fset(self, new_value)
+        return original_content.fset(self, value_with_meta_tags)
 
     HttpResponse.content = content
 
