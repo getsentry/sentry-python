@@ -92,10 +92,12 @@ def inject_tracing_into_html():
 
     @property  # type: ignore
     def content(self):
+        # type: (HttpResponse) -> Union[str, bytes]
         return original_content.fget(self)
 
     @content.setter
     def content(self, value):
+        # type: (HttpResponse, Union[str, bytes]) -> None
         new_value = _ireplace(
             "</head>", "%s\\g<matched_string>" % meta_tags, value, self.make_bytes
         )
