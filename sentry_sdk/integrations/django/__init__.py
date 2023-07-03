@@ -98,6 +98,7 @@ class DjangoIntegration(Integration):
     middleware_spans = None
     signals_spans = None
     cache_spans = None
+    enable_trace_meta_tags = None
 
     def __init__(
         self,
@@ -105,8 +106,9 @@ class DjangoIntegration(Integration):
         middleware_spans=True,
         signals_spans=True,
         cache_spans=False,
+        enable_trace_meta_tags=True,
     ):
-        # type: (str, bool, bool, bool) -> None
+        # type: (str, bool, bool, bool, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -116,6 +118,7 @@ class DjangoIntegration(Integration):
         self.middleware_spans = middleware_spans
         self.signals_spans = signals_spans
         self.cache_spans = cache_spans
+        self.enable_trace_meta_tags = enable_trace_meta_tags
 
     @staticmethod
     def setup_once():

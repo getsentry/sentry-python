@@ -84,6 +84,7 @@ def inject_tracing_into_html():
     Inject the Sentry tracing meta tags into the HTML response.
     """
     from django.http.response import HttpResponse
+    from sentry_sdk.integrations.django import DjangoIntegration
 
     original_content = HttpResponse.content
 
@@ -98,6 +99,15 @@ def inject_tracing_into_html():
     @content.setter
     def content(self, value):
         # type: (HttpResponse, Union[str, bytes]) -> None
+        hub = Hub.current
+        integration = hub.get_integration(DjangoIntegration)
+        if (
+            integration is None
+            or integration
+            and integration.enable_trace_meta_tags is False
+        ):
+            return original_content.fset(self, value)
+
         new_value = _ireplace(
             "</head>", "%s\\g<matched_string>" % meta_tags, value, self.make_bytes
         )
