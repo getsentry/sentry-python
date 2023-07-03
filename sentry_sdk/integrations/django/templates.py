@@ -118,6 +118,8 @@ def enable_tracing_meta_tags():
 
 def patch_templates():
     # type: () -> None
+    enable_tracing_meta_tags()
+
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
 
