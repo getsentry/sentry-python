@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from typing import Optional, Tuple
 
 try:
+    import loguru
     from loguru import logger
+    from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 except ImportError:
     raise DidNotEnable("LOGURU is not installed")
 
@@ -42,8 +44,14 @@ _ADDED_HANDLERS = (None, None)  # type: Tuple[Optional[int], Optional[int]]
 class LoguruIntegration(Integration):
     identifier = "loguru"
 
-    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        # type: (Optional[int], Optional[int]) -> None
+    def __init__(
+        self,
+        level=DEFAULT_LEVEL,
+        event_level=DEFAULT_EVENT_LEVEL,
+        breadcrumb_format=DEFAULT_FORMAT,
+        event_format=DEFAULT_FORMAT,
+    ):
+        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction) -> None
         global _ADDED_HANDLERS
         breadcrumb_handler, event_handler = _ADDED_HANDLERS
 
@@ -56,12 +64,16 @@ class LoguruIntegration(Integration):
 
         if level is not None:
             breadcrumb_handler = logger.add(
-                LoguruBreadcrumbHandler(level=level), level=level
+                LoguruBreadcrumbHandler(level=level),
+                level=level,
+                format=breadcrumb_format,
             )
 
         if event_level is not None:
             event_handler = logger.add(
-                LoguruEventHandler(level=event_level), level=event_level
+                LoguruEventHandler(level=event_level),
+                level=event_level,
+                format=event_format,
             )
 
         _ADDED_HANDLERS = (breadcrumb_handler, event_handler)
