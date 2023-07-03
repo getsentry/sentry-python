@@ -9,7 +9,7 @@ quart = pytest.importorskip("quart")
 from quart import Quart, Response, abort, stream_with_context
 from quart.views import View
 
-from quart_auth import AuthManager, AuthUser, login_user
+from quart_auth import QuartAuth, AuthUser, login_user
 
 from sentry_sdk import (
     set_tag,
@@ -22,7 +22,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
 
 
-auth_manager = AuthManager()
+auth_manager = QuartAuth()
 
 
 @pytest_asyncio.fixture
