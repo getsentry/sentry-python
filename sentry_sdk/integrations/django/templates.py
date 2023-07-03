@@ -91,11 +91,13 @@ def enable_tracing_meta_tags():
     hub = Hub.current
     meta_tags = hub.trace_propagation_meta()
 
+    # We need to specify both, the property and the setter for monkey patching a property.
     @property  # type: ignore
     def content(self):
         # type: (HttpResponse) -> Union[str, bytes]
         return original_content.fget(self)
 
+    # We need to specify both, the property and the setter for monkey patching a property.
     @content.setter
     def content(self, value):
         # type: (HttpResponse, Union[str, bytes]) -> None
