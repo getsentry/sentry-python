@@ -88,9 +88,6 @@ def enable_tracing_meta_tags():
 
     original_content = HttpResponse.content
 
-    hub = Hub.current
-    meta_tags = hub.trace_propagation_meta()
-
     # We need to specify both, the property and the setter for monkey patching a property.
     @property  # type: ignore
     def content(self):
@@ -106,6 +103,7 @@ def enable_tracing_meta_tags():
         if integration is None or integration.enable_tracing_meta_tags is False:
             return original_content.fset(self, value)
 
+        meta_tags = hub.trace_propagation_meta()
         new_value = _ireplace(
             "</head>", "%s\\g<matched_string>" % meta_tags, value, self.make_bytes
         )
