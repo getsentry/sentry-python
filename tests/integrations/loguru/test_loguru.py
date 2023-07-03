@@ -75,3 +75,43 @@ def test_just_log(
     assert event["level"] == (level.name.lower())
     assert event["logger"] == "tests.integrations.loguru.test_loguru"
     assert event["logentry"]["message"][23:] == formatted_message
+
+
+def test_breadcrumb_format(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            LoguruIntegration(
+                level=LoggingLevels.INFO.value,
+                event_level=None,
+                breadcrumb_format="{message}",
+            )
+        ],
+        default_integrations=False,
+    )
+
+    logger.info("test")
+    formatted_message = "test"
+
+    breadcrumbs = sentry_sdk.Hub.current.scope._breadcrumbs
+    (breadcrumb,) = breadcrumbs
+    assert breadcrumb["message"] == formatted_message
+
+
+def test_event_format(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            LoguruIntegration(
+                level=None,
+                event_level=LoggingLevels.ERROR.value,
+                event_format="{message}",
+            )
+        ],
+        default_integrations=False,
+    )
+    events = capture_events()
+
+    logger.error("test")
+    formatted_message = "test"
+
+    (event,) = events
+    assert event["logentry"]["message"] == formatted_message
