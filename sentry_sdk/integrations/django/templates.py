@@ -101,11 +101,7 @@ def enable_tracing_meta_tags():
         # type: (HttpResponse, Union[str, bytes]) -> None
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
-        if (
-            integration is None
-            or integration
-            and integration.enable_tracing_meta_tags is False
-        ):
+        if integration is None or integration.enable_tracing_meta_tags is False:
             return original_content.fset(self, value)
 
         new_value = _ireplace(
