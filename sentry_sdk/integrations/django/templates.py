@@ -1,3 +1,5 @@
+import re
+
 from django.template import TemplateSyntaxError
 from django import VERSION as DJANGO_VERSION
 
@@ -7,10 +9,12 @@ from sentry_sdk.consts import OP
 
 if TYPE_CHECKING:
     from typing import Any
+    from typing import Callable
     from typing import Dict
     from typing import Optional
     from typing import Iterator
     from typing import Tuple
+    from typing import Union
 
 try:
     # support Django 1.9
@@ -50,6 +54,54 @@ def _get_template_name_description(template_name):
             return "[{}, ...]".format(template_name[0])
     else:
         return template_name
+
+
+def _ireplace(old, repl, text, make_bytes):
+    # type: (str, str,  Union[str, bytes], Callable[[str], bytes]) -> Union[str, bytes]
+    """
+    Find `old` in `text` and replace with `repl` ignoring case.
+    Also providing a `<matched_string>` named group so in `repl` the matched string in `old` can be used.
+    If the given text is bytes, `make_bytes` is used to convert the strings to bytes.
+    """
+    if isinstance(text, (bytes, bytearray)):
+        return re.sub(
+            make_bytes("(?P<matched_string>")
+            + re.escape(make_bytes(old))
+            + make_bytes(")"),
+            make_bytes(repl),
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    return re.sub(
+        "(?P<matched_string>" + re.escape(old) + ")", repl, text, flags=re.IGNORECASE
+    )
+
+
+def inject_tracing_into_html():
+    # type: () -> None
+    """
+    Inject the Sentry tracing meta tags into the HTML response.
+    """
+    from django.http.response import HttpResponse
+
+    original_content = HttpResponse.content
+
+    hub = Hub.current
+    meta_tags = hub.trace_propagation_meta()
+
+    @property  # type: ignore
+    def content(self):
+        return original_content.fget(self)
+
+    @content.setter
+    def content(self, value):
+        new_value = _ireplace(
+            "</head>", "%s\\g<matched_string>" % meta_tags, value, self.make_bytes
+        )
+        return original_content.fset(self, new_value)
+
+    HttpResponse.content = content
 
 
 def patch_templates():
