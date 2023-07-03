@@ -104,7 +104,7 @@ def inject_tracing_into_html():
         if (
             integration is None
             or integration
-            and integration.enable_trace_meta_tags is False
+            and integration.enable_tracing_meta_tags is False
         ):
             return original_content.fset(self, value)
 
