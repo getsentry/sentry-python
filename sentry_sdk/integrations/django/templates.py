@@ -78,7 +78,7 @@ def _ireplace(old, repl, text, make_bytes):
     )
 
 
-def inject_tracing_into_html():
+def enable_tracing_meta_tags():
     # type: () -> None
     """
     Inject the Sentry tracing meta tags into the HTML response.

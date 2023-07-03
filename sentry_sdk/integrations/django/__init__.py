@@ -43,7 +43,7 @@ except ImportError:
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.templates import (
     get_template_frame_from_exception,
-    inject_tracing_into_html,
+    enable_tracing_meta_tags,
     patch_templates,
 )
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
@@ -236,7 +236,7 @@ class DjangoIntegration(Integration):
         patch_django_middlewares()
         patch_views()
         patch_templates()
-        inject_tracing_into_html()
+        enable_tracing_meta_tags()
         patch_signals()
 
         if patch_caching is not None:
