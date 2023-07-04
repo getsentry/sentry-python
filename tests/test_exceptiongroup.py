@@ -47,6 +47,7 @@ def test_exceptiongroup():
         client_options={
             "include_local_variables": True,
             "include_source_context": True,
+            "max_string_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
     )
@@ -162,6 +163,7 @@ def test_exceptiongroup_simple():
         client_options={
             "include_local_variables": True,
             "include_source_context": True,
+            "max_string_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
     )
@@ -207,6 +209,7 @@ def test_exception_chain_cause():
         client_options={
             "include_local_variables": True,
             "include_source_context": True,
+            "max_string_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
     )
@@ -246,6 +249,7 @@ def test_exception_chain_context():
         client_options={
             "include_local_variables": True,
             "include_source_context": True,
+            "max_string_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
     )
@@ -284,6 +288,7 @@ def test_simple_exception():
         client_options={
             "include_local_variables": True,
             "include_source_context": True,
+            "max_string_length": 1024,
         },
         mechanism={"type": "test_suite", "handled": False},
     )
