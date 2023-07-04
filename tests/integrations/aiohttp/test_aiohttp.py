@@ -505,3 +505,32 @@ async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_c
             parent_span_id=request_span.span_id,
             sampled=1,
         )
+
+
+@pytest.mark.asyncio
+async def test_outgoing_trace_headers_append_to_baggage(
+    sentry_init, aiohttp_raw_server, aiohttp_client
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+    )
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    with start_transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+        trace_id="0123456789012345678901234567890",
+    ):
+        client = await aiohttp_client(raw_server)
+        resp = await client.get("/", headers={"bagGage": "custom=value"})
+
+        assert (
+            resp.request_info.headers["baggage"]
+            == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0"
+        )
