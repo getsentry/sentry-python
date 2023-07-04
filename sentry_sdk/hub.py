@@ -791,14 +791,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         sentry_trace = self.get_traceparent()
         if sentry_trace is not None:
-            meta += '<meta name="%s" content="%s" />' % (
+            meta += '<meta name="%s" content="%s">' % (
                 SENTRY_TRACE_HEADER_NAME,
                 sentry_trace,
             )
 
         baggage = self.get_baggage()
         if baggage is not None:
-            meta += '<meta name="%s" content="%s" />' % (
+            meta += '<meta name="%s" content="%s">' % (
                 BAGGAGE_HEADER_NAME,
                 baggage,
             )

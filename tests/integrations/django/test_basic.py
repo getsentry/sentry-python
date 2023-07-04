@@ -706,6 +706,22 @@ def test_read_request(sentry_init, client, capture_events):
     assert "data" not in event["request"]
 
 
+def test_template_tracing_meta(sentry_init, client, capture_exceptions, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    exceptions = capture_exceptions()
+    events = capture_events()
+    content, status, headers = client.get(reverse("template_test3"))
+
+    content = b"".join(content).decode("utf-8")
+    assert content == "ok"
+
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
+
+
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
 def test_template_exception(
     sentry_init, client, capture_events, with_executing_integration
