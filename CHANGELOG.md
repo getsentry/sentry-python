@@ -13,8 +13,7 @@
 - Take trace ID always from propagation context (#2209) by @antonpirker
 - Fix trace context in event payload (#2205) by @antonpirker
 - Use new top level API in `trace_propagation_meta` (#2202) by @antonpirker
-- Do not overwrite existing baggage on outgoing requests (#2191) by @sentrivana
-- Don't overwrite existing `aiohttp` baggage (#2214) by @sentrivana
+- Do not overwrite existing baggage on outgoing requests (#2191, #2214) by @sentrivana
 - Set the transaction/span status from an OTel span (#2115) by @daniil-konovalenko
 - Fix propagation of OTel `NonRecordingSpan` (#2187) by @hartungstenio
 - Fix `TaskLockedException` handling in Huey integration (#2206) by @Zhenay
