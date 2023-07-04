@@ -706,6 +706,26 @@ def test_read_request(sentry_init, client, capture_events):
     assert "data" not in event["request"]
 
 
+def test_template_tracing_meta(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    # The view will capture_message the sentry-trace and baggage information
+    content, _, _ = client.get(reverse("template_test3"))
+    rendered_meta = b"".join(content).decode("utf-8")
+
+    traceparent, baggage = events[0]["message"].split("\n")
+    expected_meta = (
+        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">\n'
+        % (
+            traceparent,
+            baggage,
+        )
+    )
+
+    assert rendered_meta == expected_meta
+
+
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
 def test_template_exception(
     sentry_init, client, capture_events, with_executing_integration
