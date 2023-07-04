@@ -416,35 +416,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(
-        self,
-        crumb=None,  # type: Optional[Breadcrumb]
-        hint=None,  # type: Optional[BreadcrumbHint]
-        timestamp=None,  # type: Optional[datetime]
-        type=None,  # type: Optional[str]
-        data=None,  # type: Optional[Dict[str, Any]]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> None
+    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
+        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """
         Adds a breadcrumb.
 
-        :param crumb: Dictionary with the data as the Sentry v7/v8 protocol expects.
+        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
 
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
-
-        :param timestamp: The timestamp associated with this breadcrumb. Defaults
-            to now if not provided.
-
-        :param type: The type of the breadcrumb. Will be set to "default" if
-            not provided.
-
-        :param data: Additional custom data to put on the breadcrumb.
-
-        :param kwargs: Adding any further keyword arguments will not result in
-            an error, but the breadcrumb will be dropped before arriving to
-            Sentry.
         """
         client, scope = self._stack[-1]
         if client is None:
@@ -452,12 +432,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return
 
         crumb = dict(crumb or ())  # type: Breadcrumb
-        if timestamp is not None:
-            crumb["timestamp"] = timestamp
-        if type is not None:
-            crumb["type"] = type
-        if data is not None:
-            crumb["data"] = data
         crumb.update(kwargs)
         if not crumb:
             return

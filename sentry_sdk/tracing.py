@@ -837,7 +837,6 @@ def trace(func=None):
         @sentry_sdk.trace
         async def my_async_function():
             ...
-
     """
     if PY2:
         from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
