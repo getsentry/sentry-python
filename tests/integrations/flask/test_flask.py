@@ -810,7 +810,7 @@ def test_class_based_views(sentry_init, app, capture_events):
     "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
 )
 def test_sentry_trace_context(sentry_init, app, capture_events, template_string):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
     @app.route("/")
