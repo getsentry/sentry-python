@@ -97,7 +97,9 @@ def _add_sentry_trace(sender, template, context, **extra):
         return
 
     hub = Hub.current
-    context["sentry_trace"] = Markup(hub.trace_propagation_meta())
+    trace_meta = Markup(hub.trace_propagation_meta())
+    context["sentry_trace"] = trace_meta  # for backwads compatibility
+    context["sentry_trace_meta"] = trace_meta
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
