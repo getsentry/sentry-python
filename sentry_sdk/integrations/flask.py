@@ -98,7 +98,7 @@ def _add_sentry_trace(sender, template, context, **extra):
 
     hub = Hub.current
     trace_meta = Markup(hub.trace_propagation_meta())
-    context["sentry_trace"] = trace_meta  # for backwads compatibility
+    context["sentry_trace"] = trace_meta  # for backwards compatibility
     context["sentry_trace_meta"] = trace_meta
 
 
