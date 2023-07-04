@@ -7,6 +7,8 @@
 - Support for SQLAlchemy 2.0 (#2200) by @antonpirker
 - Add instrumentation of `aiohttp` client requests (#1761) by @md384
 - Add Django template tag for adding Sentry tracing information (#2222) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Django templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace.
+
 - Update Flask HTML meta helper (#2203) by @antonpirker
 - Take trace ID always from propagation context (#2209) by @antonpirker
 - Fix trace context in event payload (#2205) by @antonpirker
