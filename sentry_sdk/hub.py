@@ -805,7 +805,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         baggage = self.get_baggage()
         if baggage is not None:
-            meta += '<meta name="%s" content="%s">' % (BAGGAGE_HEADER_NAME, baggage)
+            meta += '<meta name="%s" content="%s">' % (
+                BAGGAGE_HEADER_NAME,
+                baggage,
+            )
 
         return meta
 
