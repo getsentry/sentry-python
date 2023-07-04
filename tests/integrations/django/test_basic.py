@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import json
 import pytest
 import random
+import re
 from functools import partial
 
 from werkzeug.test import Client
@@ -704,6 +705,15 @@ def test_read_request(sentry_init, client, capture_events):
     (event,) = events
 
     assert "data" not in event["request"]
+
+
+def test_template_tracing_meta(sentry_init, client, capture_exceptions, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    content, _, _ = client.get(reverse("template_test3"))
+
+    content = b"".join(content).decode("utf-8")
+    pattern = r'^<meta name="sentry-trace" content="[^\"]*"><meta name="baggage" content="[^\"]*">\n$'
+    assert re.fullmatch(pattern, content) is not None
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])

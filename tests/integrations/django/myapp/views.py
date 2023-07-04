@@ -176,6 +176,11 @@ def template_test2(request, *args, **kwargs):
 
 
 @csrf_exempt
+def template_test3(request, *args, **kwargs):
+    return render(request, "trace_meta.html", {})
+
+
+@csrf_exempt
 def postgres_select(request, *args, **kwargs):
     from django.db import connections
 
