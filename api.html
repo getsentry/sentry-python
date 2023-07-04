@@ -1,37 +1,240 @@
 <!DOCTYPE html>
-
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Main API - sentry-python 1.27.0 documentation</title>
+    <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" />
+  <script>
+    const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const sessionTheme = sessionStorage['_theme']
+    if (sessionTheme) {
+      document.documentElement.classList.add(sessionTheme)
+    } else if (isDarkTheme) {
+      document.documentElement.classList.add('dark')
+    }
+  </script><link rel="stylesheet" href="_static/pygments.css?v=2023.6.30" type="text/css" />
+    <link rel="stylesheet" href="_static/shibuya.css?v=2023.6.30" type="text/css" />
+    <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=2023.6.30" />
+    <style>
+:root {
+  --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:4rem;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));
+  --sy-rc-theme:143, 118, 214;--sy-rc-bg:255, 255, 255;--sy-rc-invert:0, 0, 0;--sy-rc-text:0, 0, 0;--sy-c-bg:#fff;--sy-c-bg-weak:#f9f9f9;--sy-c-text:#374151;--sy-c-text-weak:#6b7280;--sy-c-heading:#111827;--sy-c-bold:#111827;--sy-c-foot-text:#232226;--sy-c-foot-bg:#fafafa;--sy-c-foot-divider:#f0f0f0;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --sy-rc-theme:143, 118, 214;--sy-rc-bg:255, 255, 255;--sy-rc-invert:0, 0, 0;--sy-rc-text:0, 0, 0;--sy-c-bg:#fff;--sy-c-bg-weak:#f9f9f9;--sy-c-text:#374151;--sy-c-text-weak:#6b7280;--sy-c-heading:#111827;--sy-c-bold:#111827;--sy-c-foot-text:#232226;--sy-c-foot-bg:#fafafa;--sy-c-foot-divider:#f0f0f0;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sy-rc-theme:143, 118, 214;--sy-rc-bg:18, 18, 18;--sy-rc-invert:255, 255, 255;--sy-rc-text:255, 255, 255;--sy-c-bg:#121212;--sy-c-bg-weak:#212833;--sy-c-text:#cedbea;--sy-c-text-weak:#77889f;--sy-c-heading:#ebf0f4;--sy-c-bold:#ebf0f4;--sy-c-foot-text:#eee;--sy-c-foot-bg:#000;--sy-c-foot-divider:#000;
+  }
+}
+html.light {
+  --sy-rc-theme:143, 118, 214;--sy-rc-bg:255, 255, 255;--sy-rc-invert:0, 0, 0;--sy-rc-text:0, 0, 0;--sy-c-bg:#fff;--sy-c-bg-weak:#f9f9f9;--sy-c-text:#374151;--sy-c-text-weak:#6b7280;--sy-c-heading:#111827;--sy-c-bold:#111827;--sy-c-foot-text:#232226;--sy-c-foot-bg:#fafafa;--sy-c-foot-divider:#f0f0f0;
+}
+html.dark {
+  --sy-rc-theme:143, 118, 214;--sy-rc-bg:18, 18, 18;--sy-rc-invert:255, 255, 255;--sy-rc-text:255, 255, 255;--sy-c-bg:#121212;--sy-c-bg-weak:#212833;--sy-c-text:#cedbea;--sy-c-text-weak:#77889f;--sy-c-heading:#ebf0f4;--sy-c-bold:#ebf0f4;--sy-c-foot-text:#eee;--sy-c-foot-bg:#000;--sy-c-foot-divider:#000;
+}
+</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sy-f-heading: Inter, var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
+}
+</style>
+    <meta property="og:type" content="website"/><meta property="og:title" content="Main API"/>
+<meta name="twitter:card" content="summary"/></head>
+<body><div class="document"><div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <div class="sy-head-links flex items-center">
+      <div class="md:hidden flex items-center">
+        <button class="hamburger js-menu mr-3" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2 -translate-x-2"></span>
+          <span class="hamburger_3 -translate-x-1"></span>
+        </button>
+      </div>
+      <a class="sy-head-brand" href="index.html">
+        
+        
+        <strong>sentry-python</strong>
+      </a></div>
+    <div class="sy-head-actions flex gap-2 items-center print:hidden">
+      
+      <div class="hidden md:block"><form class="searchbox flex items-center" action="search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form>
+      </div>
+        <a class="flex items-center ml-1" href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
+          <i class="i-icon github"></i>
+        </a>
+      <button class="js-theme theme-switch flex items-center ml-1" data-aria-light="Switch to dark mode" data-aria-dark="Switch to light mode">
+        <i class="i-icon theme-icon"></i>
+      </button>
+      
+        <button class="js-menu xl:hidden flex items-center ml-1" aria-label="Show table of contents" type="button" aria-controls="rside" aria-expanded="false">
+          <i class="i-icon outdent"></i>
+        </button>
+    </div>
+  </div>
+</div>
+<div class="sy-page sy-container flex mx-auto">
+  <aside id="lside" class="sy-lside md:w-64 md:shrink-0 print:hidden">
+    <div class="sy-lside-inner md:sticky">
+      <div class="sy-lside-top md:hidden pt-3 pb-3 px-6">
+        <div class="pt-3"><form class="searchbox flex items-center" action="search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <button>Go</button>
+</form>
+        </div></div>
+      <div class="sy-scrollbar p-6">
+        <div class="globaltoc">
+          <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Main API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="integrations.html">Integrations</a></li>
+</ul>
 
-    <title>Main API &#8212; sentry-python 1.26.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
-    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-    <script src="_static/doctools.js"></script>
-    <script src="_static/sphinx_highlight.js"></script>
-    <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Integrations" href="integrations.html" />
-    <link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" />
-   
-  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
-  
-  
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+        </div>
+      </div>
+    </div>
+  </aside>
+  <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
+    <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
+      <i class="i-icon close"></i>
+    </button>
+    <div class="sy-scrollbar px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4">
+  <div class="localtoc">
+    <h3>Table of Contents</h3>
+    <ul>
+<li><a class="reference internal" href="#sentry_sdk.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.Client.capture_event"><code class="docutils literal notranslate"><span class="pre">Client.capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Client.close"><code class="docutils literal notranslate"><span class="pre">Client.close()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Client.dsn"><code class="docutils literal notranslate"><span class="pre">Client.dsn</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Client.flush"><code class="docutils literal notranslate"><span class="pre">Client.flush()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport"><code class="docutils literal notranslate"><span class="pre">HttpTransport</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.capture_envelope"><code class="docutils literal notranslate"><span class="pre">HttpTransport.capture_envelope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.capture_event"><code class="docutils literal notranslate"><span class="pre">HttpTransport.capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.flush"><code class="docutils literal notranslate"><span class="pre">HttpTransport.flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.kill"><code class="docutils literal notranslate"><span class="pre">HttpTransport.kill()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.record_lost_event"><code class="docutils literal notranslate"><span class="pre">HttpTransport.record_lost_event()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sentry_sdk.Hub"><code class="docutils literal notranslate"><span class="pre">Hub</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.Hub.add_breadcrumb"><code class="docutils literal notranslate"><span class="pre">Hub.add_breadcrumb()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.bind_client"><code class="docutils literal notranslate"><span class="pre">Hub.bind_client()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.capture_event"><code class="docutils literal notranslate"><span class="pre">Hub.capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.capture_exception"><code class="docutils literal notranslate"><span class="pre">Hub.capture_exception()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.capture_message"><code class="docutils literal notranslate"><span class="pre">Hub.capture_message()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.client"><code class="docutils literal notranslate"><span class="pre">Hub.client</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.configure_scope"><code class="docutils literal notranslate"><span class="pre">Hub.configure_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.continue_trace"><code class="docutils literal notranslate"><span class="pre">Hub.continue_trace()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.end_session"><code class="docutils literal notranslate"><span class="pre">Hub.end_session()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.flush"><code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.get_baggage"><code class="docutils literal notranslate"><span class="pre">Hub.get_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.get_integration"><code class="docutils literal notranslate"><span class="pre">Hub.get_integration()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.get_traceparent"><code class="docutils literal notranslate"><span class="pre">Hub.get_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.iter_trace_propagation_headers"><code class="docutils literal notranslate"><span class="pre">Hub.iter_trace_propagation_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.last_event_id"><code class="docutils literal notranslate"><span class="pre">Hub.last_event_id()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.pop_scope_unsafe"><code class="docutils literal notranslate"><span class="pre">Hub.pop_scope_unsafe()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.push_scope"><code class="docutils literal notranslate"><span class="pre">Hub.push_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.resume_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Hub.resume_auto_session_tracking()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.run"><code class="docutils literal notranslate"><span class="pre">Hub.run()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.scope"><code class="docutils literal notranslate"><span class="pre">Hub.scope</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.start_session"><code class="docutils literal notranslate"><span class="pre">Hub.start_session()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.start_span"><code class="docutils literal notranslate"><span class="pre">Hub.start_span()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.start_transaction"><code class="docutils literal notranslate"><span class="pre">Hub.start_transaction()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.stop_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Hub.stop_auto_session_tracking()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.trace_propagation_meta"><code class="docutils literal notranslate"><span class="pre">Hub.trace_propagation_meta()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sentry_sdk.Scope"><code class="docutils literal notranslate"><span class="pre">Scope</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_attachment"><code class="docutils literal notranslate"><span class="pre">Scope.add_attachment()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_error_processor"><code class="docutils literal notranslate"><span class="pre">Scope.add_error_processor()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_event_processor"><code class="docutils literal notranslate"><span class="pre">Scope.add_event_processor()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.apply_to_event"><code class="docutils literal notranslate"><span class="pre">Scope.apply_to_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.clear"><code class="docutils literal notranslate"><span class="pre">Scope.clear()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.clear_breadcrumbs"><code class="docutils literal notranslate"><span class="pre">Scope.clear_breadcrumbs()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.fingerprint"><code class="docutils literal notranslate"><span class="pre">Scope.fingerprint</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.generate_propagation_context"><code class="docutils literal notranslate"><span class="pre">Scope.generate_propagation_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_dynamic_sampling_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_dynamic_sampling_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_trace_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_trace_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_traceparent"><code class="docutils literal notranslate"><span class="pre">Scope.get_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.iter_headers"><code class="docutils literal notranslate"><span class="pre">Scope.iter_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.level"><code class="docutils literal notranslate"><span class="pre">Scope.level</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_context"><code class="docutils literal notranslate"><span class="pre">Scope.remove_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_extra"><code class="docutils literal notranslate"><span class="pre">Scope.remove_extra()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_tag"><code class="docutils literal notranslate"><span class="pre">Scope.remove_tag()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_context"><code class="docutils literal notranslate"><span class="pre">Scope.set_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_extra"><code class="docutils literal notranslate"><span class="pre">Scope.set_extra()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_level"><code class="docutils literal notranslate"><span class="pre">Scope.set_level()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_tag"><code class="docutils literal notranslate"><span class="pre">Scope.set_tag()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_transaction_name"><code class="docutils literal notranslate"><span class="pre">Scope.set_transaction_name()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_user"><code class="docutils literal notranslate"><span class="pre">Scope.set_user()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.span"><code class="docutils literal notranslate"><span class="pre">Scope.span</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.transaction"><code class="docutils literal notranslate"><span class="pre">Scope.transaction</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.user"><code class="docutils literal notranslate"><span class="pre">Scope.user</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sentry_sdk.Transport"><code class="docutils literal notranslate"><span class="pre">Transport</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.Transport.capture_envelope"><code class="docutils literal notranslate"><span class="pre">Transport.capture_envelope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.capture_event"><code class="docutils literal notranslate"><span class="pre">Transport.capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.flush"><code class="docutils literal notranslate"><span class="pre">Transport.flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.kill"><code class="docutils literal notranslate"><span class="pre">Transport.kill()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.record_lost_event"><code class="docutils literal notranslate"><span class="pre">Transport.record_lost_event()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sentry_sdk.add_breadcrumb"><code class="docutils literal notranslate"><span class="pre">add_breadcrumb()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.capture_event"><code class="docutils literal notranslate"><span class="pre">capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.capture_exception"><code class="docutils literal notranslate"><span class="pre">capture_exception()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.capture_message"><code class="docutils literal notranslate"><span class="pre">capture_message()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.configure_scope"><code class="docutils literal notranslate"><span class="pre">configure_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.continue_trace"><code class="docutils literal notranslate"><span class="pre">continue_trace()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.flush"><code class="docutils literal notranslate"><span class="pre">flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.get_baggage"><code class="docutils literal notranslate"><span class="pre">get_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.get_current_span"><code class="docutils literal notranslate"><span class="pre">get_current_span()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.get_traceparent"><code class="docutils literal notranslate"><span class="pre">get_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.last_event_id"><code class="docutils literal notranslate"><span class="pre">last_event_id()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.push_scope"><code class="docutils literal notranslate"><span class="pre">push_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.set_context"><code class="docutils literal notranslate"><span class="pre">set_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.set_extra"><code class="docutils literal notranslate"><span class="pre">set_extra()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.set_level"><code class="docutils literal notranslate"><span class="pre">set_level()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.set_tag"><code class="docutils literal notranslate"><span class="pre">set_tag()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.set_user"><code class="docutils literal notranslate"><span class="pre">set_user()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.start_span"><code class="docutils literal notranslate"><span class="pre">start_span()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.start_transaction"><code class="docutils literal notranslate"><span class="pre">start_transaction()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span"><code class="docutils literal notranslate"><span class="pre">Span</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_environ"><code class="docutils literal notranslate"><span class="pre">Span.continue_from_environ()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_headers"><code class="docutils literal notranslate"><span class="pre">Span.continue_from_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.from_traceparent"><code class="docutils literal notranslate"><span class="pre">Span.from_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.iter_headers"><code class="docutils literal notranslate"><span class="pre">Span.iter_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.new_span"><code class="docutils literal notranslate"><span class="pre">Span.new_span()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.start_child"><code class="docutils literal notranslate"><span class="pre">Span.start_child()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.timestamp"><code class="docutils literal notranslate"><span class="pre">Span.timestamp</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction"><code class="docutils literal notranslate"><span class="pre">Transaction</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.get_baggage"><code class="docutils literal notranslate"><span class="pre">Transaction.get_baggage()</span></code></a></li>
+</ul>
+</li>
+</ul>
 
-  </head><body>
-  
-
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          
-
-          <div class="body" role="main">
-            
-  <section id="main-api">
+  </div><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div>
+    </div>
+  </aside>
+  <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
+  <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+    <div class="flex flex-col break-words justify-between">
+      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-6 xl:px-12">
+        <article class="yue" role="main">
+          <section id="main-api">
 <h1>Main API<a class="headerlink" href="#main-api" title="Permalink to this heading">¶</a></h1>
 <span class="target" id="module-sentry_sdk"></span><dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.Client">
@@ -45,6 +248,8 @@
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>event</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]) – A ready-made event that can be directly sent to Sentry.</p></li>
 <li><p><strong>hint</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]]) – Contains metadata about the event that can be read from <cite>before_send</cite>, such as the original exception object or a HTTP request object.</p></li>
+<li><p><strong>scope</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]) – An optional scope to use for determining whether this event
+should be captured.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
@@ -199,10 +404,15 @@ to customize the breadcrumbs that are emitted.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.capture_event">
 <span class="sig-name descname"><span class="pre">capture_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_event" title="Permalink to this definition">¶</a></dt>
-<dd><p>Captures an event. Alias of <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>.</p>
+<dd><p>Captures an event.</p>
+<p>Alias of <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>scope_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – For supported <cite>**scope_args</cite> see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.update_from_kwargs()</span></code>.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -213,7 +423,11 @@ to customize the breadcrumbs that are emitted.</p></li>
 <dd><p>Captures an exception.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>error</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/types.html#types.TracebackType" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TracebackType</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]) – An exception to catch. If <cite>None</cite>, <cite>sys.exc_info()</cite> will be used.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>error</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/types.html#types.TracebackType" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TracebackType</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]) – An exception to catch. If <cite>None</cite>, <cite>sys.exc_info()</cite> will be used.</p></li>
+<li><p><strong>scope_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – For supported <cite>**scope_args</cite> see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.update_from_kwargs()</span></code>.</p></li>
+</ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
@@ -227,14 +441,22 @@ to customize the breadcrumbs that are emitted.</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.capture_message">
 <span class="sig-name descname"><span class="pre">capture_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.capture_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.capture_message" title="Permalink to this definition">¶</a></dt>
-<dd><p>Captures a message.  The message is just a string.  If no level
-is provided the default level is <cite>info</cite>.</p>
+<dd><p>Captures a message.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – The string to send as the message.</p></li>
+<li><p><strong>level</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]) – If no level is provided, the default level is <cite>info</cite>.</p></li>
+<li><p><strong>scope</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>]) – An optional <a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.Scope</span></code></a> to use.</p></li>
+<li><p><strong>scope_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – For supported <cite>**scope_args</cite> see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.update_from_kwargs()</span></code>.</p></li>
+</ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>).</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>).</p>
 </dd>
 </dl>
 </dd></dl>
@@ -263,6 +485,17 @@ is provided the default level is <cite>info</cite>.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.Hub.continue_trace">
+<span class="sig-name descname"><span class="pre">continue_trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environ_or_headers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.continue_trace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.continue_trace" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the propagation context from environment or headers and returns a transaction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.end_session">
 <span class="sig-name descname"><span class="pre">end_session</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.end_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.end_session" title="Permalink to this definition">¶</a></dt>
 <dd><p>Ends the current session if there is one.</p>
@@ -285,6 +518,17 @@ is provided the default level is <cite>info</cite>.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.Hub.get_baggage">
+<span class="sig-name descname"><span class="pre">get_baggage</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_baggage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_baggage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns Baggage either from the active span or from the scope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.get_integration">
 <span class="sig-name descname"><span class="pre">get_integration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name_or_class</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_integration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_integration" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the integration for this hub by name or class.  If there
@@ -295,6 +539,17 @@ client attached.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.Hub.get_traceparent">
+<span class="sig-name descname"><span class="pre">get_traceparent</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.get_traceparent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.get_traceparent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the traceparent either from the active span or from the scope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -399,17 +654,19 @@ with statement can be used on the hub directly.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.start_span">
 <span class="sig-name descname"><span class="pre">start_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">instrumenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sentry'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.start_span" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create and start timing a new span whose parent is the currently active
-span or transaction, if any. The return value is a span instance,
+<dd><p>Start a span whose parent is the currently active span or transaction, if any.</p>
+<p>The return value is a <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a> instance,
 typically used as a context manager to start and stop timing in a <cite>with</cite>
 block.</p>
 <p>Only spans contained in a transaction are sent to Sentry. Most
 integrations start a transaction at the appropriate time, for example
-for every incoming HTTP request. Use <cite>start_transaction</cite> to start a new
-transaction when one is not already in progress.</p>
+for every incoming HTTP request. Use
+<a class="reference internal" href="#sentry_sdk.start_transaction" title="sentry_sdk.start_transaction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.start_transaction()</span></code></a> to start a new transaction when
+one is not already in progress.</p>
+<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></p>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -431,9 +688,10 @@ finished at the end of the <cite>with</cite> block. If not using context manager
 call the <cite>.finish()</cite> method.</p>
 <p>When the transaction is finished, it will be sent to Sentry with all its
 finished child spans.</p>
+<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -454,8 +712,8 @@ To resume session tracking call <cite>resume_auto_session_tracking</cite>.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Hub.trace_propagation_meta">
 <span class="sig-name descname"><span class="pre">trace_propagation_meta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/hub.html#Hub.trace_propagation_meta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Hub.trace_propagation_meta" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return meta tags which should be injected into the HTML template
-to allow propagation of trace data.</p>
+<dd><p>Return meta tags which should be injected into HTML templates
+to allow propagation of trace information.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></p>
@@ -714,7 +972,7 @@ If not existing, creates a new one.</p>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.span">
-<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">span</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Span</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><span class="pre">None</span></a></em><a class="headerlink" href="#sentry_sdk.Scope.span" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">span</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><span class="pre">Span</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><span class="pre">None</span></a></em><a class="headerlink" href="#sentry_sdk.Scope.span" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get/set current tracing span or transaction.</p>
 </dd></dl>
 
@@ -823,10 +1081,15 @@ to customize the breadcrumbs that are emitted.</p></li>
 <dt class="sig sig-object py" id="sentry_sdk.capture_event">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></span><span class="sig-name descname"><span class="pre">capture_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.capture_event" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.capture_event" title="sentry_sdk.Hub.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_event()</span></code></a></p>
-<p>Captures an event. Alias of <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>.</p>
+<p>Captures an event.</p>
+<p>Alias of <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>scope_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – For supported <cite>**scope_args</cite> see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.update_from_kwargs()</span></code>.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -838,7 +1101,11 @@ to customize the breadcrumbs that are emitted.</p></li>
 <p>Captures an exception.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>error</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/types.html#types.TracebackType" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TracebackType</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]) – An exception to catch. If <cite>None</cite>, <cite>sys.exc_info()</cite> will be used.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>error</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/exceptions.html#BaseException" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseException</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/types.html#types.TracebackType" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TracebackType</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]) – An exception to catch. If <cite>None</cite>, <cite>sys.exc_info()</cite> will be used.</p></li>
+<li><p><strong>scope_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – For supported <cite>**scope_args</cite> see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.update_from_kwargs()</span></code>.</p></li>
+</ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
@@ -853,14 +1120,22 @@ to customize the breadcrumbs that are emitted.</p></li>
 <dt class="sig sig-object py" id="sentry_sdk.capture_message">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></span><span class="sig-name descname"><span class="pre">capture_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.capture_message" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.capture_message" title="sentry_sdk.Hub.capture_message"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_message()</span></code></a></p>
-<p>Captures a message.  The message is just a string.  If no level
-is provided the default level is <cite>info</cite>.</p>
+<p>Captures a message.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – The string to send as the message.</p></li>
+<li><p><strong>level</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]) – If no level is provided, the default level is <cite>info</cite>.</p></li>
+<li><p><strong>scope</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]) – An optional <a class="reference internal" href="#sentry_sdk.Scope" title="sentry_sdk.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.Scope</span></code></a> to use.</p></li>
+<li><p><strong>scope_args</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – For supported <cite>**scope_args</cite> see
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.update_from_kwargs()</span></code>.</p></li>
+</ul>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>).</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="#sentry_sdk.Client.capture_event" title="sentry_sdk.Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code></a>).</p>
 </dd>
 </dl>
 </dd></dl>
@@ -889,7 +1164,7 @@ is provided the default level is <cite>info</cite>.</p>
 <dd><p>Sets the propagation context from environment or headers and returns a transaction.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></p>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -923,7 +1198,7 @@ is provided the default level is <cite>info</cite>.</p>
 <dd><p>Returns the currently active span if there is one running, otherwise <cite>None</cite></p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code>]</p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1035,17 +1310,19 @@ be used to pop the scope again.</p>
 <dt class="sig sig-object py" id="sentry_sdk.start_span">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.</span></span><span class="sig-name descname"><span class="pre">start_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.start_span" title="Permalink to this definition">¶</a></dt>
 <dd><p>Alias for <a class="reference internal" href="#sentry_sdk.Hub.start_span" title="sentry_sdk.Hub.start_span"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.start_span()</span></code></a></p>
-<p>Create and start timing a new span whose parent is the currently active
-span or transaction, if any. The return value is a span instance,
+<p>Start a span whose parent is the currently active span or transaction, if any.</p>
+<p>The return value is a <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a> instance,
 typically used as a context manager to start and stop timing in a <cite>with</cite>
 block.</p>
 <p>Only spans contained in a transaction are sent to Sentry. Most
 integrations start a transaction at the appropriate time, for example
-for every incoming HTTP request. Use <cite>start_transaction</cite> to start a new
-transaction when one is not already in progress.</p>
+for every incoming HTTP request. Use
+<a class="reference internal" href="#sentry_sdk.start_transaction" title="sentry_sdk.start_transaction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.start_transaction()</span></code></a> to start a new transaction when
+one is not already in progress.</p>
+<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></p>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1068,179 +1345,178 @@ finished at the end of the <cite>with</cite> block. If not using context manager
 call the <cite>.finish()</cite> method.</p>
 <p>When the transaction is finished, it will be sent to Sentry with all its
 finished child spans.</p>
+<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</p>
 </dd>
 </dl>
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.tracing.</span></span><span class="sig-name descname"><span class="pre">Span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.continue_from_environ">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">continue_from_environ</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environ</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.continue_from_environ"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.continue_from_environ" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a Transaction with the given params, then add in data pulled from
+the ‘sentry-trace’ and ‘baggage’ headers from the environ (if any)
+before returning the Transaction.</p>
+<p>This is different from <cite>continue_from_headers</cite> in that it assumes header
+names in the form “HTTP_HEADER_NAME” - such as you would get from a wsgi
+environ - rather than the form “header-name”.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.continue_from_headers">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">continue_from_headers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">headers</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.continue_from_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.continue_from_headers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a transaction with the given params (including any data pulled from
+the ‘sentry-trace’ and ‘baggage’ headers).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.from_traceparent">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_traceparent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">traceparent</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.from_traceparent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.from_traceparent" title="Permalink to this definition">¶</a></dt>
+<dd><p>DEPRECATED: Use <code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction.continue_from_headers()</span></code>.</p>
+<p>Create a <cite>Transaction</cite> with the given params, then add in data pulled from
+the given ‘sentry-trace’ header value before returning the <cite>Transaction</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.iter_headers">
+<span class="sig-name descname"><span class="pre">iter_headers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.iter_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.iter_headers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a generator which returns the span’s <cite>sentry-trace</cite> and <cite>baggage</cite> headers.
+If the span’s containing transaction doesn’t yet have a <cite>baggage</cite> value,
+this will cause one to be generated and stored.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Iterator" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterator</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.new_span">
+<span class="sig-name descname"><span class="pre">new_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.new_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.new_span" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deprecated: use <a class="reference internal" href="#sentry_sdk.tracing.Span.start_child" title="sentry_sdk.tracing.Span.start_child"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span.start_child()</span></code></a> instead.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.start_child">
+<span class="sig-name descname"><span class="pre">start_child</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">instrumenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sentry'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.start_child"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.start_child" title="Permalink to this definition">¶</a></dt>
+<dd><p>Start a sub-span from the current span or transaction.</p>
+<p>Takes the same arguments as the initializer of <a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a>. The
+trace id, sampling decision, transaction pointer, and span recorder are
+inherited from the current span/transaction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.timestamp">
+<span class="sig-name descname"><span class="pre">timestamp</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a><span class="pre">]</span></em><a class="headerlink" href="#sentry_sdk.tracing.Span.timestamp" title="Permalink to this definition">¶</a></dt>
+<dd><p>End timestamp of span</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.tracing.</span></span><span class="sig-name descname"><span class="pre">Transaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.get_baggage">
+<span class="sig-name descname"><span class="pre">get_baggage</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction.get_baggage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction.get_baggage" title="Permalink to this definition">¶</a></dt>
+<dd><p>The first time a new baggage with sentry items is made,
+it will be frozen.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Baggage</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </section>
 
-
-          </div>
+        </article>
+        
+      </div>
+      <div class="min-w-0 max-w-6xl px-6 pb-6 xl:pt-6 xl:px-12">
+        <div class="navigation flex print:hidden">
+  <div class="navigation-prev">
+    <a href="index.html">
+      <i class="i-icon chevron"></i>
+      <div class="page-info">
+        <span>Previous</span>
+        
+        <div class="title">Home</div>
+        
+      </div>
+    </a>
+  </div>
+  <div class="navigation-next">
+    <a href="integrations.html">
+      <div class="page-info">
+        <span>Next</span>
+        <div class="title">Integrations</div>
+      </div>
+      <i class="i-icon chevron"></i>
+    </a>
+  </div>
+</div>
+        
+      </div>
+    </div>
+  </main>
+</div>
+<footer class="sy-foot">
+  <div class="sy-foot-inner sy-container mx-auto">
+    
+    <div class="sy-foot-reserved md:flex justify-between items-center">
+      <div class="sy-foot-copyright"><p>2019-2023, Sentry Team and Contributors</p>
+        
+        <p>
+          Made with
           
-        </div>
+          <a href="https://www.sphinx-doc.org/">Sphinx</a> and
+          
+          <a href="https://shibuya.lepture.com">Shibuya theme</a>.
+        </p>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper">
-<h1 class="logo"><a href="index.html">sentry-python</a></h1>
-
-
-
-
-
-
-
-
-<h3>Navigation</h3>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Main API</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Client.capture_event"><code class="docutils literal notranslate"><span class="pre">Client.capture_event()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Client.close"><code class="docutils literal notranslate"><span class="pre">Client.close()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Client.dsn"><code class="docutils literal notranslate"><span class="pre">Client.dsn</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Client.flush"><code class="docutils literal notranslate"><span class="pre">Client.flush()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.HttpTransport"><code class="docutils literal notranslate"><span class="pre">HttpTransport</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.HttpTransport.capture_envelope"><code class="docutils literal notranslate"><span class="pre">HttpTransport.capture_envelope()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.HttpTransport.capture_event"><code class="docutils literal notranslate"><span class="pre">HttpTransport.capture_event()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.HttpTransport.flush"><code class="docutils literal notranslate"><span class="pre">HttpTransport.flush()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.HttpTransport.kill"><code class="docutils literal notranslate"><span class="pre">HttpTransport.kill()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.HttpTransport.record_lost_event"><code class="docutils literal notranslate"><span class="pre">HttpTransport.record_lost_event()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.Hub"><code class="docutils literal notranslate"><span class="pre">Hub</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.add_breadcrumb"><code class="docutils literal notranslate"><span class="pre">Hub.add_breadcrumb()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.bind_client"><code class="docutils literal notranslate"><span class="pre">Hub.bind_client()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.capture_event"><code class="docutils literal notranslate"><span class="pre">Hub.capture_event()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.capture_exception"><code class="docutils literal notranslate"><span class="pre">Hub.capture_exception()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.capture_message"><code class="docutils literal notranslate"><span class="pre">Hub.capture_message()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.client"><code class="docutils literal notranslate"><span class="pre">Hub.client</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.configure_scope"><code class="docutils literal notranslate"><span class="pre">Hub.configure_scope()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.end_session"><code class="docutils literal notranslate"><span class="pre">Hub.end_session()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.flush"><code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.get_integration"><code class="docutils literal notranslate"><span class="pre">Hub.get_integration()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.iter_trace_propagation_headers"><code class="docutils literal notranslate"><span class="pre">Hub.iter_trace_propagation_headers()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.last_event_id"><code class="docutils literal notranslate"><span class="pre">Hub.last_event_id()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.pop_scope_unsafe"><code class="docutils literal notranslate"><span class="pre">Hub.pop_scope_unsafe()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.push_scope"><code class="docutils literal notranslate"><span class="pre">Hub.push_scope()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.resume_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Hub.resume_auto_session_tracking()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.run"><code class="docutils literal notranslate"><span class="pre">Hub.run()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.scope"><code class="docutils literal notranslate"><span class="pre">Hub.scope</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.start_session"><code class="docutils literal notranslate"><span class="pre">Hub.start_session()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.start_span"><code class="docutils literal notranslate"><span class="pre">Hub.start_span()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.start_transaction"><code class="docutils literal notranslate"><span class="pre">Hub.start_transaction()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.stop_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Hub.stop_auto_session_tracking()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Hub.trace_propagation_meta"><code class="docutils literal notranslate"><span class="pre">Hub.trace_propagation_meta()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.Scope"><code class="docutils literal notranslate"><span class="pre">Scope</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.add_attachment"><code class="docutils literal notranslate"><span class="pre">Scope.add_attachment()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.add_error_processor"><code class="docutils literal notranslate"><span class="pre">Scope.add_error_processor()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.add_event_processor"><code class="docutils literal notranslate"><span class="pre">Scope.add_event_processor()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.apply_to_event"><code class="docutils literal notranslate"><span class="pre">Scope.apply_to_event()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.clear"><code class="docutils literal notranslate"><span class="pre">Scope.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.clear_breadcrumbs"><code class="docutils literal notranslate"><span class="pre">Scope.clear_breadcrumbs()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.fingerprint"><code class="docutils literal notranslate"><span class="pre">Scope.fingerprint</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.generate_propagation_context"><code class="docutils literal notranslate"><span class="pre">Scope.generate_propagation_context()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.get_dynamic_sampling_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_dynamic_sampling_context()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.get_trace_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_trace_context()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.get_traceparent"><code class="docutils literal notranslate"><span class="pre">Scope.get_traceparent()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.iter_headers"><code class="docutils literal notranslate"><span class="pre">Scope.iter_headers()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.level"><code class="docutils literal notranslate"><span class="pre">Scope.level</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.remove_context"><code class="docutils literal notranslate"><span class="pre">Scope.remove_context()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.remove_extra"><code class="docutils literal notranslate"><span class="pre">Scope.remove_extra()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.remove_tag"><code class="docutils literal notranslate"><span class="pre">Scope.remove_tag()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.set_context"><code class="docutils literal notranslate"><span class="pre">Scope.set_context()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.set_extra"><code class="docutils literal notranslate"><span class="pre">Scope.set_extra()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.set_level"><code class="docutils literal notranslate"><span class="pre">Scope.set_level()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.set_tag"><code class="docutils literal notranslate"><span class="pre">Scope.set_tag()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.set_transaction_name"><code class="docutils literal notranslate"><span class="pre">Scope.set_transaction_name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.set_user"><code class="docutils literal notranslate"><span class="pre">Scope.set_user()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.span"><code class="docutils literal notranslate"><span class="pre">Scope.span</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.transaction"><code class="docutils literal notranslate"><span class="pre">Scope.transaction</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Scope.user"><code class="docutils literal notranslate"><span class="pre">Scope.user</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.Transport"><code class="docutils literal notranslate"><span class="pre">Transport</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Transport.capture_envelope"><code class="docutils literal notranslate"><span class="pre">Transport.capture_envelope()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Transport.capture_event"><code class="docutils literal notranslate"><span class="pre">Transport.capture_event()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Transport.flush"><code class="docutils literal notranslate"><span class="pre">Transport.flush()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Transport.kill"><code class="docutils literal notranslate"><span class="pre">Transport.kill()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sentry_sdk.Transport.record_lost_event"><code class="docutils literal notranslate"><span class="pre">Transport.record_lost_event()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.add_breadcrumb"><code class="docutils literal notranslate"><span class="pre">add_breadcrumb()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.capture_event"><code class="docutils literal notranslate"><span class="pre">capture_event()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.capture_exception"><code class="docutils literal notranslate"><span class="pre">capture_exception()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.capture_message"><code class="docutils literal notranslate"><span class="pre">capture_message()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.configure_scope"><code class="docutils literal notranslate"><span class="pre">configure_scope()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.continue_trace"><code class="docutils literal notranslate"><span class="pre">continue_trace()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.flush"><code class="docutils literal notranslate"><span class="pre">flush()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.get_baggage"><code class="docutils literal notranslate"><span class="pre">get_baggage()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.get_current_span"><code class="docutils literal notranslate"><span class="pre">get_current_span()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.get_traceparent"><code class="docutils literal notranslate"><span class="pre">get_traceparent()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.last_event_id"><code class="docutils literal notranslate"><span class="pre">last_event_id()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.push_scope"><code class="docutils literal notranslate"><span class="pre">push_scope()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.set_context"><code class="docutils literal notranslate"><span class="pre">set_context()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.set_extra"><code class="docutils literal notranslate"><span class="pre">set_extra()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.set_level"><code class="docutils literal notranslate"><span class="pre">set_level()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.set_tag"><code class="docutils literal notranslate"><span class="pre">set_tag()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.set_user"><code class="docutils literal notranslate"><span class="pre">set_user()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.start_span"><code class="docutils literal notranslate"><span class="pre">start_span()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sentry_sdk.start_transaction"><code class="docutils literal notranslate"><span class="pre">start_transaction()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="integrations.html">Integrations</a></li>
-</ul>
-
-<div class="relations">
-<h3>Related Topics</h3>
-<ul>
-  <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="index.html" title="previous chapter">sentry-python - Sentry SDK for Python</a></li>
-      <li>Next: <a href="integrations.html" title="next chapter">Integrations</a></li>
-  </ul></li>
-</ul>
-</div>
-<div id="searchbox" style="display: none" role="search">
-  <h3 id="searchlabel">Quick search</h3>
-    <div class="searchformwrapper">
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</div>
-<script>document.getElementById('searchbox').style.display = "block"</script>
-
-
-
-
-
-
-
-
-        </div>
+      <div class="sy-foot-socials">
+          <a href="https://github.com/getsentry/sentry-python" aria-label="GitHub"><i class="i-icon github"></i></a>
       </div>
-      <div class="clearer"></div>
     </div>
-    <div class="footer">
-      &copy;2019, Sentry Team and Contributors.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 7.0.1</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.13</a>
-      
-      |
-      <a href="_sources/api.rst.txt"
-          rel="nofollow">Page source</a>
-    </div>
-
+  </div>
+</footer></div>
+      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+      <script src="_static/doctools.js"></script>
+      <script src="_static/sphinx_highlight.js"></script>
+      <script src="_static/shibuya.js?v=2023.6.30"></script>
     
-
-    
-  </body>
+</body>
 </html>
