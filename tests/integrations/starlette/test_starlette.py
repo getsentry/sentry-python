@@ -8,7 +8,7 @@ import threading
 
 import pytest
 
-from sentry_sdk import last_event_id, capture_exception, Hub
+from sentry_sdk import last_event_id, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 from sentry_sdk.utils import parse_version
@@ -909,12 +909,26 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
 
 @pytest.mark.skipif(STARLETTE_VERSION < (0, 24), reason="Requires Starlette >= 0.24")
 def test_sentry_trace_context(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration()])
+
+    BAGGAGE_VALUE = (
+        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+    )
+
+    sentry_init(integrations=[StarletteIntegration()], traces_sample_rate=1.0)
     events = capture_events()
-    templates = Jinja2Templates(directory="templates")
+
+    template_dir = os.path.join(
+        os.getcwd(), "tests", "integrations", "starlette", "templates"
+    )
+    templates = Jinja2Templates(directory=template_dir)
 
     async def _render_template(request):
+        from sentry_sdk import Hub
+
         hub = Hub.current
+
         capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
         return templates.TemplateResponse(
             "trace_meta.html", {"request": request, "msg": "Hello Template World!"}
@@ -928,17 +942,17 @@ def test_sentry_trace_context(sentry_init, capture_events):
         ],
     )
 
-    with app.test_client() as client:
-        response = client.get("/render_template")
-        assert response.status_code == 200
+    client = TestClient(app)
+    response = client.get("/render_template", headers={"baggage": BAGGAGE_VALUE})
+    assert response.status_code == 200
 
-        rendered_meta = response.data.decode("utf-8")
-        traceparent, baggage = events[0]["message"].split("\n")
-        expected_meta = (
-            '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">\n'
-            % (
-                traceparent,
-                baggage,
-            )
+    rendered_meta = response.text
+    traceparent, baggage = events[0]["message"].split("\n")
+    expected_meta = (
+        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
+        % (
+            traceparent,
+            baggage,
         )
-        assert rendered_meta == expected_meta
+    )
+    assert rendered_meta == expected_meta
