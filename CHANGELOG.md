@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.27.0
+
+### Various fixes & improvements
+
+- Revert autocomplete hack (#2224) by @sentrivana
+- Add Django template tag for adding sentry tracing information (#2222) by @antonpirker
+- build(deps): bump checkouts/data-schemas from `7fdde87` to `1b85152` (#2218) by @dependabot
+- Allow (some) autocompletion for top-level API (#2213) by @sentrivana
+- Update Flask html meta helper  (#2203) by @antonpirker
+- Take trace id always from propagation context (#2209) by @antonpirker
+- Fix CI (#2220) by @antonpirker
+- feat(loguru): add message format configuration arguments (#2208) by @Gwill
+- Don't overwrite existing aiohttp baggage (#2214) by @sentrivana
+- Set the transaction/span status from an otel span (#2115) by @daniil-konovalenko
+- feat(profiling): Add client reports for profiles (#2207) by @Zylphrex
+- feat(aiohttp): add instrumentation of client requests (#1761) by @md384
+- Fix trace context in event payload (#2205) by @antonpirker
+- Change API doc theme (#2210) by @sentrivana
+- Use new top level api in `trace_propagation_meta` (#2202) by @antonpirker
+- Fix TaskLockedException handling (#2206) by @Zhenay
+- Do not overwrite existing baggage on outgoing requests (#2191) by @sentrivana
+- Support for SQLAlchemy 2.0 (#2200) by @antonpirker
+- build(deps): bump mypy from 1.3.0 to 1.4.1 (#2194) by @dependabot
+- fix: fix propagation of OTEL NonRecordingSpan (#2187) by @hartungstenio
+
 ## 1.26.0
 
 ### Various fixes & improvements
