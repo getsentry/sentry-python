@@ -1,9 +1,10 @@
 import inspect
+from functools import partial
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-from sentry_sdk.tracing import NoOpSpan, Transaction
+from sentry_sdk.tracing import Transaction
 
 if TYPE_CHECKING:
     from typing import Any
@@ -13,16 +14,8 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import TypeVar
     from typing import ContextManager
-    from typing import Union
 
-    from sentry_sdk._types import (
-        Event,
-        Hint,
-        Breadcrumb,
-        BreadcrumbHint,
-        ExcInfo,
-        MeasurementUnit,
-    )
+    from sentry_sdk._types import MeasurementUnit
     from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
@@ -77,46 +70,36 @@ def scopemethod(f):
     return f
 
 
-@hubmethod
-def capture_event(
-    event,  # type: Event
-    hint=None,  # type: Optional[Hint]
-    scope=None,  # type: Optional[Any]
-    **scope_args  # type: Any
-):
-    # type: (...) -> Optional[str]
-    return Hub.current.capture_event(event, hint, scope=scope, **scope_args)
+# Alias these functions to have nice auto completion for the arguments without
+# having to specify them here. The `partial(..., None)` hack is needed for Sphinx
+# to generate proper docs for these.
+if TYPE_CHECKING:
+    capture_event = partial(Hub.capture_event, None)
+    capture_message = partial(Hub.capture_message, None)
+    capture_exception = partial(Hub.capture_exception, None)
+    add_breadcrumb = partial(Hub.add_breadcrumb, None)
+    start_span = partial(Hub.start_span, None)
+    start_transaction = partial(Hub.start_transaction, None)
 
+else:
 
-@hubmethod
-def capture_message(
-    message,  # type: str
-    level=None,  # type: Optional[str]
-    scope=None,  # type: Optional[Any]
-    **scope_args  # type: Any
-):
-    # type: (...) -> Optional[str]
-    return Hub.current.capture_message(message, level, scope=scope, **scope_args)
+    def capture_event(*args, **kwargs):
+        return Hub.current.capture_event(*args, **kwargs)
 
+    def capture_message(*args, **kwargs):
+        return Hub.current.capture_message(*args, **kwargs)
 
-@hubmethod
-def capture_exception(
-    error=None,  # type: Optional[Union[BaseException, ExcInfo]]
-    scope=None,  # type: Optional[Any]
-    **scope_args  # type: Any
-):
-    # type: (...) -> Optional[str]
-    return Hub.current.capture_exception(error, scope=scope, **scope_args)
+    def capture_exception(*args, **kwargs):
+        return Hub.current.capture_exception(*args, **kwargs)
 
+    def add_breadcrumb(*args, **kwargs):
+        return Hub.current.add_breadcrumb(*args, **kwargs)
 
-@hubmethod
-def add_breadcrumb(
-    crumb=None,  # type: Optional[Breadcrumb]
-    hint=None,  # type: Optional[BreadcrumbHint]
-    **kwargs  # type: Any
-):
-    # type: (...) -> None
-    return Hub.current.add_breadcrumb(crumb, hint, **kwargs)
+    def start_span(*args, **kwargs):
+        return Hub.current.start_span(*args, **kwargs)
+
+    def start_transaction(*args, **kwargs):
+        return Hub.current.start_transaction(*args, **kwargs)
 
 
 @overload
@@ -206,24 +189,6 @@ def flush(
 def last_event_id():
     # type: () -> Optional[str]
     return Hub.current.last_event_id()
-
-
-@hubmethod
-def start_span(
-    span=None,  # type: Optional[Span]
-    **kwargs  # type: Any
-):
-    # type: (...) -> Span
-    return Hub.current.start_span(span=span, **kwargs)
-
-
-@hubmethod
-def start_transaction(
-    transaction=None,  # type: Optional[Transaction]
-    **kwargs  # type: Any
-):
-    # type: (...) -> Union[Transaction, NoOpSpan]
-    return Hub.current.start_transaction(transaction, **kwargs)
 
 
 def set_measurement(name, value, unit=""):
