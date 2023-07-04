@@ -241,7 +241,7 @@ class Span(object):
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Span
-        """Deprecated: use start_child instead."""
+        """Deprecated: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead."""
         logger.warning("Deprecated: use Span.start_child instead of Span.new_span.")
         return self.start_child(**kwargs)
 
@@ -330,11 +330,10 @@ class Span(object):
     ):
         # type: (...) -> Optional[Transaction]
         """
-        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
+        DEPRECATED: Use :py:meth:`sentry_sdk.tracing.Transaction.continue_from_headers`.
 
-        Create a Transaction with the given params, then add in data pulled from
-        the given 'sentry-trace' header value before returning the Transaction.
-
+        Create a `Transaction` with the given params, then add in data pulled from
+        the given 'sentry-trace' header value before returning the `Transaction`.
         """
         logger.warning(
             "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
@@ -826,7 +825,9 @@ def trace(func=None):
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.
 
-    Usage:
+    .. code-block::
+        :caption: Usage
+
         import sentry_sdk
 
         @sentry_sdk.trace
@@ -836,6 +837,7 @@ def trace(func=None):
         @sentry_sdk.trace
         async def my_async_function():
             ...
+
     """
     if PY2:
         from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
