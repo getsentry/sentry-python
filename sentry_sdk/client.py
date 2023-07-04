@@ -211,8 +211,11 @@ class _Client(object):
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
 
+            self.monitor = None
+            if self.transport:
+                self.monitor = Monitor(self.transport)
+
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
-            self.monitor = Monitor()
 
             request_bodies = ("always", "never", "small", "medium")
             if self.options["request_bodies"] not in request_bodies:
@@ -573,7 +576,8 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
-            self.monitor.kill()
+            if self.monitor:
+                self.monitor.kill()
             self.transport.kill()
             self.transport = None
 

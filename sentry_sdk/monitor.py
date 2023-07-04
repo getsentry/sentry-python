@@ -19,9 +19,11 @@ class Monitor(object):
 
     name = "sentry.monitor"
 
-    def __init__(self, interval=60):
-        # type: (int) -> None
+    def __init__(self, transport, interval=60):
+        # type: (sentry_sdk.transport.Transport, int) -> None
+        self.transport = transport  # type: sentry_sdk.transport.Transport
         self.interval = interval  # type: int
+
         self._healthy = True
         self._downsample_factor = 1  # type: int
 
@@ -57,11 +59,14 @@ class Monitor(object):
 
     def _is_transport_rate_limited(self):
         # type: () -> bool
-        transport = (
-            sentry_sdk.Hub.current.client and sentry_sdk.Hub.current.client.transport
-        )
-        if transport and hasattr(transport, "_is_rate_limited"):
-            return transport._is_rate_limited()
+        if self.transport and hasattr(self.transport, "is_rate_limited"):
+            return self.transport.is_rate_limited()
+        return False
+
+    def _is_transport_worker_full(self):
+        # type: () -> bool
+        if self.transport and hasattr(self.transport, "is_worker_full"):
+            return self.transport.is_worker_full()
         return False
 
     def _set_downsample_factor(self):
@@ -82,7 +87,7 @@ class Monitor(object):
         currently only checks if the transport is rate-limited.
         TODO: augment in the future with more checks.
         """
-        if self._is_transport_rate_limited():
+        if self._is_transport_rate_limited() or self._is_transport_worker_full():
             self._healthy = False
         else:
             self._healthy = True

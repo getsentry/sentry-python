@@ -311,9 +311,13 @@ class HttpTransport(Transport):
 
         return _disabled(category) or _disabled(None)
 
-    def _is_rate_limited(self):
+    def is_rate_limited(self):
         # type: () -> bool
         return any(ts > datetime.utcnow() for ts in self._disabled_until.values())
+
+    def is_worker_full(self):
+        # type: () -> bool
+        return self._worker.full()
 
     def _send_event(
         self, event  # type: Event
