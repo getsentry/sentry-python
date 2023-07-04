@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
     transaction_from_function,
 )
 
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 
 try:
     import starlette  # type: ignore
+    from starlette import __version__ as STARLETTE_VERSION  # type: ignore
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
@@ -77,10 +79,14 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        version = parse_version(STARLETTE_VERSION)
+
         patch_middlewares()
         patch_asgi_app()
         patch_request_response()
-        patch_templates()
+
+        if version >= (0, 24):
+            patch_templates()
 
 
 def _enable_span_for_middleware(middleware_class):

@@ -8,8 +8,10 @@ import threading
 
 import pytest
 
-from sentry_sdk import last_event_id, capture_exception
+from sentry_sdk import last_event_id, capture_exception, Hub
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+from sentry_sdk.utils import parse_version
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -31,9 +33,10 @@ from starlette.authentication import (
 )
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.templating import Jinja2Templates
 from starlette.testclient import TestClient
 
-STARLETTE_VERSION = tuple([int(x) for x in starlette.__version__.split(".")])
+STARLETTE_VERSION = parse_version(starlette.__version__)
 
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
 
@@ -903,3 +906,40 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     event = events[0]
     assert event["request"]["data"] == {"password": "[Filtered]"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
+
+
+@pytest.mark.skipif(STARLETTE_VERSION < (0, 24), reason="Requires Starlette >= 0.24")
+def test_sentry_trace_context(sentry_init, capture_events):
+    sentry_init(integrations=[StarletteIntegration()])
+    events = capture_events()
+    templates = Jinja2Templates(directory="templates")
+
+    async def _render_template(request):
+        hub = Hub.current
+        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        return templates.TemplateResponse(
+            "trace_meta.html", {"request": request, "msg": "Hello Template World!"}
+        )
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route(
+                "/render_template", _render_template, methods=["GET"]
+            ),
+        ],
+    )
+
+    with app.test_client() as client:
+        response = client.get("/render_template")
+        assert response.status_code == 200
+
+        rendered_meta = response.data.decode("utf-8")
+        traceparent, baggage = events[0]["message"].split("\n")
+        expected_meta = (
+            '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">\n'
+            % (
+                traceparent,
+                baggage,
+            )
+        )
+        assert rendered_meta == expected_meta
