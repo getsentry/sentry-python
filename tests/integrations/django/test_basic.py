@@ -716,7 +716,7 @@ def test_template_tracing_meta(sentry_init, client, capture_events):
 
     traceparent, baggage = events[0]["message"].split("\n")
     expected_meta = (
-        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
+        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">\n'
         % (
             traceparent,
             baggage,
