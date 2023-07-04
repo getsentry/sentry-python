@@ -707,7 +707,7 @@ def test_read_request(sentry_init, client, capture_events):
 
 
 def test_template_tracing_meta(sentry_init, client, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
     # The view will capture_message the sentry-trace and baggage information
