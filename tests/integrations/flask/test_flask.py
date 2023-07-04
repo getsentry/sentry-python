@@ -806,7 +806,10 @@ def test_class_based_views(sentry_init, app, capture_events):
     assert event["transaction"] == "hello_class"
 
 
-def test_sentry_trace_context(sentry_init, app, capture_events):
+@pytest.mark.parametrize(
+    "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
+)
+def test_sentry_trace_context(sentry_init, app, capture_events, template_string):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
@@ -814,42 +817,22 @@ def test_sentry_trace_context(sentry_init, app, capture_events):
     def index():
         hub = Hub.current
         capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
-        return render_template_string("{{ sentry_trace }}")
+        return render_template_string(template_string)
 
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
 
+        rendered_meta = response.data.decode("utf-8")
         traceparent, baggage = events[0]["message"].split("\n")
-        assert response.data.decode(
-            "utf-8"
-        ) == '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">' % (
-            traceparent,
-            baggage,
+        expected_meta = (
+            '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
+            % (
+                traceparent,
+                baggage,
+            )
         )
-
-
-def test_sentry_trace_context2(sentry_init, app, capture_events):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
-    events = capture_events()
-
-    @app.route("/")
-    def index():
-        hub = Hub.current
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
-        return render_template_string("{{ sentry_trace_meta }}")
-
-    with app.test_client() as client:
-        response = client.get("/")
-        assert response.status_code == 200
-
-        traceparent, baggage = events[0]["message"].split("\n")
-        assert response.data.decode(
-            "utf-8"
-        ) == '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">' % (
-            traceparent,
-            baggage,
-        )
+        assert rendered_meta == expected_meta
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
