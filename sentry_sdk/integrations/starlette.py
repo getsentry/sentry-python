@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 try:
     import starlette  # type: ignore
-    from starlette import __version__ as STARLETTE_VERSION  # type: ignore
+    from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
@@ -80,6 +80,11 @@ class StarletteIntegration(Integration):
     def setup_once():
         # type: () -> None
         version = parse_version(STARLETTE_VERSION)
+
+        if version is None:
+            raise DidNotEnable(
+                "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
+            )
 
         patch_middlewares()
         patch_asgi_app()
@@ -475,7 +480,7 @@ def patch_templates():
         Markup = None  # noqa: N806
 
     if Markup is not None:
-        from starlette.templating import Jinja2Templates
+        from starlette.templating import Jinja2Templates  # type: ignore
 
         old_jinja2templates_init = Jinja2Templates.__init__
 
