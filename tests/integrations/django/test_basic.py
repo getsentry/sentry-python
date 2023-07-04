@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import json
 import pytest
 import random
-import re
 from functools import partial
 
 from werkzeug.test import Client
@@ -707,13 +706,24 @@ def test_read_request(sentry_init, client, capture_events):
     assert "data" not in event["request"]
 
 
-def test_template_tracing_meta(sentry_init, client, capture_exceptions, capture_events):
+def test_template_tracing_meta(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    content, _, _ = client.get(reverse("template_test3"))
+    events = capture_events()
 
-    content = b"".join(content).decode("utf-8")
-    pattern = r'^<meta name="sentry-trace" content="[^\"]*"><meta name="baggage" content="[^\"]*">\n$'
-    assert re.match(pattern, content) is not None
+    # The view will capture_message the sentry-trace and baggage information
+    content, _, _ = client.get(reverse("template_test3"))
+    rendered_meta = b"".join(content).decode("utf-8")
+
+    traceparent, baggage = events[0]["message"].split("\n")
+    expected_meta = (
+        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
+        % (
+            traceparent,
+            baggage,
+        )
+    )
+
+    assert rendered_meta == expected_meta
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
