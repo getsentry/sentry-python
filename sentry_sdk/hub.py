@@ -481,6 +481,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if span is not None:
             return span.start_child(**kwargs)
 
+        # If there is already a trace_id in the propagation context, use it.
+        if "trace_id" not in kwargs:
+            traceparent = self.get_traceparent()
+            trace_id = traceparent.split("-")[0] if traceparent else None
+            if trace_id is not None:
+                kwargs["trace_id"] = trace_id
+
         return Span(**kwargs)
 
     def start_transaction(
