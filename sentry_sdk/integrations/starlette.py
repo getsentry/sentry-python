@@ -477,7 +477,7 @@ def patch_templates():
     try:
         from markupsafe import Markup
     except ImportError:
-        Markup = None  # noqa: N806
+        Markup = None  # type: ignore
 
     if Markup is not None:
         from starlette.templating import Jinja2Templates  # type: ignore
