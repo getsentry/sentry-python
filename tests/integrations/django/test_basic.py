@@ -713,7 +713,7 @@ def test_template_tracing_meta(sentry_init, client, capture_exceptions, capture_
 
     content = b"".join(content).decode("utf-8")
     pattern = r'^<meta name="sentry-trace" content="[^\"]*"><meta name="baggage" content="[^\"]*">\n$'
-    assert re.fullmatch(pattern, content) is not None
+    assert re.match(pattern, content) is not None
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
