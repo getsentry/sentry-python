@@ -72,11 +72,15 @@ class Monitor(object):
     def _set_downsample_factor(self):
         # type: () -> None
         if self._healthy:
+            if self._downsample_factor > 1:
+                logger.debug(
+                    "[Monitor] health check positive, reverting to normal sampling"
+                )
             self._downsample_factor = 1
         else:
             self._downsample_factor *= 2
             logger.debug(
-                "monitor health check negative, downsampling with a factor of %d",
+                "[Monitor] health check negative, downsampling with a factor of %d",
                 self._downsample_factor,
             )
 
@@ -87,17 +91,19 @@ class Monitor(object):
         currently only checks if the transport is rate-limited.
         TODO: augment in the future with more checks.
         """
-        if self._is_transport_rate_limited() or self._is_transport_worker_full():
+        if self._is_transport_worker_full() or self._is_transport_rate_limited():
             self._healthy = False
         else:
             self._healthy = True
 
     def is_healthy(self):
         # type: () -> bool
+        self._ensure_running()
         return self._healthy
 
     def downsample_factor(self):
         # type: () -> int
+        self._ensure_running()
         return self._downsample_factor
 
     def kill(self):
