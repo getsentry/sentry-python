@@ -10,7 +10,6 @@ import pytest
 
 from sentry_sdk import last_event_id, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-
 from sentry_sdk.utils import parse_version
 
 try:
@@ -95,8 +94,11 @@ async def _mock_receive(msg):
     return msg
 
 
+from sentry_sdk import Hub
+from starlette.templating import Jinja2Templates
+
+
 def starlette_app_factory(middleware=None, debug=True):
-    from starlette.templating import Jinja2Templates
 
     template_dir = os.path.join(
         os.getcwd(), "tests", "integrations", "starlette", "templates"
@@ -135,14 +137,14 @@ def starlette_app_factory(middleware=None, debug=True):
         )
 
     async def _render_template(request):
-        from sentry_sdk import Hub
-
         hub = Hub.current
-
         capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
-        return templates.TemplateResponse(
-            "trace_meta.html", {"request": request, "msg": "Hello Template World!"}
-        )
+
+        template_context = {
+            "request": request,
+            "msg": "Hello Template World!",
+        }
+        return templates.TemplateResponse("trace_meta.html", template_context)
 
     app = starlette.applications.Starlette(
         debug=debug,
@@ -925,36 +927,27 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
 
 
 @pytest.mark.skipif(STARLETTE_VERSION < (0, 24), reason="Requires Starlette >= 0.24")
-def test_sentry_trace_context(sentry_init, capture_events):
-    BAGGAGE_VALUE = (  # noqa: F841
-        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
-    )
-
+def test_template_tracing_meta(sentry_init, capture_events):
     sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[StarletteIntegration()],
-        traces_sample_rate=1.0,
+        debug=True,
     )
     events = capture_events()
 
     app = starlette_app_factory()
-    # TODO: why is the baggage only there when traces_sample_rate -> 1.0?
 
     client = TestClient(app)
-    response = client.get(
-        "/render_template",
-        # headers={"baggage": BAGGAGE_VALUE},
-    )
+    response = client.get("/render_template")
     assert response.status_code == 200
 
+    rendered_meta = response.text
     traceparent, baggage = events[0]["message"].split("\n")
     assert traceparent != ""
     assert baggage != ""
 
-    rendered_meta = response.text
     expected_meta = (
-        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">xxx'
+        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
         % (
             traceparent,
             baggage,
