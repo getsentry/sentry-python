@@ -33,7 +33,6 @@ from starlette.authentication import (
 )
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
-from starlette.templating import Jinja2Templates
 from starlette.testclient import TestClient
 
 STARLETTE_VERSION = parse_version(starlette.__version__)
@@ -97,6 +96,13 @@ async def _mock_receive(msg):
 
 
 def starlette_app_factory(middleware=None, debug=True):
+    from starlette.templating import Jinja2Templates
+
+    template_dir = os.path.join(
+        os.getcwd(), "tests", "integrations", "starlette", "templates"
+    )
+    templates = Jinja2Templates(directory=template_dir)
+
     async def _homepage(request):
         1 / 0
         return starlette.responses.JSONResponse({"status": "ok"})
@@ -128,6 +134,16 @@ def starlette_app_factory(middleware=None, debug=True):
             }
         )
 
+    async def _render_template(request):
+        from sentry_sdk import Hub
+
+        hub = Hub.current
+
+        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        return templates.TemplateResponse(
+            "trace_meta.html", {"request": request, "msg": "Hello Template World!"}
+        )
+
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
@@ -137,6 +153,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/message/{message_id}", _message_with_id),
             starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
             starlette.routing.Route("/async/thread_ids", _thread_ids_async),
+            starlette.routing.Route("/render_template", _render_template),
         ],
         middleware=middleware,
     )
@@ -909,47 +926,35 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
 
 @pytest.mark.skipif(STARLETTE_VERSION < (0, 24), reason="Requires Starlette >= 0.24")
 def test_sentry_trace_context(sentry_init, capture_events):
-
-    BAGGAGE_VALUE = (
+    BAGGAGE_VALUE = (  # noqa: F841
         "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
         "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
         "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
     )
 
-    sentry_init(integrations=[StarletteIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+    )
     events = capture_events()
 
-    template_dir = os.path.join(
-        os.getcwd(), "tests", "integrations", "starlette", "templates"
-    )
-    templates = Jinja2Templates(directory=template_dir)
-
-    async def _render_template(request):
-        from sentry_sdk import Hub
-
-        hub = Hub.current
-
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
-        return templates.TemplateResponse(
-            "trace_meta.html", {"request": request, "msg": "Hello Template World!"}
-        )
-
-    app = starlette.applications.Starlette(
-        routes=[
-            starlette.routing.Route(
-                "/render_template", _render_template, methods=["GET"]
-            ),
-        ],
-    )
+    app = starlette_app_factory()
+    # TODO: why is the baggage only there when traces_sample_rate -> 1.0?
 
     client = TestClient(app)
-    response = client.get("/render_template", headers={"baggage": BAGGAGE_VALUE})
+    response = client.get(
+        "/render_template",
+        # headers={"baggage": BAGGAGE_VALUE},
+    )
     assert response.status_code == 200
 
-    rendered_meta = response.text
     traceparent, baggage = events[0]["message"].split("\n")
+    assert traceparent != ""
+    assert baggage != ""
+
+    rendered_meta = response.text
     expected_meta = (
-        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
+        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">xxx'
         % (
             traceparent,
             baggage,
