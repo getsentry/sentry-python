@@ -4,13 +4,6 @@ import threading
 import pytest
 import pytest_asyncio
 
-quart = pytest.importorskip("quart")
-
-from quart import Quart, Response, abort, stream_with_context
-from quart.views import View
-
-from quart_auth import AuthManager, AuthUser, login_user
-
 from sentry_sdk import (
     set_tag,
     configure_scope,
@@ -21,8 +14,21 @@ from sentry_sdk import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
 
+quart = pytest.importorskip("quart")
 
-auth_manager = AuthManager()
+from quart import Quart, Response, abort, stream_with_context
+from quart.views import View
+
+from quart_auth import AuthUser, login_user
+
+try:
+    from quart_auth import QuartAuth
+
+    auth_manager = QuartAuth()
+except ImportError:
+    from quart_auth import AuthManager
+
+    auth_manager = AuthManager()
 
 
 @pytest_asyncio.fixture

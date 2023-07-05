@@ -11,7 +11,7 @@ except ImportError:
 
 
 @pytest.mark.parametrize("sampled", [True, False, None])
-def test_to_traceparent(sentry_init, sampled):
+def test_to_traceparent(sampled):
     transaction = Transaction(
         name="/interactions/other-dogs/new-dog",
         op="greeting.sniff",
@@ -21,12 +21,13 @@ def test_to_traceparent(sentry_init, sampled):
 
     traceparent = transaction.to_traceparent()
 
-    trace_id, parent_span_id, parent_sampled = traceparent.split("-")
-    assert trace_id == "12312012123120121231201212312012"
-    assert parent_span_id == transaction.span_id
-    assert parent_sampled == (
-        "1" if sampled is True else "0" if sampled is False else ""
-    )
+    parts = traceparent.split("-")
+    assert parts[0] == "12312012123120121231201212312012"  # trace_id
+    assert parts[1] == transaction.span_id  # parent_span_id
+    if sampled is None:
+        assert len(parts) == 2
+    else:
+        assert parts[2] == "1" if sampled is True else "0"  # sampled
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
@@ -41,7 +42,7 @@ def test_sentrytrace_extraction(sampling_decision):
     }
 
 
-def test_iter_headers(sentry_init, monkeypatch):
+def test_iter_headers(monkeypatch):
     monkeypatch.setattr(
         Transaction,
         "to_traceparent",

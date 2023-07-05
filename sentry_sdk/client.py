@@ -262,7 +262,7 @@ class _Client(object):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            event_ = scope.apply_to_event(event, hint)
+            event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
             if event_ is None:
@@ -469,6 +469,9 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
+        :param scope: An optional scope to use for determining whether this event
+            should be captured.
+
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if disable_capture_event.get(False):
@@ -507,11 +510,8 @@ class _Client(object):
         is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
-        dynamic_sampling_context = (
-            event_opt.get("contexts", {})
-            .get("trace", {})
-            .pop("dynamic_sampling_context", {})
-        )
+        trace_context = event_opt.get("contexts", {}).get("trace") or {}
+        dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.

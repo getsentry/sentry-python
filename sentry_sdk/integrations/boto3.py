@@ -7,7 +7,7 @@ from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import parse_url, parse_version
+from sentry_sdk.utils import capture_internal_exceptions, parse_url, parse_version
 
 if TYPE_CHECKING:
     from typing import Any
@@ -71,13 +71,14 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
         description=description,
     )
 
-    parsed_url = parse_url(request.url, sanitize=False)
+    with capture_internal_exceptions():
+        parsed_url = parse_url(request.url, sanitize=False)
+        span.set_data("aws.request.url", parsed_url.url)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
     span.set_tag("aws.service_id", service_id)
     span.set_tag("aws.operation_name", operation_name)
-    span.set_data("aws.request.url", parsed_url.url)
-    span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-    span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
     span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
     # We do it in order for subsequent http calls/retries be

@@ -62,7 +62,6 @@ PARSED_FORM = starlette.datastructures.FormData(
             starlette.datastructures.UploadFile(
                 filename="photo.jpg",
                 file=open(PICTURE, "rb"),
-                content_type="image/jpeg",
             ),
         ),
     ]

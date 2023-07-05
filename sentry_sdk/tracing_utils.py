@@ -3,7 +3,6 @@ import contextlib
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
@@ -82,11 +81,14 @@ class EnvironHeaders(Mapping):  # type: ignore
 
 
 def has_tracing_enabled(options):
-    # type: (Dict[str, Any]) -> bool
+    # type: (Optional[Dict[str, Any]]) -> bool
     """
     Returns True if either traces_sample_rate or traces_sampler is
     defined and enable_tracing is set and not false.
     """
+    if options is None:
+        return False
+
     return bool(
         options.get("enable_tracing") is not False
         and (
@@ -105,7 +107,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
 ):
-    # type: (...) -> Generator[Span, None, None]
+    # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
     # TODO: Bring back capturing of params by default
     if hub.client and hub.client.options["_experiments"].get(
@@ -140,7 +142,7 @@ def record_sql_queries(
 
 
 def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, Span) -> None
+    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
     if span.op == OP.DB_REDIS:
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
@@ -157,7 +159,7 @@ def maybe_create_breadcrumbs_from_span(hub, span):
 
 
 def extract_sentrytrace_data(header):
-    # type: (Optional[str]) -> Optional[typing.Mapping[str, Union[str, bool, None]]]
+    # type: (Optional[str]) -> Optional[Dict[str, Union[str, bool, None]]]
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """
@@ -252,8 +254,45 @@ class Baggage(object):
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
+    def from_options(cls, scope):
+        # type: (sentry_sdk.scope.Scope) -> Optional[Baggage]
+
+        sentry_items = {}  # type: Dict[str, str]
+        third_party_items = ""
+        mutable = False
+
+        client = sentry_sdk.Hub.current.client
+
+        if client is None or scope._propagation_context is None:
+            return Baggage(sentry_items)
+
+        options = client.options
+        propagation_context = scope._propagation_context
+
+        if propagation_context is not None and "trace_id" in propagation_context:
+            sentry_items["trace_id"] = propagation_context["trace_id"]
+
+        if options.get("environment"):
+            sentry_items["environment"] = options["environment"]
+
+        if options.get("release"):
+            sentry_items["release"] = options["release"]
+
+        if options.get("dsn"):
+            sentry_items["public_key"] = Dsn(options["dsn"]).public_key
+
+        if options.get("traces_sample_rate"):
+            sentry_items["sample_rate"] = options["traces_sample_rate"]
+
+        user = (scope and scope._user) or {}
+        if user.get("segment"):
+            sentry_items["user_segment"] = user["segment"]
+
+        return Baggage(sentry_items, third_party_items, mutable)
+
+    @classmethod
     def populate_from_transaction(cls, transaction):
-        # type: (Transaction) -> Baggage
+        # type: (sentry_sdk.tracing.Transaction) -> Baggage
         """
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
@@ -338,8 +377,21 @@ def should_propagate_trace(hub, url):
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
+def normalize_incoming_data(incoming_data):
+    # type: (Dict[str, Any]) -> Dict[str, Any]
+    """
+    Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
+    """
+    data = {}
+    for key, value in incoming_data.items():
+        if key.startswith("HTTP_"):
+            key = key[5:]
+
+        key = key.replace("_", "-").lower()
+        data[key] = value
+
+    return data
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
-
-if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span, Transaction

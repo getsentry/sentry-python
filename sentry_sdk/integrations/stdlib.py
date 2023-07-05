@@ -9,6 +9,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     logger,
     safe_repr,
@@ -84,17 +85,21 @@ def _install_httplib():
                 url,
             )
 
-        parsed_url = parse_url(real_url, sanitize=False)
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(real_url, sanitize=False)
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (method, parsed_url.url),
+            description="%s %s"
+            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
         )
 
         span.set_data(SPANDATA.HTTP_METHOD, method)
-        span.set_data("url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if parsed_url is not None:
+            span.set_data("url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 

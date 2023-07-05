@@ -59,9 +59,11 @@ def test_get_headers():
 @pytest.mark.parametrize(
     "seconds, expected_tuple",
     [
-        (0, (1, "minute")),
-        (0.00001, (1, "minute")),
-        (1, (1, "minute")),
+        (0, (0, "second")),
+        (1, (1, "second")),
+        (0.00001, (0, "second")),
+        (59, (59, "second")),
+        (60, (1, "minute")),
         (100, (1, "minute")),
         (1000, (16, "minute")),
         (10000, (2, "hour")),
@@ -205,13 +207,12 @@ def test_crons_task_retry():
             )
 
 
-def test_get_monitor_config():
+def test_get_monitor_config_crontab():
     app = MagicMock()
     app.conf = MagicMock()
     app.conf.timezone = "Europe/Vienna"
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
-
     monitor_config = _get_monitor_config(celery_schedule, app)
     assert monitor_config == {
         "schedule": {
@@ -222,8 +223,23 @@ def test_get_monitor_config():
     }
     assert "unit" not in monitor_config["schedule"]
 
-    celery_schedule = schedule(run_every=3)
 
+def test_get_monitor_config_seconds():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=3)  # seconds
+    monitor_config = _get_monitor_config(celery_schedule, app)
+    assert monitor_config == {}
+
+
+def test_get_monitor_config_minutes():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=60)  # seconds
     monitor_config = _get_monitor_config(celery_schedule, app)
     assert monitor_config == {
         "schedule": {
@@ -233,6 +249,12 @@ def test_get_monitor_config():
         },
         "timezone": "Europe/Vienna",
     }
+
+
+def test_get_monitor_config_unknown():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Europe/Vienna"
 
     unknown_celery_schedule = MagicMock()
     monitor_config = _get_monitor_config(unknown_celery_schedule, app)
