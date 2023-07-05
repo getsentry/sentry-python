@@ -931,7 +931,6 @@ def test_template_tracing_meta(sentry_init, capture_events):
     sentry_init(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[StarletteIntegration()],
-        debug=True,
     )
     events = capture_events()
 
