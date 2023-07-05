@@ -99,7 +99,6 @@ from starlette.templating import Jinja2Templates
 
 
 def starlette_app_factory(middleware=None, debug=True):
-
     template_dir = os.path.join(
         os.getcwd(), "tests", "integrations", "starlette", "templates"
     )
