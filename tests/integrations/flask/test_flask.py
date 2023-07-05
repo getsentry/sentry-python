@@ -809,8 +809,8 @@ def test_class_based_views(sentry_init, app, capture_events):
 @pytest.mark.parametrize(
     "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
 )
-def test_sentry_trace_context(sentry_init, app, capture_events, template_string):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
+def test_template_tracing_meta(sentry_init, app, capture_events, template_string):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -825,6 +825,9 @@ def test_sentry_trace_context(sentry_init, app, capture_events, template_string)
 
         rendered_meta = response.data.decode("utf-8")
         traceparent, baggage = events[0]["message"].split("\n")
+        assert traceparent != ""
+        assert baggage != ""
+
         expected_meta = (
             '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
             % (
