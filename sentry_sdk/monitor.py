@@ -19,7 +19,7 @@ class Monitor(object):
 
     name = "sentry.monitor"
 
-    def __init__(self, transport, interval=60):
+    def __init__(self, transport, interval=10):
         # type: (sentry_sdk.transport.Transport, int) -> None
         self.transport = transport  # type: sentry_sdk.transport.Transport
         self.interval = interval  # type: int
