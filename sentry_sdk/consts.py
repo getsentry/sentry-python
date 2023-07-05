@@ -1,5 +1,8 @@
 from sentry_sdk._types import TYPE_CHECKING
 
+# up top to prevent circular import due to integration import
+DEFAULT_MAX_STRING_LENGTH = 1024
+
 if TYPE_CHECKING:
     import sentry_sdk
 
@@ -42,7 +45,6 @@ if TYPE_CHECKING:
 
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
-DEFAULT_MAX_STRING_LENGTH = 1024
 MATCH_ALL = r".*"
 
 FALSE_VALUES = [
