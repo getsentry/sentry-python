@@ -254,10 +254,13 @@ class Scope(object):
         if self._propagation_context is None:
             return None
 
-        if self._propagation_context.get("dynamic_sampling_context") is None:
+        dynamic_sampling_context = self._propagation_context.get(
+            "dynamic_sampling_context"
+        )
+        if dynamic_sampling_context is None:
             return Baggage.from_options(self)
-
-        return None
+        else:
+            return Baggage(dynamic_sampling_context)
 
     def get_trace_context(self):
         # type: () -> Any
