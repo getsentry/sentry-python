@@ -616,7 +616,7 @@ class Scope(object):
 
         try:
             replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
-        except KeyError:
+        except (KeyError, TypeError):
             replay_id = None
 
         if replay_id is not None:
