@@ -877,12 +877,13 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
 
 
-def test_replay_event_context(sentry_init, capture_events, app):
+@pytest.mark.parametrize("traces_sample_rate", [None, 1.0])
+def test_replay_event_context(sentry_init, capture_events, app, traces_sample_rate):
     """
     Tests that the replay context is added to the event context.
     This is not strictly a Flask integration test, but it's the easiest way to test this.
     """
-    sentry_init()
+    sentry_init(traces_sample_rate=traces_sample_rate)
 
     @app.route("/error")
     def error():
@@ -898,7 +899,7 @@ def test_replay_event_context(sentry_init, capture_events, app):
     with pytest.raises(ZeroDivisionError):
         client.get("/error", headers=headers)
 
-    (event,) = events
+    event = events[0]
 
     assert event["contexts"]
     assert event["contexts"]["replay"]
