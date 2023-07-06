@@ -869,3 +869,33 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
 
     assert event["request"]["data"]["password"] == "[Filtered]"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
+
+
+def test_replay_event_context(sentry_init, capture_events, app):
+    """
+    Tests that the replay context is added to the event context.
+    This is not strictly a Flask integration test, but it's the easiest way to test this.
+    """
+    sentry_init()
+
+    @app.route("/error")
+    def error():
+        return 1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    headers = {
+        "baggage": "other-vendor-value-1=foo;bar;baz,sentry-trace_id=771a43a4192642f0b136d5159a501700,sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,other-vendor-value-2=foo;bar,sentry-replay_id=12312012123120121231201212312012",
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+    }
+    with pytest.raises(ZeroDivisionError):
+        client.get("/error", headers=headers)
+
+    (event,) = events
+
+    assert event["contexts"]
+    assert event["contexts"]["replay"]
+    assert (
+        event["contexts"]["replay"]["replay_id"] == "12312012123120121231201212312012"
+    )
