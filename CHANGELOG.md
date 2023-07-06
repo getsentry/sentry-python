@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.27.1
+
+### Various fixes & improvements
+
+- Add Starlette/FastAPI template tag for adding sentry tracing information (#2225) by @antonpirker
+- Fixed generation of baggage when a dsc is already in propagation context (#2232) by @antonpirker
+- fix(aiohttp): Handle explicitly passing None for trace_configs (#2230) by @Harmon758
+- Support newest starlette versions (#2227) by @antonpirker
+
 ## 1.27.0
 
 ### Various fixes & improvements
