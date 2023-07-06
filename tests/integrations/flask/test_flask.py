@@ -1,4 +1,5 @@
 import json
+import re
 import pytest
 import logging
 
@@ -828,14 +829,16 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
         assert traceparent != ""
         assert baggage != ""
 
-        expected_meta = (
-            '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
-            % (
-                traceparent,
-                baggage,
-            )
-        )
-        assert rendered_meta == expected_meta
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):

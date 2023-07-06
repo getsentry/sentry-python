@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import json
+import re
 import pytest
 import random
 from functools import partial
@@ -717,14 +718,16 @@ def test_template_tracing_meta(sentry_init, client, capture_events):
     assert traceparent != ""
     assert baggage != ""
 
-    expected_meta = (
-        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">\n'
-        % (
-            traceparent,
-            baggage,
-        )
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">\n',
+        rendered_meta,
     )
-    assert rendered_meta == expected_meta
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
