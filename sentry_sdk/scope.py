@@ -614,9 +614,14 @@ class Scope(object):
             else:
                 contexts["trace"] = self.get_trace_context()
 
-        if "replay_id" in contexts["trace"]["dynamic_sampling_context"]:
+        try:
+            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
+        except KeyError:
+            replay_id = None
+
+        if replay_id is not None:
             contexts["replay"] = {
-                "replay_id": contexts["trace"]["dynamic_sampling_context"]["replay_id"]
+                "replay_id": replay_id,
             }
 
         exc_info = hint.get("exc_info")
