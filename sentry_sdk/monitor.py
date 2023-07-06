@@ -20,9 +20,9 @@ class Monitor(object):
     name = "sentry.monitor"
 
     def __init__(self, transport, interval=10):
-        # type: (sentry_sdk.transport.Transport, int) -> None
+        # type: (sentry_sdk.transport.Transport, float) -> None
         self.transport = transport  # type: sentry_sdk.transport.Transport
-        self.interval = interval  # type: int
+        self.interval = interval  # type: float
 
         self._healthy = True
         self._downsample_factor = 1  # type: int
