@@ -4,10 +4,6 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
-from sentry_sdk.tracing_utils import (
-    has_tracing_enabled,
-    normalize_incoming_data,
-)
 
 if TYPE_CHECKING:
     from typing import Any
@@ -254,12 +250,7 @@ def get_traceparent():
     """
     Returns the traceparent either from the active span or from the scope.
     """
-    hub = Hub.current
-    if hub.client is not None:
-        if has_tracing_enabled(hub.client.options) and hub.scope.span is not None:
-            return hub.scope.span.to_traceparent()
-
-    return hub.scope.get_traceparent()
+    return Hub.current.get_traceparent()
 
 
 def get_baggage():
@@ -267,20 +258,7 @@ def get_baggage():
     """
     Returns Baggage either from the active span or from the scope.
     """
-    hub = Hub.current
-    if (
-        hub.client is not None
-        and has_tracing_enabled(hub.client.options)
-        and hub.scope.span is not None
-    ):
-        baggage = hub.scope.span.to_baggage()
-    else:
-        baggage = hub.scope.get_baggage()
-
-    if baggage is not None:
-        return baggage.serialize()
-
-    return None
+    return Hub.current.get_baggage()
 
 
 def continue_trace(environ_or_headers, op=None, name=None, source=None):
@@ -288,13 +266,4 @@ def continue_trace(environ_or_headers, op=None, name=None, source=None):
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
-    with Hub.current.configure_scope() as scope:
-        scope.generate_propagation_context(environ_or_headers)
-
-    transaction = Transaction.continue_from_headers(
-        normalize_incoming_data(environ_or_headers),
-        op=op,
-        name=name,
-        source=source,
-    )
-    return transaction
+    return Hub.current.continue_trace(environ_or_headers, op, name, source)

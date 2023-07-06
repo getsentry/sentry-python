@@ -11,7 +11,6 @@ from sentry_sdk._compat import text_type
 
 from celery import Celery, VERSION
 from celery.bin import worker
-from celery.signals import task_success
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -360,7 +359,7 @@ def test_retry(celery, capture_events):
 # TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
 @pytest.mark.skip
 @pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
+def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
@@ -493,17 +492,36 @@ def test_task_headers(celery):
         "sentry-monitor-check-in-id": "123abc",
     }
 
-    @celery.task(name="dummy_task")
-    def dummy_task(x, y):
-        return x + y
-
-    def crons_task_success(sender, **kwargs):
-        headers = _get_headers(sender)
-        assert headers == sentry_crons_setup
-
-    task_success.connect(crons_task_success)
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, x, y):
+        return _get_headers(self)
 
     # This is how the Celery Beat auto-instrumentation starts a task
     # in the monkey patched version of `apply_async`
     # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
-    dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
+    result = dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
+    assert result.get() == sentry_crons_setup
+
+
+def test_baggage_propagation(init_celery):
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, x, y):
+        return _get_headers(self)
+
+    with start_transaction() as transaction:
+        result = dummy_task.apply_async(
+            args=(1, 0),
+            headers={"baggage": "custom=value"},
+        ).get()
+
+        assert sorted(result["baggage"].split(",")) == sorted(
+            [
+                "sentry-release=abcdef",
+                "sentry-trace_id={}".format(transaction.trace_id),
+                "sentry-environment=production",
+                "sentry-sample_rate=1.0",
+                "custom=value",
+            ]
+        )

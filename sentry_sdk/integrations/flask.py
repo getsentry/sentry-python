@@ -6,7 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import Scope
-from sentry_sdk.tracing import SENTRY_TRACE_HEADER_NAME, SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -93,22 +93,13 @@ class FlaskIntegration(Integration):
 
 def _add_sentry_trace(sender, template, context, **extra):
     # type: (Flask, Any, Dict[str, Any], **Any) -> None
-
     if "sentry_trace" in context:
         return
 
-    sentry_span = Hub.current.scope.span
-    context["sentry_trace"] = (
-        Markup(
-            '<meta name="%s" content="%s" />'
-            % (
-                SENTRY_TRACE_HEADER_NAME,
-                sentry_span.to_traceparent(),
-            )
-        )
-        if sentry_span
-        else ""
-    )
+    hub = Hub.current
+    trace_meta = Markup(hub.trace_propagation_meta())
+    context["sentry_trace"] = trace_meta  # for backwards compatibility
+    context["sentry_trace_meta"] = trace_meta
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
