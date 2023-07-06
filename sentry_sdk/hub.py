@@ -814,7 +814,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
-        if span is None:
+        if span is not None:
             logger.warning(
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
