@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.hub - sentry-python 1.27.0 documentation</title>
+      <title>sentry_sdk.hub - sentry-python 1.27.1 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -930,7 +930,7 @@ html.dark {
 </span><span id="1-814"><span class="sd">        Return meta tags which should be injected into HTML templates</span>
 </span><span id="1-815"><span class="sd">        to allow propagation of trace information.</span>
 </span><span id="1-816"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-817">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-817">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-818">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
 </span><span id="1-819">                <span class="s2">&quot;The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.&quot;</span>
 </span><span id="1-820">            <span class="p">)</span>
