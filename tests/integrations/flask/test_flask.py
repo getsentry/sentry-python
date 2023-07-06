@@ -1,4 +1,5 @@
 import json
+import re
 import pytest
 import logging
 
@@ -765,6 +766,25 @@ def test_tracing_error(sentry_init, capture_events, app):
     assert exception["type"] == "ZeroDivisionError"
 
 
+def test_error_has_trace_context_if_tracing_disabled(sentry_init, capture_events, app):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+
+    events = capture_events()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    with pytest.raises(ZeroDivisionError):
+        with app.test_client() as client:
+            response = client.get("/error")
+            assert response.status_code == 500
+
+    (error_event,) = events
+
+    assert error_event["contexts"]["trace"]
+
+
 def test_class_based_views(sentry_init, app, capture_events):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
@@ -787,22 +807,38 @@ def test_class_based_views(sentry_init, app, capture_events):
     assert event["transaction"] == "hello_class"
 
 
-def test_sentry_trace_context(sentry_init, app, capture_events):
+@pytest.mark.parametrize(
+    "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
+)
+def test_template_tracing_meta(sentry_init, app, capture_events, template_string):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
     def index():
-        sentry_span = Hub.current.scope.span
-        capture_message(sentry_span.to_traceparent())
-        return render_template_string("{{ sentry_trace }}")
+        hub = Hub.current
+        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        return render_template_string(template_string)
 
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert response.data.decode(
-            "utf-8"
-        ) == '<meta name="sentry-trace" content="%s" />' % (events[0]["message"],)
+
+        rendered_meta = response.data.decode("utf-8")
+        traceparent, baggage = events[0]["message"].split("\n")
+        assert traceparent != ""
+        assert baggage != ""
+
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):

@@ -82,7 +82,10 @@ def check_thread_support():
     if "threads" in opt:
         return
 
-    if str(opt.get("enable-threads", "0")).lower() in ("false", "off", "no", "0"):
+    # put here because of circular import
+    from sentry_sdk.consts import FALSE_VALUES
+
+    if str(opt.get("enable-threads", "0")).lower() in FALSE_VALUES:
         from warnings import warn
 
         warn(

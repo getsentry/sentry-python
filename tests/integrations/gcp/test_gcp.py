@@ -371,3 +371,184 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     )
 
     assert return_value["AssertionError raised"] is False
+
+
+def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    """
+    envelopes, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+    (msg_event, error_event, transaction_event) = envelopes
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
+    """
+    _, events, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=None),  # this is the default, just added for clarity
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_error_has_existing_trace_context_performance_enabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions
+    from the incoming 'sentry-trace' header when performance monitoring is enabled.
+    """
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    envelopes, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers"])
+        event = GCPEvent(headers={"sentry-trace": "%s"})
+
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+            % sentry_trace_header
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+    (msg_event, error_event, transaction_event) = envelopes
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert "trace" in transaction_event["contexts"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )
+
+
+def test_error_has_existing_trace_context_performance_disabled(run_cloud_function):
+    """
+    Check if an 'trace' context is added to errros and transactions
+    from the incoming 'sentry-trace' header when performance monitoring is disabled.
+    """
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    _, events, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers"])
+        event = GCPEvent(headers={"sentry-trace": "%s"})
+
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            x = 3/0
+            return "3"
+        """
+            % sentry_trace_header
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=None),  # this is the default, just added for clarity
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+    (msg_event, error_event) = events
+
+    assert "trace" in msg_event["contexts"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert "trace" in error_event["contexts"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == "471a43a4192642f0b136d5159a501701"
+    )

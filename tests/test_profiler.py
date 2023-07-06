@@ -15,6 +15,7 @@ from sentry_sdk.profiler import (
     ThreadScheduler,
     extract_frame,
     extract_stack,
+    frame_id,
     get_current_thread_id,
     get_frame_name,
     setup_profiler,
@@ -146,6 +147,7 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
 def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
@@ -161,6 +163,7 @@ def test_profiles_sample_rate(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
         with start_transaction(name="profiling"):
@@ -173,6 +176,12 @@ def test_profiles_sample_rate(
 
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
+    if profiles_sample_rate is None or profiles_sample_rate == 0:
+        assert reports == []
+    elif profile_count:
+        assert reports == []
+    else:
+        assert reports == [("sample_rate", "profile")]
 
 
 @requires_python_version(3, 3)
@@ -212,6 +221,7 @@ def test_profiles_sample_rate(
 def test_profiles_sampler(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
     profiles_sampler,
     profile_count,
@@ -223,6 +233,7 @@ def test_profiles_sampler(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
         with start_transaction(name="profiling"):
@@ -235,12 +246,17 @@ def test_profiles_sampler(
 
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
+    if profile_count:
+        assert reports == []
+    else:
+        assert reports == [("sample_rate", "profile")]
 
 
 @requires_python_version(3, 3)
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
 ):
     sentry_init(
@@ -249,6 +265,7 @@ def test_minimum_unique_samples_required(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with start_transaction(name="profiling"):
         pass
@@ -262,6 +279,7 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
+    assert reports == [("insufficient_data", "profile")]
 
 
 @requires_python_version(3, 3)
@@ -444,7 +462,7 @@ def test_get_frame_name(frame, frame_name):
 def test_extract_frame(get_frame, function):
     cwd = os.getcwd()
     frame = get_frame()
-    extracted_frame = extract_frame(frame, cwd)
+    extracted_frame = extract_frame(frame_id(frame), frame, cwd)
 
     # the abs_path should be equal toe the normalized path of the co_filename
     assert extracted_frame["abs_path"] == os.path.normpath(frame.f_code.co_filename)

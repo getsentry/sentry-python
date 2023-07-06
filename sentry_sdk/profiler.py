@@ -111,6 +111,7 @@ if TYPE_CHECKING:
     FrameId = Tuple[
         str,  # abs_path
         int,  # lineno
+        str,  # function
     ]
     FrameIds = Tuple[FrameId, ...]
 
@@ -278,7 +279,7 @@ def extract_stack(
     for i, fid in enumerate(frame_ids):
         frame = cache.get(fid)
         if frame is None:
-            frame = extract_frame(raw_frames[i], cwd)
+            frame = extract_frame(fid, raw_frames[i], cwd)
             cache.set(fid, frame)
         frames.append(frame)
 
@@ -300,15 +301,15 @@ def extract_stack(
 
 def frame_id(raw_frame):
     # type: (FrameType) -> FrameId
-    return (raw_frame.f_code.co_filename, raw_frame.f_lineno)
+    return (raw_frame.f_code.co_filename, raw_frame.f_lineno, get_frame_name(raw_frame))
 
 
-def extract_frame(frame, cwd):
-    # type: (FrameType, str) -> ProcessedFrame
-    abs_path = frame.f_code.co_filename
+def extract_frame(fid, raw_frame, cwd):
+    # type: (FrameId, FrameType, str) -> ProcessedFrame
+    abs_path = raw_frame.f_code.co_filename
 
     try:
-        module = frame.f_globals["__name__"]
+        module = raw_frame.f_globals["__name__"]
     except Exception:
         module = None
 
@@ -327,8 +328,8 @@ def extract_frame(frame, cwd):
         "abs_path": os.path.join(cwd, abs_path),
         "module": module,
         "filename": filename_for_module(module, abs_path) or None,
-        "function": get_frame_name(frame),
-        "lineno": frame.f_lineno,
+        "function": fid[2],
+        "lineno": raw_frame.f_lineno,
     }
 
 
@@ -727,10 +728,26 @@ class Profile(object):
 
     def valid(self):
         # type: () -> bool
+        hub = self.hub or sentry_sdk.Hub.current
+        client = hub.client
+        if client is None:
+            return False
+
+        if not has_profiling_enabled(client.options):
+            return False
+
         if self.sampled is None or not self.sampled:
+            if client.transport:
+                client.transport.record_lost_event(
+                    "sample_rate", data_category="profile"
+                )
             return False
 
         if self.unique_samples < PROFILE_MINIMUM_SAMPLES:
+            if client.transport:
+                client.transport.record_lost_event(
+                    "insufficient_data", data_category="profile"
+                )
             logger.debug("[Profiling] Discarding profile because insufficient samples.")
             return False
 

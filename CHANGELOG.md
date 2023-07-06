@@ -1,5 +1,83 @@
 # Changelog
 
+## 1.27.1
+
+### Various fixes & improvements
+
+- Add Starlette/FastAPI template tag for adding Sentry tracing information (#2225) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Starlette/FastAPI Jinja2 templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+- Fixed generation of baggage when a DSC is already in propagation context (#2232) by @antonpirker
+- Handle explicitly passing `None` for `trace_configs` in `aiohttp` (#2230) by @Harmon758
+- Support newest Starlette versions (#2227) by @antonpirker
+
+## 1.27.0
+
+### Various fixes & improvements
+
+- Support for SQLAlchemy 2.0 (#2200) by @antonpirker
+- Add instrumentation of `aiohttp` client requests (#1761) by @md384
+- Add Django template tag for adding Sentry tracing information (#2222) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Django templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+
+- Update Flask HTML meta helper (#2203) by @antonpirker
+- Take trace ID always from propagation context (#2209) by @antonpirker
+- Fix trace context in event payload (#2205) by @antonpirker
+- Use new top level API in `trace_propagation_meta` (#2202) by @antonpirker
+- Do not overwrite existing baggage on outgoing requests (#2191, #2214) by @sentrivana
+- Set the transaction/span status from an OTel span (#2115) by @daniil-konovalenko
+- Fix propagation of OTel `NonRecordingSpan` (#2187) by @hartungstenio
+- Fix `TaskLockedException` handling in Huey integration (#2206) by @Zhenay
+- Add message format configuration arguments to Loguru integration (#2208) by @Gwill
+- Profiling: Add client reports for profiles (#2207) by @Zylphrex
+- CI: Fix CI (#2220) by @antonpirker
+- Dependencies: Bump `checkouts/data-schemas` from `7fdde87` to `1b85152` (#2218) by @dependabot
+- Dependencies: Bump `mypy` from 1.3.0 to 1.4.1 (#2194) by @dependabot
+- Docs: Change API doc theme (#2210) by @sentrivana
+- Docs: Allow (some) autocompletion for top-level API (#2213) by @sentrivana
+- Docs: Revert autocomplete hack (#2224) by @sentrivana
+
+## 1.26.0
+
+### Various fixes & improvements
+
+- Tracing without performance (#2136) by @antonpirker
+- Load tracing information from environment (#2176) by @antonpirker
+- Auto-enable HTTPX integration if HTTPX installed (#2177) by @sentrivana
+- Support for SOCKS proxies (#1050) by @Roguelazer
+- Wrap `parse_url` calls in `capture_internal_exceptions` (#2162) by @sentrivana
+- Run 2.7 tests in CI again (#2181) by @sentrivana
+- Crons: Do not support sub-minute cron intervals (#2172) by @antonpirker
+- Profile: Add function name to profiler frame cache (#2164) by @Zylphrex
+- Dependencies: bump checkouts/data-schemas from `0ed3357` to `7fdde87` (#2165) by @dependabot
+- Update changelog (#2163) by @sentrivana
+
+## 1.25.1
+
+### Django update (ongoing)
+
+Collections of improvements to our Django integration.
+
+By: @mgaligniana (#1773)
+
+### Various fixes & improvements
+
+- Fix `parse_url` (#2161) by @sentrivana and @antonpirker
+
+  Our URL sanitization used in multiple integrations broke with the recent Python security update. If you started seeing `ValueError`s with `"'Filtered' does not appear to be an IPv4 or IPv6 address"`, this release fixes that. See [the original issue](https://github.com/getsentry/sentry-python/issues/2160) for more context.
+
+- Better version parsing in integrations (#2152) by @antonpirker
+
+  We now properly support all integration versions that conform to [PEP 440](https://peps.python.org/pep-0440/). This replaces our naïve version parsing that wouldn't accept versions such as `2.0.0rc1` or `2.0.5.post1`.
+
+- Align HTTP status code as span data field `http.response.status_code` (#2113) by @antonpirker
+- Do not encode cached value to determine size (#2143) by @sentrivana
+- Fix using `unittest.mock` whenever available (#1926) by @mgorny
+- Fix 2.7 `common` tests (#2145) by @sentrivana
+- Bump `actions/stale` from `6` to `8` (#1978) by @dependabot
+- Bump `black` from `22.12.0` to `23.3.0` (#1984) by @dependabot
+- Bump `mypy` from `1.2.0` to `1.3.0` (#2110) by @dependabot
+- Bump `sphinx` from `5.3.0` to `7.0.1` (#2112) by @dependabot
+
 ## 1.25.0
 
 ### Various fixes & improvements

@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["2.7","3.7","3.8","3.9","3.10","3.11"]
+        python-version: ["3.7","3.8","3.9","3.10","3.11"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -69,9 +69,38 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
 
+  test-py27:
+    name: sqlalchemy, python 2.7, ubuntu-20.04
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+
+      - name: Test sqlalchemy
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          retry_wait_seconds: 5
+          shell: bash
+          command: |
+            set -x # print commands that are executed
+            coverage erase
+
+            # Run tests
+            ./scripts/runtox.sh "py2.7-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            coverage combine .coverage* &&
+            coverage xml -i
+
   check_required_tests:
     name: All sqlalchemy tests passed or skipped
-    needs: test
+    needs: [test, test-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
@@ -79,4 +108,8 @@ jobs:
       - name: Check for failures
         if: contains(needs.test.result, 'failure')
         run: |
-          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+      - name: Check for 2.7 failures
+        if: contains(needs.test-py27.result, 'failure')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
