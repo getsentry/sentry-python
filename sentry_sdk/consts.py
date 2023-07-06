@@ -36,6 +36,7 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
+            "enable_backpressure_handling": Optional[bool],
         },
         total=False,
     )
@@ -205,7 +206,6 @@ class ClientConstructor(object):
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        enable_backpressure_handling=True,  # type: bool
     ):
         # type: (...) -> None
         pass
