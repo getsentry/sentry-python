@@ -4,10 +4,11 @@
 
 ### Various fixes & improvements
 
-- Add Starlette/FastAPI template tag for adding sentry tracing information (#2225) by @antonpirker
-- Fixed generation of baggage when a dsc is already in propagation context (#2232) by @antonpirker
-- fix(aiohttp): Handle explicitly passing None for trace_configs (#2230) by @Harmon758
-- Support newest starlette versions (#2227) by @antonpirker
+- Add Starlette/FastAPI template tag for adding Sentry tracing information (#2225) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Starlette/FastAPI Jinja2 templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+- Fixed generation of baggage when a DSC is already in propagation context (#2232) by @antonpirker
+- Handle explicitly passing `None` for `trace_configs` in `aiohttp` (#2230) by @Harmon758
+- Support newest Starlette versions (#2227) by @antonpirker
 
 ## 1.27.0
 
