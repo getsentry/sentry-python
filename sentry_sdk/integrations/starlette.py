@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
     transaction_from_function,
 )
 
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
 
 try:
     import starlette  # type: ignore
+    from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
@@ -77,9 +79,19 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        version = parse_version(STARLETTE_VERSION)
+
+        if version is None:
+            raise DidNotEnable(
+                "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
+            )
+
         patch_middlewares()
         patch_asgi_app()
         patch_request_response()
+
+        if version >= (0, 24):
+            patch_templates()
 
 
 def _enable_span_for_middleware(middleware_class):
@@ -454,6 +466,47 @@ def patch_request_response():
         return old_request_response(func)
 
     starlette.routing.request_response = _sentry_request_response
+
+
+def patch_templates():
+    # type: () -> None
+
+    # If markupsafe is not installed, then Jinja2 is not installed
+    # (markupsafe is a dependency of Jinja2)
+    # In this case we do not need to patch the Jinja2Templates class
+    try:
+        from markupsafe import Markup
+    except ImportError:
+        return  # Nothing to do
+
+    from starlette.templating import Jinja2Templates  # type: ignore
+
+    old_jinja2templates_init = Jinja2Templates.__init__
+
+    not_yet_patched = "_sentry_jinja2templates_init" not in str(
+        old_jinja2templates_init
+    )
+
+    if not_yet_patched:
+
+        def _sentry_jinja2templates_init(self, *args, **kwargs):
+            # type: (Jinja2Templates, *Any, **Any) -> None
+            def add_sentry_trace_meta(request):
+                # type: (Request) -> Dict[str, Any]
+                hub = Hub.current
+                trace_meta = Markup(hub.trace_propagation_meta())
+                return {
+                    "sentry_trace_meta": trace_meta,
+                }
+
+            kwargs.setdefault("context_processors", [])
+
+            if add_sentry_trace_meta not in kwargs["context_processors"]:
+                kwargs["context_processors"].append(add_sentry_trace_meta)
+
+            return old_jinja2templates_init(self, *args, **kwargs)
+
+        Jinja2Templates.__init__ = _sentry_jinja2templates_init
 
 
 class StarletteRequestExtractor:

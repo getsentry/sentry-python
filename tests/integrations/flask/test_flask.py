@@ -1,4 +1,5 @@
 import json
+import re
 import pytest
 import logging
 
@@ -809,8 +810,8 @@ def test_class_based_views(sentry_init, app, capture_events):
 @pytest.mark.parametrize(
     "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
 )
-def test_sentry_trace_context(sentry_init, app, capture_events, template_string):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
+def test_template_tracing_meta(sentry_init, app, capture_events, template_string):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
@@ -825,14 +826,19 @@ def test_sentry_trace_context(sentry_init, app, capture_events, template_string)
 
         rendered_meta = response.data.decode("utf-8")
         traceparent, baggage = events[0]["message"].split("\n")
-        expected_meta = (
-            '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">'
-            % (
-                traceparent,
-                baggage,
-            )
-        )
-        assert rendered_meta == expected_meta
+        assert traceparent != ""
+        assert baggage != ""
+
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
