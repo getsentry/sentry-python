@@ -614,6 +614,11 @@ class Scope(object):
             else:
                 contexts["trace"] = self.get_trace_context()
 
+        if "replay_id" in contexts["trace"]["dynamic_sampling_context"]:
+            contexts["replay"] = {
+                "replay_id": contexts["trace"]["dynamic_sampling_context"]["replay_id"]
+            }
+
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
