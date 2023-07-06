@@ -477,37 +477,36 @@ def patch_templates():
     try:
         from markupsafe import Markup
     except ImportError:
-        Markup = None  # type: ignore  # noqa: N806
+        return  # Nothing to do
 
-    if Markup is not None:
-        from starlette.templating import Jinja2Templates  # type: ignore
+    from starlette.templating import Jinja2Templates  # type: ignore
 
-        old_jinja2templates_init = Jinja2Templates.__init__
+    old_jinja2templates_init = Jinja2Templates.__init__
 
-        not_yet_patched = "_sentry_jinja2templates_init" not in str(
-            old_jinja2templates_init
-        )
+    not_yet_patched = "_sentry_jinja2templates_init" not in str(
+        old_jinja2templates_init
+    )
 
-        if not_yet_patched:
+    if not_yet_patched:
 
-            def _sentry_jinja2templates_init(self, *args, **kwargs):
-                # type: (Jinja2Templates, *Any, **Any) -> None
-                def add_sentry_trace_meta(request):
-                    # type: (Request) -> Dict[str, Any]
-                    hub = Hub.current
-                    trace_meta = Markup(hub.trace_propagation_meta())
-                    return {
-                        "sentry_trace_meta": trace_meta,
-                    }
+        def _sentry_jinja2templates_init(self, *args, **kwargs):
+            # type: (Jinja2Templates, *Any, **Any) -> None
+            def add_sentry_trace_meta(request):
+                # type: (Request) -> Dict[str, Any]
+                hub = Hub.current
+                trace_meta = Markup(hub.trace_propagation_meta())
+                return {
+                    "sentry_trace_meta": trace_meta,
+                }
 
-                kwargs.setdefault("context_processors", [])
+            kwargs.setdefault("context_processors", [])
 
-                if add_sentry_trace_meta not in kwargs["context_processors"]:
-                    kwargs["context_processors"].append(add_sentry_trace_meta)
+            if add_sentry_trace_meta not in kwargs["context_processors"]:
+                kwargs["context_processors"].append(add_sentry_trace_meta)
 
-                return old_jinja2templates_init(self, *args, **kwargs)
+            return old_jinja2templates_init(self, *args, **kwargs)
 
-            Jinja2Templates.__init__ = _sentry_jinja2templates_init
+        Jinja2Templates.__init__ = _sentry_jinja2templates_init
 
 
 class StarletteRequestExtractor:
