@@ -795,11 +795,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         span on the scope if not.
         """
         client = self._stack[-1][0]
-        propagate_traces = (
-            client
-            and client.options["propagate_traces"]
-            and client.options["instrumenter"] == INSTRUMENTER.SENTRY
-        )
+        propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:
             return
 

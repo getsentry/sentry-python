@@ -814,6 +814,10 @@ class NoOpSpan(Span):
         # type: (int) -> None
         pass
 
+    def iter_headers(self):
+        # type: (int) -> None
+        yield from ()
+
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         pass
