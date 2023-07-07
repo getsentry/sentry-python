@@ -790,6 +790,19 @@ class NoOpSpan(Span):
         # type: () -> str
         return self.__class__.__name__
 
+    def __enter__(self):
+        # type: () -> Span
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        pass
+
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+        return None
+
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
@@ -797,6 +810,45 @@ class NoOpSpan(Span):
     def new_span(self, **kwargs):
         # type: (**Any) -> NoOpSpan
         return self.start_child(**kwargs)
+
+    @classmethod
+    def continue_from_environ(
+        cls,
+        environ,  # type: typing.Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        return NoOpSpan()
+
+    @classmethod
+    def continue_from_headers(
+        cls,
+        headers,  # type: typing.Mapping[str, str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Transaction
+        return NoOpSpan()
+
+    @classmethod
+    def from_traceparent(
+        cls,
+        traceparent,  # type: Optional[str]
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> Optional[Transaction]
+        return None
+
+    def to_traceparent(self):
+        # type: () -> str
+        return ""
+
+    def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        return None
+
+    def iter_headers(self):
+        # type: () -> Iterator[Tuple[str, str]]
+        yield from ()
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -814,9 +866,17 @@ class NoOpSpan(Span):
         # type: (int) -> None
         pass
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
-        yield from ()
+    def is_success(self):
+        # type: () -> bool
+        return True
+
+    def to_json(self):
+        # type: () -> Dict[str, Any]
+        return {}
+
+    def get_trace_context(self):
+        # type: () -> Any
+        return {}
 
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
