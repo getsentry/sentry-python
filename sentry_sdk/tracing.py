@@ -796,14 +796,6 @@ class NoOpSpan(Span):
         # type: () -> str
         return self.__class__.__name__
 
-    def __enter__(self):
-        # type: () -> Span
-        return self
-
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        pass
-
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
