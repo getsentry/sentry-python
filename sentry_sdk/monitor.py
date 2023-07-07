@@ -46,8 +46,7 @@ class Monitor(object):
                 while self._running:
                     time.sleep(self.interval)
                     if self._running:
-                        self.check_health()
-                        self._set_downsample_factor()
+                        self.run()
 
             thread = Thread(name=self.name, target=_thread)
             thread.daemon = True
@@ -56,6 +55,11 @@ class Monitor(object):
             self._thread_for_pid = os.getpid()
 
         return None
+
+    def run(self):
+        # type: () -> None
+        self.check_health()
+        self._set_downsample_factor()
 
     def _is_transport_rate_limited(self):
         # type: () -> bool

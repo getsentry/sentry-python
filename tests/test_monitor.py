@@ -1,5 +1,4 @@
 import random
-from time import sleep
 
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.transport import Transport
@@ -52,10 +51,10 @@ def test_monitor_unhealthy(sentry_init):
     monitor.interval = 0.1
 
     assert monitor.is_healthy() is True
-    sleep(0.1)  # wait for monitor to run
+    monitor.run()
     assert monitor.is_healthy() is False
     assert monitor.downsample_factor() == 2
-    sleep(0.1)  # wait for monitor to run
+    monitor.run()
     assert monitor.downsample_factor() == 4
 
 
@@ -77,7 +76,7 @@ def test_transaction_uses_downsampled_rate(
     monkeypatch.setattr(random, "random", lambda: 0.9)
 
     assert monitor.is_healthy() is True
-    sleep(0.1)  # wait for monitor to run
+    monitor.run()
     assert monitor.is_healthy() is False
     assert monitor.downsample_factor() == 2
 
