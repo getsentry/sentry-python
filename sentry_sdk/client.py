@@ -32,6 +32,7 @@ from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.monitor import Monitor
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -209,6 +210,13 @@ class _Client(object):
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
+
+            self.monitor = None
+            if self.transport:
+                if self.options["_experiments"].get(
+                    "enable_backpressure_handling", False
+                ):
+                    self.monitor = Monitor(self.transport)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -469,6 +477,9 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
+        :param scope: An optional scope to use for determining whether this event
+            should be captured.
+
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if disable_capture_event.get(False):
@@ -568,6 +579,8 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            if self.monitor:
+                self.monitor.kill()
             self.transport.kill()
             self.transport = None
 

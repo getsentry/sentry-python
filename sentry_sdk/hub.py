@@ -335,7 +335,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def capture_event(self, event, hint=None, scope=None, **scope_args):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
-        """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
+        """
+        Captures an event.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_event`.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+        """
         client, top_scope = self._stack[-1]
         scope = _update_scope(top_scope, scope, scope_args)
         if client is not None:
@@ -348,8 +355,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def capture_message(self, message, level=None, scope=None, **scope_args):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
-        """Captures a message.  The message is just a string.  If no level
-        is provided the default level is `info`.
+        """
+        Captures a message.
+
+        :param message: The string to send as the message.
+
+        :param level: If no level is provided, the default level is `info`.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -366,6 +382,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -441,15 +460,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (Optional[Span], str, Any) -> Span
         """
-        Create and start timing a new span whose parent is the currently active
-        span or transaction, if any. The return value is a span instance,
+        Start a span whose parent is the currently active span or transaction, if any.
+
+        The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
         typically used as a context manager to start and stop timing in a `with`
         block.
 
         Only spans contained in a transaction are sent to Sentry. Most
         integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use `start_transaction` to start a new
-        transaction when one is not already in progress.
+        for every incoming HTTP request. Use
+        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
+        one is not already in progress.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
@@ -481,6 +504,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if span is not None:
             return span.start_child(**kwargs)
 
+        # If there is already a trace_id in the propagation context, use it.
+        if "trace_id" not in kwargs:
+            traceparent = self.get_traceparent()
+            trace_id = traceparent.split("-")[0] if traceparent else None
+            if trace_id is not None:
+                kwargs["trace_id"] = trace_id
+
         return Span(**kwargs)
 
     def start_transaction(
@@ -508,6 +538,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
@@ -782,7 +814,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
-        if span is None:
+        if span is not None:
             logger.warning(
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
@@ -798,7 +830,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         baggage = self.get_baggage()
         if baggage is not None:
-            meta += '<meta name="%s" content="%s">' % (BAGGAGE_HEADER_NAME, baggage)
+            meta += '<meta name="%s" content="%s">' % (
+                BAGGAGE_HEADER_NAME,
+                baggage,
+            )
 
         return meta
 
