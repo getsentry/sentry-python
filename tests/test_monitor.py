@@ -11,13 +11,13 @@ class HealthyTestTransport(Transport):
     def _send_envelope(self, envelope):
         pass
 
-    def is_worker_full(self):
-        return False
+    def is_healthy(self):
+        return True
 
 
 class UnhealthyTestTransport(HealthyTestTransport):
-    def is_worker_full(self):
-        return True
+    def is_healthy(self):
+        return False
 
 
 def test_no_monitor_if_disabled(sentry_init):

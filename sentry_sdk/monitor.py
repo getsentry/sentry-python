@@ -59,21 +59,9 @@ class Monitor(object):
     def run(self):
         # type: () -> None
         self.check_health()
-        self._set_downsample_factor()
+        self.set_downsample_factor()
 
-    def _is_transport_rate_limited(self):
-        # type: () -> bool
-        if self.transport and hasattr(self.transport, "is_rate_limited"):
-            return self.transport.is_rate_limited()
-        return False
-
-    def _is_transport_worker_full(self):
-        # type: () -> bool
-        if self.transport and hasattr(self.transport, "is_worker_full"):
-            return self.transport.is_worker_full()
-        return False
-
-    def _set_downsample_factor(self):
+    def set_downsample_factor(self):
         # type: () -> None
         if self._healthy:
             if self._downsample_factor > 1:
@@ -95,10 +83,7 @@ class Monitor(object):
         currently only checks if the transport is rate-limited.
         TODO: augment in the future with more checks.
         """
-        if self._is_transport_worker_full() or self._is_transport_rate_limited():
-            self._healthy = False
-        else:
-            self._healthy = True
+        self._healthy = self.transport.is_healthy()
 
     def is_healthy(self):
         # type: () -> bool
