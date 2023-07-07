@@ -804,11 +804,6 @@ class NoOpSpan(Span):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         pass
 
-    @property
-    def containing_transaction(self):
-        # type: () -> Any
-        return None
-
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
@@ -816,33 +811,6 @@ class NoOpSpan(Span):
     def new_span(self, **kwargs):
         # type: (**Any) -> NoOpSpan
         return self.start_child(**kwargs)
-
-    @classmethod
-    def continue_from_environ(
-        cls,
-        environ,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Any
-        return NoOpSpan()
-
-    @classmethod
-    def continue_from_headers(
-        cls,
-        headers,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Any
-        return NoOpSpan()
-
-    @classmethod
-    def from_traceparent(
-        cls,
-        traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Any
-        return None
 
     def to_traceparent(self):
         # type: () -> str
