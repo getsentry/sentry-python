@@ -105,6 +105,7 @@ class Monitor(object):
         self._ensure_running()
         return self._healthy
 
+    @property
     def downsample_factor(self):
         # type: () -> int
         self._ensure_running()

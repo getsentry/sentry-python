@@ -595,7 +595,7 @@ class Transaction(Span):
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
             if client.transport and has_tracing_enabled(client.options):
-                if client.monitor and client.monitor.downsample_factor() > 1:
+                if client.monitor and client.monitor.downsample_factor > 1:
                     reason = "backpressure"
                 else:
                     reason = "sample_rate"
@@ -753,7 +753,7 @@ class Transaction(Span):
         self.sample_rate = float(sample_rate)
 
         if client.monitor:
-            self.sample_rate /= client.monitor.downsample_factor()
+            self.sample_rate /= client.monitor.downsample_factor
 
         # if the function returned 0 (or false), or if `traces_sample_rate` is
         # 0, it's a sign the transaction should be dropped

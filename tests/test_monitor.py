@@ -36,7 +36,7 @@ def test_monitor_if_enabled(sentry_init):
     assert monitor._thread is None
 
     assert monitor.is_healthy() is True
-    assert monitor.downsample_factor() == 1
+    assert monitor.downsample_factor == 1
     assert monitor._thread is not None
     assert monitor._thread.name == "sentry.monitor"
 
@@ -53,9 +53,9 @@ def test_monitor_unhealthy(sentry_init):
     assert monitor.is_healthy() is True
     monitor.run()
     assert monitor.is_healthy() is False
-    assert monitor.downsample_factor() == 2
+    assert monitor.downsample_factor == 2
     monitor.run()
-    assert monitor.downsample_factor() == 4
+    assert monitor.downsample_factor == 4
 
 
 def test_transaction_uses_downsampled_rate(
@@ -78,7 +78,7 @@ def test_transaction_uses_downsampled_rate(
     assert monitor.is_healthy() is True
     monitor.run()
     assert monitor.is_healthy() is False
-    assert monitor.downsample_factor() == 2
+    assert monitor.downsample_factor == 2
 
     with start_transaction(name="foobar") as transaction:
         assert transaction.sampled is False
