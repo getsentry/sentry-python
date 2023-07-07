@@ -800,7 +800,7 @@ class NoOpSpan(Span):
 
     @property
     def containing_transaction(self):
-        # type: () -> Optional[Transaction]
+        # type: () -> Any
         return None
 
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
@@ -817,7 +817,7 @@ class NoOpSpan(Span):
         environ,  # type: typing.Mapping[str, str]
         **kwargs  # type: Any
     ):
-        # type: (...) -> Transaction
+        # type: (...) -> Any
         return NoOpSpan()
 
     @classmethod
@@ -826,7 +826,7 @@ class NoOpSpan(Span):
         headers,  # type: typing.Mapping[str, str]
         **kwargs  # type: Any
     ):
-        # type: (...) -> Transaction
+        # type: (...) -> Any
         return NoOpSpan()
 
     @classmethod
@@ -835,7 +835,7 @@ class NoOpSpan(Span):
         traceparent,  # type: Optional[str]
         **kwargs  # type: Any
     ):
-        # type: (...) -> Optional[Transaction]
+        # type: (...) -> Any
         return None
 
     def to_traceparent(self):
