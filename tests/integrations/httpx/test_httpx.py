@@ -90,6 +90,46 @@ def test_outgoing_trace_headers(sentry_init, httpx_client):
 
 
 @pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_outgoing_trace_headers_append_to_baggage(sentry_init, httpx_client):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[HttpxIntegration()],
+        release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
+    )
+
+    url = "http://example.com/"
+    responses.add(responses.GET, url, status=200)
+
+    with start_transaction(
+        name="/interactions/other-dogs/new-dog",
+        op="greeting.sniff",
+        trace_id="01234567890123456789012345678901",
+    ) as transaction:
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            response = asyncio.get_event_loop().run_until_complete(
+                httpx_client.get(url, headers={"baGGage": "custom=data"})
+            )
+        else:
+            response = httpx_client.get(url, headers={"baGGage": "custom=data"})
+
+        request_span = transaction._span_recorder.spans[-1]
+        assert response.request.headers[
+            "sentry-trace"
+        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=transaction.trace_id,
+            parent_span_id=request_span.span_id,
+            sampled=1,
+        )
+        assert (
+            response.request.headers["baggage"]
+            == "custom=data,sentry-trace_id=01234567890123456789012345678901,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0"
+        )
+
+
+@pytest.mark.parametrize(
     "httpx_client,trace_propagation_targets,url,trace_propagated",
     [
         [

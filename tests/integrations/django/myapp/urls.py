@@ -28,6 +28,7 @@ from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
+    path("view-exc-with-msg", views.view_exc_with_msg, name="view_exc_with_msg"),
     path("cached-view", views.cached_view, name="cached_view"),
     path("not-cached-view", views.not_cached_view, name="not_cached_view"),
     path(
@@ -54,6 +55,7 @@ urlpatterns = [
     path("template-exc", views.template_exc, name="template_exc"),
     path("template-test", views.template_test, name="template_test"),
     path("template-test2", views.template_test2, name="template_test2"),
+    path("template-test3", views.template_test3, name="template_test3"),
     path("postgres-select", views.postgres_select, name="postgres_select"),
     path(
         "permission-denied-exc",

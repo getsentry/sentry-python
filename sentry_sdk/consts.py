@@ -36,6 +36,7 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
+            "enable_backpressure_handling": Optional[bool],
         },
         total=False,
     )
@@ -44,6 +45,14 @@ DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 
 MATCH_ALL = r".*"
+
+FALSE_VALUES = [
+    "false",
+    "no",
+    "off",
+    "n",
+    "0",
+]
 
 
 class INSTRUMENTER:
@@ -220,4 +229,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.25.1"
+VERSION = "1.27.1"

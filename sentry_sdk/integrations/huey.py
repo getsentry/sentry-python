@@ -26,12 +26,12 @@ if TYPE_CHECKING:
 
 try:
     from huey.api import Huey, Result, ResultGroup, Task
-    from huey.exceptions import CancelExecution, RetryTask
+    from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
     raise DidNotEnable("Huey is not installed")
 
 
-HUEY_CONTROL_FLOW_EXCEPTIONS = (CancelExecution, RetryTask)
+HUEY_CONTROL_FLOW_EXCEPTIONS = (CancelExecution, RetryTask, TaskLockedException)
 
 
 class HueyIntegration(Integration):

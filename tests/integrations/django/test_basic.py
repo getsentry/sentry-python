@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import json
+import re
 import pytest
 import random
 from functools import partial
@@ -160,6 +161,112 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
         event["transaction"] == "tests.integrations.django.myapp.views.ClassBasedView"
     )
     assert event["message"] == "hi"
+
+
+def test_has_trace_if_performance_enabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+    client.head(reverse("view_exc_with_msg"))
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+        == transaction_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_has_trace_if_performance_disabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+    )
+    events = capture_events()
+    client.head(reverse("view_exc_with_msg"))
+
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    client.head(
+        reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
+    )
+
+    (msg_event, error_event, transaction_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert transaction_event["contexts"]["trace"]
+    assert "trace_id" in transaction_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+def test_trace_from_headers_if_performance_disabled(
+    sentry_init, client, capture_events
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+    )
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    client.head(
+        reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
+    )
+
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
 @pytest.mark.forked
@@ -598,6 +705,29 @@ def test_read_request(sentry_init, client, capture_events):
     (event,) = events
 
     assert "data" not in event["request"]
+
+
+def test_template_tracing_meta(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    content, _, _ = client.get(reverse("template_test3"))
+    rendered_meta = b"".join(content).decode("utf-8")
+
+    traceparent, baggage = events[0]["message"].split("\n")
+    assert traceparent != ""
+    assert baggage != ""
+
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">\n',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])

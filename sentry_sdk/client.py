@@ -32,6 +32,7 @@ from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.monitor import Monitor
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -210,6 +211,13 @@ class _Client(object):
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
 
+            self.monitor = None
+            if self.transport:
+                if self.options["_experiments"].get(
+                    "enable_backpressure_handling", False
+                ):
+                    self.monitor = Monitor(self.transport)
+
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
             request_bodies = ("always", "never", "small", "medium")
@@ -262,7 +270,7 @@ class _Client(object):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
-            event_ = scope.apply_to_event(event, hint)
+            event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
             if event_ is None:
@@ -469,6 +477,9 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
+        :param scope: An optional scope to use for determining whether this event
+            should be captured.
+
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if disable_capture_event.get(False):
@@ -507,11 +518,8 @@ class _Client(object):
         is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
-        dynamic_sampling_context = (
-            event_opt.get("contexts", {})
-            .get("trace", {})
-            .pop("dynamic_sampling_context", {})
-        )
+        trace_context = event_opt.get("contexts", {}).get("trace") or {}
+        dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
@@ -571,6 +579,8 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            if self.monitor:
+                self.monitor.kill()
             self.transport.kill()
             self.transport = None
 
