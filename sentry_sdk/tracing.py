@@ -854,7 +854,7 @@ class NoOpSpan(Span):
 
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
-        yield from ()
+        return iter(())
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
