@@ -815,7 +815,7 @@ class NoOpSpan(Span):
         pass
 
     def iter_headers(self):
-        # type: (int) -> None
+        # type: () -> Iterator[Tuple[str, str]]
         yield from ()
 
     def finish(self, hub=None, end_timestamp=None):
