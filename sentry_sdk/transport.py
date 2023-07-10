@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import io
-import urllib3  # type: ignore
+import urllib3
 import certifi
 import gzip
 import time
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import DefaultDict
 
-    from urllib3.poolmanager import PoolManager  # type: ignore
+    from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
     from sentry_sdk._types import Event, EndpointType
@@ -107,6 +107,10 @@ class Transport(object):
         """
         return None
 
+    def is_healthy(self):
+        # type: () -> bool
+        return True
+
     def __del__(self):
         # type: () -> None
         try:
@@ -186,7 +190,7 @@ class HttpTransport(Transport):
         self._discarded_events[data_category, reason] += quantity
 
     def _update_rate_limits(self, response):
-        # type: (urllib3.HTTPResponse) -> None
+        # type: (urllib3.BaseHTTPResponse) -> None
 
         # new sentries with more rate limit insights.  We honor this header
         # no matter of the status code to update our internal rate limits.
@@ -310,6 +314,18 @@ class HttpTransport(Transport):
             return ts is not None and ts > datetime.utcnow()
 
         return _disabled(category) or _disabled(None)
+
+    def _is_rate_limited(self):
+        # type: () -> bool
+        return any(ts > datetime.utcnow() for ts in self._disabled_until.values())
+
+    def _is_worker_full(self):
+        # type: () -> bool
+        return self._worker.full()
+
+    def is_healthy(self):
+        # type: () -> bool
+        return not (self._is_worker_full() or self._is_rate_limited())
 
     def _send_event(
         self, event  # type: Event
@@ -441,7 +457,24 @@ class HttpTransport(Transport):
             if proxy_headers:
                 opts["proxy_headers"] = proxy_headers
 
-            return urllib3.ProxyManager(proxy, **opts)
+            if proxy.startswith("socks"):
+                use_socks_proxy = True
+                try:
+                    # Check if PySocks depencency is available
+                    from urllib3.contrib.socks import SOCKSProxyManager
+                except ImportError:
+                    use_socks_proxy = False
+                    logger.warning(
+                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
+                        proxy,
+                    )
+
+                if use_socks_proxy:
+                    return SOCKSProxyManager(proxy, **opts)
+                else:
+                    return urllib3.PoolManager(**opts)
+            else:
+                return urllib3.ProxyManager(proxy, **opts)
         else:
             return urllib3.PoolManager(**opts)
 

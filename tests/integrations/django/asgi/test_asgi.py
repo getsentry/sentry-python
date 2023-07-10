@@ -83,9 +83,7 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_active_thread_id(
-    sentry_init, capture_envelopes, teardown_profiling, endpoint, application
-):
+async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
     with mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0):
         sentry_init(
             integrations=[DjangoIntegration()],
@@ -119,7 +117,7 @@ async def test_active_thread_id(
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_views_concurrent_execution(sentry_init, capture_events, settings):
+async def test_async_views_concurrent_execution(sentry_init, settings):
     import asyncio
     import time
 
@@ -153,7 +151,7 @@ async def test_async_views_concurrent_execution(sentry_init, capture_events, set
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_middleware_that_is_function_concurrent_execution(
-    sentry_init, capture_events, settings
+    sentry_init, settings
 ):
     import asyncio
     import time
@@ -232,3 +230,126 @@ async def test_async_middleware_spans(
   - op="event.django": description="django.core.cache.close_caches"
   - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    # ASGI Django does not create transactions per default,
+    # so we do not have a transaction_event here.
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    events = capture_events()
+
+    comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+    assert (
+        msg_event["contexts"]["trace"]["trace_id"]
+        == error_event["contexts"]["trace"]["trace_id"]
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    comm = HttpCommunicator(
+        asgi_application,
+        "GET",
+        "/view-exc-with-msg",
+        headers=[(b"sentry-trace", sentry_trace_header.encode())],
+    )
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    # ASGI Django does not create transactions per default,
+    # so we do not have a transaction_event here.
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    events = capture_events()
+
+    trace_id = "582b43a4192642f0b136d5159a501701"
+    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+
+    comm = HttpCommunicator(
+        asgi_application,
+        "GET",
+        "/view-exc-with-msg",
+        headers=[(b"sentry-trace", sentry_trace_header.encode())],
+    )
+    response = await comm.get_response()
+    assert response["status"] == 500
+
+    (msg_event, error_event) = events
+
+    assert msg_event["contexts"]["trace"]
+    assert "trace_id" in msg_event["contexts"]["trace"]
+
+    assert error_event["contexts"]["trace"]
+    assert "trace_id" in error_event["contexts"]["trace"]
+
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id

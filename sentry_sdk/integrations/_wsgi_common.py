@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
@@ -77,7 +78,7 @@ class RequestExtractor(object):
         if data is not None:
             request_info["data"] = data
 
-        event["request"] = request_info
+        event["request"] = deepcopy(request_info)
 
     def content_length(self):
         # type: () -> int

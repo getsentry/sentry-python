@@ -94,16 +94,17 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _patch_redis(redis):
-    # type: (Any) -> None
-    patch_redis_client(redis.StrictRedis, is_cluster=False)
-    patch_redis_pipeline(redis.client.Pipeline, False, _get_redis_command_args)
+def _patch_redis(StrictRedis, client):
+    # type: (Any, Any) -> None
+    patch_redis_client(StrictRedis, is_cluster=False)
+    patch_redis_pipeline(client.Pipeline, False, _get_redis_command_args)
     try:
-        strict_pipeline = redis.client.StrictPipeline
+        strict_pipeline = client.StrictPipeline
     except AttributeError:
         pass
     else:
         patch_redis_pipeline(strict_pipeline, False, _get_redis_command_args)
+
     try:
         import redis.asyncio
     except ImportError:
@@ -165,11 +166,11 @@ class RedisIntegration(Integration):
     def setup_once():
         # type: () -> None
         try:
-            import redis
+            from redis import StrictRedis, client
         except ImportError:
             raise DidNotEnable("Redis client not installed")
 
-        _patch_redis(redis)
+        _patch_redis(StrictRedis, client)
         _patch_rb()
 
         try:
@@ -214,6 +215,7 @@ def _set_client_data(span, is_cluster, name, *args):
     span.set_tag("redis.is_cluster", is_cluster)
     if name:
         span.set_tag("redis.command", name)
+        span.set_tag(SPANDATA.DB_OPERATION, name)
 
     if name and args:
         name_low = name.lower()

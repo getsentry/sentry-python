@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
 from sentry_sdk._compat import PY2
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
 
@@ -240,7 +241,7 @@ class Span(object):
 
     def new_span(self, **kwargs):
         # type: (**Any) -> Span
-        """Deprecated: use start_child instead."""
+        """Deprecated: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead."""
         logger.warning("Deprecated: use Span.start_child instead of Span.new_span.")
         return self.start_child(**kwargs)
 
@@ -329,11 +330,10 @@ class Span(object):
     ):
         # type: (...) -> Optional[Transaction]
         """
-        DEPRECATED: Use Transaction.continue_from_headers(headers, **kwargs)
+        DEPRECATED: Use :py:meth:`sentry_sdk.tracing.Transaction.continue_from_headers`.
 
-        Create a Transaction with the given params, then add in data pulled from
-        the given 'sentry-trace' header value before returning the Transaction.
-
+        Create a `Transaction` with the given params, then add in data pulled from
+        the given 'sentry-trace' header value before returning the `Transaction`.
         """
         logger.warning(
             "Deprecated: Use Transaction.continue_from_headers(headers, **kwargs) "
@@ -349,12 +349,24 @@ class Span(object):
 
     def to_traceparent(self):
         # type: () -> str
-        sampled = ""
         if self.sampled is True:
             sampled = "1"
-        if self.sampled is False:
+        elif self.sampled is False:
             sampled = "0"
-        return "%s-%s-%s" % (self.trace_id, self.span_id, sampled)
+        else:
+            sampled = None
+
+        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        if sampled is not None:
+            traceparent += "-%s" % (sampled,)
+
+        return traceparent
+
+    def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        if self.containing_transaction:
+            return self.containing_transaction.get_baggage()
+        return None
 
     def set_tag(self, key, value):
         # type: (str, Any) -> None
@@ -370,7 +382,10 @@ class Span(object):
 
     def set_http_status(self, http_status):
         # type: (int) -> None
-        self.set_tag("http.status_code", str(http_status))
+        self.set_tag(
+            "http.status_code", str(http_status)
+        )  # we keep this for backwards compatability
+        self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
 
         if http_status < 400:
             self.set_status("ok")
@@ -580,9 +595,12 @@ class Transaction(Span):
             # exclusively based on sample rate but also traces sampler, but
             # we handle this the same here.
             if client.transport and has_tracing_enabled(client.options):
-                client.transport.record_lost_event(
-                    "sample_rate", data_category="transaction"
-                )
+                if client.monitor and client.monitor.downsample_factor > 1:
+                    reason = "backpressure"
+                else:
+                    reason = "sample_rate"
+
+                client.transport.record_lost_event(reason, data_category="transaction")
 
             return None
 
@@ -734,9 +752,12 @@ class Transaction(Span):
 
         self.sample_rate = float(sample_rate)
 
+        if client.monitor:
+            self.sample_rate /= client.monitor.downsample_factor
+
         # if the function returned 0 (or false), or if `traces_sample_rate` is
         # 0, it's a sign the transaction should be dropped
-        if not sample_rate:
+        if not self.sample_rate:
             logger.debug(
                 "[Tracing] Discarding {transaction_description} because {reason}".format(
                     transaction_description=transaction_description,
@@ -753,7 +774,7 @@ class Transaction(Span):
         # Now we roll the dice. random.random is inclusive of 0, but not of 1,
         # so strict < is safe here. In case sample_rate is a boolean, cast it
         # to a float (True becomes 1.0 and False becomes 0.0)
-        self.sampled = random.random() < float(sample_rate)
+        self.sampled = random.random() < self.sample_rate
 
         if self.sampled:
             logger.debug(
@@ -765,7 +786,7 @@ class Transaction(Span):
             logger.debug(
                 "[Tracing] Discarding {transaction_description} because it's not included in the random sample (sampling rate = {sample_rate})".format(
                     transaction_description=transaction_description,
-                    sample_rate=float(sample_rate),
+                    sample_rate=self.sample_rate,
                 )
             )
 
@@ -808,9 +829,11 @@ def trace(func=None):
     # type: (Any) -> Any
     """
     Decorator to start a child span under the existing current transaction.
-    If there is no current transaction, than nothing will be traced.
+    If there is no current transaction, then nothing will be traced.
 
-    Usage:
+    .. code-block::
+        :caption: Usage
+
         import sentry_sdk
 
         @sentry_sdk.trace

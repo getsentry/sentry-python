@@ -122,11 +122,11 @@ try:
     import psycopg2  # noqa
 
     DATABASES["postgres"] = {
-        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
         "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
-        "HOST": "localhost",
+        "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
         "PORT": 5432,
     }
 except (ImportError, KeyError):
