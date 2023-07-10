@@ -53,7 +53,6 @@ def _set_pipeline_data(
         "redis.commands",
         {"count": len(command_stack), "first_ten": commands},
     )
-    span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
@@ -95,7 +94,7 @@ def _parse_rediscluster_command(command):
     return command.args
 
 
-def _patch_redis(StrictRedis, client):
+def _patch_redis(StrictRedis, client):  # noqa: N803
     # type: (Any, Any) -> None
     patch_redis_client(StrictRedis, is_cluster=False)
     patch_redis_pipeline(client.Pipeline, False, _get_redis_command_args)
