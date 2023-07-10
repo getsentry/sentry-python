@@ -53,6 +53,7 @@ def _set_pipeline_data(
         "redis.commands",
         {"count": len(command_stack), "first_ten": commands},
     )
+    span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
