@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.28.0
+
+### Various fixes & improvements
+
+- Update django app to be compatible for Django 4.x (#1794) by @DilLip-Chowdary-Codes
+- Add support for cron jobs in ARQ integration (#2088) by @lewazo
+- Backpressure handling prototype (#2189) by @sl0thentr0py
+- Add "replay" context to event payload (#2234) by @antonpirker
+
 ## 1.27.1
 
 ### Various fixes & improvements
