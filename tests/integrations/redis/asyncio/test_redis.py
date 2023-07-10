@@ -40,7 +40,6 @@ async def test_async_redis_pipeline(sentry_init, capture_events, is_transaction)
 
     connection = FakeRedis()
     with start_transaction():
-
         pipeline = connection.pipeline(transaction=is_transaction)
         pipeline.get("foo")
         pipeline.set("bar", 1)
