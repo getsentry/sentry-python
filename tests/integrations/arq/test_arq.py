@@ -1,14 +1,26 @@
+import asyncio
 import pytest
 
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.arq import ArqIntegration
 
+import arq.worker
+from arq import cron
 from arq.connections import ArqRedis
 from arq.jobs import Job
 from arq.utils import timestamp_ms
-from arq.worker import Retry, Worker
 
 from fakeredis.aioredis import FakeRedis
+
+
+def async_partial(async_fn, *args, **kwargs):
+    # asyncio.iscoroutinefunction (Used in the integration code) in Python < 3.8
+    # does not detect async functions in functools.partial objects.
+    # This partial implementation returns a coroutine instead.
+    async def wrapped(ctx):
+        return await async_fn(ctx, *args, **kwargs)
+
+    return wrapped
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +40,10 @@ def patch_fakeredis_info_command():
 
 @pytest.fixture
 def init_arq(sentry_init):
-    def inner(functions, allow_abort_jobs=False):
+    def inner(functions_=None, cron_jobs_=None, allow_abort_jobs_=False):
+        functions_ = functions_ or []
+        cron_jobs_ = cron_jobs_ or []
+
         sentry_init(
             integrations=[ArqIntegration()],
             traces_sample_rate=1.0,
@@ -38,9 +53,16 @@ def init_arq(sentry_init):
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
-        return pool, Worker(
-            functions, redis_pool=pool, allow_abort_jobs=allow_abort_jobs
-        )
+
+        class WorkerSettings:
+            functions = functions_
+            cron_jobs = cron_jobs_
+            redis_pool = pool
+            allow_abort_jobs = allow_abort_jobs_
+
+        worker = arq.worker.create_worker(WorkerSettings)
+
+        return pool, worker
 
     return inner
 
@@ -70,7 +92,7 @@ async def test_job_result(init_arq):
 async def test_job_retry(capture_events, init_arq):
     async def retry_job(ctx):
         if ctx["job_try"] < 2:
-            raise Retry
+            raise arq.worker.Retry
 
     retry_job.__qualname__ = retry_job.__name__
 
@@ -105,36 +127,69 @@ async def test_job_transaction(capture_events, init_arq, job_fails):
 
     division.__qualname__ = division.__name__
 
-    pool, worker = init_arq([division])
+    cron_func = async_partial(division, a=1, b=int(not job_fails))
+    cron_func.__qualname__ = division.__name__
+
+    cron_job = cron(cron_func, minute=0, run_at_startup=True)
+
+    pool, worker = init_arq(functions_=[division], cron_jobs_=[cron_job])
 
     events = capture_events()
 
     job = await pool.enqueue_job("division", 1, b=int(not job_fails))
     await worker.run_job(job.job_id, timestamp_ms())
 
-    if job_fails:
-        error_event = events.pop(0)
-        assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+    loop = asyncio.get_event_loop()
+    task = loop.create_task(worker.async_run())
+    await asyncio.sleep(1)
 
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "division"
-    assert event["transaction_info"] == {"source": "task"}
+    task.cancel()
+
+    await worker.close()
 
     if job_fails:
-        assert event["contexts"]["trace"]["status"] == "internal_error"
-    else:
-        assert event["contexts"]["trace"]["status"] == "ok"
+        error_func_event = events.pop(0)
+        error_cron_event = events.pop(1)
 
-    assert "arq_task_id" in event["tags"]
-    assert "arq_task_retry" in event["tags"]
+        assert error_func_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert error_func_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
 
-    extra = event["extra"]["arq-job"]
-    assert extra["task"] == "division"
-    assert extra["args"] == [1]
-    assert extra["kwargs"] == {"b": int(not job_fails)}
-    assert extra["retry"] == 1
+        func_extra = error_func_event["extra"]["arq-job"]
+        assert func_extra["task"] == "division"
+
+        assert error_cron_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert error_cron_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+
+        cron_extra = error_cron_event["extra"]["arq-job"]
+        assert cron_extra["task"] == "cron:division"
+
+    [func_event, cron_event] = events
+
+    assert func_event["type"] == "transaction"
+    assert func_event["transaction"] == "division"
+    assert func_event["transaction_info"] == {"source": "task"}
+
+    assert "arq_task_id" in func_event["tags"]
+    assert "arq_task_retry" in func_event["tags"]
+
+    func_extra = func_event["extra"]["arq-job"]
+
+    assert func_extra["task"] == "division"
+    assert func_extra["kwargs"] == {"b": int(not job_fails)}
+    assert func_extra["retry"] == 1
+
+    assert cron_event["type"] == "transaction"
+    assert cron_event["transaction"] == "cron:division"
+    assert cron_event["transaction_info"] == {"source": "task"}
+
+    assert "arq_task_id" in cron_event["tags"]
+    assert "arq_task_retry" in cron_event["tags"]
+
+    cron_extra = cron_event["extra"]["arq-job"]
+
+    assert cron_extra["task"] == "cron:division"
+    assert cron_extra["kwargs"] == {}
+    assert cron_extra["retry"] == 1
 
 
 @pytest.mark.asyncio

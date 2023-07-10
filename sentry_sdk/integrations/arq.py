@@ -26,10 +26,11 @@ except ImportError:
     raise DidNotEnable("Arq is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Optional, Union
 
     from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint
 
+    from arq.cron import CronJob
     from arq.jobs import Job
     from arq.typing import WorkerCoroutine
     from arq.worker import Function
@@ -61,7 +62,7 @@ class ArqIntegration(Integration):
 
         patch_enqueue_job()
         patch_run_job()
-        patch_func()
+        patch_create_worker()
 
         ignore_logger("arq.worker")
 
@@ -186,23 +187,40 @@ def _wrap_coroutine(name, coroutine):
     return _sentry_coroutine
 
 
-def patch_func():
+def patch_create_worker():
     # type: () -> None
-    old_func = arq.worker.func
+    old_create_worker = arq.worker.create_worker
 
-    def _sentry_func(*args, **kwargs):
-        # type: (*Any, **Any) -> Function
+    def _sentry_create_worker(*args, **kwargs):
+        # type: (*Any, **Any) -> Worker
         hub = Hub.current
 
         if hub.get_integration(ArqIntegration) is None:
-            return old_func(*args, **kwargs)
+            return old_create_worker(*args, **kwargs)
 
-        func = old_func(*args, **kwargs)
+        settings_cls = args[0]
 
-        if not getattr(func, "_sentry_is_patched", False):
-            func.coroutine = _wrap_coroutine(func.name, func.coroutine)
-            func._sentry_is_patched = True
+        functions = settings_cls.functions
+        cron_jobs = settings_cls.cron_jobs
 
-        return func
+        settings_cls.functions = [_get_arq_function(func) for func in functions]
+        settings_cls.cron_jobs = [_get_arq_cron_job(cron_job) for cron_job in cron_jobs]
 
-    arq.worker.func = _sentry_func
+        return old_create_worker(*args, **kwargs)
+
+    arq.worker.create_worker = _sentry_create_worker
+
+
+def _get_arq_function(func):
+    # type: (Union[str, Function, WorkerCoroutine]) -> Function
+    arq_func = arq.worker.func(func)
+    arq_func.coroutine = _wrap_coroutine(arq_func.name, arq_func.coroutine)
+
+    return arq_func
+
+
+def _get_arq_cron_job(cron_job):
+    # type: (CronJob) -> CronJob
+    cron_job.coroutine = _wrap_coroutine(cron_job.name, cron_job.coroutine)
+
+    return cron_job
