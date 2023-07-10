@@ -26,8 +26,36 @@ _COMMANDS_INCLUDING_SENSITIVE_DATA = [
 ]
 
 _MAX_NUM_ARGS = 10  # Trim argument lists to this many values
+_MAX_NUM_COMMANDS = 10  # Trim command lists to this many values
 
 _DEFAULT_MAX_DATA_SIZE = 1024
+
+
+def _get_safe_command(name, args):
+    command_parts = [name]
+
+    for i, arg in enumerate(args):
+        if i > _MAX_NUM_ARGS:
+            break
+
+        name_low = name.lower()
+
+        if name_low in _COMMANDS_INCLUDING_SENSITIVE_DATA:
+            command_parts.append(SENSITIVE_DATA_SUBSTITUTE)
+            continue
+
+        arg_is_the_key = i == 0
+        if arg_is_the_key:
+            command_parts.append(repr(arg))
+
+        else:
+            if _should_send_default_pii():
+                command_parts.append(repr(arg))
+            else:
+                command_parts.append(SENSITIVE_DATA_SUBSTITUTE)
+
+    command = " ".join(command_parts)
+    return command
 
 
 def _set_pipeline_data(
@@ -40,18 +68,18 @@ def _set_pipeline_data(
 
     commands = []
     for i, arg in enumerate(command_stack):
-        if i > _MAX_NUM_ARGS:
+        if i >= _MAX_NUM_COMMANDS:
             break
-        command_args = []
-        for j, command_arg in enumerate(get_command_args_fn(arg)):
-            if j > 0:
-                command_arg = repr(command_arg)
-            command_args.append(command_arg)
-        commands.append(" ".join(command_args))
+
+        command = get_command_args_fn(arg)
+        commands.append(_get_safe_command(command[0], command[1:]))
 
     span.set_data(
         "redis.commands",
-        {"count": len(command_stack), "first_ten": commands},
+        {
+            "count": len(command_stack),
+            "first_ten": commands,
+        },
     )
 
 
@@ -184,28 +212,7 @@ def _get_span_description(name, *args):
     description = name
 
     with capture_internal_exceptions():
-        description_parts = [name]
-        for i, arg in enumerate(args):
-            if i > _MAX_NUM_ARGS:
-                break
-
-            name_low = name.lower()
-
-            if name_low in _COMMANDS_INCLUDING_SENSITIVE_DATA:
-                description_parts.append(SENSITIVE_DATA_SUBSTITUTE)
-                continue
-
-            arg_is_the_key = i == 0
-            if arg_is_the_key:
-                description_parts.append(repr(arg))
-
-            else:
-                if _should_send_default_pii():
-                    description_parts.append(repr(arg))
-                else:
-                    description_parts.append(SENSITIVE_DATA_SUBSTITUTE)
-
-        description = " ".join(description_parts)
+        description = _get_safe_command(name, args)
 
     return description
 
