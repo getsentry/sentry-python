@@ -58,7 +58,11 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
     assert span["data"] == {
         "redis.commands": {
             "count": 3,
-            "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
+            "first_ten": [
+                "GET 'foo'",
+                "SET 'bar' [Filtered]",
+                "SET 'baz' [Filtered]",
+            ],
         },
         SPANDATA.DB_SYSTEM: "redis",
     }
