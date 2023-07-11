@@ -804,6 +804,18 @@ class NoOpSpan(Span):
         # type: (**Any) -> NoOpSpan
         return self.start_child(**kwargs)
 
+    def to_traceparent(self):
+        # type: () -> str
+        return ""
+
+    def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        return None
+
+    def iter_headers(self):
+        # type: () -> Iterator[Tuple[str, str]]
+        return iter(())
+
     def set_tag(self, key, value):
         # type: (str, Any) -> None
         pass
@@ -819,6 +831,18 @@ class NoOpSpan(Span):
     def set_http_status(self, http_status):
         # type: (int) -> None
         pass
+
+    def is_success(self):
+        # type: () -> bool
+        return True
+
+    def to_json(self):
+        # type: () -> Dict[str, Any]
+        return {}
+
+    def get_trace_context(self):
+        # type: () -> Any
+        return {}
 
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
