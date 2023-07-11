@@ -309,5 +309,42 @@ def test_should_propagate_trace(
     assert should_propagate_trace(hub, url) == expected_propagation_decision
 
 
-def test_should_propagate_trace_to_sentry():
-    pass
+@pytest.mark.parametrize(
+    "dsn,url,expected_propagation_decision",
+    [
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "http://example.com",
+            True,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            False,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "http://squirrelchasers.ingest.sentry.io/12312012",
+            False,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "http://ingest.sentry.io/12312012",
+            True,
+        ),
+        (
+            "https://abc@localsentry.example.com/12312012",
+            "http://localsentry.example.com",
+            False,
+        ),
+    ],
+)
+def test_should_propagate_trace_to_sentry(
+    sentry_init, dsn, url, expected_propagation_decision
+):
+    sentry_init(
+        dsn=dsn,
+        traces_sample_rate=1.0,
+    )
+
+    assert should_propagate_trace(Hub.current, url) == expected_propagation_decision
