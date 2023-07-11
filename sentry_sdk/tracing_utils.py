@@ -4,6 +4,7 @@ import contextlib
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
+    BadDsn,
     capture_internal_exceptions,
     Dsn,
     match_regex_list,
@@ -373,6 +374,15 @@ def should_propagate_trace(hub, url):
     """
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
+
+    try:
+        dsn_url = Dsn(client.dsn or "").netloc
+    except BadDsn:
+        dsn_url = None
+
+    is_request_to_sentry = dsn_url and dsn_url in url
+    if is_request_to_sentry:
+        return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 

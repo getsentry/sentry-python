@@ -307,3 +307,7 @@ def test_should_propagate_trace(
     hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
 
     assert should_propagate_trace(hub, url) == expected_propagation_decision
+
+
+def test_should_propagate_trace_to_sentry():
+    pass
