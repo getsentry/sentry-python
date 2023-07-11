@@ -34,13 +34,17 @@ try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings as django_settings
     from django.core import signals
-    from django.urls.exceptions import Resolver404
     from django.conf import settings
 
     try:
         from django.urls import resolve
     except ImportError:
         from django.core.urlresolvers import resolve
+
+    try:
+        from django.urls import Resolver404
+    except ImportError:
+        from django.core.urlresolvers import Resolver404
 except ImportError:
     raise DidNotEnable("Django not installed")
 
