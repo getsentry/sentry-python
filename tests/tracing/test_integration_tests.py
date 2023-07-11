@@ -172,7 +172,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "environment": "production",
         "release": "foo",
         "sample_rate": str(sample_rate),
-        "sentry-sampled": "true" if transaction.sampled else "false",
+        "sampled": "true" if transaction.sampled else "false",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
@@ -189,7 +189,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "environment": "production",
         "release": "foo",
         "sample_rate": str(sample_rate),
-        "sentry-sampled": "true" if transaction.sampled else "false",
+        "sampled": "true" if transaction.sampled else "false",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
