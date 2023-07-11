@@ -32,6 +32,7 @@ _DEFAULT_MAX_DATA_SIZE = 1024
 
 
 def _get_safe_command(name, args):
+    # type: (str, Sequence[Any]) -> str
     command_parts = [name]
 
     for i, arg in enumerate(args):
