@@ -330,6 +330,9 @@ class Baggage(object):
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
 
+        if transaction.sampled is not None:
+            sentry_items["sampled"] = transaction.sampled
+
         # there's an existing baggage but it was mutable,
         # which is why we are creating this new baggage.
         # However, if by chance the user put some sentry items in there, give them precedence.
