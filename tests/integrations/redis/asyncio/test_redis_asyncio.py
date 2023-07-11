@@ -33,10 +33,22 @@ async def test_async_basic(sentry_init, capture_events):
     }
 
 
-@pytest.mark.parametrize("is_transaction", [False, True])
+@pytest.mark.parametrize(
+    "is_transaction, send_default_pii, expected_first_ten",
+    [
+        (False, False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
+        (True, True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
+    ],
+)
 @pytest.mark.asyncio
-async def test_async_redis_pipeline(sentry_init, capture_events, is_transaction):
-    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0)
+async def test_async_redis_pipeline(
+    sentry_init, capture_events, is_transaction, send_default_pii, expected_first_ten
+):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
     events = capture_events()
 
     connection = FakeRedis()
@@ -54,11 +66,7 @@ async def test_async_redis_pipeline(sentry_init, capture_events, is_transaction)
     assert span["data"] == {
         "redis.commands": {
             "count": 3,
-            "first_ten": [
-                "GET 'foo'",
-                "SET 'bar' [Filtered]",
-                "SET 'baz' [Filtered]",
-            ],
+            "first_ten": expected_first_ten,
         }
     }
     assert span["tags"] == {
