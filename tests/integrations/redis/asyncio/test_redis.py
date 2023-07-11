@@ -23,6 +23,7 @@ async def test_async_basic(sentry_init, capture_events):
         "category": "redis",
         "message": "GET 'foobar'",
         "data": {
+            "db.operation": "GET",
             "redis.key": "foobar",
             "redis.command": "GET",
             "redis.is_cluster": False,
@@ -53,7 +54,11 @@ async def test_async_redis_pipeline(sentry_init, capture_events, is_transaction)
     assert span["data"] == {
         "redis.commands": {
             "count": 3,
-            "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
+            "first_ten": [
+                "GET 'foo'",
+                "SET 'bar' [Filtered]",
+                "SET 'baz' [Filtered]",
+            ],
         }
     }
     assert span["tags"] == {
