@@ -254,10 +254,13 @@ class Scope(object):
         if self._propagation_context is None:
             return None
 
-        if self._propagation_context.get("dynamic_sampling_context") is None:
+        dynamic_sampling_context = self._propagation_context.get(
+            "dynamic_sampling_context"
+        )
+        if dynamic_sampling_context is None:
             return Baggage.from_options(self)
-
-        return None
+        else:
+            return Baggage(dynamic_sampling_context)
 
     def get_trace_context(self):
         # type: () -> Any
@@ -610,6 +613,16 @@ class Scope(object):
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
+
+        try:
+            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
+        except (KeyError, TypeError):
+            replay_id = None
+
+        if replay_id is not None:
+            contexts["replay"] = {
+                "replay_id": replay_id,
+            }
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:

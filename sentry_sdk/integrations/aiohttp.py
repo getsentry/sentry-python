@@ -183,7 +183,7 @@ class AioHttpIntegration(Integration):
             if hub.get_integration(AioHttpIntegration) is None:
                 return old_client_session_init(*args, **kwargs)
 
-            client_trace_configs = list(kwargs.get("trace_configs", ()))
+            client_trace_configs = list(kwargs.get("trace_configs") or ())
             trace_config = create_trace_config()
             client_trace_configs.append(trace_config)
 

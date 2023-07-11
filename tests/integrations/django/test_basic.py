@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import json
+import re
 import pytest
 import random
 from functools import partial
@@ -707,23 +708,26 @@ def test_read_request(sentry_init, client, capture_events):
 
 
 def test_template_tracing_meta(sentry_init, client, capture_events):
-    sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
+    sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
-    # The view will capture_message the sentry-trace and baggage information
     content, _, _ = client.get(reverse("template_test3"))
     rendered_meta = b"".join(content).decode("utf-8")
 
     traceparent, baggage = events[0]["message"].split("\n")
-    expected_meta = (
-        '<meta name="sentry-trace" content="%s"><meta name="baggage" content="%s">\n'
-        % (
-            traceparent,
-            baggage,
-        )
-    )
+    assert traceparent != ""
+    assert baggage != ""
 
-    assert rendered_meta == expected_meta
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">\n',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])

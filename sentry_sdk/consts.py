@@ -39,6 +39,7 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
+            "enable_backpressure_handling": Optional[bool],
         },
         total=False,
     )
@@ -231,4 +232,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.27.0"
+VERSION = "1.28.0"
