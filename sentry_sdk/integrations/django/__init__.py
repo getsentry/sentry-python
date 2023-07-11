@@ -6,6 +6,7 @@ import threading
 import weakref
 from importlib import import_module
 
+from sentry_sdk._compat import string_types
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -379,9 +380,12 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         # So we don't check here what style is configured
         if hasattr(urlconf, "handler404"):
             handler = urlconf.handler404
-            scope.transaction = transaction_from_function(
-                getattr(handler, "view_class", handler)
-            )
+            if isinstance(handler, string_types):
+                scope.transaction = handler
+            else:
+                scope.transaction = transaction_from_function(
+                    getattr(handler, "view_class", handler)
+                )
     except Exception:
         pass
 
