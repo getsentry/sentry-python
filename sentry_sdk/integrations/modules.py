@@ -26,12 +26,18 @@ def _normalize_module_name(name):
 def _generate_installed_modules():
     # type: () -> Iterator[Tuple[str, str]]
     try:
-        from importlib.metadata import distributions, version
+        from importlib import metadata
 
-        for dist in distributions():
-            yield _normalize_module_name(dist.metadata["Name"]), version(
-                dist.metadata["Name"]
-            )
+        for dist in metadata.distributions():
+            name = dist.metadata["Name"]
+            # `metadata` values may be `None`, see:
+            # https://github.com/python/cpython/issues/91216
+            # and
+            # https://github.com/python/importlib_metadata/issues/371
+            if name is not None:
+                version = metadata.version(name)
+                if version is not None:
+                    yield _normalize_module_name(name), version
 
     except ImportError:
         # < py3.8
