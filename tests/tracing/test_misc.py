@@ -306,6 +306,8 @@ def test_should_propagate_trace(
     hub = MagicMock()
     hub.client = MagicMock()
     hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
+    hub.client.transport = MagicMock()
+    hub.client.transport.parsed_dsn = Dsn("https://bla@xxx.sentry.io/12312012")
 
     assert should_propagate_trace(hub, url) == expected_propagation_decision
 
