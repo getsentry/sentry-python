@@ -50,7 +50,11 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
     from aiohttp.abc import AbstractMatchInfo
-    from aiohttp import TraceRequestStartParams, TraceRequestEndParams
+    from aiohttp import (
+        TraceRequestStartParams,
+        TraceRequestEndParams,
+        TraceRequestChunkSentParams,
+    )
     from types import SimpleNamespace
     from typing import Any
     from typing import Dict
@@ -244,6 +248,7 @@ def create_trace_config():
             trace_config_ctx.request_headers = params.headers
 
     async def on_request_chunk_sent(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestChunkSentParams) -> None
         if not hasattr(params, "url") or not hasattr(params, "method"):
             return
 
@@ -346,7 +351,7 @@ def _make_server_processor(weak_request):
 
 
 def _make_client_processor(trace_config_ctx, response, response_content):
-    # type: (SimpleNamespace, Response, Optional[dict]) -> EventProcessor
+    # type: (SimpleNamespace, Response, Optional[Dict[str, Any]]) -> EventProcessor
     def aiohttp_client_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]

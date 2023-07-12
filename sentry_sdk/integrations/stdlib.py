@@ -145,7 +145,7 @@ def _install_httplib():
             span.set_data("reason", rv.reason)
             span.finish()
 
-        url = getattr(self, "_sentrysdk_url", None)
+        url = getattr(self, "_sentrysdk_url", None)  # type: Optional[str]
         if url is None:
             return rv
 
@@ -189,18 +189,20 @@ def _install_httplib():
 
 
 def _make_request_processor(url, method, status, request_body, response_body):
-    # type: (str, str, int, Any, Any) -> EventProcessor
+    # type: (Optional[str], str, int, Any, Any) -> EventProcessor
     def stdlib_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
     ):
         with capture_internal_exceptions():
-            parsed_url = urlparse(url)
-
             request_info = event.setdefault("request", {})
-            request_info["url"] = url
+
+            if url is not None:
+                parsed_url = urlparse(url)
+                request_info["query_string"] = parsed_url.query
+                request_info["url"] = url
+
             request_info["method"] = method
-            request_info["query_string"] = parsed_url.query
             try:
                 request_info["data"] = json.loads(request_body)
             except json.JSONDecodeError:

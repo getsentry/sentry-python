@@ -207,6 +207,7 @@ def _make_request_processor(request, response):
 
 
 def _capture_graphql_errors(hub, request, response):
+    # type: (Hub, Request, Response) -> None
     if (
         request.url.path == "/graphql"
         and request.method in ("GET", "POST")

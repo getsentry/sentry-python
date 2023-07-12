@@ -1280,7 +1280,7 @@ class SentryGraphQLClientError(Exception):
 
 
 def _get_graphql_operation_name(query):
-    # type: (dict) -> str
+    # type: (Dict[str, Any]) -> str
     if query.get("operationName"):
         return query["operationName"]
 
@@ -1293,7 +1293,7 @@ def _get_graphql_operation_name(query):
 
 
 def _get_graphql_operation_type(query):
-    # type: (dict) -> str
+    # type: (Dict[str, Any]) -> str
     query = query["query"].strip()
     if query.startswith("mutation"):
         return "mutation"
