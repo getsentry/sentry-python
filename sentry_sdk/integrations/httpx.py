@@ -176,9 +176,10 @@ def _make_request_processor(request, response):
             request_info["headers"] = _filter_headers(dict(request.headers))
             request_info["query_string"] = parsed_url.query
 
-            if request.content:
+            request_content = request.read()
+            if request_content:
                 try:
-                    request_info["data"] = json.loads(request.content)
+                    request_info["data"] = json.loads(request_content)
                 except json.JSONDecodeError:
                     pass
 
