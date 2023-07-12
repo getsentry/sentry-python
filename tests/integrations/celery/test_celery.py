@@ -522,6 +522,7 @@ def test_baggage_propagation(init_celery):
                 "sentry-trace_id={}".format(transaction.trace_id),
                 "sentry-environment=production",
                 "sentry-sample_rate=1.0",
+                "sentry-sampled=true",
                 "custom=value",
             ]
         )

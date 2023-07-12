@@ -172,13 +172,14 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "environment": "production",
         "release": "foo",
         "sample_rate": str(sample_rate),
+        "sampled": "true" if transaction.sampled else "false",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }
 
     expected_baggage = (
-        "sentry-environment=production,sentry-release=foo,sentry-sample_rate=%s,sentry-transaction=Head%%20SDK%%20tx,sentry-trace_id=%s"
-        % (sample_rate, trace_id)
+        "sentry-environment=production,sentry-release=foo,sentry-sample_rate=%s,sentry-transaction=Head%%20SDK%%20tx,sentry-trace_id=%s,sentry-sampled=%s"
+        % (sample_rate, trace_id, "true" if transaction.sampled else "false")
     )
     assert sorted(baggage.serialize().split(",")) == sorted(expected_baggage.split(","))
 
@@ -188,6 +189,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
         "environment": "production",
         "release": "foo",
         "sample_rate": str(sample_rate),
+        "sampled": "true" if transaction.sampled else "false",
         "transaction": "Head SDK tx",
         "trace_id": trace_id,
     }

@@ -228,6 +228,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
         expected_outgoing_baggage_items = [
             "sentry-trace_id=%s" % transaction.trace_id,
             "sentry-sample_rate=0.5",
+            "sentry-sampled=%s" % "true" if transaction.sampled else "false",
             "sentry-release=foo",
             "sentry-environment=production",
         ]
