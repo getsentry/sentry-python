@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import subprocess
@@ -157,7 +158,9 @@ def _install_httplib():
         if getattr(self, "_sentrysdk_is_graphql_request", False):
             with capture_internal_exceptions():
                 try:
-                    response_body = json.loads(rv.read())
+                    response_data = rv.read()
+                    response_body = json.loads(response_data)
+                    rv.read = io.BytesIO(response_data).read
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     return rv
 
@@ -204,7 +207,7 @@ def _make_request_processor(url, method, status, request_body, response_body):
 
             parsed_url = parse_url(url, sanitize=False)
             request_info["query_string"] = parsed_url.query
-            request_info["url"] = url
+            request_info["url"] = parsed_url.url
             request_info["method"] = method
             try:
                 request_info["data"] = json.loads(request_body)
