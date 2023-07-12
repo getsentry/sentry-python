@@ -1,9 +1,10 @@
+import pytest
+
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from fakeredis import FakeStrictRedis
-import pytest
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -37,9 +38,21 @@ def test_basic(sentry_init, capture_events):
     }
 
 
-@pytest.mark.parametrize("is_transaction", [False, True])
-def test_redis_pipeline(sentry_init, capture_events, is_transaction):
-    sentry_init(integrations=[RedisIntegration()], traces_sample_rate=1.0)
+@pytest.mark.parametrize(
+    "is_transaction, send_default_pii, expected_first_ten",
+    [
+        (False, False, ["GET 'foo'", "SET 'bar' [Filtered]", "SET 'baz' [Filtered]"]),
+        (True, True, ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"]),
+    ],
+)
+def test_redis_pipeline(
+    sentry_init, capture_events, is_transaction, send_default_pii, expected_first_ten
+):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
     events = capture_events()
 
     connection = FakeStrictRedis()
@@ -57,7 +70,7 @@ def test_redis_pipeline(sentry_init, capture_events, is_transaction):
     assert span["data"] == {
         "redis.commands": {
             "count": 3,
-            "first_ten": ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
+            "first_ten": expected_first_ten,
         },
         SPANDATA.DB_SYSTEM: "redis",
     }

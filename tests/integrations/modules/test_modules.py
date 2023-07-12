@@ -1,3 +1,4 @@
+import pytest
 import re
 import sentry_sdk
 
@@ -55,12 +56,16 @@ def test_installed_modules():
                 dist.metadata["Name"]
             )
             for dist in distributions()
+            if dist.metadata["Name"] is not None
+            and version(dist.metadata["Name"]) is not None
         }
         assert installed_distributions == importlib_distributions
 
-    if pkg_resources_available:
+    elif pkg_resources_available:
         pkg_resources_distributions = {
             _normalize_distribution_name(dist.key): dist.version
             for dist in pkg_resources.working_set
         }
         assert installed_distributions == pkg_resources_distributions
+    else:
+        pytest.fail("Neither importlib nor pkg_resources is available")

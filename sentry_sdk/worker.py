@@ -95,6 +95,10 @@ class BackgroundWorker(object):
                 self._wait_flush(timeout, callback)
         logger.debug("background worker flushed")
 
+    def full(self):
+        # type: () -> bool
+        return self._queue.full()
+
     def _wait_flush(self, timeout, callback):
         # type: (float, Optional[Any]) -> None
         initial_timeout = min(0.1, timeout)
