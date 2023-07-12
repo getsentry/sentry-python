@@ -1,7 +1,11 @@
 import json
 import sys
 import weakref
-from urllib.parse import parse_qsl
+
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl
 
 from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise

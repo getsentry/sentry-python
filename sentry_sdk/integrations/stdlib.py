@@ -3,7 +3,11 @@ import os
 import subprocess
 import sys
 import platform
-from urllib.parse import parse_qs, urlparse
+
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
@@ -158,7 +162,7 @@ def _install_httplib():
                     return rv
 
         if isinstance(response_body, dict) and response_body.get("errors"):
-            method = getattr(self, "_sentrysdk_method", None)
+            method = getattr(self, "_sentrysdk_method", None)  # type: Optional[str]
             request_body = getattr(self, "_sentry_request_body", None)
             hub = Hub.current
             with hub.configure_scope() as scope:
@@ -189,19 +193,18 @@ def _install_httplib():
 
 
 def _make_request_processor(url, method, status, request_body, response_body):
-    # type: (Optional[str], str, int, Any, Any) -> EventProcessor
+    # type: (str, Optional[str], int, Any, Any) -> EventProcessor
     def stdlib_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
     ):
+        # type: (...) -> Optional[Event]
         with capture_internal_exceptions():
             request_info = event.setdefault("request", {})
 
-            if url is not None:
-                parsed_url = urlparse(url)
-                request_info["query_string"] = parsed_url.query
-                request_info["url"] = url
-
+            parsed_url = parse_url(url, sanitize=False)
+            request_info["query_string"] = parsed_url.query
+            request_info["url"] = url
             request_info["method"] = method
             try:
                 request_info["data"] = json.loads(request_body)
@@ -213,11 +216,11 @@ def _make_request_processor(url, method, status, request_body, response_body):
                 response_context = contexts.setdefault("response", {})
                 response_context["data"] = response_body
 
-            if parsed_url.path == "/graphql":
+            if parsed_url.url.endswith("/graphql"):
                 request_info["api_target"] = "graphql"
                 query = request_info.get("data")
                 if method == "GET":
-                    query = parse_qs(parsed_url.query)
+                    query = dict(parse_qsl(parsed_url.query))
 
                 if query:
                     operation_name = _get_graphql_operation_name(query)

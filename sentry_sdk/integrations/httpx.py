@@ -1,5 +1,9 @@
 import json
-from urllib.parse import parse_qsl
+
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
