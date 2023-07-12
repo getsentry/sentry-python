@@ -5,7 +5,7 @@ import weakref
 try:
     from urllib.parse import parse_qsl
 except ImportError:
-    from urlparse import parse_qsl
+    from urlparse import parse_qsl  # type: ignore
 
 from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise

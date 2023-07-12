@@ -3,7 +3,7 @@ import json
 try:
     from urllib.parse import parse_qsl
 except ImportError:
-    from urlparse import parse_qsl
+    from urlparse import parse_qsl  # type: ignore
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
