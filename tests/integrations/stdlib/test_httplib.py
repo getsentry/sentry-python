@@ -371,7 +371,7 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
 
     params = {"query": "query QueryName {user{name}}"}
 
-    def do_GET(self):
+    def do_GET(self):  # noqa: N802
         self.send_response(200)
         self.end_headers()
         self.wfile.write(json.dumps(graphql_response).encode())
@@ -429,7 +429,7 @@ def test_graphql_post_client_error_captured(sentry_init, capture_events):
 
     events = capture_events()
 
-    def do_POST(self):
+    def do_POST(self):  # noqa: N802
         self.send_response(200)
         self.end_headers()
         self.wfile.write(json.dumps(graphql_response).encode())
