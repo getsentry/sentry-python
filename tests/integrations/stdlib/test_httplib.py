@@ -389,9 +389,7 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
     assert event["request"]["method"] == "GET"
     assert dict(parse_qsl(event["request"]["query_string"])) == params
     assert "data" not in event["request"]
-    assert (
-        event["contexts"]["response"]["data"] == json.dumps(graphql_response).encode()
-    )
+    assert event["contexts"]["response"]["data"] == graphql_response
 
     assert event["request"]["api_target"] == "graphql"
     assert event["fingerprint"] == ["QueryName", "query", 200]
