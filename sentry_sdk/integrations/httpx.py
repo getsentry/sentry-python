@@ -193,7 +193,7 @@ def _make_request_processor(request, response):
 
                 query = request_info.get("data")
                 if request.method == "GET":
-                    query = dict(parse_qsl(request.url.query.decode()))
+                    query = dict(parse_qsl(parsed_url.query))
 
                 if query:
                     operation_name = _get_graphql_operation_name(query)
