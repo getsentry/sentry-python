@@ -13,6 +13,11 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl  # type: ignore
+
 
 @pytest.mark.parametrize(
     "httpx_client",
@@ -321,18 +326,18 @@ def test_graphql_get_client_error_captured(
             }
         ],
     }
+    params = {"query": "query QueryName {user{name}}"}
+
     httpx_mock.add_response(method="GET", json=graphql_response)
 
     events = capture_events()
 
     if asyncio.iscoroutinefunction(httpx_client.get):
         response = asyncio.get_event_loop().run_until_complete(
-            httpx_client.get(url, params={"query": "query QueryName {user{name}}"})
+            httpx_client.get(url, params=params)
         )
     else:
-        response = httpx_client.get(
-            url, params={"query": "query QueryName {user{name}}"}
-        )
+        response = httpx_client.get(url, params=params)
 
     assert response.status_code == 200
     assert response.json() == graphql_response
@@ -341,10 +346,7 @@ def test_graphql_get_client_error_captured(
 
     assert event["request"]["url"] == url
     assert event["request"]["method"] == "GET"
-    assert (
-        event["request"]["query_string"]
-        == "query=query%20QueryName%20%7Buser%7Bname%7D%7D"
-    )
+    assert dict(parse_qsl(event["request"]["query_string"])) == params
     assert "data" not in event["request"]
     assert event["contexts"]["response"]["data"] == graphql_response
 
