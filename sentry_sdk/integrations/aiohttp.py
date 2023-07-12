@@ -244,6 +244,9 @@ def create_trace_config():
             trace_config_ctx.request_headers = params.headers
 
     async def on_request_chunk_sent(session, trace_config_ctx, params):
+        if not hasattr(params, "url") or not hasattr(params, "method"):
+            return
+
         if params.url.path == "/graphql" and params.method == "POST":
             with capture_internal_exceptions():
                 trace_config_ctx.request_body = json.loads(params.chunk)
