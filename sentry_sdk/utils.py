@@ -387,7 +387,7 @@ class AnnotatedValue(object):
     @classmethod
     def removed_because_over_size_limit(cls):
         # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the request_bodies sdk option)"""
+        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
         return AnnotatedValue(
             value="",
             metadata={

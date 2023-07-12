@@ -86,6 +86,16 @@ def _get_options(*args, **kwargs):
                 rv["include_local_variables"] = value
                 continue
 
+            # Option "request_bodies" was renamed to "max_request_body_size"
+            if key == "request_bodies":
+                msg = (
+                    "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. "
+                    "Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+                )
+                logger.warning(msg)
+                rv["max_request_body_size"] = value
+                continue
+
             raise TypeError("Unknown option %r" % (key,))
 
         rv[key] = value
@@ -220,11 +230,11 @@ class _Client(object):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            request_bodies = ("always", "never", "small", "medium")
-            if self.options["request_bodies"] not in request_bodies:
+            max_request_body_size = ("always", "never", "small", "medium")
+            if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
-                    "Invalid value for request_bodies. Must be one of {}".format(
-                        request_bodies
+                    "Invalid value for max_request_body_size. Must be one of {}".format(
+                        max_request_body_size
                     )
                 )
 
@@ -328,7 +338,9 @@ class _Client(object):
         # Postprocess the event here so that annotated types do
         # generally not surface in before_send
         if event is not None:
-            event = serialize(event, request_bodies=self.options.get("request_bodies"))
+            event = serialize(
+                event, max_request_body_size=self.options.get("max_request_body_size")
+            )
 
         before_send = self.options["before_send"]
         if (

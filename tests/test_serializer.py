@@ -132,7 +132,7 @@ def test_trim_databag_breadth(body_normalizer):
         assert data.get(key) == value
 
 
-def test_no_trimming_if_request_bodies_is_always(body_normalizer):
+def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
     }
@@ -141,6 +141,6 @@ def test_no_trimming_if_request_bodies_is_always(body_normalizer):
         curr["nested"] = {}
         curr = curr["nested"]
 
-    result = body_normalizer(data, request_bodies="always")
+    result = body_normalizer(data, max_request_body_size="always")
 
     assert result == data
