@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from contextlib import suppress
 from textwrap import dedent
 
@@ -15,6 +16,12 @@ try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
+
+
+def requires_python_version(major, minor, reason=None):
+    if reason is None:
+        reason = "Requires Python {}.{}".format(major, minor)
+    return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
 
 
 @pytest.mark.asyncio
@@ -537,6 +544,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
         )
 
 
+@requires_python_version(3, 8, "GraphQL aiohttp integration requires py>=3.8")
 @pytest.mark.asyncio
 async def test_graphql_get_client_error_captured(
     sentry_init, capture_events, aiohttp_raw_server, aiohttp_client
@@ -586,6 +594,7 @@ async def test_graphql_get_client_error_captured(
     )
 
 
+@requires_python_version(3, 8, "GraphQL aiohttp integration requires py>=3.8")
 @pytest.mark.asyncio
 async def test_graphql_post_client_error_captured(
     sentry_init, capture_events, aiohttp_client, aiohttp_raw_server

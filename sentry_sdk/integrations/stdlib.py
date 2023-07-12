@@ -127,7 +127,7 @@ def _install_httplib():
         return rv
 
     def send(self, data, *args, **kwargs):
-        # type: (HTTPConnection, Any, *Any, *Any) -> Any
+        # type: (HTTPConnection, Any, *Any, **Any) -> Any
         if getattr(self, "_sentrysdk_is_graphql_request", False):
             self._sentry_request_body = data
 
