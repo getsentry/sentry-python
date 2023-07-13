@@ -1,7 +1,6 @@
 import json
 import random
 from textwrap import dedent
-from urllib.parse import urlencode
 
 import pytest
 
@@ -21,10 +20,10 @@ except ImportError:
 
 try:
     # py3
-    from urllib.parse import parse_qsl
+    from urllib.parse import parse_qsl, urlencode
 except ImportError:
     # py2
-    from urlparse import parse_qsl  # type: ignore
+    from urlparse import parse_qsl, urlencode  # type: ignore
 
 try:
     from unittest import mock  # python 3.3 and above
