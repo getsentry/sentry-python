@@ -462,30 +462,34 @@ def _patch_beat_apply_entry():
         if match_regex_list(monitor_name, integration.exclude_beat_tasks):
             return original_apply_entry(*args, **kwargs)
 
-        monitor_config = _get_monitor_config(celery_schedule, app)
+        with hub.configure_scope() as scope:
+            # When tasks are started from Celery Beat, make sure each task has its own trace.
+            scope.set_new_propagation_context()
 
-        is_supported_schedule = bool(monitor_config)
-        if is_supported_schedule:
-            headers = schedule_entry.options.pop("headers", {})
-            headers.update(
-                {
-                    "sentry-monitor-slug": monitor_name,
-                    "sentry-monitor-config": monitor_config,
-                }
-            )
+            monitor_config = _get_monitor_config(celery_schedule, app)
 
-            check_in_id = capture_checkin(
-                monitor_slug=monitor_name,
-                monitor_config=monitor_config,
-                status=MonitorStatus.IN_PROGRESS,
-            )
-            headers.update({"sentry-monitor-check-in-id": check_in_id})
+            is_supported_schedule = bool(monitor_config)
+            if is_supported_schedule:
+                headers = schedule_entry.options.pop("headers", {})
+                headers.update(
+                    {
+                        "sentry-monitor-slug": monitor_name,
+                        "sentry-monitor-config": monitor_config,
+                    }
+                )
 
-            # Set the Sentry configuration in the options of the ScheduleEntry.
-            # Those will be picked up in `apply_async` and added to the headers.
-            schedule_entry.options["headers"] = headers
+                check_in_id = capture_checkin(
+                    monitor_slug=monitor_name,
+                    monitor_config=monitor_config,
+                    status=MonitorStatus.IN_PROGRESS,
+                )
+                headers.update({"sentry-monitor-check-in-id": check_in_id})
 
-        return original_apply_entry(*args, **kwargs)
+                # Set the Sentry configuration in the options of the ScheduleEntry.
+                # Those will be picked up in `apply_async` and added to the headers.
+                schedule_entry.options["headers"] = headers
+
+            return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
 
