@@ -171,6 +171,8 @@ def _install_httplib():
                 # app; save it so that it can be accessed again
                 rv.read = io.BytesIO(response_data).read
                 try:
+                    # py3.6+ json.loads() can deal with bytes out of the box, but
+                    # for older version we have to explicitly decode first
                     response_body = json.loads(response_data.decode())
                 except (JSONDecodeError, UnicodeDecodeError, TypeError):
                     return rv
