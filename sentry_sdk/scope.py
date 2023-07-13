@@ -196,10 +196,23 @@ class Scope(object):
             "dynamic_sampling_context": None,
         }
 
+    def set_new_propagation_context(self):
+        # type: () -> None
+        """
+        Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
+        """
+        self._propagation_context = self._create_new_propagation_context()
+        logger.debug(
+            "[Tracing] Create new propagation context: %s",
+            self._propagation_context,
+        )
+
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
-        Populates `_propagation_context`. Either from `incoming_data` or with a new propagation context.
+        Makes sure `_propagation_context` is set.
+        If there is `incoming_data` overwrite existing `_propagation_context`.
+        if there is no `incoming_data` create new `_propagation_context`, but do NOT overwrite if already existing.
         """
         if incoming_data:
             context = self._extract_propagation_context(incoming_data)
@@ -212,11 +225,7 @@ class Scope(object):
                 )
 
         if self._propagation_context is None:
-            self._propagation_context = self._create_new_propagation_context()
-            logger.debug(
-                "[Tracing] Create new propagation context: %s",
-                self._propagation_context,
-            )
+            self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
