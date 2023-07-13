@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.client - sentry-python 1.28.0 documentation</title>
+      <title>sentry_sdk.client - sentry-python 1.28.1 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,12 +13,12 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" href="../../_static/pygments.css?v=2023.6.30" type="text/css" />
-    <link rel="stylesheet" href="../../_static/shibuya.css?v=2023.6.30" type="text/css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=2023.6.30" />
+  </script><link rel="stylesheet" href="../../_static/pygments.css?v=2023.7.11" type="text/css" />
+    <link rel="stylesheet" href="../../_static/shibuya.css?v=2023.7.11" type="text/css" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=2023.7.11" />
     <style>
 :root {
-  --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:4rem;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));
+  --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));
   --sy-rc-theme:143, 118, 214;--sy-rc-bg:255, 255, 255;--sy-rc-invert:0, 0, 0;--sy-rc-text:0, 0, 0;--sy-c-bg:#fff;--sy-c-bg-weak:#f9f9f9;--sy-c-text:#374151;--sy-c-text-weak:#6b7280;--sy-c-heading:#111827;--sy-c-bold:#111827;--sy-c-foot-text:#232226;--sy-c-foot-bg:#fafafa;--sy-c-foot-divider:#f0f0f0;
 }
 @media (prefers-color-scheme: light) {
@@ -51,45 +51,43 @@ html.dark {
 <body><div class="document"><div class="sy-head">
   <div class="sy-head-blur"></div>
   <div class="sy-head-inner sy-container mx-auto">
-    <div class="sy-head-links flex items-center">
-      <div class="md:hidden flex items-center">
-        <button class="hamburger js-menu mr-3" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+    <a class="sy-head-brand mr-4" href="../../index.html">
+      
+      
+      <strong>sentry-python</strong>
+    </a>
+    <div class="sy-head-links" id="_sy_links">
+      <nav class="sy-head-nav"></nav>
+      <div class="sy-head-extra flex gap-2 items-center print:hidden">
+        <form class="searchbox flex items-center" action="../../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form>
+        
+        <div class="flex gap-2 items-center">
+            <a class="flex items-center ml-1" href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
+              <i class="i-icon github"></i>
+            </a>
+        </div>
+      </div>
+    </div>
+    <div class="sy-head-actions flex items-center ml-3 shrink-0 print:hidden">
+      <button class="js-theme theme-switch flex items-center" data-aria-light="Switch to dark mode" data-aria-dark="Switch to light mode">
+        <i class="i-icon theme-icon"></i>
+      </button>
+      <div class="md:hidden flex items-center ml-3">
+        <button class="hamburger js-menu" aria-label="Menu" type="button" aria-controls="_sy_links" aria-expanded="false">
           <span class="hamburger_1"></span>
           <span class="hamburger_2 -translate-x-2"></span>
           <span class="hamburger_3 -translate-x-1"></span>
         </button>
       </div>
-      <a class="sy-head-brand" href="../../index.html">
-        
-        
-        <strong>sentry-python</strong>
-      </a></div>
-    <div class="sy-head-actions flex gap-2 items-center print:hidden">
-      
-      <div class="hidden md:block"><form class="searchbox flex items-center" action="../../search.html" method="get">
-  <input type="text" name="q" placeholder="Search" />
-  <kbd>/</kbd>
-</form>
-      </div>
-        <a class="flex items-center ml-1" href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
-          <i class="i-icon github"></i>
-        </a>
-      <button class="js-theme theme-switch flex items-center ml-1" data-aria-light="Switch to dark mode" data-aria-dark="Switch to light mode">
-        <i class="i-icon theme-icon"></i>
-      </button>
-      
     </div>
   </div>
 </div>
 <div class="sy-page sy-container flex mx-auto">
   <aside id="lside" class="sy-lside md:w-64 md:shrink-0 print:hidden">
     <div class="sy-lside-inner md:sticky">
-      <div class="sy-lside-top md:hidden pt-3 pb-3 px-6">
-        <div class="pt-3"><form class="searchbox flex items-center" action="../../search.html" method="get">
-  <input type="text" name="q" placeholder="Search" />
-  <button>Go</button>
-</form>
-        </div></div>
       <div class="sy-scrollbar p-6">
         <div class="globaltoc">
           <ul>
@@ -99,8 +97,10 @@ html.dark {
 
         </div>
       </div>
+      
     </div>
   </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
   <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
     <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
       <i class="i-icon close"></i>
@@ -110,8 +110,33 @@ html.dark {
   </aside>
   <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
   <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+    <div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-icon menu"></i>
+      </button>
+    </div>
+    <ul class="flex-1">
+      
+      
+      
+      <li><a href="../index.html">Module code</a><span>&#x2044;</span></li>
+      
+      <li><span>sentry_sdk.client</span></li>
+      
+      
+    </ul>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-icon outdent"></i>
+      </button>
+    </div>
+  </div>
+</div>
     <div class="flex flex-col break-words justify-between">
-      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-6 xl:px-12">
+      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.client</h1><div class="highlight"><pre>
 <span></span><span id="1-1"><span class="kn">from</span> <span class="nn">importlib</span> <span class="kn">import</span> <span class="n">import_module</span>
@@ -788,7 +813,7 @@ html.dark {
       <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
       <script src="../../_static/doctools.js"></script>
       <script src="../../_static/sphinx_highlight.js"></script>
-      <script src="../../_static/shibuya.js?v=2023.6.30"></script>
+      <script src="../../_static/shibuya.js?v=2023.7.11"></script>
     
 </body>
 </html>

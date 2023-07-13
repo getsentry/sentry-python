@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.tracing - sentry-python 1.28.0 documentation</title>
+      <title>sentry_sdk.tracing - sentry-python 1.28.1 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,12 +13,12 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" href="../../_static/pygments.css?v=2023.6.30" type="text/css" />
-    <link rel="stylesheet" href="../../_static/shibuya.css?v=2023.6.30" type="text/css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=2023.6.30" />
+  </script><link rel="stylesheet" href="../../_static/pygments.css?v=2023.7.11" type="text/css" />
+    <link rel="stylesheet" href="../../_static/shibuya.css?v=2023.7.11" type="text/css" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=2023.7.11" />
     <style>
 :root {
-  --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:4rem;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));
+  --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));
   --sy-rc-theme:143, 118, 214;--sy-rc-bg:255, 255, 255;--sy-rc-invert:0, 0, 0;--sy-rc-text:0, 0, 0;--sy-c-bg:#fff;--sy-c-bg-weak:#f9f9f9;--sy-c-text:#374151;--sy-c-text-weak:#6b7280;--sy-c-heading:#111827;--sy-c-bold:#111827;--sy-c-foot-text:#232226;--sy-c-foot-bg:#fafafa;--sy-c-foot-divider:#f0f0f0;
 }
 @media (prefers-color-scheme: light) {
@@ -51,45 +51,43 @@ html.dark {
 <body><div class="document"><div class="sy-head">
   <div class="sy-head-blur"></div>
   <div class="sy-head-inner sy-container mx-auto">
-    <div class="sy-head-links flex items-center">
-      <div class="md:hidden flex items-center">
-        <button class="hamburger js-menu mr-3" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+    <a class="sy-head-brand mr-4" href="../../index.html">
+      
+      
+      <strong>sentry-python</strong>
+    </a>
+    <div class="sy-head-links" id="_sy_links">
+      <nav class="sy-head-nav"></nav>
+      <div class="sy-head-extra flex gap-2 items-center print:hidden">
+        <form class="searchbox flex items-center" action="../../search.html" method="get">
+  <input type="text" name="q" placeholder="Search" />
+  <kbd>/</kbd>
+</form>
+        
+        <div class="flex gap-2 items-center">
+            <a class="flex items-center ml-1" href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
+              <i class="i-icon github"></i>
+            </a>
+        </div>
+      </div>
+    </div>
+    <div class="sy-head-actions flex items-center ml-3 shrink-0 print:hidden">
+      <button class="js-theme theme-switch flex items-center" data-aria-light="Switch to dark mode" data-aria-dark="Switch to light mode">
+        <i class="i-icon theme-icon"></i>
+      </button>
+      <div class="md:hidden flex items-center ml-3">
+        <button class="hamburger js-menu" aria-label="Menu" type="button" aria-controls="_sy_links" aria-expanded="false">
           <span class="hamburger_1"></span>
           <span class="hamburger_2 -translate-x-2"></span>
           <span class="hamburger_3 -translate-x-1"></span>
         </button>
       </div>
-      <a class="sy-head-brand" href="../../index.html">
-        
-        
-        <strong>sentry-python</strong>
-      </a></div>
-    <div class="sy-head-actions flex gap-2 items-center print:hidden">
-      
-      <div class="hidden md:block"><form class="searchbox flex items-center" action="../../search.html" method="get">
-  <input type="text" name="q" placeholder="Search" />
-  <kbd>/</kbd>
-</form>
-      </div>
-        <a class="flex items-center ml-1" href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
-          <i class="i-icon github"></i>
-        </a>
-      <button class="js-theme theme-switch flex items-center ml-1" data-aria-light="Switch to dark mode" data-aria-dark="Switch to light mode">
-        <i class="i-icon theme-icon"></i>
-      </button>
-      
     </div>
   </div>
 </div>
 <div class="sy-page sy-container flex mx-auto">
   <aside id="lside" class="sy-lside md:w-64 md:shrink-0 print:hidden">
     <div class="sy-lside-inner md:sticky">
-      <div class="sy-lside-top md:hidden pt-3 pb-3 px-6">
-        <div class="pt-3"><form class="searchbox flex items-center" action="../../search.html" method="get">
-  <input type="text" name="q" placeholder="Search" />
-  <button>Go</button>
-</form>
-        </div></div>
       <div class="sy-scrollbar p-6">
         <div class="globaltoc">
           <ul>
@@ -99,8 +97,10 @@ html.dark {
 
         </div>
       </div>
+      
     </div>
   </aside>
+  <div class="lside-overlay js-menu" role="button" aria-label="Close left sidebar" aria-controls="lside" aria-expanded="false"></div>
   <aside id="rside" class="sy-rside pb-3 w-64 shrink-0 order-last">
     <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
       <i class="i-icon close"></i>
@@ -110,8 +110,33 @@ html.dark {
   </aside>
   <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
   <main class="sy-main w-full max-sm:max-w-full print:pt-6">
+    <div class="sy-breadcrumbs" role="navigation">
+  <div class="sy-breadcrumbs-inner flex items-center">
+    <div class="md:hidden mr-3">
+      <button class="js-menu" aria-label="Menu" type="button" aria-controls="lside" aria-expanded="false">
+        <i class="i-icon menu"></i>
+      </button>
+    </div>
+    <ul class="flex-1">
+      
+      
+      
+      <li><a href="../index.html">Module code</a><span>&#x2044;</span></li>
+      
+      <li><span>sentry_sdk.tracing</span></li>
+      
+      
+    </ul>
+    <div class="xl:hidden ml-1">
+      <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
+        aria-expanded="false">
+        <i class="i-icon outdent"></i>
+      </button>
+    </div>
+  </div>
+</div>
     <div class="flex flex-col break-words justify-between">
-      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-6 xl:px-12">
+      <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.tracing</h1><div class="highlight"><pre>
 <span></span><span id="1-1"><span class="kn">import</span> <span class="nn">uuid</span>
@@ -920,68 +945,92 @@ html.dark {
 </span><span id="1-804">        <span class="c1"># type: (**Any) -&gt; NoOpSpan</span>
 </span><span id="1-805">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </span><span id="1-806">
-</span><span id="1-807">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-</span><span id="1-808">        <span class="c1"># type: (str, Any) -&gt; None</span>
-</span><span id="1-809">        <span class="k">pass</span>
+</span><span id="1-807">    <span class="k">def</span> <span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-808">        <span class="c1"># type: () -&gt; str</span>
+</span><span id="1-809">        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
 </span><span id="1-810">
-</span><span id="1-811">    <span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-</span><span id="1-812">        <span class="c1"># type: (str, Any) -&gt; None</span>
-</span><span id="1-813">        <span class="k">pass</span>
+</span><span id="1-811">    <span class="k">def</span> <span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-812">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
+</span><span id="1-813">        <span class="k">return</span> <span class="kc">None</span>
 </span><span id="1-814">
-</span><span id="1-815">    <span class="k">def</span> <span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-</span><span id="1-816">        <span class="c1"># type: (str) -&gt; None</span>
-</span><span id="1-817">        <span class="k">pass</span>
+</span><span id="1-815">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-816">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
+</span><span id="1-817">        <span class="k">return</span> <span class="nb">iter</span><span class="p">(())</span>
 </span><span id="1-818">
-</span><span id="1-819">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
-</span><span id="1-820">        <span class="c1"># type: (int) -&gt; None</span>
+</span><span id="1-819">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="1-820">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span id="1-821">        <span class="k">pass</span>
 </span><span id="1-822">
-</span><span id="1-823">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-824">        <span class="c1"># type: (Optional[sentry_sdk.Hub], Optional[datetime]) -&gt; Optional[str]</span>
+</span><span id="1-823">    <span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="1-824">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span id="1-825">        <span class="k">pass</span>
 </span><span id="1-826">
-</span><span id="1-827">
-</span><span id="1-828"><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-829">    <span class="c1"># type: (Any) -&gt; Any</span>
-</span><span id="1-830"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-831"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
-</span><span id="1-832"><span class="sd">    If there is no current transaction, then nothing will be traced.</span>
-</span><span id="1-833">
-</span><span id="1-834"><span class="sd">    .. code-block::</span>
-</span><span id="1-835"><span class="sd">        :caption: Usage</span>
-</span><span id="1-836">
-</span><span id="1-837"><span class="sd">        import sentry_sdk</span>
+</span><span id="1-827">    <span class="k">def</span> <span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="1-828">        <span class="c1"># type: (str) -&gt; None</span>
+</span><span id="1-829">        <span class="k">pass</span>
+</span><span id="1-830">
+</span><span id="1-831">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
+</span><span id="1-832">        <span class="c1"># type: (int) -&gt; None</span>
+</span><span id="1-833">        <span class="k">pass</span>
+</span><span id="1-834">
+</span><span id="1-835">    <span class="k">def</span> <span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-836">        <span class="c1"># type: () -&gt; bool</span>
+</span><span id="1-837">        <span class="k">return</span> <span class="kc">True</span>
 </span><span id="1-838">
-</span><span id="1-839"><span class="sd">        @sentry_sdk.trace</span>
-</span><span id="1-840"><span class="sd">        def my_function():</span>
-</span><span id="1-841"><span class="sd">            ...</span>
+</span><span id="1-839">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-840">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
+</span><span id="1-841">        <span class="k">return</span> <span class="p">{}</span>
 </span><span id="1-842">
-</span><span id="1-843"><span class="sd">        @sentry_sdk.trace</span>
-</span><span id="1-844"><span class="sd">        async def my_async_function():</span>
-</span><span id="1-845"><span class="sd">            ...</span>
-</span><span id="1-846"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-847">    <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
-</span><span id="1-848">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py2</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
-</span><span id="1-849">    <span class="k">else</span><span class="p">:</span>
-</span><span id="1-850">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py3</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-843">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-844">        <span class="c1"># type: () -&gt; Any</span>
+</span><span id="1-845">        <span class="k">return</span> <span class="p">{}</span>
+</span><span id="1-846">
+</span><span id="1-847">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-848">        <span class="c1"># type: (Optional[sentry_sdk.Hub], Optional[datetime]) -&gt; Optional[str]</span>
+</span><span id="1-849">        <span class="k">pass</span>
+</span><span id="1-850">
 </span><span id="1-851">
-</span><span id="1-852">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
-</span><span id="1-853">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
-</span><span id="1-854">    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
-</span><span id="1-855">        <span class="k">return</span> <span class="n">start_child_span_decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
-</span><span id="1-856">    <span class="k">else</span><span class="p">:</span>
-</span><span id="1-857">        <span class="k">return</span> <span class="n">start_child_span_decorator</span>
-</span><span id="1-858">
-</span><span id="1-859">
-</span><span id="1-860"><span class="c1"># Circular imports</span>
-</span><span id="1-861">
-</span><span id="1-862"><span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils</span> <span class="kn">import</span> <span class="p">(</span>
-</span><span id="1-863">    <span class="n">Baggage</span><span class="p">,</span>
-</span><span id="1-864">    <span class="n">EnvironHeaders</span><span class="p">,</span>
-</span><span id="1-865">    <span class="n">extract_sentrytrace_data</span><span class="p">,</span>
-</span><span id="1-866">    <span class="n">has_tracing_enabled</span><span class="p">,</span>
-</span><span id="1-867">    <span class="n">maybe_create_breadcrumbs_from_span</span><span class="p">,</span>
-</span><span id="1-868"><span class="p">)</span>
+</span><span id="1-852"><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-853">    <span class="c1"># type: (Any) -&gt; Any</span>
+</span><span id="1-854"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-855"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
+</span><span id="1-856"><span class="sd">    If there is no current transaction, then nothing will be traced.</span>
+</span><span id="1-857">
+</span><span id="1-858"><span class="sd">    .. code-block::</span>
+</span><span id="1-859"><span class="sd">        :caption: Usage</span>
+</span><span id="1-860">
+</span><span id="1-861"><span class="sd">        import sentry_sdk</span>
+</span><span id="1-862">
+</span><span id="1-863"><span class="sd">        @sentry_sdk.trace</span>
+</span><span id="1-864"><span class="sd">        def my_function():</span>
+</span><span id="1-865"><span class="sd">            ...</span>
+</span><span id="1-866">
+</span><span id="1-867"><span class="sd">        @sentry_sdk.trace</span>
+</span><span id="1-868"><span class="sd">        async def my_async_function():</span>
+</span><span id="1-869"><span class="sd">            ...</span>
+</span><span id="1-870"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-871">    <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+</span><span id="1-872">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py2</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-873">    <span class="k">else</span><span class="p">:</span>
+</span><span id="1-874">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py3</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-875">
+</span><span id="1-876">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
+</span><span id="1-877">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
+</span><span id="1-878">    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
+</span><span id="1-879">        <span class="k">return</span> <span class="n">start_child_span_decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span id="1-880">    <span class="k">else</span><span class="p">:</span>
+</span><span id="1-881">        <span class="k">return</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-882">
+</span><span id="1-883">
+</span><span id="1-884"><span class="c1"># Circular imports</span>
+</span><span id="1-885">
+</span><span id="1-886"><span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span id="1-887">    <span class="n">Baggage</span><span class="p">,</span>
+</span><span id="1-888">    <span class="n">EnvironHeaders</span><span class="p">,</span>
+</span><span id="1-889">    <span class="n">extract_sentrytrace_data</span><span class="p">,</span>
+</span><span id="1-890">    <span class="n">has_tracing_enabled</span><span class="p">,</span>
+</span><span id="1-891">    <span class="n">maybe_create_breadcrumbs_from_span</span><span class="p">,</span>
+</span><span id="1-892"><span class="p">)</span>
 </span></pre></div>
         </article>
         
@@ -1019,7 +1068,7 @@ html.dark {
       <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
       <script src="../../_static/doctools.js"></script>
       <script src="../../_static/sphinx_highlight.js"></script>
-      <script src="../../_static/shibuya.js?v=2023.6.30"></script>
+      <script src="../../_static/shibuya.js?v=2023.7.11"></script>
     
 </body>
 </html>
