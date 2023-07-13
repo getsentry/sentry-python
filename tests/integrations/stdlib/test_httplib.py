@@ -23,7 +23,8 @@ try:
     from urllib.parse import parse_qsl, urlencode
 except ImportError:
     # py2
-    from urlparse import parse_qsl, urlencode  # type: ignore
+    from urlparse import parse_qsl  # type: ignore
+    from urllib import urlencode  # type: ignore
 
 try:
     from unittest import mock  # python 3.3 and above
