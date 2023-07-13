@@ -6,9 +6,18 @@ import sys
 import platform
 
 try:
+    # py3
     from urllib.parse import parse_qsl
 except ImportError:
+    # py2
     from urlparse import parse_qsl  # type: ignore
+
+try:
+    # py3
+    from json import JSONDecodeError
+except ImportError:
+    # py2 doesn't throw a specialized json error, just Value/TypeErrors
+    JSONDecodeError = ValueError
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
@@ -163,7 +172,7 @@ def _install_httplib():
                 rv.read = io.BytesIO(response_data).read
                 try:
                     response_body = json.loads(response_data)
-                except (json.JSONDecodeError, UnicodeDecodeError):
+                except (JSONDecodeError, UnicodeDecodeError, TypeError):
                     return rv
 
         if isinstance(response_body, dict) and response_body.get("errors"):

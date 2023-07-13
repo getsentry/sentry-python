@@ -1,9 +1,18 @@
 import json
 
 try:
+    # py3
     from urllib.parse import parse_qsl
 except ImportError:
+    # py2
     from urlparse import parse_qsl  # type: ignore
+
+try:
+    # py3
+    from json import JSONDecodeError
+except ImportError:
+    # py2 doesn't throw a specialized json error, just Value/TypeErrors
+    JSONDecodeError = ValueError
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
@@ -180,7 +189,7 @@ def _make_request_processor(request, response):
             if request_content:
                 try:
                     request_info["data"] = json.loads(request_content)
-                except json.JSONDecodeError:
+                except (JSONDecodeError, TypeError):
                     pass
 
             if response:
