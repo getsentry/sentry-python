@@ -201,11 +201,11 @@ class Scope(object):
         """
         Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
         """
+        self._propagation_context = self._create_new_propagation_context()
         logger.debug(
             "[Tracing] Create new propagation context: %s",
             self._propagation_context,
         )
-        self._propagation_context = self._create_new_propagation_context()
 
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
