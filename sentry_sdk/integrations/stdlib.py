@@ -171,7 +171,7 @@ def _install_httplib():
                 # app; save it so that it can be accessed again
                 rv.read = io.BytesIO(response_data).read
                 try:
-                    response_body = json.loads(response_data)
+                    response_body = json.loads(response_data.decode())
                 except (JSONDecodeError, UnicodeDecodeError, TypeError):
                     return rv
 
@@ -221,7 +221,7 @@ def _make_request_processor(url, method, status, request_body, response_body):
             request_info["url"] = parsed_url.url
             request_info["method"] = method
             try:
-                request_info["data"] = json.loads(request_body)
+                request_info["data"] = json.loads(request_body.decode())
             except JSONDecodeError:
                 pass
 
