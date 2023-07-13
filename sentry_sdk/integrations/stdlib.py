@@ -157,10 +157,12 @@ def _install_httplib():
         response_body = None
         if getattr(self, "_sentrysdk_is_graphql_request", False):
             with capture_internal_exceptions():
+                response_data = rv.read()
+                # once we've read() the body it can't be read() again by the
+                # app; save it so that it can be accessed again
+                rv.read = io.BytesIO(response_data).read
                 try:
-                    response_data = rv.read()
                     response_body = json.loads(response_data)
-                    rv.read = io.BytesIO(response_data).read
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     return rv
 

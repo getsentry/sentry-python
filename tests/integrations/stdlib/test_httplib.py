@@ -356,6 +356,7 @@ def test_option_trace_propagation_targets(
 def test_graphql_get_client_error_captured(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
 
+    params = {"query": "query QueryName {user{name}}"}
     graphql_response = {
         "data": None,
         "errors": [
@@ -369,8 +370,6 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
 
     events = capture_events()
 
-    params = {"query": "query QueryName {user{name}}"}
-
     def do_GET(self):  # noqa: N802
         self.send_response(200)
         self.end_headers()
@@ -381,6 +380,7 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
         conn.request("GET", "/graphql?" + urlencode(params))
         response = conn.getresponse()
 
+    # make sure the response can still be read() normally
     assert response.read() == json.dumps(graphql_response).encode()
 
     (event,) = events
@@ -439,7 +439,7 @@ def test_graphql_post_client_error_captured(sentry_init, capture_events):
         conn.request("POST", "/graphql", body=json.dumps(graphql_request).encode())
         response = conn.getresponse()
 
-    # the response can still be read normally
+    # make sure the response can still be read() normally
     assert response.read() == json.dumps(graphql_response).encode()
 
     (event,) = events
