@@ -254,6 +254,7 @@ def create_trace_config():
     async def on_request_chunk_sent(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestChunkSentParams) -> None
         if not hasattr(params, "url") or not hasattr(params, "method"):
+            # these are missing from params in earlier aiohttp versions
             return
 
         if params.url.path == "/graphql" and params.method == "POST":
