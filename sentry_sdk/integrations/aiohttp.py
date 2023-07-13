@@ -307,7 +307,8 @@ def create_trace_config():
                             )
                             hub.capture_event(event, hint=hint)
 
-        span.finish()
+        if trace_config_ctx.span is not None:
+            span.finish()
 
     trace_config = TraceConfig()
 
