@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.28.1
+
+### Various fixes & improvements
+
+- Make sure each task that is started by Celery Beat has its own trace. (#2249) by @antonpirker
+- remove stale.yml (#2245) by @hubertdeng123
+- Add Sampling Decision to Trace Envelope Header (#2239) by @antonpirker
+- Skip distributions with incomplete metadata (#2231) by @rominf
+- Do not add trace headers (`sentry-trace` and `baggage`) to HTTP requests to Sentry (#2240) by @antonpirker
+- Redis: Add support for redis.asyncio (#1933) by @Zhenay
+- Prevent adding `sentry-trace` header multiple times (#2235) by @antonpirker
+- Django: Fix 404 Handler handler being labeled as "generic ASGI request" (#1277) by @BeryJu
+
 ## 1.28.0
 
 ### Various fixes & improvements
