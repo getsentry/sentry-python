@@ -222,7 +222,7 @@ def _make_request_processor(url, method, status, request_body, response_body):
             request_info["method"] = method
             try:
                 request_info["data"] = json.loads(request_body)
-            except json.JSONDecodeError:
+            except JSONDecodeError:
                 pass
 
             if response_body:
