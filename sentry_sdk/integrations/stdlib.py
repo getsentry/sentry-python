@@ -17,7 +17,7 @@ try:
     from json import JSONDecodeError
 except ImportError:
     # py2 doesn't throw a specialized json error, just Value/TypeErrors
-    JSONDecodeError = ValueError
+    JSONDecodeError = ValueError  # type: ignore
 
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
