@@ -1287,10 +1287,12 @@ def _get_graphql_operation_name(query):
     query = query["query"].strip()
 
     match = re.match(
-        r"^[a-z]* *([a-zA-Z0-9]+) \(?.*\)? *\{", query, flags=re.IGNORECASE
+        r"((query|mutation|subscription) )(?P<name>[a-zA-Z0-9]+) *\{",
+        query,
+        flags=re.IGNORECASE,
     )
     if match:
-        return match.group(1)
+        return match.group("name")
     return "anonymous"
 
 
