@@ -250,8 +250,9 @@ def create_trace_config():
                     params.headers[key] = value
 
         trace_config_ctx.span = span
+        trace_config_ctx.is_graphql_request = params.url.path == "/graphql"
 
-        if integration.capture_graphql_errors and params.url.path == "/graphql":
+        if integration.capture_graphql_errors and trace_config_ctx.is_graphql_request:
             trace_config_ctx.request_headers = params.headers
 
     async def on_request_chunk_sent(session, trace_config_ctx, params):
@@ -260,17 +261,13 @@ def create_trace_config():
         if integration is None:
             return
 
-        if not hasattr(params, "url") or not hasattr(params, "method"):
-            # these are missing from params in earlier aiohttp versions
-            return
-
-        if (
-            integration.capture_graphql_errors
-            and params.url.path == "/graphql"
-            and params.method == "POST"
-        ):
+        if integration.capture_graphql_errors and trace_config_ctx.is_graphql_request:
+            trace_config_ctx.request_body = None
             with capture_internal_exceptions():
-                trace_config_ctx.request_body = json.loads(params.chunk)
+                try:
+                    trace_config_ctx.request_body = json.loads(params.chunk)
+                except json.JSONDecodeError:
+                    return
 
     async def on_request_end(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
@@ -288,7 +285,7 @@ def create_trace_config():
 
         if (
             integration.capture_graphql_errors
-            and response.url.path == "/graphql"
+            and trace_config_ctx.is_graphql_request
             and response.method in ("GET", "POST")
             and response.status == 200
         ):

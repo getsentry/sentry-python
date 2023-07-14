@@ -1,6 +1,5 @@
 import asyncio
 import json
-import sys
 from contextlib import suppress
 from textwrap import dedent
 
@@ -11,23 +10,36 @@ from aiohttp.web import Request, json_response
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
+from sentry_sdk.utils import parse_version
 
 try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
 
+try:
+    from importlib.metadata import version  # py 3.8+
 
-def min_python_version(major, minor, reason=None):
+    AIOHTTP_VERSION = tuple(parse_version(version("aiohttp"))[:2])
+
+except ImportError:
+    from pkg_resources import get_distribution
+
+    AIOHTTP_VERSION = tuple(parse_version(get_distribution("aiohttp").version)[:2])
+
+
+def min_aiohttp_version(major, minor, reason=None):
     if reason is None:
-        reason = "Requires Python {}.{} or higher".format(major, minor)
-    return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
+        reason = "Requires aiohttp {}.{} or higher".format(major, minor)
+
+    return pytest.mark.skipif(AIOHTTP_VERSION < (major, minor), reason=reason)
 
 
-def max_python_version(major, minor, reason=None):
+def max_aiohttp_version(major, minor, reason=None):
     if reason is None:
-        reason = "Requires Python {}.{} or lower".format(major, minor)
-    return pytest.mark.skipif(sys.version_info > (major, minor), reason=reason)
+        reason = "Requires aiohttp {}.{} or lower".format(major, minor)
+
+    return pytest.mark.skipif(AIOHTTP_VERSION > (major, minor), reason=reason)
 
 
 @pytest.mark.asyncio
@@ -550,7 +562,6 @@ async def test_outgoing_trace_headers_append_to_baggage(
         )
 
 
-@min_python_version(3, 8, "GraphQL aiohttp integration requires py>=3.8")
 @pytest.mark.asyncio
 async def test_graphql_get_client_error_captured(
     sentry_init, capture_events, aiohttp_raw_server, aiohttp_client
@@ -600,7 +611,6 @@ async def test_graphql_get_client_error_captured(
     )
 
 
-@min_python_version(3, 8, "GraphQL aiohttp integration requires py>=3.8")
 @pytest.mark.asyncio
 async def test_graphql_post_client_error_captured(
     sentry_init, capture_events, aiohttp_client, aiohttp_raw_server
@@ -660,85 +670,3 @@ async def test_graphql_post_client_error_captured(
         event["exception"]["values"][0]["value"]
         == "GraphQL request failed, name: AddPet, type: mutation"
     )
-
-
-@max_python_version(3, 7, "No GraphQL aiohttp integration for py<=3.7")
-@pytest.mark.asyncio
-async def test_graphql_get_client_error_not_captured(
-    sentry_init, capture_events, aiohttp_raw_server, aiohttp_client
-):
-    """Test that firing GraphQL requests works, there will just be no event."""
-    sentry_init(send_default_pii=True, integrations=[AioHttpIntegration()])
-
-    graphql_response = {
-        "data": None,
-        "errors": [
-            {
-                "message": "some error",
-                "locations": [{"line": 2, "column": 3}],
-                "path": ["pet"],
-            }
-        ],
-    }
-
-    async def handler(request):
-        return json_response(graphql_response)
-
-    raw_server = await aiohttp_raw_server(handler)
-    events = capture_events()
-
-    client = await aiohttp_client(raw_server)
-    response = await client.get(
-        "/graphql", params={"query": "query GetPet {pet{name}}"}
-    )
-
-    assert response.status == 200
-    assert await response.json() == graphql_response
-    assert not events
-
-
-@max_python_version(3, 7, "No GraphQL aiohttp integration for py<=3.7")
-@pytest.mark.asyncio
-async def test_graphql_post_client_error_not_captured(
-    sentry_init, capture_events, aiohttp_client, aiohttp_raw_server
-):
-    """Test that firing GraphQL requests works, there will just be no event."""
-    sentry_init(send_default_pii=True, integrations=[AioHttpIntegration()])
-
-    graphql_request = {
-        "query": dedent(
-            """
-            mutation AddPet ($name: String!) {
-                addPet(name: $name) {
-                    id
-                    name
-                }
-            }
-        """
-        ),
-        "variables": {
-            "name": "Lucy",
-        },
-    }
-    graphql_response = {
-        "data": None,
-        "errors": [
-            {
-                "message": "already have too many pets",
-                "locations": [{"line": 1, "column": 1}],
-            }
-        ],
-    }
-
-    async def handler(request):
-        return json_response(graphql_response)
-
-    raw_server = await aiohttp_raw_server(handler)
-    events = capture_events()
-
-    client = await aiohttp_client(raw_server)
-    response = await client.post("/graphql", json=graphql_request)
-
-    assert response.status == 200
-    assert await response.json() == graphql_response
-    assert not events
