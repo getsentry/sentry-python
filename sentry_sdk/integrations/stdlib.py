@@ -20,7 +20,7 @@ except ImportError:
     JSONDecodeError = ValueError  # type: ignore
 
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
@@ -236,18 +236,23 @@ def _make_request_processor(url, method, status, request_body, response_body):
             request_info = event.setdefault("request", {})
 
             parsed_url = parse_url(url, sanitize=False)
-            request_info["query_string"] = parsed_url.query
+
+            if _should_send_default_pii():
+                request_info["query_string"] = parsed_url.query
+
             request_info["url"] = parsed_url.url
             request_info["method"] = method
-            try:
-                request_info["data"] = json.loads(request_body.decode())
-            except JSONDecodeError:
-                pass
 
-            if response_body:
-                contexts = event.setdefault("contexts", {})
-                response_context = contexts.setdefault("response", {})
-                response_context["data"] = response_body
+            if _should_send_default_pii():
+                try:
+                    request_info["data"] = json.loads(request_body.decode())
+                except JSONDecodeError:
+                    pass
+
+                if response_body:
+                    contexts = event.setdefault("contexts", {})
+                    response_context = contexts.setdefault("response", {})
+                    response_context["data"] = response_body
 
             if parsed_url.url.endswith("/graphql"):
                 request_info["api_target"] = "graphql"

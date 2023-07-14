@@ -14,8 +14,8 @@ except ImportError:
     # py2 doesn't throw a specialized json error, just Value/TypeErrors
     JSONDecodeError = ValueError  # type: ignore
 
-from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import should_propagate_trace
@@ -191,20 +191,22 @@ def _make_request_processor(request, response):
             request_info["url"] = parsed_url.url
             request_info["method"] = request.method
             request_info["headers"] = _filter_headers(dict(request.headers))
-            request_info["query_string"] = parsed_url.query
 
-            request_content = request.read()
-            if request_content:
-                try:
-                    request_info["data"] = json.loads(request_content)
-                except (JSONDecodeError, TypeError):
-                    pass
+            if _should_send_default_pii():
+                request_info["query_string"] = parsed_url.query
 
-            if response:
-                response_content = response.json()
-                contexts = event.setdefault("contexts", {})
-                response_context = contexts.setdefault("response", {})
-                response_context["data"] = response_content
+                request_content = request.read()
+                if request_content:
+                    try:
+                        request_info["data"] = json.loads(request_content)
+                    except (JSONDecodeError, TypeError):
+                        pass
+
+                if response:
+                    response_content = response.json()
+                    contexts = event.setdefault("contexts", {})
+                    response_context = contexts.setdefault("response", {})
+                    response_context["data"] = response_content
 
             if request.url.path == "/graphql":
                 request_info["api_target"] = "graphql"

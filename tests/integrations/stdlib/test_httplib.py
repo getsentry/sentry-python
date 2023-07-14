@@ -354,7 +354,7 @@ def test_option_trace_propagation_targets(
 
 
 def test_graphql_get_client_error_captured(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(send_default_pii=True, integrations=[StdlibIntegration()])
 
     params = {"query": "query QueryName {user{name}}"}
     graphql_response = {
@@ -400,7 +400,7 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
 
 
 def test_graphql_post_client_error_captured(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(send_default_pii=True, integrations=[StdlibIntegration()])
 
     graphql_request = {
         "query": dedent(

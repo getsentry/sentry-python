@@ -313,7 +313,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock)
 def test_graphql_get_client_error_captured(
     sentry_init, capture_events, httpx_client, httpx_mock
 ):
-    sentry_init(integrations=[HttpxIntegration()])
+    sentry_init(send_default_pii=True, integrations=[HttpxIntegration()])
 
     url = "http://example.com/graphql"
     graphql_response = {
@@ -365,7 +365,7 @@ def test_graphql_get_client_error_captured(
 def test_graphql_post_client_error_captured(
     sentry_init, capture_events, httpx_client, httpx_mock
 ):
-    sentry_init(integrations=[HttpxIntegration()])
+    sentry_init(send_default_pii=True, integrations=[HttpxIntegration()])
 
     url = "http://example.com/graphql"
     graphql_request = {

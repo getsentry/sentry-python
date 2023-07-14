@@ -555,7 +555,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
 async def test_graphql_get_client_error_captured(
     sentry_init, capture_events, aiohttp_raw_server, aiohttp_client
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(send_default_pii=True, integrations=[AioHttpIntegration()])
 
     graphql_response = {
         "data": None,
@@ -605,7 +605,7 @@ async def test_graphql_get_client_error_captured(
 async def test_graphql_post_client_error_captured(
     sentry_init, capture_events, aiohttp_client, aiohttp_raw_server
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(send_default_pii=True, integrations=[AioHttpIntegration()])
 
     graphql_request = {
         "query": dedent(
@@ -668,7 +668,7 @@ async def test_graphql_get_client_error_not_captured(
     sentry_init, capture_events, aiohttp_raw_server, aiohttp_client
 ):
     """Test that firing GraphQL requests works, there will just be no event."""
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(send_default_pii=True, integrations=[AioHttpIntegration()])
 
     graphql_response = {
         "data": None,
@@ -703,7 +703,7 @@ async def test_graphql_post_client_error_not_captured(
     sentry_init, capture_events, aiohttp_client, aiohttp_raw_server
 ):
     """Test that firing GraphQL requests works, there will just be no event."""
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(send_default_pii=True, integrations=[AioHttpIntegration()])
 
     graphql_request = {
         "query": dedent(

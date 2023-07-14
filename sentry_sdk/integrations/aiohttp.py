@@ -10,7 +10,7 @@ except ImportError:
 from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.sessions import auto_session_tracking
@@ -384,15 +384,18 @@ def _make_client_processor(trace_config_ctx, response, response_content):
 
             parsed_url = parse_url(str(response.url), sanitize=False)
             request_info["url"] = parsed_url.url
-            request_info["query_string"] = parsed_url.query
             request_info["method"] = response.method
 
             if getattr(trace_config_ctx, "request_headers", None):
                 request_info["headers"] = _filter_headers(
                     dict(trace_config_ctx.request_headers)
                 )
-            if getattr(trace_config_ctx, "request_body", None):
-                request_info["data"] = trace_config_ctx.request_body
+
+            if _should_send_default_pii():
+                if getattr(trace_config_ctx, "request_body", None):
+                    request_info["data"] = trace_config_ctx.request_body
+
+                request_info["query_string"] = parsed_url.query
 
             if response.url.path == "/graphql":
                 request_info["api_target"] = "graphql"
@@ -415,7 +418,7 @@ def _make_client_processor(trace_config_ctx, response, response_content):
                         operation_name, operation_type
                     )
 
-                if response_content:
+                if _should_send_default_pii() and response_content:
                     contexts = event.setdefault("contexts", {})
                     response_context = contexts.setdefault("response", {})
                     response_context["data"] = response_content
