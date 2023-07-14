@@ -64,6 +64,10 @@ _RUNTIME_CONTEXT = {
 class StdlibIntegration(Integration):
     identifier = "stdlib"
 
+    def __init__(self, capture_graphql_errors=True):
+        # type: (bool) -> None
+        self.capture_graphql_errors = capture_graphql_errors
+
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -142,7 +146,13 @@ def _install_httplib():
 
     def send(self, data, *args, **kwargs):
         # type: (HTTPConnection, Any, *Any, **Any) -> Any
-        if getattr(self, "_sentrysdk_is_graphql_request", False):
+        integration = Hub.current.get_integration(StdlibIntegration)
+        if integration is None:
+            return real_send(self, data, *args, **kwargs)
+
+        if integration.capture_graphql_errors and getattr(
+            self, "_sentrysdk_is_graphql_request", False
+        ):
             self._sentry_request_body = data
 
         rv = real_send(self, data, *args, **kwargs)
@@ -150,10 +160,14 @@ def _install_httplib():
 
     def getresponse(self, *args, **kwargs):
         # type: (HTTPConnection, *Any, **Any) -> Any
-        span = getattr(self, "_sentrysdk_span", None)
-
         rv = real_getresponse(self, *args, **kwargs)
 
+        hub = Hub.current
+        integration = hub.get_integration(StdlibIntegration)
+        if integration is None:
+            return rv
+
+        span = getattr(self, "_sentrysdk_span", None)
         if span is not None:
             span.set_http_status(int(rv.status))
             span.set_data("reason", rv.reason)
@@ -163,46 +177,46 @@ def _install_httplib():
         if url is None:
             return rv
 
-        response_body = None
-        if getattr(self, "_sentrysdk_is_graphql_request", False):
-            with capture_internal_exceptions():
-                response_data = rv.read()
-                # once we've read() the body it can't be read() again by the
-                # app; save it so that it can be accessed again
-                rv.read = io.BytesIO(response_data).read
-                try:
-                    # py3.6+ json.loads() can deal with bytes out of the box, but
-                    # for older version we have to explicitly decode first
-                    response_body = json.loads(response_data.decode())
-                except (JSONDecodeError, UnicodeDecodeError, TypeError):
-                    return rv
+        if integration.capture_graphql_errors:
+            response_body = None
+            if getattr(self, "_sentrysdk_is_graphql_request", False):
+                with capture_internal_exceptions():
+                    response_data = rv.read()
+                    # once we've read() the body it can't be read() again by the
+                    # app; save it so that it can be accessed again
+                    rv.read = io.BytesIO(response_data).read
+                    try:
+                        # py3.6+ json.loads() can deal with bytes out of the box, but
+                        # for older version we have to explicitly decode first
+                        response_body = json.loads(response_data.decode())
+                    except (JSONDecodeError, UnicodeDecodeError, TypeError):
+                        return rv
 
-        is_graphql_response_with_errors = isinstance(
-            response_body, dict
-        ) and response_body.get("errors")
-        if is_graphql_response_with_errors:
-            method = getattr(self, "_sentrysdk_method", None)  # type: Optional[str]
-            request_body = getattr(self, "_sentry_request_body", None)
-            hub = Hub.current
-            with hub.configure_scope() as scope:
-                scope.add_event_processor(
-                    _make_request_processor(
-                        url, method, rv.status, request_body, response_body
+            is_graphql_response_with_errors = isinstance(
+                response_body, dict
+            ) and response_body.get("errors")
+            if is_graphql_response_with_errors:
+                method = getattr(self, "_sentrysdk_method", None)  # type: Optional[str]
+                request_body = getattr(self, "_sentry_request_body", None)
+                with hub.configure_scope() as scope:
+                    scope.add_event_processor(
+                        _make_request_processor(
+                            url, method, rv.status, request_body, response_body
+                        )
                     )
-                )
-                try:
-                    raise SentryGraphQLClientError
-                except SentryGraphQLClientError as ex:
-                    event, hint = event_from_exception(
-                        ex,
-                        client_options=hub.client.options if hub.client else None,
-                        mechanism={
-                            "type": StdlibIntegration.identifier,
-                            "handled": False,
-                        },
-                    )
+                    try:
+                        raise SentryGraphQLClientError
+                    except SentryGraphQLClientError as ex:
+                        event, hint = event_from_exception(
+                            ex,
+                            client_options=hub.client.options if hub.client else None,
+                            mechanism={
+                                "type": StdlibIntegration.identifier,
+                                "handled": False,
+                            },
+                        )
 
-            hub.capture_event(event, hint=hint)
+                hub.capture_event(event, hint=hint)
 
         return rv
 

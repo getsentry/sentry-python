@@ -77,14 +77,16 @@ TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
 
-    def __init__(self, transaction_style="handler_name"):
-        # type: (str) -> None
+    def __init__(self, transaction_style="handler_name", capture_graphql_errors=True):
+        # type: (str, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+
+        self.capture_graphql_errors = capture_graphql_errors
 
     @staticmethod
     def setup_once():
@@ -212,7 +214,8 @@ def create_trace_config():
     async def on_request_start(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
         hub = Hub.current
-        if hub.get_integration(AioHttpIntegration) is None:
+        integration = hub.get_integration(AioHttpIntegration)
+        if integration is None:
             return
 
         method = params.method.upper()
@@ -248,21 +251,34 @@ def create_trace_config():
 
         trace_config_ctx.span = span
 
-        if params.url.path == "/graphql":
+        if integration.capture_graphql_errors and params.url.path == "/graphql":
             trace_config_ctx.request_headers = params.headers
 
     async def on_request_chunk_sent(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestChunkSentParams) -> None
+        integration = Hub.current.get_integration(AioHttpIntegration)
+        if integration is None:
+            return
+
         if not hasattr(params, "url") or not hasattr(params, "method"):
             # these are missing from params in earlier aiohttp versions
             return
 
-        if params.url.path == "/graphql" and params.method == "POST":
+        if (
+            integration.capture_graphql_errors
+            and params.url.path == "/graphql"
+            and params.method == "POST"
+        ):
             with capture_internal_exceptions():
                 trace_config_ctx.request_body = json.loads(params.chunk)
 
     async def on_request_end(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
+        hub = Hub.current
+        integration = hub.get_integration(AioHttpIntegration)
+        if integration is None:
+            return
+
         response = params.response
 
         if trace_config_ctx.span is not None:
@@ -270,9 +286,9 @@ def create_trace_config():
             span.set_http_status(int(response.status))
             span.set_data("reason", response.reason)
 
-        hub = Hub.current
         if (
-            response.url.path == "/graphql"
+            integration.capture_graphql_errors
+            and response.url.path == "/graphql"
             and response.method in ("GET", "POST")
             and response.status == 200
         ):

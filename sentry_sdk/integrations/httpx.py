@@ -48,6 +48,10 @@ __all__ = ["HttpxIntegration"]
 class HttpxIntegration(Integration):
     identifier = "httpx"
 
+    def __init__(self, capture_graphql_errors=True):
+        # type: (bool) -> None
+        self.capture_graphql_errors = capture_graphql_errors
+
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -66,7 +70,8 @@ def _install_httpx_client():
     def send(self, request, **kwargs):
         # type: (Client, Request, **Any) -> Response
         hub = Hub.current
-        if hub.get_integration(HttpxIntegration) is None:
+        integration = hub.get_integration(HttpxIntegration)
+        if integration is None:
             return real_send(self, request, **kwargs)
 
         parsed_url = None
@@ -107,7 +112,8 @@ def _install_httpx_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
-            _capture_graphql_errors(hub, request, rv)
+            if integration.capture_graphql_errors:
+                _capture_graphql_errors(hub, request, rv)
 
             return rv
 
@@ -121,7 +127,8 @@ def _install_httpx_async_client():
     async def send(self, request, **kwargs):
         # type: (AsyncClient, Request, **Any) -> Response
         hub = Hub.current
-        if hub.get_integration(HttpxIntegration) is None:
+        integration = hub.get_integration(HttpxIntegration)
+        if integration is None:
             return await real_send(self, request, **kwargs)
 
         parsed_url = None
@@ -162,7 +169,8 @@ def _install_httpx_async_client():
             span.set_http_status(rv.status_code)
             span.set_data("reason", rv.reason_phrase)
 
-            _capture_graphql_errors(hub, request, rv)
+            if integration.capture_graphql_errors:
+                _capture_graphql_errors(hub, request, rv)
 
             return rv
 
