@@ -412,6 +412,20 @@ def test_include_local_variables_deprecation(sentry_init):
         fake_warning.assert_not_called()
 
 
+def test_request_bodies_deprecation(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(request_bodies="small")
+
+        client = Hub.current.client
+        assert "request_bodies" not in client.options
+        assert "max_request_body_size" in client.options
+        assert client.options["max_request_body_size"] == "small"
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+        )
+
+
 def test_include_local_variables_enabled(sentry_init, capture_events):
     sentry_init(include_local_variables=True)
     events = capture_events()

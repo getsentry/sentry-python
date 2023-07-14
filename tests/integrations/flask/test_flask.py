@@ -394,7 +394,9 @@ def test_flask_formdata_request_appear_transaction_body(
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="small"
+    )
 
     data = input_char * 2000
 
@@ -421,7 +423,9 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
 
 
 def test_flask_files_and_form(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 
@@ -449,10 +453,12 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     assert not event["request"]["data"]["file"]
 
 
-def test_json_not_truncated_if_request_bodies_is_always(
+def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)

@@ -37,7 +37,7 @@ def request_body_within_bounds(client, content_length):
     if client is None:
         return False
 
-    bodies = client.options["request_bodies"]
+    bodies = client.options["max_request_body_size"]
     return not (
         bodies == "never"
         or (bodies == "small" and content_length > 10**3)

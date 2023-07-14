@@ -68,7 +68,7 @@ else:
 MAX_EVENT_BYTES = 10**6
 
 # Maximum depth and breadth of databags. Excess data will be trimmed. If
-# request_bodies is "always", request bodies won't be trimmed.
+# max_request_body_size is "always", request bodies won't be trimmed.
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = "<cyclic>"
@@ -120,7 +120,9 @@ def serialize(event, **kwargs):
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
 
-    keep_request_bodies = kwargs.pop("request_bodies", None) == "always"  # type: bool
+    keep_request_bodies = (
+        kwargs.pop("max_request_body_size", None) == "always"
+    )  # type: bool
 
     def _annotate(**meta):
         # type: (**Any) -> None
