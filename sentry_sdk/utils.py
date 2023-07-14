@@ -1286,7 +1286,9 @@ def _get_graphql_operation_name(query):
 
     query = query["query"].strip()
 
-    match = re.match(r"^[a-z]* *([a-zA-Z0-9]+) \(?.*\)? *\{", query)
+    match = re.match(
+        r"^[a-z]* *([a-zA-Z0-9]+) \(?.*\)? *\{", query, flags=re.IGNORECASE
+    )
     if match:
         return match.group(1)
     return "anonymous"
@@ -1294,7 +1296,7 @@ def _get_graphql_operation_name(query):
 
 def _get_graphql_operation_type(query):
     # type: (Dict[str, Any]) -> str
-    query = query["query"].strip()
+    query = query["query"].strip().lower()
     if query.startswith("mutation"):
         return "mutation"
     if query.startswith("subscription"):
