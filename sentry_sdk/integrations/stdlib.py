@@ -177,7 +177,10 @@ def _install_httplib():
                 except (JSONDecodeError, UnicodeDecodeError, TypeError):
                     return rv
 
-        if isinstance(response_body, dict) and response_body.get("errors"):
+        is_graphql_response_with_errors = isinstance(
+            response_body, dict
+        ) and response_body.get("errors")
+        if is_graphql_response_with_errors:
             method = getattr(self, "_sentrysdk_method", None)  # type: Optional[str]
             request_body = getattr(self, "_sentry_request_body", None)
             hub = Hub.current
