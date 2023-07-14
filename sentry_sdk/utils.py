@@ -1287,7 +1287,7 @@ def _get_graphql_operation_name(query):
     query = query["query"].strip()
 
     match = re.match(
-        r"((query|mutation|subscription) )(?P<name>[a-zA-Z0-9]+) *\{",
+        r"((query|mutation|subscription) )(?P<name>[a-zA-Z0-9]+).*\{",
         query,
         flags=re.IGNORECASE,
     )
