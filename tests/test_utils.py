@@ -465,6 +465,12 @@ def test_parse_version(version, expected_result):
             },
             "SomeOtherOperation",
         ],
+        [
+            {
+                "query": "mutation AddPet ($name: String!) {addPet(name: $name) {id name}}}"
+            },
+            "AddPet",
+        ],
     ],
 )
 def test_graphql_operation_name_extraction(query, expected_result):
@@ -508,6 +514,12 @@ def test_graphql_operation_name_extraction(query, expected_result):
                 "variables": {},
             },
             "query",
+        ],
+        [
+            {
+                "query": "mutation AddPet ($name: String!) {addPet(name: $name) {id name}}}"
+            },
+            "mutation",
         ],
     ],
 )
