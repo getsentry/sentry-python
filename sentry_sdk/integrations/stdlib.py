@@ -88,7 +88,7 @@ class StdlibIntegration(Integration):
 def _install_httplib():
     # type: () -> None
     real_putrequest = HTTPConnection.putrequest
-    real_send = HTTPConnection.send
+    real_endheaders = HTTPConnection.endheaders
     real_getresponse = HTTPConnection.getresponse
 
     def putrequest(self, method, url, *args, **kwargs):
@@ -144,18 +144,19 @@ def _install_httplib():
 
         return rv
 
-    def send(self, data, *args, **kwargs):
-        # type: (HTTPConnection, Any, *Any, **Any) -> Any
+    def endheaders(self, message_body=None, **kwargs):
+        # type: (HTTPConnection, Any, **Any) -> Any
+        rv = real_endheaders(self, message_body, **kwargs)
+
         integration = Hub.current.get_integration(StdlibIntegration)
         if integration is None:
-            return real_send(self, data, *args, **kwargs)
+            return rv
 
         if integration.capture_graphql_errors and getattr(
             self, "_sentrysdk_is_graphql_request", False
         ):
-            self._sentry_request_body = data
+            self._sentry_request_body = message_body
 
-        rv = real_send(self, data, *args, **kwargs)
         return rv
 
     def getresponse(self, *args, **kwargs):
@@ -221,7 +222,7 @@ def _install_httplib():
         return rv
 
     HTTPConnection.putrequest = putrequest
-    HTTPConnection.send = send
+    HTTPConnection.endheaders = endheaders
     HTTPConnection.getresponse = getresponse
 
 
@@ -246,7 +247,7 @@ def _make_request_processor(url, method, status, request_body, response_body):
             if _should_send_default_pii():
                 try:
                     request_info["data"] = json.loads(request_body.decode())
-                except JSONDecodeError:
+                except (JSONDecodeError, AttributeError):
                     pass
 
                 if response_body:
