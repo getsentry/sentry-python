@@ -456,3 +456,88 @@ def test_graphql_post_client_error_captured(sentry_init, capture_events):
         event["exception"]["values"][0]["value"]
         == "GraphQL request failed, name: AddPet, type: mutation"
     )
+
+
+def test_graphql_no_get_errors_if_option_is_off(sentry_init, capture_events):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StdlibIntegration(capture_graphql_errors=False)],
+    )
+
+    params = {"query": "query QueryName {user{name}}"}
+    graphql_response = {
+        "data": None,
+        "errors": [
+            {
+                "message": "some error",
+                "locations": [{"line": 2, "column": 3}],
+                "path": ["user"],
+            }
+        ],
+    }
+
+    events = capture_events()
+
+    def do_GET(self):  # noqa: N802
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(json.dumps(graphql_response).encode())
+
+    with mock.patch.object(MockServerRequestHandler, "do_GET", do_GET):
+        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn.request("GET", "/graphql?" + urlencode(params))
+        response = conn.getresponse()
+
+    # make sure the response can still be read() normally
+    assert response.read() == json.dumps(graphql_response).encode()
+
+    assert not events
+
+
+def test_graphql_no_post_errors_if_option_is_off(sentry_init, capture_events):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[StdlibIntegration(capture_graphql_errors=False)],
+    )
+
+    graphql_request = {
+        "query": dedent(
+            """
+            mutation AddPet ($name: String!) {
+                addPet(name: $name) {
+                    id
+                    name
+                }
+            }
+        """
+        ),
+        "variables": {
+            "name": "Lucy",
+        },
+    }
+    graphql_response = {
+        "data": None,
+        "errors": [
+            {
+                "message": "already have too many pets",
+                "locations": [{"line": 1, "column": 1}],
+            }
+        ],
+    }
+
+    events = capture_events()
+
+    def do_POST(self):  # noqa: N802
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(json.dumps(graphql_response).encode())
+
+    with mock.patch.object(MockServerRequestHandler, "do_POST", do_POST):
+        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn.request("POST", "/graphql", body=json.dumps(graphql_request).encode())
+        response = conn.getresponse()
+
+    # make sure the response can still be read() normally
+    assert response.read() == json.dumps(graphql_response).encode()
+
+    assert not events

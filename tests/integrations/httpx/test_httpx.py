@@ -420,3 +420,99 @@ def test_graphql_post_client_error_captured(
         event["exception"]["values"][0]["value"]
         == "GraphQL request failed, name: AddPet, type: mutation"
     )
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_graphql_no_get_errors_if_option_is_off(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[HttpxIntegration(capture_graphql_errors=False)],
+    )
+
+    url = "http://example.com/graphql"
+    graphql_response = {
+        "data": None,
+        "errors": [
+            {
+                "message": "some error",
+                "locations": [{"line": 2, "column": 3}],
+                "path": ["user"],
+            }
+        ],
+    }
+    params = {"query": "query QueryName {user{name}}"}
+
+    httpx_mock.add_response(method="GET", json=graphql_response)
+
+    events = capture_events()
+
+    if asyncio.iscoroutinefunction(httpx_client.get):
+        response = asyncio.get_event_loop().run_until_complete(
+            httpx_client.get(url, params=params)
+        )
+    else:
+        response = httpx_client.get(url, params=params)
+
+    assert response.status_code == 200
+    assert response.json() == graphql_response
+
+    assert not events
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_graphql_no_post_errors_if_option_is_off(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[HttpxIntegration(capture_graphql_errors=False)],
+    )
+
+    url = "http://example.com/graphql"
+    graphql_request = {
+        "query": dedent(
+            """
+            mutation AddPet ($name: String!) {
+                addPet(name: $name) {
+                    id
+                    name
+                }
+            }
+        """
+        ),
+        "variables": {
+            "name": "Lucy",
+        },
+    }
+    graphql_response = {
+        "data": None,
+        "errors": [
+            {
+                "message": "already have too many pets",
+                "locations": [{"line": 1, "column": 1}],
+            }
+        ],
+    }
+    httpx_mock.add_response(method="POST", json=graphql_response)
+
+    events = capture_events()
+
+    if asyncio.iscoroutinefunction(httpx_client.post):
+        response = asyncio.get_event_loop().run_until_complete(
+            httpx_client.post(url, json=graphql_request)
+        )
+    else:
+        response = httpx_client.post(url, json=graphql_request)
+
+    assert response.status_code == 200
+    assert response.json() == graphql_response
+
+    assert not events

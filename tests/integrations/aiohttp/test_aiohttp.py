@@ -670,3 +670,89 @@ async def test_graphql_post_client_error_captured(
         event["exception"]["values"][0]["value"]
         == "GraphQL request failed, name: AddPet, type: mutation"
     )
+
+
+@pytest.mark.asyncio
+async def test_graphql_no_get_errors_if_option_is_off(
+    sentry_init, capture_events, aiohttp_raw_server, aiohttp_client
+):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[AioHttpIntegration(capture_graphql_errors=False)],
+    )
+
+    graphql_response = {
+        "data": None,
+        "errors": [
+            {
+                "message": "some error",
+                "locations": [{"line": 2, "column": 3}],
+                "path": ["pet"],
+            }
+        ],
+    }
+
+    async def handler(request):
+        return json_response(graphql_response)
+
+    raw_server = await aiohttp_raw_server(handler)
+    events = capture_events()
+
+    client = await aiohttp_client(raw_server)
+    response = await client.get(
+        "/graphql", params={"query": "query GetPet {pet{name}}"}
+    )
+
+    assert response.status == 200
+    assert await response.json() == graphql_response
+
+    assert not events
+
+
+@pytest.mark.asyncio
+async def test_graphql_no_post_errors_if_option_is_off(
+    sentry_init, capture_events, aiohttp_client, aiohttp_raw_server
+):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[AioHttpIntegration(capture_graphql_errors=False)],
+    )
+
+    graphql_request = {
+        "query": dedent(
+            """
+            mutation AddPet ($name: String!) {
+                addPet(name: $name) {
+                    id
+                    name
+                }
+            }
+        """
+        ),
+        "variables": {
+            "name": "Lucy",
+        },
+    }
+    graphql_response = {
+        "data": None,
+        "errors": [
+            {
+                "message": "already have too many pets",
+                "locations": [{"line": 1, "column": 1}],
+            }
+        ],
+    }
+
+    async def handler(request):
+        return json_response(graphql_response)
+
+    raw_server = await aiohttp_raw_server(handler)
+    events = capture_events()
+
+    client = await aiohttp_client(raw_server)
+    response = await client.post("/graphql", json=graphql_request)
+
+    assert response.status == 200
+    assert await response.json() == graphql_response
+
+    assert not events
