@@ -623,7 +623,7 @@ def test_graphql_non_json_response(
             "name": "Lucy",
         },
     }
-    httpx_mock.add_response(method="POST", text="not json")
+    httpx_mock.add_response(method="POST", content=b"not json")
 
     events = capture_events()
 
