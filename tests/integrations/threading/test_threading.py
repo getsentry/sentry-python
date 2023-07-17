@@ -6,6 +6,8 @@ import pytest
 
 from sentry_sdk import configure_scope, capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import sentry_sdk
 
 original_start = Thread.start
 original_run = Thread.run
@@ -71,6 +73,42 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
         assert event["tags"]["stage1"] == "true"
     else:
         assert "stage1" not in event.get("tags", {})
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 2),
+    reason="ThreadPool was added in 3.2",
+)
+@pytest.mark.parametrize("propagate_hub", (True, False))
+def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[ThreadingIntegration(propagate_hub=propagate_hub)],
+    )
+    events = capture_events()
+
+    def double(number):
+        with sentry_sdk.start_span(op="task", description=f"{number}"):
+            return number * 2
+
+    with sentry_sdk.start_transaction(name="test_handles_threadpool"):
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            futures = [executor.submit(double, number) for number in [1, 2, 3, 4]]
+            for future in as_completed(futures):
+                print("Getting future value!", future.result())
+
+    sentry_sdk.flush()
+
+    if propagate_hub:
+        assert len(events) == 1
+        (event,) = events
+        assert event["spans"][0]["trace_id"] == event["spans"][1]["trace_id"]
+        assert event["spans"][1]["trace_id"] == event["spans"][2]["trace_id"]
+        assert event["spans"][2]["trace_id"] == event["spans"][3]["trace_id"]
+        assert event["spans"][3]["trace_id"] == event["spans"][0]["trace_id"]
+    else:
+        (event,) = events
+        assert len(event["spans"]) == 0
 
 
 def test_circular_references(sentry_init, request):
