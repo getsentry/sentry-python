@@ -44,7 +44,7 @@ try:
     import asyncio
 
     from aiohttp import __version__ as AIOHTTP_VERSION
-    from aiohttp import ClientSession, TraceConfig
+    from aiohttp import ClientSession, ContentTypeError, TraceConfig
     from aiohttp.web import Application, HTTPException, UrlDispatcher, Response
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
@@ -291,34 +291,38 @@ def create_trace_config():
         ):
             with hub.configure_scope() as scope:
                 with capture_internal_exceptions():
-                    response_content = await response.json()
-                    scope.add_event_processor(
-                        _make_client_processor(
-                            trace_config_ctx=trace_config_ctx,
-                            response=response,
-                            response_content=response_content,
-                        )
-                    )
-
-                    if (
-                        response_content
-                        and isinstance(response_content, dict)
-                        and response_content.get("errors")
-                    ):
-                        try:
-                            raise SentryGraphQLClientError
-                        except SentryGraphQLClientError as ex:
-                            event, hint = event_from_exception(
-                                ex,
-                                client_options=hub.client.options
-                                if hub.client
-                                else None,
-                                mechanism={
-                                    "type": AioHttpIntegration.identifier,
-                                    "handled": False,
-                                },
+                    try:
+                        response_content = await response.json()
+                    except ContentTypeError:
+                        pass
+                    else:
+                        scope.add_event_processor(
+                            _make_client_processor(
+                                trace_config_ctx=trace_config_ctx,
+                                response=response,
+                                response_content=response_content,
                             )
-                            hub.capture_event(event, hint=hint)
+                        )
+
+                        if (
+                            response_content
+                            and isinstance(response_content, dict)
+                            and response_content.get("errors")
+                        ):
+                            try:
+                                raise SentryGraphQLClientError
+                            except SentryGraphQLClientError as ex:
+                                event, hint = event_from_exception(
+                                    ex,
+                                    client_options=hub.client.options
+                                    if hub.client
+                                    else None,
+                                    mechanism={
+                                        "type": AioHttpIntegration.identifier,
+                                        "handled": False,
+                                    },
+                                )
+                                hub.capture_event(event, hint=hint)
 
         if trace_config_ctx.span is not None:
             span.finish()

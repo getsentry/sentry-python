@@ -593,3 +593,48 @@ def test_graphql_no_post_errors_if_option_is_off(
     assert response.json() == graphql_response
 
     assert not events
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_graphql_non_json_response(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[HttpxIntegration()],
+    )
+
+    url = "http://example.com/graphql"
+    graphql_request = {
+        "query": dedent(
+            """
+            mutation AddPet ($name: String!) {
+                addPet(name: $name) {
+                    id
+                    name
+                }
+            }
+        """
+        ),
+        "variables": {
+            "name": "Lucy",
+        },
+    }
+    httpx_mock.add_response(method="POST", text="not json")
+
+    events = capture_events()
+
+    if asyncio.iscoroutinefunction(httpx_client.post):
+        response = asyncio.get_event_loop().run_until_complete(
+            httpx_client.post(url, json=graphql_request)
+        )
+    else:
+        response = httpx_client.post(url, json=graphql_request)
+
+    assert response.text == "not json"
+    assert response.status_code == 200
+
+    assert not events

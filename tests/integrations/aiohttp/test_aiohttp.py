@@ -6,7 +6,7 @@ from textwrap import dedent
 import pytest
 from aiohttp import web
 from aiohttp.client import ServerDisconnectedError
-from aiohttp.web import Request, json_response
+from aiohttp.web import Request, Response, json_response
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
@@ -821,5 +821,45 @@ async def test_graphql_no_post_errors_if_option_is_off(
 
     assert response.status == 200
     assert await response.json() == graphql_response
+
+    assert not events
+
+
+@pytest.mark.asyncio
+async def test_graphql_non_json_response(
+    sentry_init, capture_events, aiohttp_client, aiohttp_raw_server
+):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[AioHttpIntegration()],
+    )
+
+    graphql_request = {
+        "query": dedent(
+            """
+            mutation AddPet ($name: String!) {
+                addPet(name: $name) {
+                    id
+                    name
+                }
+            }
+        """
+        ),
+        "variables": {
+            "name": "Lucy",
+        },
+    }
+
+    async def handler(request):
+        return Response(body=b"not json")
+
+    raw_server = await aiohttp_raw_server(handler)
+    events = capture_events()
+
+    client = await aiohttp_client(raw_server)
+    response = await client.post("/graphql", json=graphql_request)
+
+    assert response.status == 200
+    assert await response.text() == "not json"
 
     assert not events

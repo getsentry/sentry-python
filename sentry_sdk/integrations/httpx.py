@@ -241,7 +241,11 @@ def _capture_graphql_errors(hub, request, response):
             scope.add_event_processor(_make_request_processor(request, response))
 
             with capture_internal_exceptions():
-                response_content = response.json()
+                try:
+                    response_content = response.json()
+                except JSONDecodeError:
+                    return
+
                 if isinstance(response_content, dict) and response_content.get(
                     "errors"
                 ):
