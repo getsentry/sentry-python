@@ -2,11 +2,12 @@ import gc
 import sys
 from threading import Thread
 
+from concurrent import futures
+
 import pytest
 
 from sentry_sdk import configure_scope, capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import sentry_sdk
 
 original_start = Thread.start
@@ -92,9 +93,9 @@ def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
             return number * 2
 
     with sentry_sdk.start_transaction(name="test_handles_threadpool"):
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            futures = [executor.submit(double, number) for number in [1, 2, 3, 4]]
-            for future in as_completed(futures):
+        with futures.ThreadPoolExecutor(max_workers=1) as executor:
+            tasks = [executor.submit(double, number) for number in [1, 2, 3, 4]]
+            for future in futures.as_completed(tasks):
                 print("Getting future value!", future.result())
 
     sentry_sdk.flush()
