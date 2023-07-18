@@ -2,13 +2,16 @@ import gc
 import sys
 from threading import Thread
 
-from concurrent import futures
+try:
+    from concurrent import futures
+except ImportError:
+    futures = None
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import configure_scope, capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
-import sentry_sdk
 
 original_start = Thread.start
 original_run = Thread.run
@@ -77,7 +80,7 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 2),
+    futures is None,
     reason="ThreadPool was added in 3.2",
 )
 @pytest.mark.parametrize("propagate_hub", (True, False))
