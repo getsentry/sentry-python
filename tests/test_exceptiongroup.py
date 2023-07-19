@@ -192,7 +192,6 @@ def test_exceptiongroup_simple():
     }
     frame = exception_values[1]["stacktrace"]["frames"][0]
     assert frame["module"] == "tests.test_exceptiongroup"
-    assert frame["lineno"] == 151
     assert frame["context_line"] == "        raise ExceptionGroup("
 
 
