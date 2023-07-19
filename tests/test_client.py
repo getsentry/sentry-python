@@ -1108,7 +1108,10 @@ def test_multiple_positional_args(sentry_init):
 
 @pytest.mark.parametrize(
     "sdk_options, expected_data_length",
-    [({}, DEFAULT_MAX_STRING_LENGTH), ({"max_string_length": 2000}, 2000)],
+    [
+        ({}, DEFAULT_MAX_STRING_LENGTH),
+        ({"max_string_length": 1800}, 1800),
+    ],
 )
 def test_max_string_length_option(
     sentry_init, capture_events, sdk_options, expected_data_length

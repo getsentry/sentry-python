@@ -157,7 +157,7 @@ def test_max_string_length_default(body_normalizer):
 def test_max_string_length(body_normalizer):
     data = {"key": "a" * 2000}
 
-    max_string_length = 2000
+    max_string_length = 1800
     result = body_normalizer(data, max_string_length=max_string_length)
 
     assert len(result["key"]) == max_string_length
