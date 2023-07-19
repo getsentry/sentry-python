@@ -180,7 +180,7 @@ class ClientConstructor(object):
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
-        request_bodies="medium",  # type: str
+        max_request_body_size="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=False,  # type: bool
@@ -232,4 +232,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.28.0"
+VERSION = "1.28.1"
