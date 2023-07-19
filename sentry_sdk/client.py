@@ -21,7 +21,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace, has_tracing_enabled
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
-    DEFAULT_MAX_STRING_LENGTH,
+    DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
     VERSION,
@@ -308,8 +308,8 @@ class _Client(object):
                                 include_local_variables=self.options.get(
                                     "include_local_variables", True
                                 ),
-                                max_string_length=self.options.get(
-                                    "max_string_length", DEFAULT_MAX_STRING_LENGTH
+                                max_value_length=self.options.get(
+                                    "max_value_length", DEFAULT_MAX_VALUE_LENGTH
                                 ),
                             ),
                             "crashed": False,
@@ -347,7 +347,7 @@ class _Client(object):
             event = serialize(
                 event,
                 max_request_body_size=self.options.get("max_request_body_size"),
-                max_string_length=self.options.get("max_string_length"),
+                max_value_length=self.options.get("max_value_length"),
             )
 
         before_send = self.options["before_send"]

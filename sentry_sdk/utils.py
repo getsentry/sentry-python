@@ -50,7 +50,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_STRING_LENGTH
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -515,7 +515,7 @@ def get_lines_from_file(
 def get_source_context(
     frame,  # type: FrameType
     tb_lineno,  # type: int
-    max_string_length=None,  # type: Optional[int]
+    max_value_length=None,  # type: Optional[int]
 ):
     # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
@@ -533,7 +533,7 @@ def get_source_context(
     lineno = tb_lineno - 1
     if lineno is not None and abs_path:
         return get_lines_from_file(
-            abs_path, lineno, max_string_length, loader=loader, module=module
+            abs_path, lineno, max_value_length, loader=loader, module=module
         )
     return [], None, []
 
@@ -612,7 +612,7 @@ def serialize_frame(
     tb_lineno=None,
     include_local_variables=True,
     include_source_context=True,
-    max_string_length=None,
+    max_value_length=None,
 ):
     # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
@@ -640,7 +640,7 @@ def serialize_frame(
 
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
-            frame, tb_lineno, max_string_length
+            frame, tb_lineno, max_value_length
         )
 
     if include_local_variables:
@@ -652,7 +652,7 @@ def serialize_frame(
 def current_stacktrace(
     include_local_variables=True,  # type: bool
     include_source_context=True,  # type: bool
-    max_string_length=None,  # type: Optional[int]
+    max_value_length=None,  # type: Optional[int]
 ):
     # type: (...) -> Dict[str, Any]
     __tracebackhide__ = True
@@ -666,7 +666,7 @@ def current_stacktrace(
                     f,
                     include_local_variables=include_local_variables,
                     include_source_context=include_source_context,
-                    max_string_length=max_string_length,
+                    max_value_length=max_value_length,
                 )
             )
         f = f.f_back
@@ -739,11 +739,11 @@ def single_exception_from_error_tuple(
     if client_options is None:
         include_local_variables = True
         include_source_context = True
-        max_string_length = DEFAULT_MAX_STRING_LENGTH  # fallback
+        max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
-        max_string_length = client_options["max_string_length"]
+        max_value_length = client_options["max_value_length"]
 
     frames = [
         serialize_frame(
@@ -751,7 +751,7 @@ def single_exception_from_error_tuple(
             tb_lineno=tb.tb_lineno,
             include_local_variables=include_local_variables,
             include_source_context=include_source_context,
-            max_string_length=max_string_length,
+            max_value_length=max_value_length,
         )
         for tb in iter_stacks(tb)
     ]
@@ -1102,7 +1102,7 @@ def strip_string(value, max_length=None):
         return value
 
     if max_length is None:
-        max_length = DEFAULT_MAX_STRING_LENGTH
+        max_length = DEFAULT_MAX_VALUE_LENGTH
 
     length = len(value.encode("utf-8"))
 

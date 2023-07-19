@@ -1,7 +1,7 @@
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
-DEFAULT_MAX_STRING_LENGTH = 1024
+DEFAULT_MAX_VALUE_LENGTH = 1024
 
 if TYPE_CHECKING:
     import sentry_sdk
@@ -208,7 +208,7 @@ class ClientConstructor(object):
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_string_length=DEFAULT_MAX_STRING_LENGTH,  # type: int
+        max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
     ):
         # type: (...) -> None
         pass

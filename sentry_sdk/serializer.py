@@ -123,7 +123,7 @@ def serialize(event, **kwargs):
     keep_request_bodies = (
         kwargs.pop("max_request_body_size", None) == "always"
     )  # type: bool
-    max_string_length = kwargs.pop("max_string_length", None)  # type: Optional[int]
+    max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -297,7 +297,7 @@ def serialize(event, **kwargs):
             _annotate(rem=[["!limit", "x"]])
             if is_databag:
                 return _flatten_annotated(
-                    strip_string(safe_repr(obj), max_length=max_string_length)
+                    strip_string(safe_repr(obj), max_length=max_value_length)
                 )
             return None
 
@@ -399,7 +399,7 @@ def serialize(event, **kwargs):
         if is_span_description:
             return obj
 
-        return _flatten_annotated(strip_string(obj, max_length=max_string_length))
+        return _flatten_annotated(strip_string(obj, max_length=max_value_length))
 
     #
     # Start of serialize() function

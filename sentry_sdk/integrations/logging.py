@@ -208,7 +208,7 @@ class EventHandler(_BaseHandler):
                                 include_local_variables=client_options[
                                     "include_local_variables"
                                 ],
-                                max_string_length=client_options["max_string_length"],
+                                max_value_length=client_options["max_value_length"],
                             ),
                             "crashed": False,
                             "current": True,
