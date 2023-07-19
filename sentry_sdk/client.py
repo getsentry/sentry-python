@@ -21,6 +21,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace, has_tracing_enabled
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
+    DEFAULT_MAX_STRING_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
     VERSION,
@@ -305,9 +306,11 @@ class _Client(object):
                         {
                             "stacktrace": current_stacktrace(
                                 include_local_variables=self.options.get(
-                                    "include_local_variables"
+                                    "include_local_variables", True
                                 ),
-                                max_string_length=self.options.get("max_string_length"),
+                                max_string_length=self.options.get(
+                                    "max_string_length", DEFAULT_MAX_STRING_LENGTH
+                                ),
                             ),
                             "crashed": False,
                             "current": True,
