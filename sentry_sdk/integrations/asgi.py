@@ -173,9 +173,16 @@ class SentryAsgiMiddleware:
                         headers = {}
                         transaction = Transaction(op=OP.HTTP_SERVER)
 
-                    transaction.name = self._get_url(
-                        scope, "http" if ty == "http" else "ws", headers.get("host")
-                    )
+                    # Set default transaction name
+                    if self.transaction_style == "url":
+                        transaction.name = self._get_url(
+                            scope, "http" if ty == "http" else "ws", headers.get("host")
+                        )
+                    else:
+                        endpoint = scope.get("endpoint")
+                        if endpoint:
+                            transaction.name = transaction_from_function(endpoint) or ""
+
                     transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
 
@@ -233,8 +240,8 @@ class SentryAsgiMiddleware:
             event.get("transaction", _DEFAULT_TRANSACTION_NAME)
             != _DEFAULT_TRANSACTION_NAME
         )
-        if transaction_name_already_set:
-            return
+        # if transaction_name_already_set:
+        #     return
 
         name = ""
 

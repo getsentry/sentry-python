@@ -142,7 +142,7 @@ async def test_capture_transaction(
     (transaction_event,) = events
 
     assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "generic ASGI request"
+    assert transaction_event["transaction"] == "http://localhost/"
     assert transaction_event["contexts"]["trace"]["op"] == "http.server"
     assert transaction_event["request"] == {
         "headers": {
@@ -174,7 +174,7 @@ async def test_capture_transaction_with_error(
 
     (error_event, transaction_event) = events
 
-    assert error_event["transaction"] == "generic ASGI request"
+    assert error_event["transaction"] == "http://localhost/"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
     assert error_event["exception"]["values"][0]["value"] == "division by zero"
@@ -389,7 +389,7 @@ async def test_auto_session_tracking_with_aggregates(
         (
             "/message",
             "url",
-            "generic ASGI request",
+            "http://localhost/message",
             "route",
         ),
         (
