@@ -374,7 +374,7 @@ def test_get_cloud_resource_context_supported_providers(cloud_provider):
         [CLOUD_PROVIDER.TENCENT, {}, True, False],
         ["", {"some": "context"}, False, True],
         [CLOUD_PROVIDER.AWS, {"some": "context"}, False, True],
-        # [CLOUD_PROVIDER.GCP, {"some": "context"}, False, True],
+        [CLOUD_PROVIDER.GCP, {"some": "context"}, False, True],
     ],
 )
 def test_setup_once(
