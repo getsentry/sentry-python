@@ -164,14 +164,18 @@ class SentryAsgiMiddleware:
                     ty = scope["type"]
 
                     if ty in ("http", "websocket"):
+                        headers = self._get_headers(scope)
                         transaction = continue_trace(
-                            self._get_headers(scope),
+                            headers,
                             op="{}.server".format(ty),
                         )
                     else:
+                        headers = {}
                         transaction = Transaction(op=OP.HTTP_SERVER)
 
-                    transaction.name = _DEFAULT_TRANSACTION_NAME
+                    transaction.name = self._get_url(
+                        scope, "http" if ty == "http" else "ws", headers.get("host")
+                    )
                     transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
 
