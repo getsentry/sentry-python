@@ -39,6 +39,9 @@ class FastApiIntegration(StarletteIntegration):
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (Scope, str, Any) -> None
+    import ipdb
+
+    ipdb.set_trace()
     name = ""
 
     if transaction_style == "endpoint":

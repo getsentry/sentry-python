@@ -342,9 +342,15 @@ def patch_asgi_app():
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
+            should_start_transaction=False,
         )
 
         middleware.__call__ = middleware._run_asgi3
+
+        import ipdb
+
+        ipdb.set_trace()
+
         return await middleware(scope, receive, send)
 
     Starlette.__call__ = _sentry_patched_asgi_app
@@ -621,6 +627,9 @@ class StarletteRequestExtractor:
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (SentryScope, str, Any) -> None
+    import ipdb
+
+    ipdb.set_trace()
     name = ""
 
     if transaction_style == "endpoint":
