@@ -24,7 +24,7 @@ from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -1118,3 +1118,21 @@ def test_multiple_positional_args(sentry_init):
     with pytest.raises(TypeError) as exinfo:
         sentry_init(1, None)
     assert "Only single positional argument is expected" in str(exinfo.value)
+
+
+@pytest.mark.parametrize(
+    "sdk_options, expected_data_length",
+    [
+        ({}, DEFAULT_MAX_VALUE_LENGTH),
+        ({"max_value_length": 1800}, 1800),
+    ],
+)
+def test_max_value_length_option(
+    sentry_init, capture_events, sdk_options, expected_data_length
+):
+    sentry_init(sdk_options)
+    events = capture_events()
+
+    capture_message("a" * 2000)
+
+    assert len(events[0]["message"]) == expected_data_length
