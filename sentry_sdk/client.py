@@ -21,6 +21,7 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace, has_tracing_enabled
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
+    DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
     VERSION,
@@ -304,7 +305,12 @@ class _Client(object):
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                self.options["include_local_variables"]
+                                include_local_variables=self.options.get(
+                                    "include_local_variables", True
+                                ),
+                                max_value_length=self.options.get(
+                                    "max_value_length", DEFAULT_MAX_VALUE_LENGTH
+                                ),
                             ),
                             "crashed": False,
                             "current": True,
@@ -339,7 +345,9 @@ class _Client(object):
         # generally not surface in before_send
         if event is not None:
             event = serialize(
-                event, max_request_body_size=self.options.get("max_request_body_size")
+                event,
+                max_request_body_size=self.options.get("max_request_body_size"),
+                max_value_length=self.options.get("max_value_length"),
             )
 
         before_send = self.options["before_send"]

@@ -213,7 +213,7 @@ def test_get_monitor_config_crontab():
     app.conf.timezone = "Europe/Vienna"
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
-    monitor_config = _get_monitor_config(celery_schedule, app)
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
     assert monitor_config == {
         "schedule": {
             "type": "crontab",
@@ -230,8 +230,17 @@ def test_get_monitor_config_seconds():
     app.conf.timezone = "Europe/Vienna"
 
     celery_schedule = schedule(run_every=3)  # seconds
-    monitor_config = _get_monitor_config(celery_schedule, app)
-    assert monitor_config == {}
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.logger.warning"
+    ) as mock_logger_warning:
+        monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+        mock_logger_warning.assert_called_with(
+            "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+            "foo",
+            3,
+        )
+        assert monitor_config == {}
 
 
 def test_get_monitor_config_minutes():
@@ -240,7 +249,7 @@ def test_get_monitor_config_minutes():
     app.conf.timezone = "Europe/Vienna"
 
     celery_schedule = schedule(run_every=60)  # seconds
-    monitor_config = _get_monitor_config(celery_schedule, app)
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
     assert monitor_config == {
         "schedule": {
             "type": "interval",
@@ -257,7 +266,7 @@ def test_get_monitor_config_unknown():
     app.conf.timezone = "Europe/Vienna"
 
     unknown_celery_schedule = MagicMock()
-    monitor_config = _get_monitor_config(unknown_celery_schedule, app)
+    monitor_config = _get_monitor_config(unknown_celery_schedule, app, "foo")
     assert monitor_config == {}
 
 
@@ -268,7 +277,7 @@ def test_get_monitor_config_default_timezone():
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
 
-    monitor_config = _get_monitor_config(celery_schedule, app)
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
 
     assert monitor_config["timezone"] == "UTC"
 
