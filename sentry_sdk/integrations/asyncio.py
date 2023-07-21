@@ -65,7 +65,7 @@ def patch_asyncio():
             # WARNING:
             # If the default behavior of the task creation in asyncio changes,
             # this will break!
-            task = Task(_coro_creating_hub_and_span(), loop=loop)
+            task = Task(_coro_creating_hub_and_span(), loop=loop, **kwargs)
             if task._source_traceback:  # type: ignore
                 del task._source_traceback[-1]  # type: ignore
 
