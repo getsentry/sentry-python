@@ -20,8 +20,6 @@ from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_URL,
-    TRANSACTION_SOURCE_COMPONENT,
 )
 from sentry_sdk.utils import (
     ContextVar,
@@ -81,13 +79,7 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = (
-        "app",
-        "__call__",
-        "transaction_style",
-        "mechanism_type",
-        "should_start_transaction",
-    )
+    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
 
     def __init__(
         self,
@@ -95,7 +87,6 @@ class SentryAsgiMiddleware:
         unsafe_context_data=False,
         transaction_style="endpoint",
         mechanism_type="asgi",
-        should_start_transaction=True,
     ):
         # type: (Any, bool, str, str) -> None
         """
@@ -130,31 +121,12 @@ class SentryAsgiMiddleware:
 
         self.transaction_style = transaction_style
         self.mechanism_type = mechanism_type
-        self.should_start_transaction = should_start_transaction
         self.app = app
 
         if _looks_like_asgi3(app):
             self.__call__ = self._run_asgi3  # type: Callable[..., Any]
         else:
             self.__call__ = self._run_asgi2
-
-    def _get_default_transaction_name_and_source(self, scope):
-        name = _DEFAULT_TRANSACTION_NAME
-        source = TRANSACTION_SOURCE_ROUTE
-
-        if self.transaction_style == "url":
-            source = TRANSACTION_SOURCE_URL
-            headers = self._get_headers(scope)
-            name = self._get_url(
-                scope, "http" if scope["type"] == "http" else "ws", headers.get("host")
-            )
-        else:
-            source = TRANSACTION_SOURCE_COMPONENT
-            endpoint = scope.get("endpoint")
-            if endpoint:
-                name = transaction_from_function(endpoint) or ""
-
-        return name, source
 
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
@@ -189,48 +161,33 @@ class SentryAsgiMiddleware:
                         processor = partial(self.event_processor, asgi_scope=scope)
                         sentry_scope.add_event_processor(processor)
 
-                    import ipdb
-
-                    ipdb.set_trace()
-                    (
-                        default_transaction_name,
-                        default_transaction_source,
-                    ) = self._get_default_transaction_name_and_source(scope)
-
                     ty = scope["type"]
+
                     if ty in ("http", "websocket"):
                         transaction = continue_trace(
                             self._get_headers(scope),
                             op="{}.server".format(ty),
-                            name=default_transaction_name,
-                            source=default_transaction_source,
                         )
                     else:
-                        transaction = Transaction(
-                            op=OP.HTTP_SERVER,
-                            name=default_transaction_name,
-                            source=default_transaction_source,
-                        )
+                        transaction = Transaction(op=OP.HTTP_SERVER)
 
+                    transaction.name = _DEFAULT_TRANSACTION_NAME
+                    transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
 
-                    if self.should_start_transaction:
-                        transaction = hub.start_transaction(
-                            transaction, custom_sampling_context={"asgi_scope": scope}
-                        )
-
-                    # XXX: Would be cool to have correct span status, but we
-                    # would have to wrap send(). That is a bit hard to do with
-                    # the current abstraction over ASGI 2/3.
-                    try:
-                        return await callback()
-                    except Exception as exc:
-                        _capture_exception(hub, exc, mechanism_type=self.mechanism_type)
-                        raise exc from None
-                    finally:
-                        if self.should_start_transaction:
-                            transaction.__exit__()
-
+                    with hub.start_transaction(
+                        transaction, custom_sampling_context={"asgi_scope": scope}
+                    ):
+                        # XXX: Would be cool to have correct span status, but we
+                        # would have to wrap send(). That is a bit hard to do with
+                        # the current abstraction over ASGI 2/3.
+                        try:
+                            return await callback()
+                        except Exception as exc:
+                            _capture_exception(
+                                hub, exc, mechanism_type=self.mechanism_type
+                            )
+                            raise exc from None
         finally:
             _asgi_middleware_applied.set(False)
 
@@ -268,15 +225,9 @@ class SentryAsgiMiddleware:
 
     def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> None
-        import ipdb
-
-        ipdb.set_trace()
-        default_transaction_name, _ = self._get_default_transaction_name_and_source(
-            asgi_scope
-        )
         transaction_name_already_set = (
-            event.get("transaction", default_transaction_name)
-            != default_transaction_name
+            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
+            != _DEFAULT_TRANSACTION_NAME
         )
         if transaction_name_already_set:
             return
