@@ -13,7 +13,6 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -31,7 +30,6 @@ if TYPE_CHECKING:
 try:
     import starlette  # type: ignore
     from starlette import __version__ as STARLETTE_VERSION
-    from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
     from starlette.middleware.authentication import (  # type: ignore
@@ -39,7 +37,7 @@ try:
     )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
+    from starlette.types import ASGIApp  # type: ignore
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
@@ -87,11 +85,25 @@ class StarletteIntegration(Integration):
             )
 
         patch_middlewares()
-        patch_asgi_app()
         patch_request_response()
 
         if version >= (0, 24):
             patch_templates()
+
+    def _get_headers(self, scope):
+        # type: (Any) -> Dict[str, str]
+        """
+        Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
+        """
+        headers = {}  # type: Dict[str, str]
+        for raw_key, raw_value in scope["headers"]:
+            key = raw_key.decode("latin-1")
+            value = raw_value.decode("latin-1")
+            if key in headers:
+                headers[key] = headers[key] + ", " + value
+            else:
+                headers[key] = value
+        return headers
 
 
 def _enable_span_for_middleware(middleware_class):
@@ -312,9 +324,8 @@ def patch_middlewares():
 
         def _sentry_middleware_init(self, cls, **options):
             # type: (Any, Any, Any) -> None
-            if cls == SentryAsgiMiddleware:
-                return old_middleware_init(self, cls, **options)
 
+            # TODO: check if we should return the return value of old_middleware_init at the end of this function?
             span_enabled_cls = _enable_span_for_middleware(cls)
             old_middleware_init(self, span_enabled_cls, **options)
 
@@ -325,35 +336,6 @@ def patch_middlewares():
                 patch_exception_middleware(cls)
 
         Middleware.__init__ = _sentry_middleware_init
-
-
-def patch_asgi_app():
-    # type: () -> None
-    """
-    Instrument Starlette ASGI app using the SentryAsgiMiddleware.
-    """
-    old_app = Starlette.__call__
-
-    async def _sentry_patched_asgi_app(self, scope, receive, send):
-        # type: (Starlette, StarletteScope, Receive, Send) -> None
-        if Hub.current.get_integration(StarletteIntegration) is None:
-            return await old_app(self, scope, receive, send)
-
-        middleware = SentryAsgiMiddleware(
-            lambda *a, **kw: old_app(self, *a, **kw),
-            mechanism_type=StarletteIntegration.identifier,
-            should_start_transaction=False,
-        )
-
-        middleware.__call__ = middleware._run_asgi3
-
-        import ipdb
-
-        ipdb.set_trace()
-
-        return await middleware(scope, receive, send)
-
-    Starlette.__call__ = _sentry_patched_asgi_app
 
 
 # This was vendored in from Starlette to support Starlette 0.19.1 because
@@ -627,9 +609,6 @@ class StarletteRequestExtractor:
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (SentryScope, str, Any) -> None
-    import ipdb
-
-    ipdb.set_trace()
     name = ""
 
     if transaction_style == "endpoint":
