@@ -38,7 +38,7 @@ def patch_asyncio():
         orig_task_factory = loop.get_task_factory()
 
         def _sentry_task_factory(loop, coro, **kwargs):
-            # type: (Any, Any) -> Any
+            # type: (Any, Any, Any) -> Any
 
             async def _coro_creating_hub_and_span():
                 # type: () -> Any
