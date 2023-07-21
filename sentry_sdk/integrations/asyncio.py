@@ -37,7 +37,7 @@ def patch_asyncio():
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop, coro):
+        def _sentry_task_factory(loop, coro, **kwargs):
             # type: (Any, Any) -> Any
 
             async def _coro_creating_hub_and_span():
@@ -56,7 +56,7 @@ def patch_asyncio():
 
             # Trying to use user set task factory (if there is one)
             if orig_task_factory:
-                return orig_task_factory(loop, _coro_creating_hub_and_span())
+                return orig_task_factory(loop, _coro_creating_hub_and_span(), **kwargs)
 
             # The default task factory in `asyncio` does not have its own function
             # but is just a couple of lines in `asyncio.base_events.create_task()`
