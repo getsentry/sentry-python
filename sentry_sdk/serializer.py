@@ -68,7 +68,7 @@ else:
 MAX_EVENT_BYTES = 10**6
 
 # Maximum depth and breadth of databags. Excess data will be trimmed. If
-# request_bodies is "always", request bodies won't be trimmed.
+# max_request_body_size is "always", request bodies won't be trimmed.
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = "<cyclic>"
@@ -120,7 +120,10 @@ def serialize(event, **kwargs):
     path = []  # type: List[Segment]
     meta_stack = []  # type: List[Dict[str, Any]]
 
-    keep_request_bodies = kwargs.pop("request_bodies", None) == "always"  # type: bool
+    keep_request_bodies = (
+        kwargs.pop("max_request_body_size", None) == "always"
+    )  # type: bool
+    max_value_length = kwargs.pop("max_value_length", None)  # type: Optional[int]
 
     def _annotate(**meta):
         # type: (**Any) -> None
@@ -293,7 +296,9 @@ def serialize(event, **kwargs):
         if remaining_depth is not None and remaining_depth <= 0:
             _annotate(rem=[["!limit", "x"]])
             if is_databag:
-                return _flatten_annotated(strip_string(safe_repr(obj)))
+                return _flatten_annotated(
+                    strip_string(safe_repr(obj), max_length=max_value_length)
+                )
             return None
 
         if is_databag and global_repr_processors:
@@ -394,7 +399,7 @@ def serialize(event, **kwargs):
         if is_span_description:
             return obj
 
-        return _flatten_annotated(strip_string(obj))
+        return _flatten_annotated(strip_string(obj, max_length=max_value_length))
 
     #
     # Start of serialize() function

@@ -330,6 +330,9 @@ class Baggage(object):
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
 
+        if transaction.sampled is not None:
+            sentry_items["sampled"] = "true" if transaction.sampled else "false"
+
         # there's an existing baggage but it was mutable,
         # which is why we are creating this new baggage.
         # However, if by chance the user put some sentry items in there, give them precedence.
@@ -373,6 +376,15 @@ def should_propagate_trace(hub, url):
     """
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
+
+    if client.transport and client.transport.parsed_dsn:
+        dsn_url = client.transport.parsed_dsn.netloc
+    else:
+        dsn_url = None
+
+    is_request_to_sentry = dsn_url and dsn_url in url
+    if is_request_to_sentry:
+        return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 

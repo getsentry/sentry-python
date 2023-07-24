@@ -1,5 +1,6 @@
 from datetime import datetime
 import time
+import pytest
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -14,7 +15,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
 )
 from sentry_sdk.tracing import Span, Transaction
 
-from opentelemetry.trace import SpanKind, SpanContext
+from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
 
@@ -218,6 +219,28 @@ def test_update_span_with_otel_data_http_method():
     assert sentry_span._data["http.target"] == "/"
 
 
+@pytest.mark.parametrize(
+    "otel_status, expected_status",
+    [
+        pytest.param(Status(StatusCode.UNSET), None, id="unset"),
+        pytest.param(Status(StatusCode.OK), "ok", id="ok"),
+        pytest.param(Status(StatusCode.ERROR), "internal_error", id="error"),
+    ],
+)
+def test_update_span_with_otel_status(otel_status, expected_status):
+    sentry_span = Span()
+
+    otel_span = MagicMock()
+    otel_span.name = "Test OTel Span"
+    otel_span.kind = SpanKind.INTERNAL
+    otel_span.status = otel_status
+
+    span_processor = SentrySpanProcessor()
+    span_processor._update_span_with_otel_status(sentry_span, otel_span)
+
+    assert sentry_span.get_trace_context().get("status") == expected_status
+
+
 def test_update_span_with_otel_data_http_method2():
     sentry_span = Span()
 
@@ -394,6 +417,7 @@ def test_on_end_sentry_transaction():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.end_time = time.time_ns()
+    otel_span.status = Status(StatusCode.OK)
     span_context = SpanContext(
         trace_id=int("1234567890abcdef1234567890abcdef", 16),
         span_id=int("1234567890abcdef", 16),
@@ -414,6 +438,7 @@ def test_on_end_sentry_transaction():
 
     fake_sentry_span.set_context.assert_called_once()
     span_processor._update_span_with_otel_data.assert_not_called()
+    fake_sentry_span.set_status.assert_called_once_with("ok")
     fake_sentry_span.finish.assert_called_once()
 
 
@@ -424,6 +449,7 @@ def test_on_end_sentry_span():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
     otel_span.end_time = time.time_ns()
+    otel_span.status = Status(StatusCode.OK)
     span_context = SpanContext(
         trace_id=int("1234567890abcdef1234567890abcdef", 16),
         span_id=int("1234567890abcdef", 16),
@@ -446,6 +472,7 @@ def test_on_end_sentry_span():
     span_processor._update_span_with_otel_data.assert_called_once_with(
         fake_sentry_span, otel_span
     )
+    fake_sentry_span.set_status.assert_called_once_with("ok")
     fake_sentry_span.finish.assert_called_once()
 
 

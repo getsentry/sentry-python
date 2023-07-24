@@ -4,7 +4,9 @@ from __future__ import absolute_import
 import sys
 import threading
 import weakref
+from importlib import import_module
 
+from sentry_sdk._compat import string_types
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -32,11 +34,17 @@ try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings as django_settings
     from django.core import signals
+    from django.conf import settings
 
     try:
         from django.urls import resolve
     except ImportError:
         from django.core.urlresolvers import resolve
+
+    try:
+        from django.urls import Resolver404
+    except ImportError:
+        from django.core.urlresolvers import Resolver404
 except ImportError:
     raise DidNotEnable("Django not installed")
 
@@ -370,6 +378,18 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             transaction_name,
             source=source,
         )
+    except Resolver404:
+        urlconf = import_module(settings.ROOT_URLCONF)
+        # This exception only gets thrown when transaction_style is `function_name`
+        # So we don't check here what style is configured
+        if hasattr(urlconf, "handler404"):
+            handler = urlconf.handler404
+            if isinstance(handler, string_types):
+                scope.transaction = handler
+            else:
+                scope.transaction = transaction_from_function(
+                    getattr(handler, "view_class", handler)
+                )
     except Exception:
         pass
 

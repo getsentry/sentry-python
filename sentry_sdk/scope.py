@@ -196,10 +196,23 @@ class Scope(object):
             "dynamic_sampling_context": None,
         }
 
+    def set_new_propagation_context(self):
+        # type: () -> None
+        """
+        Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
+        """
+        self._propagation_context = self._create_new_propagation_context()
+        logger.debug(
+            "[Tracing] Create new propagation context: %s",
+            self._propagation_context,
+        )
+
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
-        Populates `_propagation_context`. Either from `incoming_data` or with a new propagation context.
+        Makes sure `_propagation_context` is set.
+        If there is `incoming_data` overwrite existing `_propagation_context`.
+        if there is no `incoming_data` create new `_propagation_context`, but do NOT overwrite if already existing.
         """
         if incoming_data:
             context = self._extract_propagation_context(incoming_data)
@@ -212,11 +225,7 @@ class Scope(object):
                 )
 
         if self._propagation_context is None:
-            self._propagation_context = self._create_new_propagation_context()
-            logger.debug(
-                "[Tracing] Create new propagation context: %s",
-                self._propagation_context,
-            )
+            self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
@@ -254,10 +263,13 @@ class Scope(object):
         if self._propagation_context is None:
             return None
 
-        if self._propagation_context.get("dynamic_sampling_context") is None:
+        dynamic_sampling_context = self._propagation_context.get(
+            "dynamic_sampling_context"
+        )
+        if dynamic_sampling_context is None:
             return Baggage.from_options(self)
-
-        return None
+        else:
+            return Baggage(dynamic_sampling_context)
 
     def get_trace_context(self):
         # type: () -> Any
@@ -605,11 +617,21 @@ class Scope(object):
 
         contexts = event.setdefault("contexts", {})
 
-        if has_tracing_enabled(options):
-            if self._span is not None:
+        if contexts.get("trace") is None:
+            if has_tracing_enabled(options) and self._span is not None:
                 contexts["trace"] = self._span.get_trace_context()
-        else:
-            contexts["trace"] = self.get_trace_context()
+            else:
+                contexts["trace"] = self.get_trace_context()
+
+        try:
+            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
+        except (KeyError, TypeError):
+            replay_id = None
+
+        if replay_id is not None:
+            contexts["replay"] = {
+                "replay_id": replay_id,
+            }
 
         exc_info = hint.get("exc_info")
         if exc_info is not None:

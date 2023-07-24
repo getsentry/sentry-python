@@ -1,10 +1,16 @@
+import json
 import sys
 import weakref
 
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl  # type: ignore
+
 from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
-from sentry_sdk.consts import OP
-from sentry_sdk.hub import Hub
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.sessions import auto_session_tracking
@@ -12,22 +18,34 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_ROUTE,
+)
+from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    logger,
+    parse_url,
     parse_version,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    SentryGraphQLClientError,
+    _get_graphql_operation_name,
+    _get_graphql_operation_type,
 )
 
 try:
     import asyncio
 
     from aiohttp import __version__ as AIOHTTP_VERSION
-    from aiohttp.web import Application, HTTPException, UrlDispatcher
+    from aiohttp import ClientSession, ContentTypeError, TraceConfig
+    from aiohttp.web import Application, HTTPException, UrlDispatcher, Response
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
 
@@ -36,6 +54,12 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
     from aiohttp.abc import AbstractMatchInfo
+    from aiohttp import (
+        TraceRequestStartParams,
+        TraceRequestEndParams,
+        TraceRequestChunkSentParams,
+    )
+    from types import SimpleNamespace
     from typing import Any
     from typing import Dict
     from typing import Optional
@@ -53,14 +77,16 @@ TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
 
-    def __init__(self, transaction_style="handler_name"):
-        # type: (str) -> None
+    def __init__(self, transaction_style="handler_name", capture_graphql_errors=True):
+        # type: (str, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+
+        self.capture_graphql_errors = capture_graphql_errors
 
     @staticmethod
     def setup_once():
@@ -100,7 +126,7 @@ class AioHttpIntegration(Integration):
                     # create a task to wrap each request.
                     with hub.configure_scope() as scope:
                         scope.clear_breadcrumbs()
-                        scope.add_event_processor(_make_request_processor(weak_request))
+                        scope.add_event_processor(_make_server_processor(weak_request))
 
                     transaction = continue_trace(
                         request.headers,
@@ -128,6 +154,7 @@ class AioHttpIntegration(Integration):
                             reraise(*_capture_exception(hub))
 
                         transaction.set_http_status(response.status)
+
                         return response
 
         Application._handle = sentry_app_handle
@@ -164,10 +191,154 @@ class AioHttpIntegration(Integration):
 
         UrlDispatcher.resolve = sentry_urldispatcher_resolve
 
+        old_client_session_init = ClientSession.__init__
 
-def _make_request_processor(weak_request):
+        def init(*args, **kwargs):
+            # type: (Any, Any) -> ClientSession
+            hub = Hub.current
+            if hub.get_integration(AioHttpIntegration) is None:
+                return old_client_session_init(*args, **kwargs)
+
+            client_trace_configs = list(kwargs.get("trace_configs") or ())
+            trace_config = create_trace_config()
+            client_trace_configs.append(trace_config)
+
+            kwargs["trace_configs"] = client_trace_configs
+            return old_client_session_init(*args, **kwargs)
+
+        ClientSession.__init__ = init
+
+
+def create_trace_config():
+    # type: () -> TraceConfig
+    async def on_request_start(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
+        hub = Hub.current
+        integration = hub.get_integration(AioHttpIntegration)
+        if integration is None:
+            return
+
+        method = params.method.upper()
+
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(str(params.url), sanitize=False)
+
+        span = hub.start_span(
+            op=OP.HTTP_CLIENT,
+            description="%s %s"
+            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+        )
+        span.set_data(SPANDATA.HTTP_METHOD, method)
+        span.set_data("url", parsed_url.url)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        if should_propagate_trace(hub, str(params.url)):
+            for key, value in hub.iter_trace_propagation_headers(span):
+                logger.debug(
+                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                        key=key, value=value, url=params.url
+                    )
+                )
+                if key == BAGGAGE_HEADER_NAME and params.headers.get(
+                    BAGGAGE_HEADER_NAME
+                ):
+                    # do not overwrite any existing baggage, just append to it
+                    params.headers[key] += "," + value
+                else:
+                    params.headers[key] = value
+
+        trace_config_ctx.span = span
+        trace_config_ctx.is_graphql_request = params.url.path == "/graphql"
+
+        if integration.capture_graphql_errors and trace_config_ctx.is_graphql_request:
+            trace_config_ctx.request_headers = params.headers
+
+    async def on_request_chunk_sent(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestChunkSentParams) -> None
+        integration = Hub.current.get_integration(AioHttpIntegration)
+        if integration is None:
+            return
+
+        if integration.capture_graphql_errors and trace_config_ctx.is_graphql_request:
+            trace_config_ctx.request_body = None
+            with capture_internal_exceptions():
+                try:
+                    trace_config_ctx.request_body = json.loads(params.chunk)
+                except json.JSONDecodeError:
+                    return
+
+    async def on_request_end(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
+        hub = Hub.current
+        integration = hub.get_integration(AioHttpIntegration)
+        if integration is None:
+            return
+
+        response = params.response
+
+        if trace_config_ctx.span is not None:
+            span = trace_config_ctx.span
+            span.set_http_status(int(response.status))
+            span.set_data("reason", response.reason)
+
+        if (
+            integration.capture_graphql_errors
+            and trace_config_ctx.is_graphql_request
+            and response.method in ("GET", "POST")
+            and response.status == 200
+        ):
+            with hub.configure_scope() as scope:
+                with capture_internal_exceptions():
+                    try:
+                        response_content = await response.json()
+                    except ContentTypeError:
+                        pass
+                    else:
+                        scope.add_event_processor(
+                            _make_client_processor(
+                                trace_config_ctx=trace_config_ctx,
+                                response=response,
+                                response_content=response_content,
+                            )
+                        )
+
+                        if (
+                            response_content
+                            and isinstance(response_content, dict)
+                            and response_content.get("errors")
+                        ):
+                            try:
+                                raise SentryGraphQLClientError
+                            except SentryGraphQLClientError as ex:
+                                event, hint = event_from_exception(
+                                    ex,
+                                    client_options=hub.client.options
+                                    if hub.client
+                                    else None,
+                                    mechanism={
+                                        "type": AioHttpIntegration.identifier,
+                                        "handled": False,
+                                    },
+                                )
+                                hub.capture_event(event, hint=hint)
+
+        if trace_config_ctx.span is not None:
+            span.finish()
+
+    trace_config = TraceConfig()
+
+    trace_config.on_request_start.append(on_request_start)
+    trace_config.on_request_chunk_sent.append(on_request_chunk_sent)
+    trace_config.on_request_end.append(on_request_end)
+
+    return trace_config
+
+
+def _make_server_processor(weak_request):
     # type: (Callable[[], Request]) -> EventProcessor
-    def aiohttp_processor(
+    def aiohttp_server_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
     ):
@@ -199,7 +370,63 @@ def _make_request_processor(weak_request):
 
         return event
 
-    return aiohttp_processor
+    return aiohttp_server_processor
+
+
+def _make_client_processor(trace_config_ctx, response, response_content):
+    # type: (SimpleNamespace, Response, Optional[Dict[str, Any]]) -> EventProcessor
+    def aiohttp_client_processor(
+        event,  # type: Dict[str, Any]
+        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+    ):
+        # type: (...) -> Dict[str, Any]
+        with capture_internal_exceptions():
+            request_info = event.setdefault("request", {})
+
+            parsed_url = parse_url(str(response.url), sanitize=False)
+            request_info["url"] = parsed_url.url
+            request_info["method"] = response.method
+
+            if getattr(trace_config_ctx, "request_headers", None):
+                request_info["headers"] = _filter_headers(
+                    dict(trace_config_ctx.request_headers)
+                )
+
+            if _should_send_default_pii():
+                if getattr(trace_config_ctx, "request_body", None):
+                    request_info["data"] = trace_config_ctx.request_body
+
+                request_info["query_string"] = parsed_url.query
+
+            if response.url.path == "/graphql":
+                request_info["api_target"] = "graphql"
+
+                query = request_info.get("data")
+                if response.method == "GET":
+                    query = dict(parse_qsl(parsed_url.query))
+
+                if query:
+                    operation_name = _get_graphql_operation_name(query)
+                    operation_type = _get_graphql_operation_type(query)
+                    event["fingerprint"] = [
+                        operation_name,
+                        operation_type,
+                        response.status,
+                    ]
+                    event["exception"]["values"][0][
+                        "value"
+                    ] = "GraphQL request failed, name: {}, type: {}".format(
+                        operation_name, operation_type
+                    )
+
+                if _should_send_default_pii() and response_content:
+                    contexts = event.setdefault("contexts", {})
+                    response_context = contexts.setdefault("response", {})
+                    response_context["data"] = response_content
+
+        return event
+
+    return aiohttp_client_processor
 
 
 def _capture_exception(hub):

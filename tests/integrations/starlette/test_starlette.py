@@ -4,12 +4,14 @@ import functools
 import json
 import logging
 import os
+import re
 import threading
 
 import pytest
 
 from sentry_sdk import last_event_id, capture_exception
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.utils import parse_version
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -33,7 +35,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.testclient import TestClient
 
-STARLETTE_VERSION = tuple([int(x) for x in starlette.__version__.split(".")])
+STARLETTE_VERSION = parse_version(starlette.__version__)
 
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
 
@@ -62,7 +64,6 @@ PARSED_FORM = starlette.datastructures.FormData(
             starlette.datastructures.UploadFile(
                 filename="photo.jpg",
                 file=open(PICTURE, "rb"),
-                content_type="image/jpeg",
             ),
         ),
     ]
@@ -94,7 +95,16 @@ async def _mock_receive(msg):
     return msg
 
 
+from sentry_sdk import Hub
+from starlette.templating import Jinja2Templates
+
+
 def starlette_app_factory(middleware=None, debug=True):
+    template_dir = os.path.join(
+        os.getcwd(), "tests", "integrations", "starlette", "templates"
+    )
+    templates = Jinja2Templates(directory=template_dir)
+
     async def _homepage(request):
         1 / 0
         return starlette.responses.JSONResponse({"status": "ok"})
@@ -126,6 +136,16 @@ def starlette_app_factory(middleware=None, debug=True):
             }
         )
 
+    async def _render_template(request):
+        hub = Hub.current
+        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+
+        template_context = {
+            "request": request,
+            "msg": "Hello Template World!",
+        }
+        return templates.TemplateResponse("trace_meta.html", template_context)
+
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
@@ -135,6 +155,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/message/{message_id}", _message_with_id),
             starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
             starlette.routing.Route("/async/thread_ids", _thread_ids_async),
+            starlette.routing.Route("/render_template", _render_template),
         ],
         middleware=middleware,
     )
@@ -903,3 +924,34 @@ def test_original_request_not_scrubbed(sentry_init, capture_events):
     event = events[0]
     assert event["request"]["data"] == {"password": "[Filtered]"}
     assert event["request"]["headers"]["authorization"] == "[Filtered]"
+
+
+@pytest.mark.skipif(STARLETTE_VERSION < (0, 24), reason="Requires Starlette >= 0.24")
+def test_template_tracing_meta(sentry_init, capture_events):
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[StarletteIntegration()],
+    )
+    events = capture_events()
+
+    app = starlette_app_factory()
+
+    client = TestClient(app)
+    response = client.get("/render_template")
+    assert response.status_code == 200
+
+    rendered_meta = response.text
+    traceparent, baggage = events[0]["message"].split("\n")
+    assert traceparent != ""
+    assert baggage != ""
+
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))

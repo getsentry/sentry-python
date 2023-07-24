@@ -1,5 +1,8 @@
 from sentry_sdk._types import TYPE_CHECKING
 
+# up top to prevent circular import due to integration import
+DEFAULT_MAX_VALUE_LENGTH = 1024
+
 if TYPE_CHECKING:
     import sentry_sdk
 
@@ -36,13 +39,13 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
+            "enable_backpressure_handling": Optional[bool],
         },
         total=False,
     )
 
 DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
-
 MATCH_ALL = r".*"
 
 FALSE_VALUES = [
@@ -177,7 +180,7 @@ class ClientConstructor(object):
         http_proxy=None,  # type: Optional[str]
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
-        request_bodies="medium",  # type: str
+        max_request_body_size="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=False,  # type: bool
@@ -205,6 +208,7 @@ class ClientConstructor(object):
         ],  # type: Optional[Sequence[str]]
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
+        max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
     ):
         # type: (...) -> None
         pass
@@ -228,4 +232,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.26.0"
+VERSION = "1.28.1"

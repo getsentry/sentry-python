@@ -11,6 +11,8 @@ from sentry_sdk.utils import (
     parse_version,
     sanitize_url,
     serialize_frame,
+    _get_graphql_operation_name,
+    _get_graphql_operation_type,
 )
 
 try:
@@ -423,3 +425,103 @@ def test_match_regex_list(item, regex_list, expected_result):
 )
 def test_parse_version(version, expected_result):
     assert parse_version(version) == expected_result
+
+
+@pytest.mark.parametrize(
+    "query,expected_result",
+    [
+        [{"query": '{cats(id: "7") {name}}'}, "anonymous"],
+        [{"query": 'query {cats(id: "7") {name}}'}, "anonymous"],
+        [{"query": 'query CatQuery {cats(id: "7") {name}}'}, "CatQuery"],
+        [
+            {
+                "query": 'mutation {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
+            },
+            "anonymous",
+        ],
+        [
+            {
+                "query": 'mutation categoryAdd {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
+            },
+            "categoryAdd",
+        ],
+        [
+            {
+                "query": "subscription {newLink {id url description postedBy {id name email}}}"
+            },
+            "anonymous",
+        ],
+        [
+            {
+                "query": "subscription PostSubcription {newLink {id url description postedBy {id name email}}}"
+            },
+            "PostSubcription",
+        ],
+        [
+            {
+                "query": 'query CatQuery {cats(id: "7") {name}}',
+                "operationName": "SomeOtherOperation",
+                "variables": {},
+            },
+            "SomeOtherOperation",
+        ],
+        [
+            {
+                "query": "mutation AddPet ($name: String!) {addPet(name: $name) {id name}}}"
+            },
+            "AddPet",
+        ],
+    ],
+)
+def test_graphql_operation_name_extraction(query, expected_result):
+    assert _get_graphql_operation_name(query) == expected_result
+
+
+@pytest.mark.parametrize(
+    "query,expected_result",
+    [
+        [{"query": '{cats(id: "7") {name}}'}, "query"],
+        [{"query": 'query {cats(id: "7") {name}}'}, "query"],
+        [{"query": 'query CatQuery {cats(id: "7") {name}}'}, "query"],
+        [
+            {
+                "query": 'mutation {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
+            },
+            "mutation",
+        ],
+        [
+            {
+                "query": 'mutation categoryAdd {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
+            },
+            "mutation",
+        ],
+        [
+            {
+                "query": "subscription {newLink {id url description postedBy {id name email}}}"
+            },
+            "subscription",
+        ],
+        [
+            {
+                "query": "subscription PostSubcription {newLink {id url description postedBy {id name email}}}"
+            },
+            "subscription",
+        ],
+        [
+            {
+                "query": 'query CatQuery {cats(id: "7") {name}}',
+                "operationName": "SomeOtherOperation",
+                "variables": {},
+            },
+            "query",
+        ],
+        [
+            {
+                "query": "mutation AddPet ($name: String!) {addPet(name: $name) {id name}}}"
+            },
+            "mutation",
+        ],
+    ],
+)
+def test_graphql_operation_type_extraction(query, expected_result):
+    assert _get_graphql_operation_type(query) == expected_result
