@@ -1,31 +1,51 @@
+import io
+import json
 import os
 import subprocess
 import sys
 import platform
-from sentry_sdk.consts import OP, SPANDATA
 
-from sentry_sdk.hub import Hub
+try:
+    # py3
+    from urllib.parse import parse_qsl
+except ImportError:
+    # py2
+    from urlparse import parse_qsl  # type: ignore
+
+try:
+    # py3
+    from json import JSONDecodeError
+except ImportError:
+    # py2 doesn't throw a specialized json error, just Value/TypeErrors
+    JSONDecodeError = ValueError  # type: ignore
+
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
+    SentryGraphQLClientError,
     capture_internal_exceptions,
+    event_from_exception,
     logger,
     safe_repr,
     parse_url,
+    _get_graphql_operation_name,
+    _get_graphql_operation_type,
 )
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import Optional
     from typing import List
+    from typing import Optional
+    from typing import Tuple
 
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, EventProcessor, Hint
 
 
 try:
@@ -43,6 +63,10 @@ _RUNTIME_CONTEXT = {
 
 class StdlibIntegration(Integration):
     identifier = "stdlib"
+
+    def __init__(self, capture_graphql_errors=True):
+        # type: (bool) -> None
+        self.capture_graphql_errors = capture_graphql_errors
 
     @staticmethod
     def setup_once():
@@ -64,6 +88,7 @@ class StdlibIntegration(Integration):
 def _install_httplib():
     # type: () -> None
     real_putrequest = HTTPConnection.putrequest
+    real_endheaders = HTTPConnection.endheaders
     real_getresponse = HTTPConnection.getresponse
 
     def putrequest(self, method, url, *args, **kwargs):
@@ -84,10 +109,12 @@ def _install_httplib():
                 port != default_port and ":%s" % port or "",
                 url,
             )
+        self._sentrysdk_url = real_url
 
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(real_url, sanitize=False)
+            self._sentrysdk_is_graphql_request = parsed_url.url.endswith("/graphql")
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
@@ -113,26 +140,140 @@ def _install_httplib():
                 self.putheader(key, value)
 
         self._sentrysdk_span = span
+        self._sentrysdk_method = method
+
+        return rv
+
+    def endheaders(self, message_body=None, **kwargs):
+        # type: (HTTPConnection, Any, **Any) -> Any
+        rv = real_endheaders(self, message_body, **kwargs)
+
+        integration = Hub.current.get_integration(StdlibIntegration)
+        if integration is None:
+            return rv
+
+        if integration.capture_graphql_errors and getattr(
+            self, "_sentrysdk_is_graphql_request", False
+        ):
+            self._sentry_request_body = message_body
 
         return rv
 
     def getresponse(self, *args, **kwargs):
         # type: (HTTPConnection, *Any, **Any) -> Any
-        span = getattr(self, "_sentrysdk_span", None)
-
-        if span is None:
-            return real_getresponse(self, *args, **kwargs)
-
         rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_http_status(int(rv.status))
-        span.set_data("reason", rv.reason)
-        span.finish()
+        hub = Hub.current
+        integration = hub.get_integration(StdlibIntegration)
+        if integration is None:
+            return rv
+
+        span = getattr(self, "_sentrysdk_span", None)
+        if span is not None:
+            span.set_http_status(int(rv.status))
+            span.set_data("reason", rv.reason)
+            span.finish()
+
+        url = getattr(self, "_sentrysdk_url", None)  # type: Optional[str]
+        if url is None:
+            return rv
+
+        if integration.capture_graphql_errors:
+            response_body = None
+            if getattr(self, "_sentrysdk_is_graphql_request", False):
+                with capture_internal_exceptions():
+                    response_data = rv.read()
+                    # once we've read() the body it can't be read() again by the
+                    # app; save it so that it can be accessed again
+                    rv.read = io.BytesIO(response_data).read
+                    try:
+                        # py3.6+ json.loads() can deal with bytes out of the box, but
+                        # for older version we have to explicitly decode first
+                        response_body = json.loads(response_data.decode())
+                    except (JSONDecodeError, UnicodeDecodeError, TypeError):
+                        return rv
+
+            is_graphql_response_with_errors = isinstance(
+                response_body, dict
+            ) and response_body.get("errors")
+            if is_graphql_response_with_errors:
+                method = getattr(self, "_sentrysdk_method", None)  # type: Optional[str]
+                request_body = getattr(self, "_sentry_request_body", None)
+                with hub.configure_scope() as scope:
+                    scope.add_event_processor(
+                        _make_request_processor(
+                            url, method, rv.status, request_body, response_body
+                        )
+                    )
+                    try:
+                        raise SentryGraphQLClientError
+                    except SentryGraphQLClientError as ex:
+                        event, hint = event_from_exception(
+                            ex,
+                            client_options=hub.client.options if hub.client else None,
+                            mechanism={
+                                "type": StdlibIntegration.identifier,
+                                "handled": False,
+                            },
+                        )
+
+                hub.capture_event(event, hint=hint)
 
         return rv
 
     HTTPConnection.putrequest = putrequest
+    HTTPConnection.endheaders = endheaders
     HTTPConnection.getresponse = getresponse
+
+
+def _make_request_processor(url, method, status, request_body, response_body):
+    # type: (str, Optional[str], int, Any, Any) -> EventProcessor
+    def stdlib_processor(
+        event,  # type: Dict[str, Any]
+        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+    ):
+        # type: (...) -> Optional[Event]
+        with capture_internal_exceptions():
+            request_info = event.setdefault("request", {})
+
+            parsed_url = parse_url(url, sanitize=False)
+
+            if _should_send_default_pii():
+                request_info["query_string"] = parsed_url.query
+
+            request_info["url"] = parsed_url.url
+            request_info["method"] = method
+
+            if _should_send_default_pii():
+                try:
+                    request_info["data"] = json.loads(request_body.decode())
+                except (JSONDecodeError, AttributeError):
+                    pass
+
+                if response_body:
+                    contexts = event.setdefault("contexts", {})
+                    response_context = contexts.setdefault("response", {})
+                    response_context["data"] = response_body
+
+            if parsed_url.url.endswith("/graphql"):
+                request_info["api_target"] = "graphql"
+                query = request_info.get("data")
+                if method == "GET":
+                    query = dict(parse_qsl(parsed_url.query))
+
+                if query:
+                    operation_name = _get_graphql_operation_name(query)
+                    operation_type = _get_graphql_operation_type(query)
+                    event["fingerprint"] = [operation_name, operation_type, status]
+                    event["exception"]["values"][0][
+                        "value"
+                    ] = "GraphQL request failed, name: {}, type: {}".format(
+                        operation_name, operation_type
+                    )
+
+        return event
+
+    return stdlib_processor
 
 
 def _init_argument(args, kwargs, name, position, setdefault_callback=None):
