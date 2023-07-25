@@ -6,6 +6,7 @@ from copy import deepcopy
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -25,11 +26,10 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional
 
-    from sentry_sdk.scope import Scope as SentryScope
-
 try:
     import starlette  # type: ignore
     from starlette import __version__ as STARLETTE_VERSION
+    from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import UploadFile  # type: ignore
     from starlette.middleware import Middleware  # type: ignore
     from starlette.middleware.authentication import (  # type: ignore
@@ -84,6 +84,7 @@ class StarletteIntegration(Integration):
                 "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
             )
 
+        patch_starlette_application()
         patch_middlewares()
         patch_request_response()
 
@@ -104,6 +105,42 @@ class StarletteIntegration(Integration):
             else:
                 headers[key] = value
         return headers
+
+
+def patch_starlette_application():
+    old_call = Starlette.__call__
+
+    def _call(self, *outer_args, **outer_kwargs):
+        async def _sentry_starlette_call(*args, **kwargs):
+            hub = Hub.current
+            integration = hub.get_integration(StarletteIntegration)
+            if integration is None:
+                return await old_call(self, *args, **kwargs)
+
+            scope = args[0]
+            receive = args[1]
+            request = Request(scope, receive)
+
+            transaction_name, transaction_source = _get_transaction_name_and_source(
+                integration.transaction_style, request
+            )
+
+            ty = scope["type"]
+            transaction = continue_trace(
+                integration._get_headers(scope),
+                op="{}.server".format(ty),
+                name=transaction_name,
+                source=transaction_source,
+            )
+
+            with hub.start_transaction(
+                transaction, custom_sampling_context={"asgi_scope": scope}
+            ):
+                return await old_call(self, *args, **kwargs)
+
+        return _sentry_starlette_call
+
+    Starlette.__call__ = _call
 
 
 def _enable_span_for_middleware(middleware_class):
@@ -370,9 +407,15 @@ def patch_request_response():
 
                 with hub.configure_scope() as sentry_scope:
                     request = args[0]
-
-                    _set_transaction_name_and_source(
-                        sentry_scope, integration.transaction_style, request
+                    (
+                        transaction_name,
+                        transaction_source,
+                    ) = _get_transaction_name_and_source(
+                        integration.transaction_style, request
+                    )
+                    sentry_scope.set_transaction_name(
+                        name=transaction_name,
+                        source=transaction_source,
                     )
 
                     extractor = StarletteRequestExtractor(request)
@@ -418,11 +461,6 @@ def patch_request_response():
                         sentry_scope.profile.update_active_thread_id()
 
                     request = args[0]
-
-                    _set_transaction_name_and_source(
-                        sentry_scope, integration.transaction_style, request
-                    )
-
                     extractor = StarletteRequestExtractor(request)
                     cookies = extractor.extract_cookies_from_request()
 
@@ -607,27 +645,32 @@ class StarletteRequestExtractor:
         return await self.request.json()
 
 
-def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (SentryScope, str, Any) -> None
+def _get_transaction_name_and_source(transaction_style, request):
+    # type: (str, Any) -> None
     name = ""
 
     if transaction_style == "endpoint":
         endpoint = request.scope.get("endpoint")
         if endpoint:
             name = transaction_from_function(endpoint) or ""
+        else:
+            name = request.scope.get("raw_path")
 
     elif transaction_style == "url":
-        router = request.scope["router"]
-        for route in router.routes:
-            match = route.matches(request.scope)
+        router = request.scope.get("router")
+        if router:
+            for route in router.routes:
+                match = route.matches(request.scope)
 
-            if match[0] == Match.FULL:
-                if transaction_style == "endpoint":
-                    name = transaction_from_function(match[1]["endpoint"]) or ""
-                    break
-                elif transaction_style == "url":
-                    name = route.path
-                    break
+                if match[0] == Match.FULL:
+                    if transaction_style == "endpoint":
+                        name = transaction_from_function(match[1]["endpoint"]) or ""
+                        break
+                    elif transaction_style == "url":
+                        name = route.path
+                        break
+        else:
+            name = request.scope.get("raw_path")
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
@@ -635,4 +678,4 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
     else:
         source = SOURCE_FOR_STYLE[transaction_style]
 
-    scope.set_transaction_name(name, source=source)
+    return name, source
