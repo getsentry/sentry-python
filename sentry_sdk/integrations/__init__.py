@@ -52,7 +52,7 @@ def _generate_default_integrations_iterator(
     return iter_default_integrations
 
 
-_DEFAULT_INTEGRATIONS = (
+_DEFAULT_INTEGRATIONS = [
     # stdlib/base runtime integrations
     "sentry_sdk.integrations.argv.ArgvIntegration",
     "sentry_sdk.integrations.atexit.AtexitIntegration",
@@ -62,9 +62,9 @@ _DEFAULT_INTEGRATIONS = (
     "sentry_sdk.integrations.modules.ModulesIntegration",
     "sentry_sdk.integrations.stdlib.StdlibIntegration",
     "sentry_sdk.integrations.threading.ThreadingIntegration",
-)
+]
 
-_AUTO_ENABLING_INTEGRATIONS = (
+_AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.boto3.Boto3Integration",
     "sentry_sdk.integrations.bottle.BottleIntegration",
@@ -81,7 +81,7 @@ _AUTO_ENABLING_INTEGRATIONS = (
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.starlette.StarletteIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
-)
+]
 
 
 iter_default_integrations = _generate_default_integrations_iterator(
