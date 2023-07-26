@@ -52,7 +52,9 @@ def test_processors(sentry_init, capture_events):
 
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
-    REDIS = 12  # noqa: N806
+    REDIS = _AUTO_ENABLING_INTEGRATIONS.index(
+        "sentry_sdk.integrations.redis.RedisIntegration"
+    )  # noqa: N806
 
     sentry_init(auto_enabling_integrations=True, debug=True)
 
