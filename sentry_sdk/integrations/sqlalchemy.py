@@ -67,7 +67,7 @@ def _before_cursor_execute(
     span = ctx_mgr.__enter__()
 
     if span is not None:
-        set_db_data(span, conn)
+        _set_db_data(span, conn)
         context._sentry_sql_span = span
 
 
@@ -128,7 +128,7 @@ def _get_db_system(name):
     return None
 
 
-def set_db_data(span, conn):
+def _set_db_data(span, conn):
     # type: (Span, Any) -> None
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:

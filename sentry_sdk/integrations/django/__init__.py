@@ -612,7 +612,7 @@ def install_sql_hook():
         with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
-            set_db_data(span, self.db.vendor, self.db.get_connection_params())
+            _set_db_data(span, self.db.vendor, self.db.get_connection_params())
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -624,7 +624,7 @@ def install_sql_hook():
         with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
-            set_db_data(span, self.db.vendor, self.db.get_connection_params())
+            _set_db_data(span, self.db.vendor, self.db.get_connection_params())
             return real_executemany(self, sql, param_list)
 
     def connect(self):
@@ -637,7 +637,7 @@ def install_sql_hook():
             hub.add_breadcrumb(message="connect", category="query")
 
         with hub.start_span(op=OP.DB, description="connect") as span:
-            set_db_data(span, self.vendor, self.get_connection_params())
+            _set_db_data(span, self.vendor, self.get_connection_params())
             return real_connect(self)
 
     CursorWrapper.execute = execute
@@ -646,7 +646,7 @@ def install_sql_hook():
     ignore_logger("django.db.backends")
 
 
-def set_db_data(span, vendor, connection_params):
+def _set_db_data(span, vendor, connection_params):
     # type: (Span, str, Dict[str, str]) -> None
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
     span.set_data(SPANDATA.DB_NAME, connection_params.get("database"))
