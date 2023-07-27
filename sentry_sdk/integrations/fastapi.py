@@ -2,7 +2,6 @@ import asyncio
 from copy import deepcopy
 
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.api import continue_trace
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
@@ -98,47 +97,38 @@ def patch_get_request_handler():
 
             with hub.configure_scope() as sentry_scope:
                 request = args[0]
-                scope = request.scope
-                ty = scope["type"]
-
                 transaction_name, transaction_source = _get_transaction_name_and_source(
                     sentry_scope, integration.transaction_style, request
                 )
-                transaction = continue_trace(
-                    integration._get_headers(scope),
-                    op="{}.server".format(ty),
-                    name=transaction_name,
-                    source=transaction_source,
+                sentry_scope.set_transaction_name(
+                    transaction_name, source=transaction_source
                 )
 
-                with hub.start_transaction(
-                    transaction, custom_sampling_context={"asgi_scope": scope}
-                ):
-                    extractor = StarletteRequestExtractor(request)
-                    info = await extractor.extract_request_info()
+                extractor = StarletteRequestExtractor(request)
+                info = await extractor.extract_request_info()
 
-                    def _make_request_event_processor(req, integration):
-                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
-                        def event_processor(event, hint):
-                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                def _make_request_event_processor(req, integration):
+                    # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                    def event_processor(event, hint):
+                        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
 
-                            # Extract information from request
-                            request_info = event.get("request", {})
-                            if info:
-                                if "cookies" in info and _should_send_default_pii():
-                                    request_info["cookies"] = info["cookies"]
-                                if "data" in info:
-                                    request_info["data"] = info["data"]
-                            event["request"] = deepcopy(request_info)
+                        # Extract information from request
+                        request_info = event.get("request", {})
+                        if info:
+                            if "cookies" in info and _should_send_default_pii():
+                                request_info["cookies"] = info["cookies"]
+                            if "data" in info:
+                                request_info["data"] = info["data"]
+                        event["request"] = deepcopy(request_info)
 
-                            return event
+                        return event
 
-                        return event_processor
+                    return event_processor
 
-                    sentry_scope._name = FastApiIntegration.identifier
-                    sentry_scope.add_event_processor(
-                        _make_request_event_processor(request, integration)
-                    )
+                sentry_scope._name = FastApiIntegration.identifier
+                sentry_scope.add_event_processor(
+                    _make_request_event_processor(request, integration)
+                )
 
             return await old_app(*args, **kwargs)
 
