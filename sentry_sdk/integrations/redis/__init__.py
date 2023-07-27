@@ -13,7 +13,7 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Sequence
+    from typing import Any, Dict, Sequence
     from sentry_sdk.tracing import Span
 
 _SINGLE_KEY_COMMANDS = frozenset(
@@ -99,6 +99,7 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
             with capture_internal_exceptions():
+                _set_db_data(span, self.connection_pool.connection_kwargs)
                 _set_pipeline_data(
                     span,
                     is_cluster,
@@ -106,7 +107,6 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
                     self.transaction,
                     self.command_stack,
                 )
-                span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
             return old_execute(self, *args, **kwargs)
 
@@ -220,7 +220,6 @@ def _get_span_description(name, *args):
 
 def _set_client_data(span, is_cluster, name, *args):
     # type: (Span, bool, str, *Any) -> None
-    span.set_data(SPANDATA.DB_SYSTEM, "redis")
     span.set_tag("redis.is_cluster", is_cluster)
     if name:
         span.set_tag("redis.command", name)
@@ -232,6 +231,14 @@ def _set_client_data(span, is_cluster, name, *args):
             name_low in _MULTI_KEY_COMMANDS and len(args) == 1
         ):
             span.set_tag("redis.key", args[0])
+
+
+def _set_db_data(span, connection_params):
+    # type: (Span, Dict[str, Any]) -> None
+    span.set_data(SPANDATA.DB_SYSTEM, "redis")
+    span.set_data(SPANDATA.DB_NAME, connection_params.get("db"))
+    span.set_data(SPANDATA.SERVER_ADDRESS, connection_params.get("host"))
+    span.set_data(SPANDATA.SERVER_PORT, connection_params.get("port"))
 
 
 def patch_redis_client(cls, is_cluster):
@@ -259,6 +266,7 @@ def patch_redis_client(cls, is_cluster):
             description = description[: integration.max_data_size - len("...")] + "..."
 
         with hub.start_span(op=OP.DB_REDIS, description=description) as span:
+            _set_db_data(span, self.connection_pool.connection_kwargs)
             _set_client_data(span, is_cluster, name, *args)
 
             return old_execute_command(self, name, *args, **kwargs)
