@@ -73,6 +73,11 @@ def test_redis_pipeline(
             "first_ten": expected_first_ten,
         },
         SPANDATA.DB_SYSTEM: "redis",
+        SPANDATA.DB_NAME: "0",
+        SPANDATA.SERVER_ADDRESS: connection.connection_pool.connection_kwargs.get(
+            "host"
+        ),
+        SPANDATA.SERVER_PORT: 6379,
     }
     assert span["tags"] == {
         "redis.transaction": is_transaction,
