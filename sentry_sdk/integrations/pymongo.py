@@ -121,10 +121,13 @@ class CommandTracer(monitoring.CommandListener):
                 pass
 
             data = {"operation_ids": {}}  # type: Dict[str, Any]
-
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
+
             data[SPANDATA.DB_SYSTEM] = "mongodb"
+            data[SPANDATA.DB_NAME] = event.database_name
+            data[SPANDATA.SERVER_ADDRESS] = event.connection_id[0]
+            data[SPANDATA.SERVER_PORT] = event.connection_id[1]
 
             try:
                 lsid = command.pop("lsid")["id"]
