@@ -108,17 +108,17 @@ class StarletteIntegration(Integration):
 
 
 def patch_starlette_application():
-    old_call = Starlette.__call__
-
-    def _call(self, *outer_args, **outer_kwargs):
-        async def _sentry_starlette_call(*args, **kwargs):
+    # type: () -> None
+    def wrap_call_function(func):
+        # type: (Callable[..., Any]) -> Callable[..., Any]
+        @functools.wraps(func)
+        async def __sentry_call__(self, scope, receive, send):
+            # type: (Starlette, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
             hub = Hub.current
             integration = hub.get_integration(StarletteIntegration)
             if integration is None:
-                return await old_call(self, *args, **kwargs)
+                await func(self, scope, receive, send)
 
-            scope = args[0]
-            receive = args[1]
             request = Request(scope, receive)
 
             transaction_name, transaction_source = _get_transaction_name_and_source(
@@ -136,11 +136,11 @@ def patch_starlette_application():
             with hub.start_transaction(
                 transaction, custom_sampling_context={"asgi_scope": scope}
             ):
-                return await old_call(self, *args, **kwargs)
+                await func(self, scope, receive, send)
 
-        return _sentry_starlette_call
+        return __sentry_call__
 
-    Starlette.__call__ = _call
+    Starlette.__call__ = wrap_call_function(Starlette.__call__)
 
 
 def _enable_span_for_middleware(middleware_class):
