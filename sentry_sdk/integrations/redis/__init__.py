@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk._compat import text_type
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -236,7 +237,7 @@ def _set_client_data(span, is_cluster, name, *args):
 def _set_db_data(span, connection_params):
     # type: (Span, Dict[str, Any]) -> None
     span.set_data(SPANDATA.DB_SYSTEM, "redis")
-    span.set_data(SPANDATA.DB_NAME, connection_params.get("db"))
+    span.set_data(SPANDATA.DB_NAME, text_type(connection_params.get("db")))
     span.set_data(SPANDATA.SERVER_ADDRESS, connection_params.get("host"))
     span.set_data(SPANDATA.SERVER_PORT, connection_params.get("port"))
 
