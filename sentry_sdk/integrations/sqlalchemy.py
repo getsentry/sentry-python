@@ -130,11 +130,11 @@ def _get_db_system(name):
 
 def set_db_data(span, conn):
     # type: (Span, Any) -> None
-    span.set_data(SPANDATA.SERVER_ADDRESS, conn.engine.url.host)
-    span.set_data(SPANDATA.SERVER_PORT, conn.engine.url.port)
-
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)
 
     span.set_data(SPANDATA.DB_NAME, conn.engine.url.database)
+
+    span.set_data(SPANDATA.SERVER_ADDRESS, conn.engine.url.host)
+    span.set_data(SPANDATA.SERVER_PORT, conn.engine.url.port)
