@@ -1,9 +1,10 @@
 from __future__ import absolute_import
 
 import json
+import os
+import random
 import re
 import pytest
-import random
 from functools import partial
 
 from werkzeug.test import Client
@@ -616,6 +617,43 @@ def test_django_connect_breadcrumbs(sentry_init, capture_events):
         {"message": "connect", "category": "query", "type": "default"},
         {"message": "select 1", "category": "query", "data": {}, "type": "default"},
     ]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_connection_span_data(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("postgres_select"))
+    assert status == "200 OK"
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db":
+            data = span.get("data")
+            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
+            assert (
+                data.get(SPANDATA.DB_NAME)
+                == "test_" + os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"]
+            )
+            assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+                "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
+            )
+            assert data.get(SPANDATA.SERVER_PORT) == 5432
 
 
 @pytest.mark.parametrize(
