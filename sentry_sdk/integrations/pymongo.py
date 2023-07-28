@@ -92,7 +92,7 @@ def _get_db_data(event):
     data[SPANDATA.DB_SYSTEM] = "mongodb"
 
     db_name = event.database_name
-    if db_name is None:
+    if db_name is not None:
         data[SPANDATA.DB_NAME] = db_name
 
     server_address = event.connection_id[0]
