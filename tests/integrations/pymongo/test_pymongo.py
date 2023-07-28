@@ -59,7 +59,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         assert span["data"][SPANDATA.DB_SYSTEM] == "mongodb"
         assert span["data"][SPANDATA.DB_NAME] == "test_db"
         assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
-        assert span["data"][SPANDATA.SERVER_PORT] == ""
+        assert span["data"][SPANDATA.SERVER_PORT] == mongo_server.port
         for field, value in common_tags.items():
             assert span["tags"][field] == value
 
