@@ -86,7 +86,7 @@ def _strip_pii(command):
 
 
 def _get_db_data(event):
-    # type: (Union[CommandFailedEvent, CommandStartedEvent, CommandSucceededEvent]) -> Dict[str, Any]
+    # type: (Any) -> Dict[str, Any]
     data = {}
 
     data[SPANDATA.DB_SYSTEM] = "mongodb"
