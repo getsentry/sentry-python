@@ -1056,7 +1056,9 @@ def test_get_receiver_name():
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_disabled_middleware(sentry_init, client, capture_events):
+def test_cache_spans_disabled_middleware(
+    sentry_init, client, capture_events, use_django_caching_with_middlewares
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -1080,7 +1082,9 @@ def test_cache_spans_disabled_middleware(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_disabled_decorator(sentry_init, client, capture_events):
+def test_cache_spans_disabled_decorator(
+    sentry_init, client, capture_events, use_django_caching
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -1104,7 +1108,9 @@ def test_cache_spans_disabled_decorator(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_disabled_templatetag(sentry_init, client, capture_events):
+def test_cache_spans_disabled_templatetag(
+    sentry_init, client, capture_events, use_django_caching
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -1128,7 +1134,9 @@ def test_cache_spans_disabled_templatetag(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_middleware(sentry_init, client, capture_events):
+def test_cache_spans_middleware(
+    sentry_init, client, capture_events, use_django_caching_with_middlewares
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -1172,7 +1180,7 @@ def test_cache_spans_middleware(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_decorator(sentry_init, client, capture_events):
+def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -1214,7 +1222,9 @@ def test_cache_spans_decorator(sentry_init, client, capture_events):
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
-def test_cache_spans_templatetag(sentry_init, client, capture_events):
+def test_cache_spans_templatetag(
+    sentry_init, client, capture_events, use_django_caching
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
