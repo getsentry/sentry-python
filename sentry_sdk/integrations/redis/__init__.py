@@ -99,15 +99,20 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
         with hub.start_span(
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
-            with capture_internal_exceptions():
-                _set_db_data(span, self.connection_pool.connection_kwargs)
-                _set_pipeline_data(
-                    span,
-                    is_cluster,
-                    get_command_args_fn,
-                    self.transaction,
-                    self.command_stack,
-                )
+            # with capture_internal_exceptions():
+            # import ipdb; ipdb.set_trace()
+            print("#####################################")
+            print(dir(self.connection_pool))
+            print("#####################################")
+            print(self.connection_pool)
+            _set_db_data(span, self.connection_pool.connection_kwargs)
+            _set_pipeline_data(
+                span,
+                is_cluster,
+                get_command_args_fn,
+                self.transaction,
+                self.command_stack,
+            )
 
             return old_execute(self, *args, **kwargs)
 
