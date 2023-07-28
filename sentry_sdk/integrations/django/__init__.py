@@ -649,6 +649,19 @@ def install_sql_hook():
 def _set_db_data(span, vendor, connection_params):
     # type: (Span, str, Dict[str, str]) -> None
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
-    span.set_data(SPANDATA.DB_NAME, connection_params.get("database"))
-    span.set_data(SPANDATA.SERVER_ADDRESS, connection_params.get("host"))
-    span.set_data(SPANDATA.SERVER_PORT, connection_params.get("port"))
+
+    db_name = connection_params.get("dbname") or connection_params.get("database")
+    if db_name is not None:
+        span.set_data(SPANDATA.DB_NAME, db_name)
+
+    server_address = connection_params.get("host")
+    if server_address is not None:
+        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+
+    server_port = connection_params.get("port")
+    if server_port is not None:
+        span.set_data(SPANDATA.SERVER_PORT, server_port)
+
+    server_socket_address = connection_params.get("unix_socket")
+    if server_socket_address is not None:
+        span.set_data(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
