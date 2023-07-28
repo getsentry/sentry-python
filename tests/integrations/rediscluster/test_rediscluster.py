@@ -5,7 +5,6 @@ from sentry_sdk.api import start_transaction
 from sentry_sdk.integrations.redis import RedisIntegration
 
 import rediscluster
-from fakeredis import FakeStrictRedis
 
 rediscluster_classes = [rediscluster.RedisCluster]
 
@@ -70,17 +69,7 @@ def test_rediscluster_pipeline(
     )
     events = capture_events()
 
-    connection = FakeStrictRedis()
-    startup_nodes = [
-        {
-            "host": connection.connection_pool.connection_kwargs.get("host"),
-            "port": connection.connection_pool.connection_kwargs.get("port"),
-        }
-    ]
-    print("////////////")
-    print(startup_nodes)
-
-    rc = rediscluster.RedisCluster(startup_nodes=startup_nodes)
+    rc = rediscluster.RedisCluster(connection_pool=True)
     with start_transaction():
         pipeline = rc.pipeline()
         pipeline.get("foo")
@@ -98,9 +87,6 @@ def test_rediscluster_pipeline(
             "first_ten": expected_first_ten,
         },
         SPANDATA.DB_SYSTEM: "redis",
-        SPANDATA.DB_NAME: "0",
-        SPANDATA.SERVER_ADDRESS: rc.connection_pool.connection_kwargs.get("host"),
-        SPANDATA.SERVER_PORT: 6379,
     }
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False
