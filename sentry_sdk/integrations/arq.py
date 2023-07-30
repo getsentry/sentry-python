@@ -55,7 +55,7 @@ class ArqIntegration(Integration):
             version = None
 
         if version is None:
-            raise DidNotEnable("Unparsable arq version: {}".format(ARQ_VERSION))
+            raise DidNotEnable(f"Unparsable arq version: {ARQ_VERSION}")
 
         if version < (0, 23):
             raise DidNotEnable("arq 0.23 or newer required.")

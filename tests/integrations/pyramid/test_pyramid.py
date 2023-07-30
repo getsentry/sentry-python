@@ -208,9 +208,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
 ):
     sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
 
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {f"key{i}": f"value{i}" for i in range(MAX_DATABAG_BREADTH + 10)}
 
     @route("/")
     def index(request):

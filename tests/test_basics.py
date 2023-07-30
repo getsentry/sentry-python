@@ -64,10 +64,10 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
 
         assert any(
             record.message.startswith(
-                "Did not import default integration {}:".format(import_string)
+                f"Did not import default integration {import_string}:"
             )
             for record in caplog.records
-        ), "Problem with checking auto enabling {}".format(import_string)
+        ), f"Problem with checking auto enabling {import_string}"
 
 
 def test_event_id(sentry_init, capture_events):
@@ -620,7 +620,7 @@ def test_get_sdk_name(installed_integrations, expected_name):
 
 
 def _hello_world(word):
-    return "Hello, {}".format(word)
+    return f"Hello, {word}"
 
 
 def test_functions_to_trace(sentry_init, capture_events):
@@ -657,7 +657,7 @@ class WorldGreeter:
         self.word = word
 
     def greet(self, new_word=None):
-        return "Hello, {}".format(new_word if new_word else self.word)
+        return f"Hello, {new_word if new_word else self.word}"
 
 
 def test_functions_to_trace_with_class(sentry_init, capture_events):

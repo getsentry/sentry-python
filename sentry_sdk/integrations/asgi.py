@@ -166,7 +166,7 @@ class SentryAsgiMiddleware:
                     if ty in ("http", "websocket"):
                         transaction = continue_trace(
                             self._get_headers(scope),
-                            op="{}.server".format(ty),
+                            op=f"{ty}.server",
                         )
                     else:
                         transaction = Transaction(op=OP.HTTP_SERVER)

@@ -85,12 +85,9 @@ def test_outgoing_trace_headers(sentry_init, httpx_client, httpx_mock):
             response = httpx_client.get(url)
 
         request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
+        assert (
+            response.request.headers["sentry-trace"]
+            == f"{transaction.trace_id}-{request_span.span_id}-{1}"
         )
 
 
@@ -123,12 +120,9 @@ def test_outgoing_trace_headers_append_to_baggage(
             response = httpx_client.get(url, headers={"baGGage": "custom=data"})
 
         request_span = transaction._span_recorder.spans[-1]
-        assert response.request.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
+        assert (
+            response.request.headers["sentry-trace"]
+            == f"{transaction.trace_id}-{request_span.span_id}-{1}"
         )
         assert (
             response.request.headers["baggage"]

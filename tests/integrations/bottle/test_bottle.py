@@ -1,19 +1,16 @@
+import sentry_sdk.integrations.bottle as bottle_sentry
+from werkzeug.test import Client
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk import capture_message
+from bottle import Bottle, debug as set_debug, abort, redirect
+from io import BytesIO
 import json
 import pytest
 import logging
 
 
 pytest.importorskip("bottle")
-
-from io import BytesIO
-from bottle import Bottle, debug as set_debug, abort, redirect
-from sentry_sdk import capture_message
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-
-from sentry_sdk.integrations.logging import LoggingIntegration
-from werkzeug.test import Client
-
-import sentry_sdk.integrations.bottle as bottle_sentry
 
 
 @pytest.fixture(scope="function")
@@ -283,9 +280,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
         integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="always"
     )
 
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {f"key{i}": f"value{i}" for i in range(MAX_DATABAG_BREADTH + 10)}
 
     @app.route("/", method="POST")
     def index():

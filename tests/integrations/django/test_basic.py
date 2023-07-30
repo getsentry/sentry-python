@@ -220,7 +220,7 @@ def test_trace_from_headers_if_performance_enabled(sentry_init, client, capture_
     events = capture_events()
 
     trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    sentry_trace_header = f"{trace_id}-6e8f22c393e68f19-{1}"
 
     client.head(
         reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
@@ -252,7 +252,7 @@ def test_trace_from_headers_if_performance_disabled(
     events = capture_events()
 
     trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    sentry_trace_header = f"{trace_id}-6e8f22c393e68f19-{1}"
 
     client.head(
         reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
@@ -448,9 +448,7 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
 @pytest.mark.parametrize(
     "query",
     [
-        lambda sql: sql.SQL("SELECT %(my_param)s FROM {mytable}").format(
-            mytable=sql.Identifier("foobar")
-        ),
+        lambda sql: sql.SQL(f"SELECT %(my_param)s FROM {sql.Identifier('foobar')}"),
         lambda sql: sql.SQL('SELECT %(my_param)s FROM "foobar"'),
     ],
 )
@@ -516,9 +514,8 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
         ]
         sql.execute("create table my_test_table (foo text, bar date)")
 
-        query = psycopg2.sql.SQL("insert into my_test_table ({}) values ({})").format(
-            psycopg2.sql.SQL(", ").join(identifiers),
-            psycopg2.sql.SQL(", ").join(placeholders),
+        query = psycopg2.sql.SQL(
+            f"insert into my_test_table ({psycopg2.sql.SQL(', ').join(identifiers)}) values ({psycopg2.sql.SQL(', ').join(placeholders)})"
         )
         sql.execute(query, {"first_var": "fizz", "second_var": "not a date"})
 

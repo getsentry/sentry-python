@@ -215,7 +215,7 @@ class SentryListener(SparkListener):
 
     def onJobStart(self, jobStart):  # noqa: N802,N803
         # type: (Any) -> None
-        message = "Job {} Started".format(jobStart.jobId())
+        message = f"Job {jobStart.jobId()} Started"
         self.hub.add_breadcrumb(level="info", message=message)
         _set_app_properties()
 
@@ -227,17 +227,17 @@ class SentryListener(SparkListener):
 
         if jobEnd.jobResult().toString() == "JobSucceeded":
             level = "info"
-            message = "Job {} Ended".format(jobEnd.jobId())
+            message = f"Job {jobEnd.jobId()} Ended"
         else:
             level = "warning"
-            message = "Job {} Failed".format(jobEnd.jobId())
+            message = f"Job {jobEnd.jobId()} Failed"
 
         self.hub.add_breadcrumb(level=level, message=message, data=data)
 
     def onStageSubmitted(self, stageSubmitted):  # noqa: N802,N803
         # type: (Any) -> None
         stage_info = stageSubmitted.stageInfo()
-        message = "Stage {} Submitted".format(stage_info.stageId())
+        message = f"Stage {stage_info.stageId()} Submitted"
         data = {"attemptId": stage_info.attemptId(), "name": stage_info.name()}
         self.hub.add_breadcrumb(level="info", message=message, data=data)
         _set_app_properties()
@@ -254,10 +254,10 @@ class SentryListener(SparkListener):
         # Have to Try Except because stageInfo.failureReason() is typed with Scala Option
         try:
             data["reason"] = stage_info.failureReason().get()
-            message = "Stage {} Failed".format(stage_info.stageId())
+            message = f"Stage {stage_info.stageId()} Failed"
             level = "warning"
         except Py4JJavaError:
-            message = "Stage {} Completed".format(stage_info.stageId())
+            message = f"Stage {stage_info.stageId()} Completed"
             level = "info"
 
         self.hub.add_breadcrumb(level=level, message=message, data=data)

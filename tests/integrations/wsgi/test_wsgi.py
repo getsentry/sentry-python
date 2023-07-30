@@ -256,7 +256,7 @@ def test_trace_from_headers_if_performance_enabled(
     events = capture_events()
 
     trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    sentry_trace_header = f"{trace_id}-6e8f22c393e68f19-{1}"
 
     with pytest.raises(Exception):
         client.get(
@@ -294,7 +294,7 @@ def test_trace_from_headers_if_performance_disabled(
     events = capture_events()
 
     trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    sentry_trace_header = f"{trace_id}-6e8f22c393e68f19-{1}"
 
     with pytest.raises(Exception):
         client.get(

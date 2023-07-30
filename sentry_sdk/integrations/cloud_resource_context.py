@@ -14,15 +14,13 @@ if TYPE_CHECKING:
 CONTEXT_TYPE = "cloud_resource"
 
 AWS_METADATA_HOST = "169.254.169.254"
-AWS_TOKEN_URL = "http://{}/latest/api/token".format(AWS_METADATA_HOST)
-AWS_METADATA_URL = "http://{}/latest/dynamic/instance-identity/document".format(
-    AWS_METADATA_HOST
+AWS_TOKEN_URL = f"http://{AWS_METADATA_HOST}/latest/api/token"
+AWS_METADATA_URL = (
+    f"http://{AWS_METADATA_HOST}/latest/dynamic/instance-identity/document"
 )
 
 GCP_METADATA_HOST = "metadata.google.internal"
-GCP_METADATA_URL = "http://{}/computeMetadata/v1/?recursive=true".format(
-    GCP_METADATA_HOST
-)
+GCP_METADATA_URL = f"http://{GCP_METADATA_HOST}/computeMetadata/v1/?recursive=true"
 
 
 class CLOUD_PROVIDER:  # noqa: N801

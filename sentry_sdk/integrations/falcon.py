@@ -136,7 +136,7 @@ class FalconIntegration(Integration):
         version = parse_version(FALCON_VERSION)
 
         if version is None:
-            raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
+            raise DidNotEnable(f"Unparsable Falcon version: {FALCON_VERSION}")
 
         if version < (1, 4):
             raise DidNotEnable("Falcon 1.4 or newer required.")

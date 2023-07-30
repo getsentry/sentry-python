@@ -162,7 +162,7 @@ def get_sdk_name(installed_integrations):
 
     for integration in framework_integrations:
         if integration in installed_integrations:
-            return "sentry.python.{}".format(integration)
+            return f"sentry.python.{integration}"
 
     return "sentry.python"
 
@@ -410,7 +410,8 @@ class AnnotatedValue(object):
             metadata={
                 "rem": [  # Remark
                     [
-                        "!config",  # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
+                        # Because of SDK configuration (in this case the config is the hard coded removal of certain django cookies)
+                        "!config",
                         "s",  # The fields original value was substituted
                     ]
                 ]
@@ -837,7 +838,9 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
+    should_supress_context = (
+        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__
+    )  # type: ignore
     if should_supress_context:
         # Add direct cause.
         # The field `__cause__` is set when raised with the exception (using the `from` keyword).
@@ -1352,9 +1355,7 @@ class TimeoutThread(threading.Thread):
 
         # Raising Exception after timeout duration is reached
         raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
+            f"WARNING : Function is expected to get timed out. Configured timeout duration = {integer_configured_timeout} seconds."
         )
 
 
@@ -1370,7 +1371,7 @@ def to_base64(original):
         base64_bytes = base64.b64encode(utf8_bytes)
         base64_string = base64_bytes.decode("UTF-8")
     except Exception as err:
-        logger.warning("Unable to encode {orig} to base64:".format(orig=original), err)
+        logger.warning(f"Unable to encode {original} to base64: {err}")
 
     return base64_string
 
@@ -1390,9 +1391,7 @@ def from_base64(base64_string):
         utf8_bytes = base64.b64decode(base64_bytes)
         utf8_string = utf8_bytes.decode("UTF-8")
     except Exception as err:
-        logger.warning(
-            "Unable to decode {b64} from base64:".format(b64=base64_string), err
-        )
+        logger.warning(f"Unable to decode {base64_string} from base64: {err}")
 
     return utf8_string
 
@@ -1487,9 +1486,7 @@ def is_valid_sample_rate(rate, source):
     # separately for NaN and Decimal does not derive from Real so need to check that too
     if not isinstance(rate, (Real, Decimal)) or math.isnan(rate):
         logger.warning(
-            "{source} Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type}.".format(
-                source=source, rate=rate, type=type(rate)
-            )
+            f"{source} Given sample rate is invalid. Sample rate must be a boolean or a number between 0 and 1. Got {rate} of type {type(rate).__name__}."
         )
         return False
 
@@ -1497,9 +1494,7 @@ def is_valid_sample_rate(rate, source):
     rate = float(rate)
     if rate < 0 or rate > 1:
         logger.warning(
-            "{source} Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}.".format(
-                source=source, rate=rate
-            )
+            f"{source} Given sample rate is invalid. Sample rate must be between 0 and 1. Got {rate}."
         )
         return False
 
@@ -1567,7 +1562,8 @@ def parse_version(version):
 
     try:
         release = pattern.match(version).groupdict()["release"]  # type: ignore
-        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+        # type: Tuple[int, ...]
+        release_tuple = tuple(map(int, release.split(".")[:3]))
     except (TypeError, ValueError, AttributeError):
         return None
 

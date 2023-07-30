@@ -94,7 +94,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
         "cookies": {"name": "value", "name2": "value2", "name3": "value3"},
         "method": "GET",
         "query_string": "foo=bar",
-        "url": "http://{host}/hi".format(host=host),
+        "url": f"http://{host}/hi",
     }
 
     assert event["tags"] == {"foo": "42"}
@@ -174,7 +174,7 @@ def test_transactions(tornado_testcase, sentry_init, capture_events, handler, co
         "method": "POST",
         "query_string": "",
         "data": {"heyoo": [""]},
-        "url": "http://{host}/hi".format(host=host),
+        "url": f"http://{host}/hi",
     }
 
     assert (
@@ -378,7 +378,7 @@ def test_error_has_existing_trace_context_performance_enabled(
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     headers = {"sentry-trace": sentry_trace_header}
 
@@ -420,7 +420,7 @@ def test_error_has_existing_trace_context_performance_disabled(
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     headers = {"sentry-trace": sentry_trace_header}
 

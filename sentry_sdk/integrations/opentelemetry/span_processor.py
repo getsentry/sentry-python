@@ -279,18 +279,18 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
             peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
             if peer_name:
-                description += " {}".format(peer_name)
+                description += f" {peer_name}"
 
             target = otel_span.attributes.get(SpanAttributes.HTTP_TARGET, None)
             if target:
-                description += " {}".format(target)
+                description += f" {target}"
 
             if not peer_name and not target:
                 url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
                 if url:
                     parsed_url = urlparse(url)
                     url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
-                    description += " {}".format(url)
+                    description += f" {url}"
 
             status_code = otel_span.attributes.get(
                 SpanAttributes.HTTP_STATUS_CODE, None

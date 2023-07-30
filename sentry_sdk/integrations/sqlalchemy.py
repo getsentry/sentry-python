@@ -34,9 +34,7 @@ class SqlalchemyIntegration(Integration):
         version = parse_version(SQLALCHEMY_VERSION)
 
         if version is None:
-            raise DidNotEnable(
-                "Unparsable SQLAlchemy version: {}".format(SQLALCHEMY_VERSION)
-            )
+            raise DidNotEnable(f"Unparsable SQLAlchemy version: {SQLALCHEMY_VERSION}")
 
         if version < (1, 2):
             raise DidNotEnable("SQLAlchemy 1.2 or newer required.")

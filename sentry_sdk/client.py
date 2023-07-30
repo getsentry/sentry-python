@@ -53,7 +53,8 @@ _client_init_debug = ContextVar("client_init_debug")
 
 
 SDK_INFO = {
-    "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
+    # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
+    "name": "sentry.python",
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
@@ -234,9 +235,7 @@ class _Client(object):
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
-                    "Invalid value for max_request_body_size. Must be one of {}".format(
-                        max_request_body_size
-                    )
+                    f"Invalid value for max_request_body_size. Must be one of {max_request_body_size}"
                 )
 
             self.integrations = setup_integrations(
@@ -631,8 +630,6 @@ class _Client(object):
         # type: (Any, Any, Any) -> None
         self.close()
 
-
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a

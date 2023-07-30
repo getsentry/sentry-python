@@ -1,3 +1,10 @@
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    EnvironHeaders,
+    extract_sentrytrace_data,
+    has_tracing_enabled,
+    maybe_create_breadcrumbs_from_span,
+)
 import uuid
 import random
 
@@ -229,7 +236,7 @@ class Span(object):
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs
+            **kwargs,
         )
 
         span_recorder = (
@@ -249,7 +256,7 @@ class Span(object):
     def continue_from_environ(
         cls,
         environ,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -272,7 +279,7 @@ class Span(object):
     def continue_from_headers(
         cls,
         headers,  # type: typing.Mapping[str, str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -326,7 +333,7 @@ class Span(object):
     def from_traceparent(
         cls,
         traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
         """
@@ -509,7 +516,7 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> None
         # TODO: consider removing this in a future release.
@@ -709,8 +716,8 @@ class Transaction(Span):
         hub = self.hub or sentry_sdk.Hub.current
         client = hub.client
         options = (client and client.options) or {}
-        transaction_description = "{op}transaction <{name}>".format(
-            op=("<" + self.op + "> " if self.op else ""), name=self.name
+        transaction_description = (
+            f"{('<' + self.op + '> ' if self.op else '')}transaction <{self.name}>"
         )
 
         # nothing to do if there's no client or if tracing is disabled
@@ -743,9 +750,7 @@ class Transaction(Span):
         # booleans or numbers between 0 and 1.)
         if not is_valid_sample_rate(sample_rate, source="Tracing"):
             logger.warning(
-                "[Tracing] Discarding {transaction_description} because of invalid sample rate.".format(
-                    transaction_description=transaction_description,
-                )
+                f"[Tracing] Discarding {transaction_description} because of invalid sample rate."
             )
             self.sampled = False
             return
@@ -759,13 +764,9 @@ class Transaction(Span):
         # 0, it's a sign the transaction should be dropped
         if not self.sample_rate:
             logger.debug(
-                "[Tracing] Discarding {transaction_description} because {reason}".format(
-                    transaction_description=transaction_description,
-                    reason=(
-                        "traces_sampler returned 0 or False"
-                        if callable(options.get("traces_sampler"))
-                        else "traces_sample_rate is set to 0"
-                    ),
+                (
+                    f"[Tracing] Discarding {transaction_description} because "
+                    f"{'traces_sampler returned 0 or False' if callable(options.get('traces_sampler')) else 'traces_sample_rate is set to 0'}"
                 )
             )
             self.sampled = False
@@ -777,17 +778,10 @@ class Transaction(Span):
         self.sampled = random.random() < self.sample_rate
 
         if self.sampled:
-            logger.debug(
-                "[Tracing] Starting {transaction_description}".format(
-                    transaction_description=transaction_description,
-                )
-            )
+            logger.debug(f"[Tracing] Starting {transaction_description}")
         else:
             logger.debug(
-                "[Tracing] Discarding {transaction_description} because it's not included in the random sample (sampling rate = {sample_rate})".format(
-                    transaction_description=transaction_description,
-                    sample_rate=self.sample_rate,
-                )
+                f"[Tracing] Discarding {transaction_description} because it's not included in the random sample (sampling rate = {self.sample_rate})"
             )
 
 
@@ -882,11 +876,3 @@ def trace(func=None):
 
 
 # Circular imports
-
-from sentry_sdk.tracing_utils import (
-    Baggage,
-    EnvironHeaders,
-    extract_sentrytrace_data,
-    has_tracing_enabled,
-    maybe_create_breadcrumbs_from_span,
-)

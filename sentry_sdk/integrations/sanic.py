@@ -61,7 +61,7 @@ class SanicIntegration(Integration):
         SanicIntegration.version = parse_version(SANIC_VERSION)
 
         if SanicIntegration.version is None:
-            raise DidNotEnable("Unparsable Sanic version: {}".format(SANIC_VERSION))
+            raise DidNotEnable(f"Unparsable Sanic version: {SANIC_VERSION}")
 
         if SanicIntegration.version < (0, 8):
             raise DidNotEnable("Sanic 0.8 or newer required.")

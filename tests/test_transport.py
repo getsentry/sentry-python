@@ -70,8 +70,7 @@ def capturing_server(request):
 def make_client(request, capturing_server):
     def inner(**kwargs):
         return Client(
-            "http://foobar@{}/132".format(capturing_server.url[len("http://") :]),
-            **kwargs
+            f"http://foobar@{capturing_server.url[len('http://') :]}/132", **kwargs
         )
 
     return inner

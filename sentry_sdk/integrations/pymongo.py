@@ -156,7 +156,7 @@ class CommandTracer(monitoring.CommandListener):
             if not _should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = "{} {}".format(event.command_name, command)
+            query = f"{event.command_name} {command}"
             span = hub.start_span(op=op, description=query)
 
             for tag, value in tags.items():

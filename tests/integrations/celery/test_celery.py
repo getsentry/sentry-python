@@ -1,16 +1,14 @@
+from celery.bin import worker
+from celery import Celery, VERSION
+from sentry_sdk._compat import text_type
+from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
+from sentry_sdk import Hub, configure_scope, start_transaction
 import threading
 
 import pytest
 
 pytest.importorskip("celery")
 
-from sentry_sdk import Hub, configure_scope, start_transaction
-from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
-
-from sentry_sdk._compat import text_type
-
-from celery import Celery, VERSION
-from celery.bin import worker
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -32,7 +30,7 @@ def init_celery(sentry_init, request):
     def inner(propagate_traces=True, backend="always_eager", **kwargs):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
-            **kwargs
+            **kwargs,
         )
         celery = Celery(__name__)
 
@@ -62,10 +60,13 @@ def init_celery(sentry_init, request):
             else:
                 from celery.bin.base import CLIContext
 
-                worker_fn = lambda: worker.worker(
-                    obj=CLIContext(app=celery, no_color=True, workdir=".", quiet=False),
-                    args=[],
-                )
+                def worker_fn():
+                    return worker.worker(
+                        obj=CLIContext(
+                            app=celery, no_color=True, workdir=".", quiet=False
+                        ),
+                        args=[],
+                    )
 
             worker_thread = threading.Thread(target=worker_fn)
             worker_thread.daemon = True
@@ -519,7 +520,7 @@ def test_baggage_propagation(init_celery):
         assert sorted(result["baggage"].split(",")) == sorted(
             [
                 "sentry-release=abcdef",
-                "sentry-trace_id={}".format(transaction.trace_id),
+                f"sentry-trace_id={transaction.trace_id}",
                 "sentry-environment=production",
                 "sentry-sample_rate=1.0",
                 "sentry-sampled=true",

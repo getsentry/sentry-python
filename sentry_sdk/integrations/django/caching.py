@@ -22,7 +22,7 @@ METHODS_TO_INSTRUMENT = [
 
 def _get_span_description(method_name, args, kwargs):
     # type: (str, Any, Any) -> str
-    description = "{} ".format(method_name)
+    description = f"{method_name} "
 
     if args is not None and len(args) >= 1:
         description += text_type(args[0])

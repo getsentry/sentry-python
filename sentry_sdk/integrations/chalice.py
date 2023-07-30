@@ -107,7 +107,7 @@ class ChaliceIntegration(Integration):
         version = parse_version(CHALICE_VERSION)
 
         if version is None:
-            raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
+            raise DidNotEnable(f"Unparsable Chalice version: {CHALICE_VERSION}")
 
         if version < (1, 20):
             old_get_view_function_response = Chalice._get_view_function_response

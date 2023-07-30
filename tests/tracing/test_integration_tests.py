@@ -206,7 +206,7 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
 
     with start_transaction(name="hi"):
         for i in range(100):
-            with start_span(op="helloworld", description="hi {}".format(i)) as span:
+            with start_span(op="helloworld", description=f"hi {i}") as span:
 
                 def foo():
                     pass

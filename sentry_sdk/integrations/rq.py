@@ -44,7 +44,7 @@ class RqIntegration(Integration):
         version = parse_version(RQ_VERSION)
 
         if version is None:
-            raise DidNotEnable("Unparsable RQ version: {}".format(RQ_VERSION))
+            raise DidNotEnable(f"Unparsable RQ version: {RQ_VERSION}")
 
         if version < (0, 6):
             raise DidNotEnable("RQ 0.6 or newer is required.")

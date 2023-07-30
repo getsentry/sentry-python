@@ -113,17 +113,17 @@ def run_cloud_function():
 
             subprocess.check_call(
                 [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             subprocess.check_call(
                 "pip install ../*.tar.gz -t .",
                 cwd=tmpdir,
                 shell=True,
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
-            stream = os.popen("python {}/main.py".format(tmpdir))
+            stream = os.popen(f"python {tmpdir}/main.py")
             stream_data = stream.read()
 
             stream.close()
@@ -460,7 +460,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_cloud_function
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     envelopes, _, _ = run_cloud_function(
         dedent(
@@ -513,7 +513,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     _, events, _ = run_cloud_function(
         dedent(

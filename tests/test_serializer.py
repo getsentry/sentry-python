@@ -121,9 +121,7 @@ def test_custom_mapping_doesnt_mess_with_mock(extra_normalizer):
 
 
 def test_trim_databag_breadth(body_normalizer):
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {f"key{i}: value{i}" for i in range(MAX_DATABAG_BREADTH + 10)}
 
     result = body_normalizer(data)
 
@@ -133,9 +131,7 @@ def test_trim_databag_breadth(body_normalizer):
 
 
 def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {f"key{i}: value{i}" for i in range(MAX_DATABAG_BREADTH + 10)}
     curr = data
     for _ in range(MAX_DATABAG_DEPTH + 5):
         curr["nested"] = {}

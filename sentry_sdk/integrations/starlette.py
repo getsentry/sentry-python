@@ -82,9 +82,7 @@ class StarletteIntegration(Integration):
         version = parse_version(STARLETTE_VERSION)
 
         if version is None:
-            raise DidNotEnable(
-                "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
-            )
+            raise DidNotEnable(f"Unparsable Starlette version: {STARLETTE_VERSION}")
 
         patch_middlewares()
         patch_asgi_app()

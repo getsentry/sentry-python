@@ -46,7 +46,7 @@ def _generate_default_integrations_iterator(integrations, auto_enabling_integrat
 
     if isinstance(iter_default_integrations.__doc__, str):
         for import_string in integrations:
-            iter_default_integrations.__doc__ += "\n- `{}`".format(import_string)
+            iter_default_integrations.__doc__ += f"\n- `{import_string}`"
 
     return iter_default_integrations
 

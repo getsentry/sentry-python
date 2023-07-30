@@ -95,7 +95,7 @@ class AioHttpIntegration(Integration):
         version = parse_version(AIOHTTP_VERSION)
 
         if version is None:
-            raise DidNotEnable("Unparsable AIOHTTP version: {}".format(AIOHTTP_VERSION))
+            raise DidNotEnable(f"Unparsable AIOHTTP version: {AIOHTTP_VERSION}")
 
         if version < (3, 4):
             raise DidNotEnable("AIOHTTP 3.4 or newer required.")
@@ -176,7 +176,7 @@ class AioHttpIntegration(Integration):
                 elif integration.transaction_style == "method_and_path_pattern":
                     route_info = rv.get_info()
                     pattern = route_info.get("path") or route_info.get("formatter")
-                    name = "{} {}".format(request.method, pattern)
+                    name = f"{request.method} {pattern}"
             except Exception:
                 pass
 
@@ -237,9 +237,7 @@ def create_trace_config():
         if should_propagate_trace(hub, str(params.url)):
             for key, value in hub.iter_trace_propagation_headers(span):
                 logger.debug(
-                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                        key=key, value=value, url=params.url
-                    )
+                    f"[Tracing] Adding `{key}` header {value} to outgoing request to {params.url}."
                 )
                 if key == BAGGAGE_HEADER_NAME and params.headers.get(
                     BAGGAGE_HEADER_NAME
@@ -415,9 +413,7 @@ def _make_client_processor(trace_config_ctx, response, response_content):
                     ]
                     event["exception"]["values"][0][
                         "value"
-                    ] = "GraphQL request failed, name: {}, type: {}".format(
-                        operation_name, operation_type
-                    )
+                    ] = f"GraphQL request failed, name: {operation_name}, type: {operation_type}"
 
                 if _should_send_default_pii() and response_content:
                     contexts = event.setdefault("contexts", {})

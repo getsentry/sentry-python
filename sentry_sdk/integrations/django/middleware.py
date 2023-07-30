@@ -35,7 +35,10 @@ else:
 
 
 if DJANGO_VERSION < (3, 1):
-    _asgi_middleware_mixin_factory = lambda _: object
+
+    def _asgi_middleware_mixin_factory(_):
+        return object
+
 else:
     from .asgi import _asgi_middleware_mixin_factory
 
@@ -86,7 +89,7 @@ def _wrap_middleware(middleware, middleware_name):
         description = middleware_name
         function_basename = getattr(old_method, "__name__", None)
         if function_basename:
-            description = "{}.{}".format(description, function_basename)
+            description = f"{description}.{function_basename}"
 
         middleware_span = hub.start_span(
             op=OP.MIDDLEWARE_DJANGO, description=description

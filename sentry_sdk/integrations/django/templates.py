@@ -26,7 +26,8 @@ def get_template_frame_from_exception(exc_value):
 
     # As of Django 1.9 or so the new template debug thing showed up.
     if hasattr(exc_value, "template_debug"):
-        return _get_template_frame_from_debug(exc_value.template_debug)  # type: ignore
+        # type: ignore
+        return _get_template_frame_from_debug(exc_value.template_debug)
 
     # As of r16833 (Django) all exceptions may contain a
     # ``django_template_source`` attribute (rather than the legacy
@@ -48,7 +49,7 @@ def _get_template_name_description(template_name):
     # type: (str) -> str
     if isinstance(template_name, (list, tuple)):
         if template_name:
-            return "[{}, ...]".format(template_name[0])
+            return f"[{template_name[0]}, ...]"
     else:
         return template_name
 

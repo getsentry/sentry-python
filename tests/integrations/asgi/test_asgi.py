@@ -1,3 +1,4 @@
+from async_asgi_testclient import TestClient
 import sys
 
 from collections import Counter
@@ -8,7 +9,6 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
 async_asgi_testclient = pytest.importorskip("async_asgi_testclient")
-from async_asgi_testclient import TestClient
 
 
 minimum_python_36 = pytest.mark.skipif(
@@ -258,7 +258,7 @@ async def test_trace_from_headers_if_performance_enabled(
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    sentry_trace_header = f"{trace_id}-6e8f22c393e68f19-{1}"
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
@@ -292,7 +292,7 @@ async def test_trace_from_headers_if_performance_disabled(
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
     trace_id = "582b43a4192642f0b136d5159a501701"
-    sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
+    sentry_trace_header = f"{trace_id}--6e8f22c393e68f19-{1}"
 
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:

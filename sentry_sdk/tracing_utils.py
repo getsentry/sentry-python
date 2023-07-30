@@ -1,3 +1,4 @@
+from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 import re
 import contextlib
 
@@ -177,9 +178,9 @@ def extract_sentrytrace_data(header):
     parent_sampled = None
 
     if trace_id:
-        trace_id = "{:032x}".format(int(trace_id, 16))
+        trace_id = f"{int(trace_id, 16):032x}"
     if parent_span_id:
-        parent_span_id = "{:016x}".format(int(parent_span_id, 16))
+        parent_span_id = f"{int(parent_span_id, 16):016x}"
     if sampled_str:
         parent_sampled = sampled_str != "0"
 
@@ -406,4 +407,3 @@ def normalize_incoming_data(incoming_data):
 
 
 # Circular imports
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES

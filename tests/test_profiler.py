@@ -37,7 +37,7 @@ except ImportError:
 
 def requires_python_version(major, minor, reason=None):
     if reason is None:
-        reason = "Requires Python {}.{}".format(major, minor)
+        reason = f"Requires Python {major}.{minor}"
     return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
 
 

@@ -61,18 +61,12 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
             metadata = (
                 (
                     "baggage",
-                    "sentry-trace_id={trace_id},sentry-environment=test,"
-                    "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
-                        trace_id=transaction.trace_id
-                    ),
+                    f"sentry-trace_id={transaction.trace_id},sentry-environment=test,"
+                    "sentry-transaction=test-transaction,sentry-sample_rate=1.0",
                 ),
                 (
                     "sentry-trace",
-                    "{trace_id}-{parent_span_id}-{sampled}".format(
-                        trace_id=transaction.trace_id,
-                        parent_span_id=transaction.span_id,
-                        sampled=1,
-                    ),
+                    f"{transaction.trace_id}-{transaction.span_id}-{1}",
                 ),
             )
             stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)

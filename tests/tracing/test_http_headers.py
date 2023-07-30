@@ -32,9 +32,7 @@ def test_to_traceparent(sampled):
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
 def test_sentrytrace_extraction(sampling_decision):
-    sentrytrace_header = "12312012123120121231201212312012-0415201309082013-{}".format(
-        1 if sampling_decision is True else 0
-    )
+    sentrytrace_header = f"12312012123120121231201212312012-0415201309082013-{1 if sampling_decision is True else 0}"
     assert extract_sentrytrace_data(sentrytrace_header) == {
         "trace_id": "12312012123120121231201212312012",
         "parent_span_id": "0415201309082013",

@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "sentry-python"
-copyright = "2019-{}, Sentry Team and Contributors".format(datetime.now().year)
+copyright = f"2019-{datetime.now().year}, Sentry Team and Contributors"
 author = "Sentry Team and Contributors"
 
 release = "1.28.1"

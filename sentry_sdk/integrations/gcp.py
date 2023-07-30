@@ -176,7 +176,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
 
         request = event.get("request", {})
 
-        request["url"] = "gcp:///{}".format(environ.get("FUNCTION_NAME"))
+        request["url"] = f"gcp:///{environ.get('FUNCTION_NAME')}"
 
         if hasattr(gcp_event, "method"):
             request["method"] = gcp_event.method
@@ -216,17 +216,11 @@ def _get_google_cloud_logs_url(final_time):
     formatstring = "%Y-%m-%dT%H:%M:%SZ"
 
     url = (
-        "https://console.cloud.google.com/logs/viewer?project={project}&resource=cloud_function"
-        "%2Ffunction_name%2F{function_name}%2Fregion%2F{region}&minLogLevel=0&expandAll=false"
-        "&timestamp={timestamp_end}&customFacets=&limitCustomFacetWidth=true"
-        "&dateRangeStart={timestamp_start}&dateRangeEnd={timestamp_end}"
-        "&interval=PT1H&scrollTimestamp={timestamp_end}"
-    ).format(
-        project=environ.get("GCP_PROJECT"),
-        function_name=environ.get("FUNCTION_NAME"),
-        region=environ.get("FUNCTION_REGION"),
-        timestamp_end=final_time.strftime(formatstring),
-        timestamp_start=hour_ago.strftime(formatstring),
+        f"https://console.cloud.google.com/logs/viewer?project={environ.get('GCP_PROJECT')}"
+        f"&resource=cloud_function%2Ffunction_name%2F{environ.get('FUNCTION_NAME')}%2Fregion%2F{environ.get('FUNCTION_REGION')}"
+        f"&minLogLevel=0&expandAll=false&timestamp={final_time.strftime(formatstring)}"
+        f"&customFacets=&limitCustomFacetWidth=true&dateRangeStart={hour_ago.strftime(formatstring)}"
+        f"&dateRangeEnd={final_time.strftime(formatstring)}&interval=PT1H&scrollTimestamp={final_time.strftime(formatstring)}"
     )
 
     return url

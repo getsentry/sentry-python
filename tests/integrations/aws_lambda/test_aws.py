@@ -509,7 +509,7 @@ def test_non_dict_event(
             },
         }
     else:
-        request_data = {"url": "awslambda:///{}".format(function_name)}
+        request_data = {"url": f"awslambda:///{function_name}"}
 
     assert error_event["request"] == request_data
     assert envelope["request"] == request_data
@@ -733,7 +733,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     envelopes, _, _ = run_lambda_function(
         LAMBDA_PRELUDE
@@ -772,7 +772,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
     parent_sampled = 1
-    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-{parent_sampled}"
 
     _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE

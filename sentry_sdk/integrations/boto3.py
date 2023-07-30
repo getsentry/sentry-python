@@ -34,9 +34,7 @@ class Boto3Integration(Integration):
         version = parse_version(BOTOCORE_VERSION)
 
         if version is None:
-            raise DidNotEnable(
-                "Unparsable botocore version: {}".format(BOTOCORE_VERSION)
-            )
+            raise DidNotEnable(f"Unparsable botocore version: {BOTOCORE_VERSION}")
 
         if version < (1, 12):
             raise DidNotEnable("Botocore 1.12 or newer is required.")

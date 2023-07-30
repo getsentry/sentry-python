@@ -201,9 +201,7 @@ def test_concurrency(sentry_init, app):
         responses = []
 
         kwargs = {
-            "url_bytes": "http://localhost/context-check/{i}".format(i=i).encode(
-                "ascii"
-            ),
+            "url_bytes": f"http://localhost/context-check/{i}".encode("ascii"),
             "headers": {},
             "version": "1.1",
             "method": "GET",

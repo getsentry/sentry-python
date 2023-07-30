@@ -1,21 +1,18 @@
-import pytest
-import inspect
-
-pytest.importorskip("apache_beam")
-
-import dill
-
+from apache_beam.utils.windowed_value import WindowedValue
+from apache_beam.runners.common import DoFnInvoker, OutputProcessor, DoFnContext
+from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
+from apache_beam.typehints.decorators import getcallargs_forhints
+from apache_beam.typehints.trivial_inference import instance_to_type
 from sentry_sdk.integrations.beam import (
     BeamIntegration,
     _wrap_task_call,
     _wrap_inspect_call,
 )
+import dill
+import pytest
+import inspect
 
-from apache_beam.typehints.trivial_inference import instance_to_type
-from apache_beam.typehints.decorators import getcallargs_forhints
-from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
-from apache_beam.runners.common import DoFnInvoker, OutputProcessor, DoFnContext
-from apache_beam.utils.windowed_value import WindowedValue
+pytest.importorskip("apache_beam")
 
 
 def foo():
@@ -105,7 +102,7 @@ def test_monkey_patch_call(obj, f, args, kwargs):
 @pytest.mark.parametrize("f", [foo, bar, baz, test_parent.fn, test_child.fn])
 def test_monkey_patch_pickle(f):
     f_temp = _wrap_task_call(f)
-    assert dill.pickles(f_temp), "{} is not pickling correctly!".format(f)
+    assert dill.pickles(f_temp), f"{f} is not pickling correctly!"
 
     # Pickle everything
     s1 = dill.dumps(f_temp)
@@ -131,21 +128,19 @@ def test_monkey_patch_signature(f, args, kwargs):
     try:
         getcallargs_forhints(f, *arg_types, **kwargs_types)
     except Exception:
-        print("Failed on {} with parameters {}, {}".format(f, args, kwargs))
+        print(f"Failed on {f} with parameters {args}, {kwargs}")
         raise
     try:
         getcallargs_forhints(f_temp, *arg_types, **kwargs_types)
     except Exception:
-        print("Failed on {} with parameters {}, {}".format(f_temp, args, kwargs))
+        print(f"Failed on {f_temp} with parameters {args}, {kwargs}")
         raise
     try:
         expected_signature = inspect.signature(f)
         test_signature = inspect.signature(f_temp)
         assert (
             expected_signature == test_signature
-        ), "Failed on {}, signature {} does not match {}".format(
-            f, expected_signature, test_signature
-        )
+        ), f"Failed on {f}, signature {expected_signature} does not match {test_signature}"
     except Exception:
         # expected to pass for py2.7
         pass
@@ -181,7 +176,7 @@ def init_beam(sentry_init):
 @pytest.mark.parametrize("fn", [test_simple, test_callable, test_place_holder])
 def test_invoker_normal(init_beam, fn):
     invoker = init_beam(fn)
-    print("Normal testing {} with {} invoker.".format(fn, invoker))
+    print(f"Normal testing {fn} with {invoker} invoker.")
     windowed_value = WindowedValue(False, 0, [None])
     invoker.invoke_process(windowed_value)
 
@@ -191,7 +186,7 @@ def test_invoker_exception(init_beam, capture_events, capture_exceptions, fn):
     invoker = init_beam(fn)
     events = capture_events()
 
-    print("Exception testing {} with {} invoker.".format(fn, invoker))
+    print(f"Exception testing {fn} with {invoker} invoker.")
     # Window value will always have one value for the process to run.
     windowed_value = WindowedValue(True, 0, [None])
     try:

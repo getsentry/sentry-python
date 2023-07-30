@@ -260,7 +260,7 @@ class HttpTransport(Transport):
                     response.status,
                     response.data,
                 )
-                self.on_dropped_event("status_{}".format(response.status))
+                self.on_dropped_event(f"status_{response.status}")
                 record_loss("network_error")
         finally:
             response.close()

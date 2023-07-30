@@ -71,11 +71,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = Hub.current.scope._propagation_context
-    expected_baggage = (
-        "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
-            propagation_context["trace_id"]
-        )
-    )
+    expected_baggage = f"sentry-trace_id={propagation_context['trace_id']},sentry-environment=dev,sentry-release=1.0.0"
     # order not guaranteed in older python versions
     assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
@@ -83,9 +79,7 @@ def test_baggage_with_tracing_disabled(sentry_init):
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
-        expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
-            transaction.trace_id, "true" if transaction.sampled else "false"
-        )
+        expected_baggage = f"sentry-trace_id={transaction.trace_id},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={'true' if transaction.sampled else 'false'}"
         # order not guaranteed in older python versions
         assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
@@ -98,7 +92,7 @@ def test_continue_trace(sentry_init):
     parent_sampled = 1
     transaction = continue_trace(
         {
-            "sentry-trace": "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled),
+            "sentry-trace": f"{trace_id}-{parent_span_id}-{parent_sampled}",
             "baggage": "sentry-trace_id=566e3688a61d4bc888951642d6f14a19",
         },
         name="some name",

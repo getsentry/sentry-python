@@ -45,11 +45,7 @@ def test_just_log(
 
     getattr(logger, level.name.lower())("test")
 
-    formatted_message = (
-        " | "
-        + "{:9}".format(level.name.upper())
-        + "| tests.integrations.loguru.test_loguru:test_just_log:46 - test"
-    )
+    formatted_message = f" | {level.name.upper():9} | tests.integrations.loguru.test_loguru:test_just_log:46 - test"
 
     if not created_event:
         assert not events

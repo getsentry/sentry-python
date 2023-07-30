@@ -21,7 +21,7 @@ except ImportError:
     from django.conf.urls import url
 
     def path(path, *args, **kwargs):
-        return url("^{}$".format(path), *args, **kwargs)
+        return url(f"^{path}$", *args, **kwargs)
 
 
 from . import views

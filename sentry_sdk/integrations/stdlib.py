@@ -133,9 +133,7 @@ def _install_httplib():
         if should_propagate_trace(hub, real_url):
             for key, value in hub.iter_trace_propagation_headers(span):
                 logger.debug(
-                    "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
-                        key=key, value=value, real_url=real_url
-                    )
+                    f"[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}."
                 )
                 self.putheader(key, value)
 
@@ -267,9 +265,7 @@ def _make_request_processor(url, method, status, request_body, response_body):
                     event["fingerprint"] = [operation_name, operation_type, status]
                     event["exception"]["values"][0][
                         "value"
-                    ] = "GraphQL request failed, name: {}, type: {}".format(
-                        operation_name, operation_type
-                    )
+                    ] = f"GraphQL request failed, name: {operation_name}, type: {operation_type}"
 
         return event
 

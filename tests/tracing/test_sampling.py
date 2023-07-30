@@ -191,11 +191,7 @@ def test_passes_parent_sampling_decision_in_sampling_context(
 ):
     sentry_init(traces_sample_rate=1.0)
 
-    sentry_trace_header = (
-        "12312012123120121231201212312012-1121201211212012-{sampled}".format(
-            sampled=int(parent_sampling_decision)
-        )
-    )
+    sentry_trace_header = f"12312012123120121231201212312012-1121201211212012-{int(parent_sampling_decision)}"
 
     transaction = Transaction.continue_from_headers(
         headers={"sentry-trace": sentry_trace_header}, name="dogpark"

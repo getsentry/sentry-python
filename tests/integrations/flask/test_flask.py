@@ -1,24 +1,6 @@
-import json
-import re
-import pytest
-import logging
-
-from io import BytesIO
-
-flask = pytest.importorskip("flask")
-
-from flask import (
-    Flask,
-    Response,
-    request,
-    abort,
-    stream_with_context,
-    render_template_string,
-)
-from flask.views import View
-
-from flask_login import LoginManager, login_user
-
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+import sentry_sdk.integrations.flask as flask_sentry
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk import (
     set_tag,
     configure_scope,
@@ -27,9 +9,24 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-from sentry_sdk.integrations.logging import LoggingIntegration
-import sentry_sdk.integrations.flask as flask_sentry
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from flask_login import LoginManager, login_user
+from flask.views import View
+from flask import (
+    Flask,
+    Response,
+    request,
+    abort,
+    stream_with_context,
+    render_template_string,
+)
+import json
+import re
+import pytest
+import logging
+
+from io import BytesIO
+
+flask = pytest.importorskip("flask")
 
 
 login_manager = LoginManager()
@@ -460,9 +457,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
         integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
     )
 
-    data = {
-        "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
-    }
+    data = {f"key{i}": f"value{i}" for i in range(MAX_DATABAG_BREADTH + 10)}
 
     @app.route("/", methods=["POST"])
     def index():

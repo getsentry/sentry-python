@@ -30,7 +30,8 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
 
 # Constants
-TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to Sentry
+# Buffer time required to send timeout warning to Sentry
+TIMEOUT_WARNING_BUFFER = 1500
 MILLIS_TO_SECONDS = 1000.0
 
 
@@ -209,7 +210,8 @@ class AwsLambdaIntegration(Integration):
             )
             return
 
-        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6 or 2.7
+        # Python 3.6 or 2.7
+        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")
 
         if pre_37:
             old_handle_event_request = lambda_bootstrap.handle_event_request
@@ -400,8 +402,8 @@ def _get_url(aws_event, aws_context):
     host = headers.get("Host", None)
     proto = headers.get("X-Forwarded-Proto", None)
     if proto and host and path:
-        return "{}://{}{}".format(proto, host, path)
-    return "awslambda:///{}".format(aws_context.function_name)
+        return f"{proto}://{host}{path}"
+    return f"awslambda:///{aws_context.function_name}"
 
 
 def _get_cloudwatch_logs_url(aws_context, start_time):
@@ -419,16 +421,11 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
     region = environ.get("AWS_REGION", "")
 
     url = (
-        "https://console.{domain}/cloudwatch/home?region={region}"
-        "#logEventViewer:group={log_group};stream={log_stream}"
-        ";start={start_time};end={end_time}"
-    ).format(
-        domain="amazonaws.cn" if region.startswith("cn-") else "aws.amazon.com",
-        region=region,
-        log_group=aws_context.log_group_name,
-        log_stream=aws_context.log_stream_name,
-        start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),
-        end_time=(datetime.utcnow() + timedelta(seconds=2)).strftime(formatstring),
+        f"https://console.{'amazonaws.cn' if region.startswith('cn-') else 'aws.amazon.com'}"
+        f"/cloudwatch/home?region={region}"
+        f"#logEventViewer:group={aws_context.log_group_name};stream={aws_context.log_stream_name}"
+        f";start={(start_time - timedelta(seconds=1)).strftime(formatstring)}"
+        f";end={(datetime.utcnow() + timedelta(seconds=2)).strftime(formatstring)}"
     )
 
     return url

@@ -46,7 +46,7 @@ def test_crumb_capture(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
     events = capture_events()
 
-    url = "http://localhost:{}/some/random/url".format(PORT)
+    url = f"http://localhost:{PORT}/some/random/url"
     urlopen(url)
 
     capture_message("Testing!")
@@ -74,7 +74,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
     events = capture_events()
 
-    url = "http://localhost:{}/some/random/url".format(PORT)
+    url = f"http://localhost:{PORT}/some/random/url"
     urlopen(url)
 
     capture_message("Testing!")
@@ -142,7 +142,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
     assert crumb["data"] == {
-        "url": "http://localhost:{}/200".format(PORT),
+        "url": f"http://localhost:{PORT}/200",
         SPANDATA.HTTP_METHOD: "GET",
         SPANDATA.HTTP_STATUS_CODE: 200,
         "reason": "OK",
@@ -185,11 +185,7 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
                 request_headers[key] = val
 
         request_span = transaction._span_recorder.spans[-1]
-        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
+        expected_sentry_trace = f"{transaction.trace_id}-{request_span.span_id}-{1}"
         assert request_headers["sentry-trace"] == expected_sentry_trace
 
         expected_outgoing_baggage_items = [
@@ -228,11 +224,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
                 request_headers[key] = val
 
         request_span = transaction._span_recorder.spans[-1]
-        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
+        expected_sentry_trace = f"{transaction.trace_id}-{request_span.span_id}-{1}"
         assert request_headers["sentry-trace"] == expected_sentry_trace
 
         expected_outgoing_baggage_items = [
@@ -376,7 +368,7 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
         self.wfile.write(json.dumps(graphql_response).encode())
 
     with mock.patch.object(MockServerRequestHandler, "do_GET", do_GET):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("GET", "/graphql?" + urlencode(params))
         response = conn.getresponse()
 
@@ -385,7 +377,7 @@ def test_graphql_get_client_error_captured(sentry_init, capture_events):
 
     (event,) = events
 
-    assert event["request"]["url"] == "http://localhost:{}/graphql".format(PORT)
+    assert event["request"]["url"] == f"http://localhost:{PORT}/graphql"
     assert event["request"]["method"] == "GET"
     assert dict(parse_qsl(event["request"]["query_string"])) == params
     assert "data" not in event["request"]
@@ -435,7 +427,7 @@ def test_graphql_post_client_error_captured(sentry_init, capture_events):
         self.wfile.write(json.dumps(graphql_response).encode())
 
     with mock.patch.object(MockServerRequestHandler, "do_POST", do_POST):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("POST", "/graphql", body=json.dumps(graphql_request).encode())
         response = conn.getresponse()
 
@@ -444,7 +436,7 @@ def test_graphql_post_client_error_captured(sentry_init, capture_events):
 
     (event,) = events
 
-    assert event["request"]["url"] == "http://localhost:{}/graphql".format(PORT)
+    assert event["request"]["url"] == f"http://localhost:{PORT}/graphql"
     assert event["request"]["method"] == "POST"
     assert event["request"]["query_string"] == ""
     assert event["request"]["data"] == graphql_request
@@ -474,7 +466,7 @@ def test_graphql_get_client_no_errors_returned(sentry_init, capture_events):
         self.wfile.write(json.dumps(graphql_response).encode())
 
     with mock.patch.object(MockServerRequestHandler, "do_GET", do_GET):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("GET", "/graphql?" + urlencode(params))
         response = conn.getresponse()
 
@@ -514,7 +506,7 @@ def test_graphql_post_client_no_errors_returned(sentry_init, capture_events):
         self.wfile.write(json.dumps(graphql_response).encode())
 
     with mock.patch.object(MockServerRequestHandler, "do_POST", do_POST):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("POST", "/graphql", body=json.dumps(graphql_request).encode())
         response = conn.getresponse()
 
@@ -550,7 +542,7 @@ def test_graphql_no_get_errors_if_option_is_off(sentry_init, capture_events):
         self.wfile.write(json.dumps(graphql_response).encode())
 
     with mock.patch.object(MockServerRequestHandler, "do_GET", do_GET):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("GET", "/graphql?" + urlencode(params))
         response = conn.getresponse()
 
@@ -599,7 +591,7 @@ def test_graphql_no_post_errors_if_option_is_off(sentry_init, capture_events):
         self.wfile.write(json.dumps(graphql_response).encode())
 
     with mock.patch.object(MockServerRequestHandler, "do_POST", do_POST):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("POST", "/graphql", body=json.dumps(graphql_request).encode())
         response = conn.getresponse()
 
@@ -639,7 +631,7 @@ def test_graphql_non_json_response(sentry_init, capture_events):
         self.wfile.write(b"not json")
 
     with mock.patch.object(MockServerRequestHandler, "do_POST", do_POST):
-        conn = HTTPConnection("localhost:{}".format(PORT))
+        conn = HTTPConnection(f"localhost:{PORT}")
         conn.request("POST", "/graphql", body=json.dumps(graphql_request).encode())
         response = conn.getresponse()
 

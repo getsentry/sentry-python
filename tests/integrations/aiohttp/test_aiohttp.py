@@ -30,14 +30,14 @@ except ImportError:
 
 def min_aiohttp_version(major, minor, reason=None):
     if reason is None:
-        reason = "Requires aiohttp {}.{} or higher".format(major, minor)
+        reason = f"Requires aiohttp {major}.{minor} or higher"
 
     return pytest.mark.skipif(AIOHTTP_VERSION < (major, minor), reason=reason)
 
 
 def max_aiohttp_version(major, minor, reason=None):
     if reason is None:
-        reason = "Requires aiohttp {}.{} or lower".format(major, minor)
+        reason = f"Requires aiohttp {major}.{minor} or lower"
 
     return pytest.mark.skipif(AIOHTTP_VERSION > (major, minor), reason=reason)
 
@@ -74,7 +74,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     assert request["method"] == "GET"
     assert request["query_string"] == ""
     assert request.get("data") is None
-    assert request["url"] == "http://{host}/".format(host=host)
+    assert request["url"] == f"http://{host}/"
     assert request["headers"] == {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate",
@@ -492,7 +492,7 @@ async def test_crumb_capture(
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
         assert crumb["data"] == {
-            "url": "http://127.0.0.1:{}/".format(raw_server.port),
+            "url": f"http://127.0.0.1:{raw_server.port}/",
             "http.fragment": "",
             "http.method": "GET",
             "http.query": "",
@@ -524,12 +524,9 @@ async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_c
         resp = await client.get("/")
         request_span = transaction._span_recorder.spans[-1]
 
-        assert resp.request_info.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
+        assert (
+            resp.request_info.headers["sentry-trace"]
+            == f"{transaction.trace_id}-{request_span.span_id}-1"
         )
 
 
@@ -595,9 +592,7 @@ async def test_graphql_get_client_error_captured(
 
     (event,) = events
 
-    assert event["request"]["url"] == "http://127.0.0.1:{}/graphql".format(
-        raw_server.port
-    )
+    assert event["request"]["url"] == f"http://127.0.0.1:{raw_server.port}/graphql"
     assert event["request"]["method"] == "GET"
     assert event["request"]["query_string"] == "query=query+GetPet+%7Bpet%7Bname%7D%7D"
     assert "data" not in event["request"]
@@ -656,9 +651,7 @@ async def test_graphql_post_client_error_captured(
 
     (event,) = events
 
-    assert event["request"]["url"] == "http://127.0.0.1:{}/graphql".format(
-        raw_server.port
-    )
+    assert event["request"]["url"] == f"http://127.0.0.1:{raw_server.port}/graphql"
     assert event["request"]["method"] == "POST"
     assert event["request"]["query_string"] == ""
     assert event["request"]["data"] == graphql_request

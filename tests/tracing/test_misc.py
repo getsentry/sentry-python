@@ -24,7 +24,7 @@ def test_span_trimming(sentry_init, capture_events):
 
     with start_transaction(name="hi"):
         for i in range(10):
-            with start_span(op="foo{}".format(i)):
+            with start_span(op=f"foo{i}"):
                 pass
 
     (event,) = events

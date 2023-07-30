@@ -164,10 +164,7 @@ def _wrap_apply_async(f):
 
                         combined_baggage = sentry_baggage or existing_baggage
                         if sentry_baggage and existing_baggage:
-                            combined_baggage = "{},{}".format(
-                                existing_baggage,
-                                sentry_baggage,
-                            )
+                            combined_baggage = f"{existing_baggage},{sentry_baggage}"
 
                         kwarg_headers.update(headers)
                         if combined_baggage:

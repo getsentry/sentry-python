@@ -156,7 +156,7 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     engine = create_engine("sqlite:///:memory:")
     with start_transaction(name="test"):
         with engine.connect() as con:
-            con.execute(text(" UNION ".join("SELECT {}".format(i) for i in range(100))))
+            con.execute(text(" UNION ".join(f"SELECT {i}" for i in range(100))))
 
     (event,) = events
     description = event["spans"][0]["description"]
@@ -184,9 +184,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     with start_transaction(name="test"):
         with engine.connect() as con:
             for _ in range(1500):
-                con.execute(
-                    text(" UNION ".join("SELECT {}".format(i) for i in range(100)))
-                )
+                con.execute(text(" UNION ".join(f"SELECT {i}" for i in range(100))))
 
     (event,) = events
 

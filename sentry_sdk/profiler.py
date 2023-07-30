@@ -221,11 +221,9 @@ def setup_profiler(options):
     elif profiler_mode == GeventScheduler.mode:
         _scheduler = GeventScheduler(frequency=frequency)
     else:
-        raise ValueError("Unknown profiler mode: {}".format(profiler_mode))
+        raise ValueError(f"Unknown profiler mode: {profiler_mode}")
 
-    logger.debug(
-        "[Profiling] Setting up profiler in {mode} mode".format(mode=_scheduler.mode)
-    )
+    logger.debug(f"[Profiling] Setting up profiler in {_scheduler.mode} mode")
     _scheduler.setup()
 
     atexit.register(teardown_profiler)
@@ -363,7 +361,7 @@ else:
             ):
                 for cls in frame.f_locals["self"].__class__.__mro__:
                     if name in cls.__dict__:
-                        return "{}.{}".format(cls.__name__, name)
+                        return f"{cls.__name__}.{name}"
         except AttributeError:
             pass
 
@@ -379,7 +377,7 @@ else:
             ):
                 for cls in frame.f_locals["cls"].__mro__:
                     if name in cls.__dict__:
-                        return "{}.{}".format(cls.__name__, name)
+                        return f"{cls.__name__}.{name}"
         except AttributeError:
             pass
 
@@ -484,9 +482,7 @@ class Profile(object):
         # type: () -> None
         self.active_thread_id = get_current_thread_id()
         logger.debug(
-            "[Profiling] updating active thread id to {tid}".format(
-                tid=self.active_thread_id
-            )
+            f"[Profiling] updating active thread id to {self.active_thread_id}"
         )
 
     def _set_initial_sampling_decision(self, sampling_context):
@@ -560,9 +556,7 @@ class Profile(object):
             logger.debug("[Profiling] Initializing profile")
         else:
             logger.debug(
-                "[Profiling] Discarding profile because it's not included in the random sample (sample rate = {sample_rate})".format(
-                    sample_rate=float(sample_rate)
-                )
+                f"[Profiling] Discarding profile because it's not included in the random sample (sample rate = {float(sample_rate)})"
             )
 
     def start(self):
@@ -963,7 +957,7 @@ class GeventScheduler(Scheduler):
         # type: (int) -> None
 
         if ThreadPool is None:
-            raise ValueError("Profiler mode: {} is not available".format(self.mode))
+            raise ValueError(f"Profiler mode: {self.mode} is not available")
 
         super(GeventScheduler, self).__init__(frequency=frequency)
 

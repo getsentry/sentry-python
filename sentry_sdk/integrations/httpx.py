@@ -95,9 +95,7 @@ def _install_httpx_client():
             if should_propagate_trace(hub, str(request.url)):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
-                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                            key=key, value=value, url=request.url
-                        )
+                        f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
                     )
                     if key == BAGGAGE_HEADER_NAME and request.headers.get(
                         BAGGAGE_HEADER_NAME
@@ -152,9 +150,7 @@ def _install_httpx_async_client():
             if should_propagate_trace(hub, str(request.url)):
                 for key, value in hub.iter_trace_propagation_headers():
                     logger.debug(
-                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                            key=key, value=value, url=request.url
-                        )
+                        f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
                     )
                     if key == BAGGAGE_HEADER_NAME and request.headers.get(
                         BAGGAGE_HEADER_NAME
@@ -221,9 +217,7 @@ def _make_request_processor(request, response):
                     event["fingerprint"] = [operation_name, operation_type, 200]
                     event["exception"]["values"][0][
                         "value"
-                    ] = "GraphQL request failed, name: {}, type: {}".format(
-                        operation_name, operation_type
-                    )
+                    ] = f"GraphQL request failed, name: {operation_name}, type: {operation_type}"
 
         return event
 

@@ -12,13 +12,13 @@ except ImportError:
 
 @sentry_sdk.monitor(monitor_slug="abc123")
 def _hello_world(name):
-    return "Hello, {}".format(name)
+    return f"Hello, {name}"
 
 
 @sentry_sdk.monitor(monitor_slug="def456")
 def _break_world(name):
     1 / 0
-    return "Hello, {}".format(name)
+    return f"Hello, {name}"
 
 
 def test_decorator(sentry_init):

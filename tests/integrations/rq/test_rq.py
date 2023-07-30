@@ -34,11 +34,11 @@ def crashing_job(foo):
 
 
 def chew_up_shoes(dog, human, shoes):
-    raise Exception("{}!! Why did you eat {}'s {}??".format(dog, human, shoes))
+    raise Exception(f"{dog}!! Why did you eat {human}'s {shoes}??")
 
 
 def do_trick(dog, trick):
-    return "{}, can you {}? Good dog!".format(dog, trick)
+    return f"{dog}, can you {trick}? Good dog!"
 
 
 def test_basic(sentry_init, capture_events):
