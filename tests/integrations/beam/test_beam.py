@@ -14,7 +14,7 @@ from sentry_sdk.integrations.beam import (
 from apache_beam.typehints.trivial_inference import instance_to_type
 from apache_beam.typehints.decorators import getcallargs_forhints
 from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
-from apache_beam.runners.common import DoFnInvoker, DoFnContext
+from apache_beam.runners.common import DoFnInvoker, OutputProcessor, DoFnContext
 from apache_beam.utils.windowed_value import WindowedValue
 
 
@@ -149,7 +149,7 @@ def test_monkey_patch_signature(f, args, kwargs):
         pass
 
 
-class _OutputProcessor:
+class _OutputProcessor(OutputProcessor):
     def process_outputs(
         self, windowed_input_element, results, watermark_estimator=None
     ):
