@@ -1,10 +1,3 @@
-from sentry_sdk.tracing_utils import (
-    Baggage,
-    EnvironHeaders,
-    extract_sentrytrace_data,
-    has_tracing_enabled,
-    maybe_create_breadcrumbs_from_span,
-)
 import uuid
 import random
 
@@ -876,3 +869,10 @@ def trace(func=None):
 
 
 # Circular imports
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    EnvironHeaders,
+    extract_sentrytrace_data,
+    has_tracing_enabled,
+    maybe_create_breadcrumbs_from_span,
+)

@@ -9,6 +9,7 @@ import os
 import sys
 import re
 
+
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration

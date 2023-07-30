@@ -1,18 +1,21 @@
-from apache_beam.utils.windowed_value import WindowedValue
-from apache_beam.runners.common import DoFnInvoker, OutputProcessor, DoFnContext
-from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
-from apache_beam.typehints.decorators import getcallargs_forhints
-from apache_beam.typehints.trivial_inference import instance_to_type
+import pytest
+import inspect
+
+pytest.importorskip("apache_beam")
+
+import dill
+
 from sentry_sdk.integrations.beam import (
     BeamIntegration,
     _wrap_task_call,
     _wrap_inspect_call,
 )
-import dill
-import pytest
-import inspect
 
-pytest.importorskip("apache_beam")
+from apache_beam.typehints.trivial_inference import instance_to_type
+from apache_beam.typehints.decorators import getcallargs_forhints
+from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
+from apache_beam.runners.common import DoFnInvoker, DoFnContext
+from apache_beam.utils.windowed_value import WindowedValue
 
 
 def foo():
@@ -146,7 +149,7 @@ def test_monkey_patch_signature(f, args, kwargs):
         pass
 
 
-class _OutputProcessor(OutputProcessor):
+class _OutputProcessor:
     def process_outputs(
         self, windowed_input_element, results, watermark_estimator=None
     ):

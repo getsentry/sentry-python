@@ -1,14 +1,16 @@
-from celery.bin import worker
-from celery import Celery, VERSION
-from sentry_sdk._compat import text_type
-from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
-from sentry_sdk import Hub, configure_scope, start_transaction
 import threading
 
 import pytest
 
 pytest.importorskip("celery")
 
+from sentry_sdk import Hub, configure_scope, start_transaction
+from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
+
+from sentry_sdk._compat import text_type
+
+from celery import Celery, VERSION
+from celery.bin import worker
 
 try:
     from unittest import mock  # python 3.3 and above

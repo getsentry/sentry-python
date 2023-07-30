@@ -1,24 +1,3 @@
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-import sentry_sdk.integrations.flask as flask_sentry
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk import (
-    set_tag,
-    configure_scope,
-    capture_message,
-    capture_exception,
-    last_event_id,
-    Hub,
-)
-from flask_login import LoginManager, login_user
-from flask.views import View
-from flask import (
-    Flask,
-    Response,
-    request,
-    abort,
-    stream_with_context,
-    render_template_string,
-)
 import json
 import re
 import pytest
@@ -27,6 +6,29 @@ import logging
 from io import BytesIO
 
 flask = pytest.importorskip("flask")
+
+from flask import (
+    Flask,
+    Response,
+    abort,
+    stream_with_context,
+    render_template_string,
+)
+from flask.views import View
+
+from flask_login import LoginManager, login_user
+
+from sentry_sdk import (
+    set_tag,
+    configure_scope,
+    capture_message,
+    capture_exception,
+    last_event_id,
+    Hub,
+)
+from sentry_sdk.integrations.logging import LoggingIntegration
+import sentry_sdk.integrations.flask as flask_sentry
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
 login_manager = LoginManager()
@@ -247,7 +249,7 @@ def test_flask_large_json_request(sentry_init, capture_events, app):
     data = {"foo": {"bar": "a" * 2000}}
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert request.get_json() == data
         assert request.get_data() == json.dumps(data).encode("ascii")
         assert not request.form
@@ -313,7 +315,7 @@ def test_flask_empty_json_request(sentry_init, capture_events, app, data):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert request.get_json() == data
         assert request.get_data() == json.dumps(data).encode("ascii")
         assert not request.form
@@ -336,7 +338,7 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     data = {"foo": "a" * 2000}
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert request.form["foo"] == data["foo"]
         assert not request.get_data()
         assert not request.get_json()
@@ -367,7 +369,7 @@ def test_flask_formdata_request_appear_transaction_body(
     data = {"username": "sentry-user", "age": "26"}
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert request.form["username"] == data["username"]
         assert request.form["age"] == data["age"]
         assert not request.get_data()
@@ -398,7 +400,7 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
     data = input_char * 2000
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert not request.form
         if isinstance(data, bytes):
             assert request.get_data() == data
@@ -427,7 +429,7 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert list(request.form) == ["foo"]
         assert list(request.files) == ["file"]
         assert not request.get_json()
@@ -460,7 +462,7 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     data = {f"key{i}": f"value{i}" for i in range(MAX_DATABAG_BREADTH + 10)}
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         assert request.get_json() == data
         assert request.get_data() == json.dumps(data).encode("ascii")
         capture_message("hi")
@@ -859,7 +861,7 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     @app.route("/", methods=["POST"])
-    def index():
+    def index(request):
         logging.critical("oops")
         assert request.get_json() == {"password": "ohno"}
         assert request.headers["Authorization"] == "Bearer ohno"

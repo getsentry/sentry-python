@@ -1,4 +1,3 @@
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
 import re
 import contextlib
 
@@ -407,3 +406,4 @@ def normalize_incoming_data(incoming_data):
 
 
 # Circular imports
+from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES

@@ -1,16 +1,19 @@
-import sentry_sdk.integrations.bottle as bottle_sentry
-from werkzeug.test import Client
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from sentry_sdk import capture_message
-from bottle import Bottle, debug as set_debug, abort, redirect
-from io import BytesIO
 import json
 import pytest
 import logging
 
 
 pytest.importorskip("bottle")
+
+from io import BytesIO
+from bottle import Bottle, debug as set_debug, abort, redirect
+from sentry_sdk import capture_message
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+
+from sentry_sdk.integrations.logging import LoggingIntegration
+from werkzeug.test import Client
+
+import sentry_sdk.integrations.bottle as bottle_sentry
 
 
 @pytest.fixture(scope="function")

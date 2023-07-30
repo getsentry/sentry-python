@@ -631,6 +631,8 @@ class _Client(object):
         self.close()
 
 
+from sentry_sdk._types import TYPE_CHECKING
+
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `get_options` is a
     # type to have nicer autocompletion for params.

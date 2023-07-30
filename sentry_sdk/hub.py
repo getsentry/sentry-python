@@ -136,6 +136,8 @@ def _init(*args, **kwargs):
     return rv
 
 
+from sentry_sdk._types import TYPE_CHECKING
+
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
