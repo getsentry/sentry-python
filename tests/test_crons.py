@@ -81,6 +81,18 @@ def test_capture_checkin_simple(sentry_init):
     assert check_in_id == "112233"
 
 
+def test_sample_rate_doesnt_affect_crons(sentry_init, capture_envelopes):
+    sentry_init(sample_rate=0)
+    envelopes = capture_envelopes()
+
+    capture_checkin(check_in_id="112233")
+
+    assert len(envelopes) == 1
+
+    check_in = envelopes[0].items[0].payload.json
+    assert check_in["check_in_id"] == "112233"
+
+
 def test_capture_checkin_new_id(sentry_init):
     sentry_init()
 
