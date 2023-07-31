@@ -1,9 +1,10 @@
 from __future__ import absolute_import
 
 import json
+import os
+import random
 import re
 import pytest
-import random
 from functools import partial
 
 from werkzeug.test import Client
@@ -584,9 +585,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_django_connect_breadcrumbs(
-    sentry_init, client, capture_events, render_span_tree
-):
+def test_django_connect_breadcrumbs(sentry_init, capture_events):
     """
     Verify we record a breadcrumb when opening a new database.
     """
@@ -618,6 +617,43 @@ def test_django_connect_breadcrumbs(
         {"message": "connect", "category": "query", "type": "default"},
         {"message": "select 1", "category": "query", "data": {}, "type": "default"},
     ]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_connection_span_data(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("postgres_select"))
+    assert status == "200 OK"
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db":
+            data = span.get("data")
+            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
+            assert (
+                data.get(SPANDATA.DB_NAME)
+                == connections["postgres"].get_connection_params()["database"]
+            )
+            assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+                "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
+            )
+            assert data.get(SPANDATA.SERVER_PORT) == 5432
 
 
 @pytest.mark.parametrize(
@@ -1059,11 +1095,7 @@ def test_get_receiver_name():
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_middleware(
-    sentry_init,
-    client,
-    capture_events,
-    use_django_caching_with_middlewares,
-    settings,
+    sentry_init, client, capture_events, use_django_caching_with_middlewares
 ):
     sentry_init(
         integrations=[
@@ -1141,11 +1173,7 @@ def test_cache_spans_disabled_templatetag(
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
-    sentry_init,
-    client,
-    capture_events,
-    use_django_caching_with_middlewares,
-    settings,
+    sentry_init, client, capture_events, use_django_caching_with_middlewares
 ):
     sentry_init(
         integrations=[
