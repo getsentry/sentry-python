@@ -524,12 +524,16 @@ class _Client(object):
             self._update_session_from_event(session, event)
 
         is_transaction = event_opt.get("type") == "transaction"
+        is_checkin = event_opt.get("type") == "check_in"
 
-        if not is_transaction and not self._should_sample_error(event):
+        if (
+            not is_transaction
+            and not is_checkin
+            and not self._should_sample_error(event)
+        ):
             return None
 
         tracing_enabled = has_tracing_enabled(self.options)
-        is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
