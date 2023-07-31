@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 A backport of Python 3 functools to Python 2/3. The only important change
 we rely upon is that `update_wrapper` handles AttributeError gracefully.
@@ -63,8 +64,7 @@ from functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    pass
 
 
 WRAPPER_ASSIGNMENTS = (

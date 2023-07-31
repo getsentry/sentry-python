@@ -1,29 +1,15 @@
+# -*- coding: utf-8 -*-
 import inspect
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
-    from typing import Optional
     from typing import overload
     from typing import Callable
     from typing import TypeVar
-    from typing import ContextManager
-    from typing import Union
-
-    from sentry_sdk._types import (
-        Event,
-        Hint,
-        Breadcrumb,
-        BreadcrumbHint,
-        ExcInfo,
-        MeasurementUnit,
-    )
-    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])

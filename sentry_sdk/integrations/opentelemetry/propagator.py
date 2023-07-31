@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from opentelemetry import trace  # type: ignore
 from opentelemetry.context import (  # type: ignore
     Context,
@@ -33,8 +34,7 @@ from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
-    from typing import Set
+    pass
 
 
 class SentryPropagator(TextMapPropagator):  # type: ignore

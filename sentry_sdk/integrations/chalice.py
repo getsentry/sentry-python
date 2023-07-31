@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 
 from sentry_sdk._compat import reraise
@@ -19,7 +20,6 @@ from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type:
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
     from typing import TypeVar
     from typing import Callable
 

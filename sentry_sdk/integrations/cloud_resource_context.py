@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import urllib3
 
@@ -8,7 +9,7 @@ from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Dict
+    pass
 
 
 CONTEXT_TYPE = "cloud_resource"

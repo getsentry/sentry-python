@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """This package"""
 from __future__ import absolute_import
 

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 A fork of Python 3.6's stdlib queue (found in Pythons 'cpython/Lib/queue.py')
 with Lock swapped out for RLock to avoid a deadlock while garbage collecting.
@@ -79,19 +80,17 @@ from time import time
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 __all__ = ["EmptyError", "FullError", "Queue"]
 
 
 class EmptyError(Exception):
     "Exception raised by Queue.get(block=0)/get_nowait()."
-    pass
 
 
 class FullError(Exception):
     "Exception raised by Queue.put(block=0)/put_nowait()."
-    pass
 
 
 class Queue(object):

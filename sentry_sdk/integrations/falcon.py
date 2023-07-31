@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 from sentry_sdk.hub import Hub
@@ -14,11 +15,8 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    pass
 
-    from sentry_sdk._types import EventProcessor
 
 # In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
 # and `falcon.API` to `falcon.App`

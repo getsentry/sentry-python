@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 A fork of Python 3.6's stdlib lru_cache (found in Python's 'cpython/Lib/functools.py')
 adapted into a data structure for single threaded uses.

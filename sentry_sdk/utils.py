@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import base64
 import json
 import linecache
@@ -47,28 +48,14 @@ try:
 except ImportError:
     _PARTIALMETHOD_AVAILABLE = False
 
-import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 
 if TYPE_CHECKING:
-    from types import FrameType, TracebackType
     from typing import (
-        Any,
-        Callable,
-        ContextManager,
-        Dict,
-        Iterator,
-        List,
-        Optional,
-        Set,
-        Tuple,
-        Type,
         Union,
     )
-
-    from sentry_sdk._types import EndpointType, ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -1284,13 +1271,9 @@ disable_capture_event = ContextVar("disable_capture_event")
 class ServerlessTimeoutWarning(Exception):  # noqa: N818
     """Raised when a serverless method is about to reach its timeout."""
 
-    pass
-
 
 class SentryGraphQLClientError(Exception):
     """Synthetic exception for GraphQL client errors."""
-
-    pass
 
 
 def _get_graphql_operation_name(query):

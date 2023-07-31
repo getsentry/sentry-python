@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import asyncio
@@ -24,9 +25,8 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional
+    pass
 
-    from sentry_sdk.scope import Scope as SentryScope
 
 try:
     import starlette  # type: ignore

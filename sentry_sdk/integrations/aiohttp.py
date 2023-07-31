@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import sys
 import weakref
@@ -45,30 +46,14 @@ try:
 
     from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp import ClientSession, ContentTypeError, TraceConfig
-    from aiohttp.web import Application, HTTPException, UrlDispatcher, Response
+    from aiohttp.web import Application, HTTPException, UrlDispatcher
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aiohttp.web_request import Request
-    from aiohttp.abc import AbstractMatchInfo
-    from aiohttp import (
-        TraceRequestStartParams,
-        TraceRequestEndParams,
-        TraceRequestChunkSentParams,
-    )
-    from types import SimpleNamespace
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Tuple
-    from typing import Callable
-    from typing import Union
-
-    from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    pass
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")

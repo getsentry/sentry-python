@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import weakref
 from inspect import isawaitable
@@ -19,17 +20,8 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Optional
-    from typing import Union
-    from typing import Tuple
-    from typing import Dict
+    pass
 
-    from sanic.request import Request, RequestParameters
-
-    from sentry_sdk._types import Event, EventProcessor, Hint
-    from sanic.router import Route
 
 try:
     from sanic import Sanic, __version__ as SANIC_VERSION

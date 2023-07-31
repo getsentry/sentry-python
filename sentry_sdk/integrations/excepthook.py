@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 
 from sentry_sdk.hub import Hub

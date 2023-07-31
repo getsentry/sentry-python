@@ -299,7 +299,6 @@ def _patch_drf():
                         request._request._sentry_drf_request_backref = weakref.ref(
                             request
                         )
-                        pass
                     return old_drf_initial(self, request, *args, **kwargs)
 
                 APIView.initial = sentry_patched_drf_initial

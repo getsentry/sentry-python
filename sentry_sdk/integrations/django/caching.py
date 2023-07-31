@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import functools
 from typing import TYPE_CHECKING
 
@@ -10,8 +11,7 @@ from sentry_sdk._compat import text_type
 
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    pass
 
 
 METHODS_TO_INSTRUMENT = [

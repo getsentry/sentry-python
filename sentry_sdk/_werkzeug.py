@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Copyright (c) 2007 by the Pallets team.
 
@@ -37,9 +38,7 @@ from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Dict
-    from typing import Iterator
-    from typing import Tuple
+    pass
 
 
 #

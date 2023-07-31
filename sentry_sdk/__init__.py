@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from sentry_sdk.hub import Hub, init
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport

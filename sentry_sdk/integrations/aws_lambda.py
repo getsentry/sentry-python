@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 from copy import deepcopy
 from datetime import datetime, timedelta
@@ -23,9 +24,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
     from typing import Callable
-    from typing import Optional
-
-    from sentry_sdk._types import EventProcessor, Event, Hint
 
     F = TypeVar("F", bound=Callable[..., Any])
 

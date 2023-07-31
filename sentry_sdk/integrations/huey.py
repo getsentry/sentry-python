@@ -1,7 +1,7 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import sys
-from datetime import datetime
 
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
@@ -17,15 +17,12 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Union, TypeVar
-
-    from sentry_sdk._types import EventProcessor, Event, Hint
-    from sentry_sdk.utils import ExcInfo
+    from typing import Any, Callable, TypeVar
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from huey.api import Huey, Result, ResultGroup, Task
+    from huey.api import Huey
     from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
     raise DidNotEnable("Huey is not installed")

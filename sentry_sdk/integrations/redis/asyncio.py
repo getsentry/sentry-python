@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
@@ -15,7 +16,7 @@ from sentry_sdk.integrations.redis import (
 from sentry_sdk._types import MYPY
 
 if MYPY:
-    from typing import Any
+    pass
 
 
 def patch_redis_async_pipeline(pipeline_cls):

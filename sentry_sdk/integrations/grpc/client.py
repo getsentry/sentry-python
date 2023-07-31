@@ -1,16 +1,14 @@
+# -*- coding: utf-8 -*-
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 
 if MYPY:
-    from typing import Any, Callable, Iterator, Iterable, Union
+    pass
 
 try:
     import grpc
-    from grpc import ClientCallDetails, Call
-    from grpc._interceptor import _UnaryOutcome
-    from grpc.aio._interceptor import UnaryStreamCall
     from google.protobuf.message import Message  # type: ignore
 except ImportError:
     raise DidNotEnable("grpcio is not installed")

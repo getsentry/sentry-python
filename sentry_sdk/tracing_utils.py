@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import re
 import contextlib
 
@@ -20,13 +21,7 @@ else:
     from urllib.parse import quote, unquote
 
 if TYPE_CHECKING:
-    import typing
-
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import Union
+    pass
 
 
 SENTRY_TRACE_REGEX = re.compile(

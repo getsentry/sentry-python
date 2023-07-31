@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 from sentry_sdk.hub import Hub
@@ -15,14 +16,8 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Any
-    from typing import Dict
-    from typing import Callable
-    from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-    from sentry_sdk._types import EventProcessor, Event
 
 try:
     from bottle import (

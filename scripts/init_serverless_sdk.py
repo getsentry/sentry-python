@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 For manual instrumentation,
 The Handler function string of an aws lambda function should be added as an
@@ -11,11 +12,10 @@ import re
 
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import Dsn
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 
 # Configure Sentry SDK

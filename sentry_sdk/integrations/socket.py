@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import socket
@@ -7,8 +8,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 
 if MYPY:
-    from socket import AddressFamily, SocketKind
-    from typing import Tuple, Optional, Union, List
+    pass
 
 __all__ = ["SocketIntegration"]
 

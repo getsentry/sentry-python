@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 This file is originally based on code from https://github.com/nylas/nylas-perftools,
 which is published under the following license:
@@ -49,20 +50,14 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from types import FrameType
-    from typing import Any
-    from typing import Callable
-    from typing import Deque
     from typing import Dict
     from typing import List
     from typing import Optional
-    from typing import Set
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
 
     import sentry_sdk.tracing
-    from sentry_sdk._types import SamplingContext, ProfilerMode
 
     ThreadId = str
 

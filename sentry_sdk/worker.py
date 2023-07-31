@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import threading
 
@@ -10,9 +11,7 @@ from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Callable
+    pass
 
 
 _TERMINATOR = object()

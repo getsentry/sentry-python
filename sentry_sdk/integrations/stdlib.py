@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import io
 import json
 import os
@@ -38,14 +39,7 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Tuple
-
-    from sentry_sdk._types import Event, EventProcessor, Hint
+    pass
 
 
 try:

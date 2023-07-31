@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import asyncio
 from copy import deepcopy
 
@@ -8,8 +9,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import transaction_from_function
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
-    from sentry_sdk.scope import Scope
+    pass
 
 try:
     from sentry_sdk.integrations.starlette import (

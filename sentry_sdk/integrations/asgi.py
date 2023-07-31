@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 An ASGI middleware.
 
@@ -32,14 +33,7 @@ from sentry_sdk.utils import (
 from sentry_sdk.tracing import Transaction
 
 if TYPE_CHECKING:
-    from typing import Dict
-    from typing import Any
-    from typing import Optional
-    from typing import Callable
-
-    from typing_extensions import Literal
-
-    from sentry_sdk._types import Event, Hint
+    pass
 
 
 _asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")

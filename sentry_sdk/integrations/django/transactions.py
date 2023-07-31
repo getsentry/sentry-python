@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Copied from raven-python. Used for
 `DjangoIntegration(transaction_fron="raven_legacy")`.
@@ -10,14 +11,7 @@ import re
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from django.urls.resolvers import URLResolver
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from django.urls.resolvers import URLPattern
-    from typing import Tuple
-    from typing import Union
-    from re import Pattern
+    pass
 
 try:
     from django.urls import get_resolver

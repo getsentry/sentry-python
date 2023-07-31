@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import weakref
@@ -26,12 +27,7 @@ except ImportError:
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
-
-    from sentry_sdk._types import EventProcessor
-    from sentry_sdk.utils import ExcInfo
-
-    from rq.job import Job
+    pass
 
 
 class RqIntegration(Integration):

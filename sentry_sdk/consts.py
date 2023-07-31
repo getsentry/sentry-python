@@ -1,30 +1,17 @@
+# -*- coding: utf-8 -*-
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
 if TYPE_CHECKING:
-    import sentry_sdk
+    pass
 
     from typing import Optional
-    from typing import Callable
-    from typing import Union
-    from typing import List
-    from typing import Type
-    from typing import Dict
-    from typing import Any
-    from typing import Sequence
     from typing_extensions import TypedDict
 
-    from sentry_sdk.integrations import Integration
-
     from sentry_sdk._types import (
-        BreadcrumbProcessor,
-        Event,
-        EventProcessor,
         ProfilerMode,
-        TracesSampler,
-        TransactionProcessor,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK

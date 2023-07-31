@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 try:
     from typing import TYPE_CHECKING as TYPE_CHECKING
 except ImportError:

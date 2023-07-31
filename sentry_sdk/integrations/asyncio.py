@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 import sys
 
@@ -16,9 +17,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any
-
-    from sentry_sdk._types import ExcInfo
+    pass
 
 
 def get_name(coro):

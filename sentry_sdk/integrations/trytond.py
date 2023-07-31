@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sentry_sdk.hub
 import sentry_sdk.utils
 import sentry_sdk.integrations
@@ -8,7 +9,7 @@ from trytond.exceptions import TrytonException  # type: ignore
 from trytond.wsgi import app  # type: ignore
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 
 # TODO: trytond-worker, trytond-cron and trytond-admin intergations

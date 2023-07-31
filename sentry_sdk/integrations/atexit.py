@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import os
@@ -11,8 +12,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
+    pass
 
 
 def default_callback(pending, timeout):

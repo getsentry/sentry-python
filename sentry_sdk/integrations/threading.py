@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import sys
@@ -14,9 +15,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import TypeVar
     from typing import Callable
-    from typing import Optional
-
-    from sentry_sdk._types import ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
 

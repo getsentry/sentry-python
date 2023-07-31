@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import io
 import json
 import mimetypes
@@ -8,14 +9,7 @@ from sentry_sdk.session import Session
 from sentry_sdk.utils import json_dumps, capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Union
-    from typing import Dict
-    from typing import List
-    from typing import Iterator
-
-    from sentry_sdk._types import Event, EventDataCategory
+    pass
 
 
 def parse_json(data):

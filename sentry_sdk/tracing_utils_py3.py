@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import inspect
 from functools import wraps
 
@@ -9,7 +10,7 @@ from sentry_sdk.utils import logger, qualname_from_function
 
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 
 def start_child_span_decorator(func):

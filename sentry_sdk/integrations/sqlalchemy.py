@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 from sentry_sdk._compat import text_type
@@ -17,11 +18,7 @@ except ImportError:
     raise DidNotEnable("SQLAlchemy not installed.")
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import ContextManager
-    from typing import Optional
-
-    from sentry_sdk.tracing import Span
+    pass
 
 
 class SqlalchemyIntegration(Integration):

@@ -10,9 +10,7 @@ from sentry_sdk.consts import OP
 
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import List
+    pass
 
 
 def _get_receiver_name(receiver):

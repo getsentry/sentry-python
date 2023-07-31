@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 from copy import deepcopy
 
@@ -8,12 +9,7 @@ from sentry_sdk._compat import text_type, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import sentry_sdk
-
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Union
+    pass
 
 
 SENSITIVE_ENV_KEYS = (

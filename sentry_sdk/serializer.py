@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import math
 
@@ -22,18 +23,14 @@ from sentry_sdk._compat import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from types import TracebackType
+    pass
 
     from typing import Any
     from typing import Callable
-    from typing import ContextManager
     from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Type
     from typing import Union
 
-    from sentry_sdk._types import NotImplementedType, Event
+    from sentry_sdk._types import NotImplementedType
 
     Span = Dict[str, Any]
 

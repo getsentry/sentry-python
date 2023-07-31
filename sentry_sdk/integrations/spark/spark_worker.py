@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import sys
@@ -16,10 +17,7 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-
-    from sentry_sdk._types import ExcInfo, Event, Hint
+    pass
 
 
 class SparkWorkerIntegration(Integration):

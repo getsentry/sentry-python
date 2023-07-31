@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Instrumentation for Django 3.0
 
@@ -15,11 +16,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Union
-    from typing import Callable
-
-    from django.http.response import HttpResponse
+    pass
 
 
 def patch_django_asgi_handler_impl(cls):

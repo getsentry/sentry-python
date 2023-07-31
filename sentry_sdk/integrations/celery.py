@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import sys
@@ -23,21 +24,13 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Tuple
     from typing import TypeVar
-    from typing import Union
-
-    from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 
 try:
     from celery import VERSION as CELERY_VERSION  # type: ignore
-    from celery import Task, Celery
     from celery.app.trace import task_has_custom
     from celery.beat import Scheduler  # type: ignore
     from celery.exceptions import (  # type: ignore

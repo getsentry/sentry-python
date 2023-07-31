@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Split Tox to GitHub Actions
 
 This is a small script to split a tox.ini config file into multiple GitHub actions configuration files.
@@ -131,8 +132,6 @@ def write_yaml_file(
         outfile_name = OUT_DIR / f"test-{current_framework}.yml"
     else:
         outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
-
-    print(f"Writing {outfile_name}")
     f = open(outfile_name, "w")
     f.writelines(out)
     f.close()
@@ -155,20 +154,14 @@ def main(fail_on_changes):
     """Create one CI workflow for each framework defined in tox.ini"""
     if fail_on_changes:
         old_hash = get_yaml_files_hash()
-
-    print("Read GitHub actions config file template")
     f = open(TEMPLATE_FILE, "r")
     template = f.readlines()
     f.close()
-
-    print("Read tox.ini")
     config = configparser.ConfigParser()
     config.read(TOX_FILE)
     lines = [x for x in config["tox"]["envlist"].split("\n") if len(x) > 0]
 
     python_versions = defaultdict(list)
-
-    print("Parse tox.ini envlist")
 
     for line in lines:
         # normalize lines
@@ -193,7 +186,7 @@ def main(fail_on_changes):
                     python_versions[framework].append(python_version)
 
         except ValueError:
-            print(f"ERROR reading line {line}")
+            pass
 
     for framework in python_versions:
         write_yaml_file(template, framework, python_versions[framework])
@@ -208,8 +201,6 @@ def main(fail_on_changes):
                 "Please run `python scripts/split-tox-gh-actions/split-tox-gh-actions.py` "
                 "locally and commit the changes of the yaml configuration files to continue. "
             )
-
-    print("All done. Have a nice day!")
 
 
 if __name__ == "__main__":

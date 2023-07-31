@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import enum
@@ -11,11 +12,9 @@ from sentry_sdk.integrations.logging import (
 )
 
 if TYPE_CHECKING:
-    from logging import LogRecord
-    from typing import Optional, Tuple
+    pass
 
 try:
-    import loguru
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 except ImportError:

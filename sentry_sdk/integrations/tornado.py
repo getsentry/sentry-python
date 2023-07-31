@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import weakref
 import contextlib
 from inspect import iscoroutinefunction
@@ -35,13 +36,7 @@ except ImportError:
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Dict
-    from typing import Callable
-    from typing import Generator
-
-    from sentry_sdk._types import EventProcessor
+    pass
 
 
 class TornadoIntegration(Integration):

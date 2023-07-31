@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from functools import wraps
 import sys
 
@@ -9,7 +10,7 @@ from sentry_sdk.utils import now
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    pass
 
 
 def monitor(monitor_slug=None):

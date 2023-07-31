@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 
 from sentry_sdk.hub import Hub
@@ -12,8 +13,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import TypeVar
-    from typing import Union
-    from typing import Optional
 
     from typing import overload
 

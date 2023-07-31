@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from copy import copy
 from collections import deque
 from itertools import chain
@@ -25,28 +26,8 @@ from sentry_sdk.consts import FALSE_VALUES
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import Optional
-    from typing import Deque
-    from typing import List
     from typing import Callable
-    from typing import Tuple
     from typing import TypeVar
-
-    from sentry_sdk._types import (
-        Breadcrumb,
-        Event,
-        EventProcessor,
-        ErrorProcessor,
-        ExcInfo,
-        Hint,
-        Type,
-    )
-
-    from sentry_sdk.profiler import Profile
-    from sentry_sdk.tracing import Span
-    from sentry_sdk.session import Session
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")

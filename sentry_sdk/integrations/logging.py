@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import logging
@@ -17,10 +18,7 @@ from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from logging import LogRecord
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    pass
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR

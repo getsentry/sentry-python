@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 
 try:
@@ -33,8 +34,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Tuple
-    from sentry_sdk._types import EventProcessor
+    pass
 
 
 try:

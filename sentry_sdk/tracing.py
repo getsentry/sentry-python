@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import uuid
 import random
 
@@ -12,17 +13,9 @@ from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    import typing
-
-    from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import Tuple
+    pass
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
 
 
 BAGGAGE_HEADER_NAME = "baggage"

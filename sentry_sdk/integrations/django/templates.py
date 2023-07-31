@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from django.template import TemplateSyntaxError
 from django.utils.safestring import mark_safe
 from django import VERSION as DJANGO_VERSION
@@ -7,11 +8,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Iterator
-    from typing import Tuple
+    pass
 
 try:
     # support Django 1.9

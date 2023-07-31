@@ -1,12 +1,9 @@
+# -*- coding: utf-8 -*-
 import sys
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
-    from typing import Tuple
-    from typing import Any
-    from typing import Type
     from typing import TypeVar
 
     T = TypeVar("T")

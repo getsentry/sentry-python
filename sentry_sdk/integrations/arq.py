@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import sys
@@ -26,14 +27,8 @@ except ImportError:
     raise DidNotEnable("Arq is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    pass
 
-    from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint
-
-    from arq.cron import CronJob
-    from arq.jobs import Job
-    from arq.typing import WorkerCoroutine
-    from arq.worker import Function
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 

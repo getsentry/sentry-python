@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function
 
 import io
@@ -16,20 +17,7 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Iterable
     from typing import Optional
-    from typing import Tuple
-    from typing import Type
-    from typing import Union
-    from typing import DefaultDict
-
-    from urllib3.poolmanager import PoolManager
-    from urllib3.poolmanager import ProxyManager
-
-    from sentry_sdk._types import Event, EndpointType
 
     DataCategory = Optional[str]
 
@@ -88,12 +76,10 @@ class Transport(object):
     ):
         # type: (...) -> None
         """Wait `timeout` seconds for the current events to be sent out."""
-        pass
 
     def kill(self):
         # type: () -> None
         """Forcefully kills the transport."""
-        pass
 
     def record_lost_event(
         self,
@@ -252,7 +238,6 @@ class HttpTransport(Transport):
                 # do not want to record event loss here as we will have recorded
                 # an outcome in relay already.
                 self.on_dropped_event("status_429")
-                pass
 
             elif response.status >= 300 or response.status < 200:
                 logger.error(

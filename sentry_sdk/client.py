@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from importlib import import_module
 import os
 import uuid
@@ -39,14 +40,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Callable
     from typing import Dict
-    from typing import Optional
-    from typing import Sequence
-
-    from sentry_sdk.scope import Scope
-    from sentry_sdk._types import Event, Hint
-    from sentry_sdk.session import Session
 
 
 _client_init_debug = ContextVar("client_init_debug")

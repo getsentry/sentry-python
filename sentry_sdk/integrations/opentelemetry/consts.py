@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from opentelemetry.context import (  # type: ignore
     create_key,
 )

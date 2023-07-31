@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
 import os
@@ -5,7 +6,6 @@ import sys
 import weakref
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -26,17 +26,8 @@ except ImportError:
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pyramid.response import Response
-    from typing import Any
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
     from webob.cookies import RequestCookies  # type: ignore
     from webob.compat import cgi_FieldStorage  # type: ignore
-
-    from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
 
 
 if getattr(Request, "authenticated_userid", None):

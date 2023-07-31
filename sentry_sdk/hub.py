@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import copy
 import sys
 
@@ -32,27 +33,9 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union
-    from typing import Any
-    from typing import Optional
-    from typing import Tuple
-    from typing import Dict
-    from typing import List
-    from typing import Callable
-    from typing import Generator
-    from typing import Type
     from typing import TypeVar
     from typing import overload
-    from typing import ContextManager
 
-    from sentry_sdk.integrations import Integration
-    from sentry_sdk._types import (
-        Event,
-        Hint,
-        Breadcrumb,
-        BreadcrumbHint,
-        ExcInfo,
-    )
     from sentry_sdk.consts import ClientConstructor
 
     T = TypeVar("T")

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Create spans from Django middleware invocations
 """
@@ -17,10 +18,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import Optional
     from typing import TypeVar
-
-    from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
 

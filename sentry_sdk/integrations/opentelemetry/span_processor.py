@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from datetime import datetime
 
 from opentelemetry.context import get_value  # type: ignore
@@ -22,16 +23,15 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import Transaction, Span as SentrySpan
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
 from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    pass
 
-    from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
 
