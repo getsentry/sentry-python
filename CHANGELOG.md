@@ -4,16 +4,16 @@
 
 ### Various fixes & improvements
 
+- Capture GraphQL client errors (#2243) by @sentrivana
+- Read MAX_VALUE_LENGTH from client options (#2121) (#2171) by @puittenbroek
+- Rename `request_bodies` to `max_request_body_size` (#2247) by @mgaligniana
 - Always sample checkin regardless of sample_rate (#2279) by @szokeasaurusrex
+- Add information to short-interval cron error message (#2246) by @lobsterkatie
 - Add DB connection attributes in spans (#2274) by @antonpirker
+- Add db.system to remaining redis spans (#2271) by @AbhiPrasad
 - Clarified the procedure for running tests (#2276) by @szokeasaurusrex
 - Fix chalice tests (#2278) by @sentrivana
-- feat(redis): Add db.system to remaining redis spans (#2271) by @AbhiPrasad
-- Capture GraphQL client errors (#2243) by @sentrivana
-- build(deps): bump black from 23.3.0 to 23.7.0 (#2256) by @dependabot
-- ref(crons): Add information to short-interval cron error message (#2246) by @lobsterkatie
-- Read MAX_VALUE_LENGTH from client options (#2121) (#2171) by @puittenbroek
-- ref(integrations): Rename `request_bodies` to `max_request_body_size` (#2247) by @mgaligniana
+- Bump black from 23.3.0 to 23.7.0 (#2256) by @dependabot
 - Remove py3.4 from tox.ini (#2248) by @sentrivana
 
 ## 1.28.1
