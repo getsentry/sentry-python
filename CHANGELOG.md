@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.29.2
+
+### Various fixes & improvements
+
+- Revert GraphQL integration (#2287) by @sentrivana
+
 ## 1.29.1
 
 ### Various fixes & improvements
