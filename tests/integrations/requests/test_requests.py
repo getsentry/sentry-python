@@ -69,8 +69,10 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     }
 
 
-def test_graphql_integration_doesnt_affect_responses(sentry_init):
+def test_graphql_integration_doesnt_affect_responses(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()])
+
+    events = capture_events()
 
     msg = {"errors": [{"message": "some message"}]}
 
@@ -82,4 +84,5 @@ def test_graphql_integration_doesnt_affect_responses(sentry_init):
     with mock.patch.object(MockServerRequestHandler, "do_POST", do_POST):
         response = requests.post("http://localhost:{}".format(PORT) + "/graphql")
 
+    assert len(events) == 1
     assert response.json() == msg
