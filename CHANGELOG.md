@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.29.1
+
+### Various fixes & improvements
+
+- Fix GraphQL integration swallowing responses (#2286) by @sentrivana
+- Fix typo (#2283) by @sentrivana
+
 ## 1.29.0
 
 ### Various fixes & improvements
