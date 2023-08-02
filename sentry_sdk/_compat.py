@@ -35,6 +35,7 @@ if PY2:
         cls.__str__ = lambda x: unicode(x).encode("utf-8")  # noqa
         return cls
 
+    # The line below is written as an "exec" because it triggers a syntax error in Python 3
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
 
