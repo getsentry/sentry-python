@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.29.2
+
+### Various fixes & improvements
+
+- Revert GraphQL integration (#2287) by @sentrivana
+
+## 1.29.1
+
+### Various fixes & improvements
+
+- Fix GraphQL integration swallowing responses (#2286) by @sentrivana
+- Fix typo (#2283) by @sentrivana
+
+## 1.29.0
+
+### Various fixes & improvements
+
+- Capture GraphQL client errors (#2243) by @sentrivana
+  - The SDK will now create dedicated errors whenever an HTTP client makes a request to a `/graphql` endpoint and the response contains an error. You can opt out of this by providing `capture_graphql_errors=False` to the HTTP client integration.
+- Read MAX_VALUE_LENGTH from client options (#2121) (#2171) by @puittenbroek
+- Rename `request_bodies` to `max_request_body_size` (#2247) by @mgaligniana
+- Always sample checkin regardless of `sample_rate` (#2279) by @szokeasaurusrex
+- Add information to short-interval cron error message (#2246) by @lobsterkatie
+- Add DB connection attributes in spans (#2274) by @antonpirker
+- Add `db.system` to remaining Redis spans (#2271) by @AbhiPrasad
+- Clarified the procedure for running tests (#2276) by @szokeasaurusrex
+- Fix Chalice tests (#2278) by @sentrivana
+- Bump Black from 23.3.0 to 23.7.0 (#2256) by @dependabot
+- Remove py3.4 from tox.ini (#2248) by @sentrivana
+
 ## 1.28.1
 
 ### Various fixes & improvements

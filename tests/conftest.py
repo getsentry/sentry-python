@@ -584,12 +584,6 @@ class MockServerRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         return
 
-    def do_POST(self):  # noqa: N802
-        # Process an HTTP POST request and return a response with an HTTP 200 status.
-        self.send_response(200)
-        self.end_headers()
-        return
-
 
 def get_free_port():
     s = socket.socket(socket.AF_INET, type=socket.SOCK_STREAM)

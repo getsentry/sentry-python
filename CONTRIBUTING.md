@@ -65,48 +65,20 @@ That's it. You should be ready to make changes, run tests, and make commits! If 
 
 ## Running tests
 
-We have a `Makefile` to help people get started with hacking on the SDK
-without having to know or understand the Python ecosystem.
-Run `make` or `make help` to list commands.
-
-So the simplest way to run tests is:
-
+To run the tests, first setup your development environment according to the instructions above. Then, install the required packages for running tests with the following command:
 ```bash
-cd sentry-python
-
-make test
+pip install -r test-requirements.txt
 ```
 
-This will use [Tox](https://tox.wiki/en/latest/) to run our whole test suite
-under Python 2.7 and Python 3.7.
-
-Of course you can always run the underlying commands yourself, which is
-particularly useful when wanting to provide arguments to `pytest` to run
-specific tests:
-
+Once the requirements are installed, you can run all tests with the following command:
 ```bash
-cd sentry-python
-
-# create virtual environment
-python -m venv .venv
-
-# activate virtual environment
-source .venv/bin/activate
-
-# install sentry-python
-pip install -e .
-
-# install requirements
-pip install -r test-requirements.txt
-
-# run tests
 pytest tests/
 ```
 
-If you want to run the tests for a specific integration you should do so by doing this:
+If you would like to run the tests for a specific integration, use a command similar to the one below:
 
 ```bash
-pytest -rs tests/integrations/flask/
+pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integration you wish to test
 ```
 
 **Hint:** Tests of integrations need additional dependencies. The switch `-rs` will show you why tests where skipped and what dependencies you need to install for the tests to run. (You can also consult the [tox.ini](tox.ini) file to see what dependencies are installed for each integration)

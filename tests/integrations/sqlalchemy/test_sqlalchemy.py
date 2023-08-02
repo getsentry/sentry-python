@@ -122,6 +122,9 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
 
     for span in event["spans"]:
         assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+        assert span["data"][SPANDATA.DB_NAME] == ":memory:"
+        assert SPANDATA.SERVER_ADDRESS not in span["data"]
+        assert SPANDATA.SERVER_PORT not in span["data"]
 
     assert (
         render_span_tree(event)

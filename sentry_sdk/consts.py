@@ -68,6 +68,12 @@ class SPANDATA:
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
+    DB_NAME = "db.name"
+    """
+    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
+    Example: myDatabase
+    """
+
     DB_OPERATION = "db.operation"
     """
     The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
@@ -116,6 +122,31 @@ class SPANDATA:
     """
     The HTTP status code as an integer.
     Example: 418
+    """
+
+    SERVER_ADDRESS = "server.address"
+    """
+    Name of the database host.
+    Example: example.com
+    """
+
+    SERVER_PORT = "server.port"
+    """
+    Logical server port number
+    Example: 80; 8080; 443
+    """
+
+    SERVER_SOCKET_ADDRESS = "server.socket.address"
+    """
+    Physical server IP address or Unix socket address.
+    Example: 10.5.3.2
+    """
+
+    SERVER_SOCKET_PORT = "server.socket.port"
+    """
+    Physical server port.
+    Recommended: If different than server.port.
+    Example: 16456
     """
 
 
@@ -232,4 +263,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.28.1"
+VERSION = "1.29.2"
