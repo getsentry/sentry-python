@@ -4,14 +4,14 @@ from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.utils import logger
 
 try:
-    from opentelemetry import trace
-    from opentelemetry.instrumentation.auto_instrumentation._load import (
+    from opentelemetry import trace  # type: ignore
+    from opentelemetry.instrumentation.auto_instrumentation._load import (  # type: ignore
         _load_distro,
         _load_instrumentors,
     )
-    from opentelemetry.propagate import set_global_textmap
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import (
+    from opentelemetry.propagate import set_global_textmap  # type: ignore
+    from opentelemetry.sdk.trace import TracerProvider  # type: ignore
+    from opentelemetry.sdk.trace.export import (  # type: ignore
         BatchSpanProcessor,
         ConsoleSpanExporter,
     )
