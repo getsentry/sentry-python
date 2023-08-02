@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from typing import Iterator
     from typing import List
     from typing import Set
-    from typing import Tuple
     from typing import Type
 
 
@@ -21,8 +20,8 @@ _installed_integrations = set()  # type: Set[str]
 
 
 def _generate_default_integrations_iterator(
-    integrations,  # type: Tuple[str, ...]
-    auto_enabling_integrations,  # type: Tuple[str, ...]
+    integrations,  # type: List[str]
+    auto_enabling_integrations,  # type: List[str]
 ):
     # type: (...) -> Callable[[bool], Iterator[Type[Integration]]]
 
