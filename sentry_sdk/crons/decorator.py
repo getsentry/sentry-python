@@ -1,15 +1,11 @@
-from contextlib import contextmanager
 import sys
 
-from sentry_sdk._compat import reraise, PY2
+from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.utils import now
-
-
-if PY2:
-    from sentry_sdk._compat import DecoratorContextManager
+from sentry_sdk._compat import contextmanager
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -62,7 +58,3 @@ def monitor(monitor_slug=None):
         status=MonitorStatus.OK,
         duration=duration_s,
     )
-
-
-if PY2:
-    monitor = DecoratorContextManager(monitor)

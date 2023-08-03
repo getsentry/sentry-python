@@ -1,4 +1,6 @@
 import sys
+import contextlib
+from functools import wraps
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -38,28 +40,35 @@ if PY2:
     # The line below is written as an "exec" because it triggers a syntax error in Python 3
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
-    class DecoratorContextManager:
-        def __init__(self, the_contextmanager):
-            self.the_contextmanager = the_contextmanager
+    def contextmanager(func):
+        """
+        Decorator which creates a contextmanager that can also be used as a
+        decorator, similar to how the built-in contextlib.contextmanager
+        function works in Python 3.2+.
+        """
+        contextmanager_func = contextlib.contextmanager(func)
 
-        def __enter__(self):
-            self.the_contextmanager.__enter__()
+        @wraps(func)
+        class DecoratorContextManager:
+            def __init__(self, *args, **kwargs):
+                self.the_contextmanager = contextmanager_func(*args, **kwargs)
 
-        def __exit__(self, *args, **kwargs):
-            self.the_contextmanager.__exit__(*args, **kwargs)
+            def __enter__(self):
+                self.the_contextmanager.__enter__()
 
-        def __call__(self, *context_manager_args, **context_manager_kwargs):
-            def inner(decorated):
+            def __exit__(self, *args, **kwargs):
+                self.the_contextmanager.__exit__(*args, **kwargs)
+
+            def __call__(self, decorated_func):
+                @wraps(decorated_func)
                 def when_called(*args, **kwargs):
-                    with self.the_contextmanager(
-                        *context_manager_args, **context_manager_kwargs
-                    ):
-                        return_val = decorated(*args, **kwargs)
+                    with self.the_contextmanager:
+                        return_val = decorated_func(*args, **kwargs)
                     return return_val
 
                 return when_called
 
-            return inner
+        return DecoratorContextManager
 
 else:
     import urllib.parse as urlparse  # noqa
@@ -81,6 +90,9 @@ else:
         if value.__traceback__ is not tb:
             raise value.with_traceback(tb)
         raise value
+
+    # contextlib.contextmanager already can be used as decorator in Python 3.2+
+    contextmanager = contextlib.contextmanager
 
 
 def with_metaclass(meta, *bases):
