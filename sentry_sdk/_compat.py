@@ -38,6 +38,28 @@ if PY2:
     # The line below is written as an "exec" because it triggers a syntax error in Python 3
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
+    class DecoratorContextManager:
+        def __init__(self, the_contextmanager):
+            self.the_contextmanager = the_contextmanager
+
+        def __enter__(self):
+            self.the_contextmanager.__enter__()
+
+        def __exit__(self, *args, **kwargs):
+            self.the_contextmanager.__exit__(*args, **kwargs)
+
+        def __call__(self, *context_manager_args, **context_manager_kwargs):
+            def inner(decorated):
+                def when_called(*args, **kwargs):
+                    with self.the_contextmanager(
+                        *context_manager_args, **context_manager_kwargs
+                    ):
+                        return_val = decorated(*args, **kwargs)
+                    return return_val
+
+                return when_called
+
+            return inner
 
 else:
     import urllib.parse as urlparse  # noqa
