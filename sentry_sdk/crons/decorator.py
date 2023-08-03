@@ -8,12 +8,12 @@ from sentry_sdk.utils import now
 from sentry_sdk._compat import contextmanager
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Generator, Optional
 
 
 @contextmanager
 def monitor(monitor_slug=None):
-    # type: (Optional[str]) -> Callable[..., Any]
+    # type: (Optional[str]) -> Generator[None, None, None]
     """
     Decorator to capture checkin events for a monitor.
 

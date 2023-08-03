@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Type
     from typing import TypeVar
+    from typing import Callable
 
     T = TypeVar("T")
 
@@ -41,6 +42,7 @@ if PY2:
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
     def contextmanager(func):
+        # type: (Callable) -> Callable
         """
         Decorator which creates a contextmanager that can also be used as a
         decorator, similar to how the built-in contextlib.contextmanager
@@ -51,17 +53,22 @@ if PY2:
         @wraps(func)
         class DecoratorContextManager:
             def __init__(self, *args, **kwargs):
+                # type: (...) -> None
                 self.the_contextmanager = contextmanager_func(*args, **kwargs)
 
             def __enter__(self):
+                # type: () -> None
                 self.the_contextmanager.__enter__()
 
             def __exit__(self, *args, **kwargs):
+                # type: (...) -> None
                 self.the_contextmanager.__exit__(*args, **kwargs)
 
             def __call__(self, decorated_func):
+                # type: (Callable) -> Callable[...]
                 @wraps(decorated_func)
                 def when_called(*args, **kwargs):
+                    # type: (...) -> Any
                     with self.the_contextmanager:
                         return_val = decorated_func(*args, **kwargs)
                     return return_val
