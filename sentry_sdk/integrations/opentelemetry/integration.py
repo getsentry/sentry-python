@@ -27,6 +27,7 @@ INSTRUMENTED_CLASSES = {
     # A mapping of packages to (original class, instrumented class) pairs. This
     # is used to instrument any classes that were imported before OTel
     # instrumentation took place.
+    # XXX otel: mappings need to be added manually
     "fastapi": (
         "fastapi.FastAPI",
         "opentelemetry.instrumentation.fastapi._InstrumentedFastAPI",
@@ -58,9 +59,7 @@ class OpenTelemetryIntegration(Integration):
 
 def _record_unpatched_classes():
     # type: () -> None
-    """
-    Keep references to classes that are about to be instrumented.
-    """
+    """Keep references to classes that are about to be instrumented."""
     installed_packages = _get_installed_modules()
 
     for package, (orig_path, instr_path) in INSTRUMENTED_CLASSES.items():
@@ -73,13 +72,13 @@ def _record_unpatched_classes():
                 orig = getattr(import_module(parts[0]), parts[1])
                 INSTRUMENTED_CLASSES[package] = (orig, instr_path)
             except (AttributeError, ImportError):
-                logger.debug("Failed to import %s", orig_path)
+                logger.debug("[OTel] Failed to import %s", orig_path)
 
 
 def _patch_remaining_objects():
     # type: () -> None
     """
-    Best-effort attempt to patch any unpatched OTel-instrumented classes in sys.modules.
+    Best-effort attempt to patch any uninstrumented classes in sys.modules.
 
     This enables us to not care about the order of imports and sentry_sdk.init()
     in user code. If e.g. the Flask class had been imported before sentry_sdk
@@ -119,7 +118,7 @@ def _patch_remaining_objects():
                     try:
                         instr = getattr(import_module(parts[0]), parts[-1])
                     except (AttributeError, ImportError):
-                        logger.debug("Failed to import %s", instr_path)
+                        logger.debug("[OTel] Failed to import %s", instr_path)
 
                     setattr(module, var_name, instr)
 
