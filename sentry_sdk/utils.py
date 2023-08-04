@@ -1271,9 +1271,10 @@ disable_capture_event = ContextVar("disable_capture_event")
 class ServerlessTimeoutWarning(Exception):  # noqa: N818
     """Raised when a serverless method is about to reach its timeout."""
 
-
 class SentryGraphQLClientError(Exception):
     """Synthetic exception for GraphQL client errors."""
+
+    pass
 
 
 def _get_graphql_operation_name(query):
@@ -1301,7 +1302,6 @@ def _get_graphql_operation_type(query):
     if query.startswith("subscription"):
         return "subscription"
     return "query"
-
 
 class TimeoutThread(threading.Thread):
     """Creates a Thread which runs (sleeps) for a time duration equal to

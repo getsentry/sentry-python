@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import sys
+import contextlib
+from functools import wraps
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import TypeVar
+    from typing import Callable
 
     T = TypeVar("T")
 
@@ -32,8 +35,44 @@ if PY2:
         cls.__str__ = lambda x: unicode(x).encode("utf-8")  # noqa
         return cls
 
+    # The line below is written as an "exec" because it triggers a syntax error in Python 3
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
+    def contextmanager(func):
+        # type: (Callable) -> Callable
+        """
+        Decorator which creates a contextmanager that can also be used as a
+        decorator, similar to how the built-in contextlib.contextmanager
+        function works in Python 3.2+.
+        """
+        contextmanager_func = contextlib.contextmanager(func)
+
+        @wraps(func)
+        class DecoratorContextManager:
+            def __init__(self, *args, **kwargs):
+                # type: (...) -> None
+                self.the_contextmanager = contextmanager_func(*args, **kwargs)
+
+            def __enter__(self):
+                # type: () -> None
+                self.the_contextmanager.__enter__()
+
+            def __exit__(self, *args, **kwargs):
+                # type: (...) -> None
+                self.the_contextmanager.__exit__(*args, **kwargs)
+
+            def __call__(self, decorated_func):
+                # type: (Callable) -> Callable[...]
+                @wraps(decorated_func)
+                def when_called(*args, **kwargs):
+                    # type: (...) -> Any
+                    with self.the_contextmanager:
+                        return_val = decorated_func(*args, **kwargs)
+                    return return_val
+
+                return when_called
+
+        return DecoratorContextManager
 
 else:
     import urllib.parse as urlparse  # noqa
@@ -55,6 +94,9 @@ else:
         if value.__traceback__ is not tb:
             raise value.with_traceback(tb)
         raise value
+
+    # contextlib.contextmanager already can be used as decorator in Python 3.2+
+    contextmanager = contextlib.contextmanager
 
 
 def with_metaclass(meta, *bases):

@@ -1,11 +1,24 @@
 # Changelog
 
+## 1.29.2
+
+### Various fixes & improvements
+
+- Revert GraphQL integration (#2287) by @sentrivana
+
+## 1.29.1
+
+### Various fixes & improvements
+
+- Fix GraphQL integration swallowing responses (#2286) by @sentrivana
+- Fix typo (#2283) by @sentrivana
+
 ## 1.29.0
 
 ### Various fixes & improvements
 
 - Capture GraphQL client errors (#2243) by @sentrivana
-  - The SDK will now create dedicated errors whenever an HTTP client makes a reqwuest to a `/graphql` endpoint and the response contains an error. You can opt out of this by providing `capture_graphql_errors=False` to the HTTP client integration.
+  - The SDK will now create dedicated errors whenever an HTTP client makes a request to a `/graphql` endpoint and the response contains an error. You can opt out of this by providing `capture_graphql_errors=False` to the HTTP client integration.
 - Read MAX_VALUE_LENGTH from client options (#2121) (#2171) by @puittenbroek
 - Rename `request_bodies` to `max_request_body_size` (#2247) by @mgaligniana
 - Always sample checkin regardless of `sample_rate` (#2279) by @szokeasaurusrex

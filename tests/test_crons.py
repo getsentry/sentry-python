@@ -21,6 +21,17 @@ def _break_world(name):
     return "Hello, {}".format(name)
 
 
+def _hello_world_contextmanager(name):
+    with sentry_sdk.monitor(monitor_slug="abc123"):
+        return "Hello, {}".format(name)
+
+
+def _break_world_contextmanager(name):
+    with sentry_sdk.monitor(monitor_slug="def456"):
+        1 / 0
+        return "Hello, {}".format(name)
+
+
 def test_decorator(sentry_init):
     sentry_init()
 
@@ -52,6 +63,54 @@ def test_decorator_error(sentry_init):
     ) as fake_capture_checking:
         with pytest.raises(Exception):
             result = _break_world("Grace")
+
+        assert "result" not in locals()
+
+        # Check for initial checkin
+        fake_capture_checking.assert_has_calls(
+            [
+                mock.call(monitor_slug="def456", status="in_progress"),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checking.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checking.call_args[1]["status"] == "error"
+        assert fake_capture_checking.call_args[1]["duration"]
+        assert fake_capture_checking.call_args[1]["check_in_id"]
+
+
+def test_contextmanager(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checking:
+        result = _hello_world_contextmanager("Grace")
+        assert result == "Hello, Grace"
+
+        # Check for initial checkin
+        fake_capture_checking.assert_has_calls(
+            [
+                mock.call(monitor_slug="abc123", status="in_progress"),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checking.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checking.call_args[1]["status"] == "ok"
+        assert fake_capture_checking.call_args[1]["duration"]
+        assert fake_capture_checking.call_args[1]["check_in_id"]
+
+
+def test_contextmanager_error(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checking:
+        with pytest.raises(Exception):
+            result = _break_world_contextmanager("Grace")
 
         assert "result" not in locals()
 

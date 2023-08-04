@@ -46,14 +46,30 @@ try:
 
     from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp import ClientSession, ContentTypeError, TraceConfig
-    from aiohttp.web import Application, HTTPException, UrlDispatcher
+    from aiohttp.web import Application, HTTPException, UrlDispatcher, Response
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    pass
+    from aiohttp.web_request import Request
+    from aiohttp.abc import AbstractMatchInfo
+    from aiohttp import (
+        TraceRequestStartParams,
+        TraceRequestEndParams,
+        TraceRequestChunkSentParams,
+    )
+    from types import SimpleNamespace
+    from typing import Any
+    from typing import Dict
+    from typing import Optional
+    from typing import Tuple
+    from typing import Callable
+    from typing import Union
+
+    from sentry_sdk.utils import ExcInfo
+    from sentry_sdk._types import EventProcessor
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
@@ -62,16 +78,14 @@ TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
 
-    def __init__(self, transaction_style="handler_name", capture_graphql_errors=True):
-        # type: (str, bool) -> None
+    def __init__(self, transaction_style="handler_name"):
+        # type: (str) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
-
-        self.capture_graphql_errors = capture_graphql_errors
 
     @staticmethod
     def setup_once():
@@ -111,7 +125,7 @@ class AioHttpIntegration(Integration):
                     # create a task to wrap each request.
                     with hub.configure_scope() as scope:
                         scope.clear_breadcrumbs()
-                        scope.add_event_processor(_make_server_processor(weak_request))
+                        scope.add_event_processor(_make_request_processor(weak_request))
 
                     transaction = continue_trace(
                         request.headers,
@@ -139,7 +153,6 @@ class AioHttpIntegration(Integration):
                             reraise(*_capture_exception(hub))
 
                         transaction.set_http_status(response.status)
-
                         return response
 
         Application._handle = sentry_app_handle
@@ -199,8 +212,7 @@ def create_trace_config():
     async def on_request_start(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
         hub = Hub.current
-        integration = hub.get_integration(AioHttpIntegration)
-        if integration is None:
+        if hub.get_integration(AioHttpIntegration) is None:
             return
 
         method = params.method.upper()
@@ -235,95 +247,28 @@ def create_trace_config():
                     params.headers[key] = value
 
         trace_config_ctx.span = span
-        trace_config_ctx.is_graphql_request = params.url.path == "/graphql"
-
-        if integration.capture_graphql_errors and trace_config_ctx.is_graphql_request:
-            trace_config_ctx.request_headers = params.headers
-
-    async def on_request_chunk_sent(session, trace_config_ctx, params):
-        # type: (ClientSession, SimpleNamespace, TraceRequestChunkSentParams) -> None
-        integration = Hub.current.get_integration(AioHttpIntegration)
-        if integration is None:
-            return
-
-        if integration.capture_graphql_errors and trace_config_ctx.is_graphql_request:
-            trace_config_ctx.request_body = None
-            with capture_internal_exceptions():
-                try:
-                    trace_config_ctx.request_body = json.loads(params.chunk)
-                except json.JSONDecodeError:
-                    return
 
     async def on_request_end(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
-        hub = Hub.current
-        integration = hub.get_integration(AioHttpIntegration)
-        if integration is None:
+        if trace_config_ctx.span is None:
             return
 
-        response = params.response
-
-        if trace_config_ctx.span is not None:
-            span = trace_config_ctx.span
-            span.set_http_status(int(response.status))
-            span.set_data("reason", response.reason)
-
-        if (
-            integration.capture_graphql_errors
-            and trace_config_ctx.is_graphql_request
-            and response.method in ("GET", "POST")
-            and response.status == 200
-        ):
-            with hub.configure_scope() as scope:
-                with capture_internal_exceptions():
-                    try:
-                        response_content = await response.json()
-                    except ContentTypeError:
-                        pass
-                    else:
-                        scope.add_event_processor(
-                            _make_client_processor(
-                                trace_config_ctx=trace_config_ctx,
-                                response=response,
-                                response_content=response_content,
-                            )
-                        )
-
-                        if (
-                            response_content
-                            and isinstance(response_content, dict)
-                            and response_content.get("errors")
-                        ):
-                            try:
-                                raise SentryGraphQLClientError
-                            except SentryGraphQLClientError as ex:
-                                event, hint = event_from_exception(
-                                    ex,
-                                    client_options=hub.client.options
-                                    if hub.client
-                                    else None,
-                                    mechanism={
-                                        "type": AioHttpIntegration.identifier,
-                                        "handled": False,
-                                    },
-                                )
-                                hub.capture_event(event, hint=hint)
-
-        if trace_config_ctx.span is not None:
-            span.finish()
+        span = trace_config_ctx.span
+        span.set_http_status(int(params.response.status))
+        span.set_data("reason", params.response.reason)
+        span.finish()
 
     trace_config = TraceConfig()
 
     trace_config.on_request_start.append(on_request_start)
-    trace_config.on_request_chunk_sent.append(on_request_chunk_sent)
     trace_config.on_request_end.append(on_request_end)
 
     return trace_config
 
 
-def _make_server_processor(weak_request):
+def _make_request_processor(weak_request):
     # type: (Callable[[], Request]) -> EventProcessor
-    def aiohttp_server_processor(
+    def aiohttp_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
     ):
@@ -355,63 +300,7 @@ def _make_server_processor(weak_request):
 
         return event
 
-    return aiohttp_server_processor
-
-
-def _make_client_processor(trace_config_ctx, response, response_content):
-    # type: (SimpleNamespace, Response, Optional[Dict[str, Any]]) -> EventProcessor
-    def aiohttp_client_processor(
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
-    ):
-        # type: (...) -> Dict[str, Any]
-        with capture_internal_exceptions():
-            request_info = event.setdefault("request", {})
-
-            parsed_url = parse_url(str(response.url), sanitize=False)
-            request_info["url"] = parsed_url.url
-            request_info["method"] = response.method
-
-            if getattr(trace_config_ctx, "request_headers", None):
-                request_info["headers"] = _filter_headers(
-                    dict(trace_config_ctx.request_headers)
-                )
-
-            if _should_send_default_pii():
-                if getattr(trace_config_ctx, "request_body", None):
-                    request_info["data"] = trace_config_ctx.request_body
-
-                request_info["query_string"] = parsed_url.query
-
-            if response.url.path == "/graphql":
-                request_info["api_target"] = "graphql"
-
-                query = request_info.get("data")
-                if response.method == "GET":
-                    query = dict(parse_qsl(parsed_url.query))
-
-                if query:
-                    operation_name = _get_graphql_operation_name(query)
-                    operation_type = _get_graphql_operation_type(query)
-                    event["fingerprint"] = [
-                        operation_name,
-                        operation_type,
-                        response.status,
-                    ]
-                    event["exception"]["values"][0][
-                        "value"
-                    ] = "GraphQL request failed, name: {}, type: {}".format(
-                        operation_name, operation_type
-                    )
-
-                if _should_send_default_pii() and response_content:
-                    contexts = event.setdefault("contexts", {})
-                    response_context = contexts.setdefault("response", {})
-                    response_context["data"] = response_content
-
-        return event
-
-    return aiohttp_client_processor
+    return aiohttp_processor
 
 
 def _capture_exception(hub):
