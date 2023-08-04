@@ -51,7 +51,7 @@ class OpenTelemetryIntegration(Integration):
         except Exception:
             logger.exception("Failed to auto initialize opentelemetry")
 
-        _patch_remaining_objects()
+        _patch_remaining_classes()
         _setup_sentry_tracing()
 
         logger.debug("Finished setting up opentelemetry integration")
@@ -75,7 +75,7 @@ def _record_unpatched_classes():
                 logger.debug("[OTel] Failed to import %s", orig_path)
 
 
-def _patch_remaining_objects():
+def _patch_remaining_classes():
     # type: () -> None
     """
     Best-effort attempt to patch any uninstrumented classes in sys.modules.
