@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 def monitor(monitor_slug=None):
     # type: (Optional[str]) -> Generator[None, None, None]
     """
-    Decorator to capture checkin events for a monitor.
+    Decorator/contextmanager to capture checkin events for a monitor.
 
-    Usage:
+    Usage (as decorator):
     ```
     import sentry_sdk
 
@@ -27,6 +27,18 @@ def monitor(monitor_slug=None):
     @sentry_sdk.monitor(monitor_slug='my-fancy-slug')
     def test(arg):
         print(arg)
+    ```
+
+    Usage (as contextmanager):
+    ```
+    import sentry_sdk
+
+    app = Celery()
+
+    @app.task
+    def test(arg):
+        with sentry_sdk.monitor(monitor_slug='my-fancy-slug'):
+            print(arg)
     ```
 
     This does not have to be used with Celery, but if you do use it with celery,
