@@ -6,6 +6,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProce
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.utils import logger
+from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from opentelemetry import trace  # type: ignore
@@ -22,12 +23,15 @@ try:
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
+if TYPE_CHECKING:
+    from typing import Dict
+
 
 INSTRUMENTED_CLASSES = {
     # A mapping of packages to (original class, instrumented class) pairs. This
     # is used to instrument any classes that were imported before OTel
     # instrumentation took place.
-    # XXX otel: mappings need to be added manually
+    # XXX otel: class mappings need to be added manually
     "fastapi": (
         "fastapi.FastAPI",
         "opentelemetry.instrumentation.fastapi._InstrumentedFastAPI",
@@ -42,7 +46,7 @@ class OpenTelemetryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        _record_unpatched_classes()
+        original_classes = _record_unpatched_classes()
 
         try:
             distro = _load_distro()
@@ -51,39 +55,45 @@ class OpenTelemetryIntegration(Integration):
         except Exception:
             logger.exception("Failed to auto initialize opentelemetry")
 
-        _patch_remaining_classes()
+        _patch_remaining_classes(original_classes)
         _setup_sentry_tracing()
 
         logger.debug("Finished setting up opentelemetry integration")
 
 
 def _record_unpatched_classes():
-    # type: () -> None
+    # type: () -> Dict[str, type]
     """Keep references to classes that are about to be instrumented."""
     installed_packages = _get_installed_modules()
 
-    for package, (orig_path, instr_path) in INSTRUMENTED_CLASSES.items():
+    original_classes = {}
+
+    for package, (orig_path, _) in INSTRUMENTED_CLASSES.items():
         if package in installed_packages:
             # this package is likely to get instrumented, let's remember the
             # unpatched classes so that we can re-patch any missing occurrences
             # later on
-            parts = orig_path.rsplit(".", maxsplit=1)
             try:
-                orig = getattr(import_module(parts[0]), parts[1])
-                INSTRUMENTED_CLASSES[package] = (orig, instr_path)
+                original_cls = _import_by_path(orig_path)
             except (AttributeError, ImportError):
                 logger.debug("[OTel] Failed to import %s", orig_path)
+                continue
+
+            original_classes[package] = original_cls
+
+    return original_classes
 
 
-def _patch_remaining_classes():
-    # type: () -> None
+def _patch_remaining_classes(original_classes):
+    # type: (Dict[str, type]) -> None
     """
     Best-effort attempt to patch any uninstrumented classes in sys.modules.
 
     This enables us to not care about the order of imports and sentry_sdk.init()
     in user code. If e.g. the Flask class had been imported before sentry_sdk
-    was init()ed (and therefore before the OTel instrumentation ran), we would
-    find and replace it here.
+    was init()ed (and therefore before the OTel instrumentation ran), it would
+    not be instrumented. This function goes over remaining uninstrumented
+    occurrences of the class in sys.modules and patches them.
 
     Since this is looking for exact matches, it will not work in some scenarios
     (e.g. if someone is not using the specific class explicitly, but rather
@@ -97,30 +107,42 @@ def _patch_remaining_classes():
         ):
             continue
 
-        for orig, instr_path in INSTRUMENTED_CLASSES.values():
-            if isinstance(orig, str):
-                # XXX otel: actually check that it's been instrumented before
-                # patching! this just means that autoinstrumentation was
-                # attempted, but it might have failed due to version mismatches
-                # etc.
+        for package, original_cls in original_classes.items():
+            original_path, instrumented_path = INSTRUMENTED_CLASSES[package]
+
+            try:
+                cls = _import_by_path(original_path)
+            except (AttributeError, ImportError):
+                logger.debug(
+                    "[OTel] Failed to check if class has been instrumented: %s",
+                    original_path,
+                )
+                continue
+
+            if not cls.__module__.startswith("opentelemetry."):
+                # the class wasn't instrumented, don't do any additional patching
                 continue
 
             for var_name, var in vars(module).copy().items():
-                if var == orig:
+                if var == original_cls:
                     logger.debug(
-                        "Additionally patching %s from %s with %s",
-                        orig,
+                        "[OTel] Additionally patching %s from %s with %s",
+                        original_cls,
                         module_name,
-                        instr_path,
+                        instrumented_path,
                     )
 
-                    parts = instr_path.rsplit(".", maxsplit=1)
                     try:
-                        instr = getattr(import_module(parts[0]), parts[-1])
+                        isntrumented_cls = _import_by_path(instrumented_path)
                     except (AttributeError, ImportError):
-                        logger.debug("[OTel] Failed to import %s", instr_path)
+                        logger.debug("[OTel] Failed to import %s", instrumented_path)
 
-                    setattr(module, var_name, instr)
+                    setattr(module, var_name, isntrumented_cls)
+
+
+def _import_by_path(path):
+    parts = path.rsplit(".", maxsplit=1)
+    return getattr(import_module(parts[0]), parts[-1])
 
 
 def _setup_sentry_tracing():

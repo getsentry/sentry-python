@@ -5,7 +5,6 @@ except ImportError:
     # python < 3.3
     from mock import MagicMock
 
-
 from sentry_sdk.integrations.opentelemetry.integration import OpenTelemetryIntegration
 
 
@@ -16,7 +15,6 @@ def test_integration_enabled_if_option_is_on(sentry_init):
             "otel_powered_performance": True,
         }
     )
-
     OpenTelemetryIntegration.setup_once.assert_called_once()
 
 
