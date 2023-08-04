@@ -316,3 +316,12 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             status_code = otel_span.attributes.get(SpanAttributes.HTTP_STATUS_CODE)
             if status_code:
                 sentry_span.set_http_status(status_code)
+
+            op = "http"
+
+            if otel_span.kind == SpanKind.SERVER:
+                op += ".server"
+            elif otel_span.kind == SpanKind.CLIENT:
+                op += ".client"
+
+            sentry_span.op = op
