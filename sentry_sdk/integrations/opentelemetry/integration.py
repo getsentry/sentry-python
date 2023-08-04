@@ -141,6 +141,7 @@ def _patch_remaining_classes(original_classes):
 
 
 def _import_by_path(path):
+    # type: (str) -> type
     parts = path.rsplit(".", maxsplit=1)
     return getattr(import_module(parts[0]), parts[-1])
 
