@@ -46,6 +46,10 @@ class OpenTelemetryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        logger.warning(
+            "[OTel] Initializing highly experimental OpenTelemetry support. Use at your own risk."
+        )
+
         original_classes = _record_unpatched_classes()
 
         try:
@@ -53,12 +57,12 @@ class OpenTelemetryIntegration(Integration):
             distro.configure()
             _load_instrumentors(distro)
         except Exception:
-            logger.exception("Failed to auto initialize opentelemetry")
+            logger.exception("[OTel] Failed to auto-initialize OpenTelemetry")
 
         _patch_remaining_classes(original_classes)
         _setup_sentry_tracing()
 
-        logger.debug("Finished setting up opentelemetry integration")
+        logger.debug("[OTel] Finished setting up OpenTelemetry integration")
 
 
 def _record_unpatched_classes():
