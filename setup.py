@@ -61,13 +61,13 @@ setup(
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
             "opentelemetry-distro~=0.40b0",
-            # XXX otel: this is just a cherry-picked selection, there's much more
-            # that can be imported
+            # XXX otel: this is just a cherry-picked selection for the PoC,
+            # there's much more that can be imported
             "opentelemetry-instrumentation-fastapi~=0.40b0",
             "opentelemetry-instrumentation-flask~=0.40b0",
             "opentelemetry-instrumentation-requests~=0.40b0",
+            "opentelemetry-instrumentation-sqlite3~=0.40b0",
             "opentelemetry-instrumentation-urllib~=0.40b0",
-            "opentelemetry-instrumentation-wsgi~=0.40b0",
         ],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
