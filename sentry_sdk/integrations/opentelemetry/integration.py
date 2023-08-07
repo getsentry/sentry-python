@@ -21,10 +21,6 @@ try:
     )
     from opentelemetry.propagate import set_global_textmap  # type: ignore
     from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-    from opentelemetry.sdk.trace.export import (  # type: ignore
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-    )
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
@@ -160,11 +156,6 @@ def _setup_sentry_tracing():
     # type: () -> None
 
     provider = TracerProvider()
-
-    # XXX for debugging
-    processor = BatchSpanProcessor(ConsoleSpanExporter())
-    provider.add_span_processor(processor)
-    # XXX end
 
     provider.add_span_processor(SentrySpanProcessor())
 
