@@ -240,7 +240,9 @@ class _Client(object):
                 )
 
             if self.options["_experiments"].get("otel_powered_performance", False):
-                logger.debug("Enabling experimental OTel-powered performance")
+                logger.debug(
+                    "[OTel] Enabling experimental OTel-powered performance monitoring."
+                )
                 self.options["instrumenter"] = INSTRUMENTER.OTEL
                 _DEFAULT_INTEGRATIONS.append(
                     "sentry_sdk.integrations.opentelemetry.OpenTelemetryIntegration",

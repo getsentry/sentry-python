@@ -61,8 +61,6 @@ setup(
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
             "opentelemetry-distro~=0.40b0",
-            # XXX otel: this is just a cherry-picked selection for the PoC,
-            # there's much more that can be imported
             "opentelemetry-instrumentation-django~=0.40b0",
             "opentelemetry-instrumentation-fastapi~=0.40b0",
             "opentelemetry-instrumentation-flask~=0.40b0",

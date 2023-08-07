@@ -1,3 +1,8 @@
+"""
+IMPORTANT: The contents of this file are part of a proof of concept and as such
+are experimental and not suitable for production use. They may be changed or
+removed at any time without prior notice.
+"""
 import sys
 from importlib import import_module
 
@@ -29,9 +34,8 @@ if TYPE_CHECKING:
 
 INSTRUMENTED_CLASSES = {
     # A mapping of packages to (original class, instrumented class) pairs. This
-    # is used to instrument any classes that were imported before OTel
+    # is used to post-instrument any classes that were imported before OTel
     # instrumentation took place.
-    # XXX otel: class mappings need to be added manually
     "fastapi": (
         "fastapi.FastAPI",
         "opentelemetry.instrumentation.fastapi._InstrumentedFastAPI",
@@ -67,16 +71,18 @@ class OpenTelemetryIntegration(Integration):
 
 def _record_unpatched_classes():
     # type: () -> Dict[str, type]
-    """Keep references to classes that are about to be instrumented."""
+    """
+    Keep references to classes that are about to be instrumented.
+
+    Used to search for unpatched classes after the instrumentation has run so
+    that they can be patched manually.
+    """
     installed_packages = _get_installed_modules()
 
     original_classes = {}
 
     for package, (orig_path, _) in INSTRUMENTED_CLASSES.items():
         if package in installed_packages:
-            # this package is likely to get instrumented, let's remember the
-            # unpatched classes so that we can re-patch any missing occurrences
-            # later on
             try:
                 original_cls = _import_by_path(orig_path)
             except (AttributeError, ImportError):
