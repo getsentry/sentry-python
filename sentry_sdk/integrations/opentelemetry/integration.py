@@ -154,7 +154,6 @@ def _import_by_path(path):
 
 def _setup_sentry_tracing():
     # type: () -> None
-
     provider = TracerProvider()
 
     provider.add_span_processor(SentrySpanProcessor())
