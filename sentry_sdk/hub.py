@@ -838,7 +838,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return meta
 
     def is_sentry_url(self, url):
-        return self.client.is_sentry_url(url)
+        # type: (str) -> bool
+        return self.client is not None and self.client.is_sentry_url(url)
 
 
 GLOBAL_HUB = Hub()

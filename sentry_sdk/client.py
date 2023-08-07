@@ -586,10 +586,11 @@ class _Client(object):
         """
         Determines whether the given URL matches the Sentry DSN.
         """
-        try:
-            return self.transport.parsed_dsn.netloc in url
-        except AttributeError:
-            return False
+        return (
+            self.transport is not None
+            and self.transport.parsed_dsn is not None
+            and self.transport.parsed_dsn.netloc in url
+        )
 
     def capture_session(
         self, session  # type: Session
