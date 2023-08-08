@@ -224,9 +224,7 @@ class _Client(object):
 
             self.monitor = None
             if self.transport:
-                if self.options["_experiments"].get(
-                    "enable_backpressure_handling", False
-                ):
+                if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
