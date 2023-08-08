@@ -69,12 +69,13 @@ def _install_httplib():
     def putrequest(self, method, url, *args, **kwargs):
         # type: (HTTPConnection, str, str, *Any, **Any) -> Any
         hub = Hub.current
-        if hub.get_integration(StdlibIntegration) is None:
-            return real_putrequest(self, method, url, *args, **kwargs)
 
         host = self.host
         port = self.port
         default_port = self.default_port
+
+        if hub.get_integration(StdlibIntegration) is None or hub.is_sentry_url(host):
+            return real_putrequest(self, method, url, *args, **kwargs)
 
         real_url = url
         if real_url is None or not real_url.startswith(("http://", "https://")):
