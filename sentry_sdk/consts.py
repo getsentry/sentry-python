@@ -40,6 +40,7 @@ if TYPE_CHECKING:
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
             "enable_backpressure_handling": Optional[bool],
+            "otel_powered_performance": Optional[bool],
         },
         total=False,
     )
