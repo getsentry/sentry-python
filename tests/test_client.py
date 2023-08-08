@@ -1136,3 +1136,31 @@ def test_max_value_length_option(
     capture_message("a" * 2000)
 
     assert len(events[0]["message"]) == expected_data_length
+
+
+def test_is_sentry_url_true():
+    client = Client(dsn="https://asdf@abcd1234.ingest.sentry.io/123456789")
+    test_url = "abcd1234.ingest.sentry.io"
+
+    is_sentry_url = client.is_sentry_url(test_url)
+
+    assert is_sentry_url
+
+
+def test_is_sentry_url_false():
+    client = Client(dsn="https://asdf@abcd1234.ingest.sentry.io/123456789")
+    test_url = "abcd1234.mywebsite.com"
+
+    is_sentry_url = client.is_sentry_url(test_url)
+
+    assert not is_sentry_url
+
+
+def test_is_sentry_url_no_transport():
+    client = Client()
+    client.transport = None
+    test_url = "abcd1234.mywebsite.com"
+
+    is_sentry_url = client.is_sentry_url(test_url)
+
+    assert not is_sentry_url
