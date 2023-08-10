@@ -425,21 +425,21 @@ def test_match_regex_list(item, regex_list, expected_result):
 def test_parse_version(version, expected_result):
     assert parse_version(version) == expected_result
 
+
 @pytest.mark.parametrize(
     "error,expected_result",
-        [
-            ['',''], 
-            ['some-string', 'some-string'], 
-        ]
-)    
+    [
+        ["", ""],
+        ["some-string", "some-string"],
+    ],
+)
 def test_get_errror_message(error, expected_result):
     with pytest.raises(BaseException) as exc_value:
         exc_value.message = error
         raise Exception
     assert get_error_message(exc_value) == expected_result
-    
+
     with pytest.raises(BaseException) as exc_value:
         exc_value.detail = error
         raise Exception
     assert get_error_message(exc_value) == expected_result
-    
