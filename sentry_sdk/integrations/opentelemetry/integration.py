@@ -132,7 +132,7 @@ def _patch_remaining_classes(original_classes):
         ):
             continue
 
-        for original_cls in original_classes.values():
+        for package, original_cls in original_classes.items():
             _, instrumented_path = INSTRUMENTED_CLASSES[package]
 
             for var_name, var in vars(module).copy().items():
