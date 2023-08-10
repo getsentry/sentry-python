@@ -106,6 +106,25 @@ def _patch_remaining_classes(original_classes):
     inheriting from it). In those cases it's still necessary to sentry_sdk.init()
     before importing anything that's supposed to be instrumented.
     """
+    # check which classes have actually been instrumented
+    for package, original_cls in original_classes.copy().items():
+        original_path, instrumented_path = INSTRUMENTED_CLASSES[package]
+
+        try:
+            cls = _import_by_path(original_path)
+        except (AttributeError, ImportError):
+            logger.debug(
+                "[OTel] Failed to check if class has been instrumented: %s",
+                original_path,
+            )
+            del original_classes[package]
+
+        if not cls.__module__.startswith("opentelemetry."):
+            del original_classes[package]
+
+    if not original_classes:
+        return
+
     for module_name, module in sys.modules.copy().items():
         if (
             module_name.startswith("sentry_sdk")
@@ -114,21 +133,6 @@ def _patch_remaining_classes(original_classes):
             continue
 
         for package, original_cls in original_classes.items():
-            original_path, instrumented_path = INSTRUMENTED_CLASSES[package]
-
-            try:
-                cls = _import_by_path(original_path)
-            except (AttributeError, ImportError):
-                logger.debug(
-                    "[OTel] Failed to check if class has been instrumented: %s",
-                    original_path,
-                )
-                continue
-
-            if not cls.__module__.startswith("opentelemetry."):
-                # the class wasn't instrumented, don't do any additional patching
-                continue
-
             for var_name, var in vars(module).copy().items():
                 if var == original_cls:
                     logger.debug(
@@ -139,11 +143,11 @@ def _patch_remaining_classes(original_classes):
                     )
 
                     try:
-                        isntrumented_cls = _import_by_path(instrumented_path)
+                        instrumented_cls = _import_by_path(instrumented_path)
                     except (AttributeError, ImportError):
                         logger.debug("[OTel] Failed to import %s", instrumented_path)
 
-                    setattr(module, var_name, isntrumented_cls)
+                    setattr(module, var_name, instrumented_cls)
 
 
 def _import_by_path(path):
