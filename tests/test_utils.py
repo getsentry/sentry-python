@@ -4,6 +4,7 @@ import sys
 
 from sentry_sdk.utils import (
     Components,
+    Dsn,
     get_error_message,
     is_valid_sample_rate,
     logger,
@@ -13,7 +14,10 @@ from sentry_sdk.utils import (
     safe_str,
     sanitize_url,
     serialize_frame,
+    is_sentry_url,
 )
+
+import sentry_sdk
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -425,6 +429,46 @@ def test_match_regex_list(item, regex_list, expected_result):
 )
 def test_parse_version(version, expected_result):
     assert parse_version(version) == expected_result
+
+
+@pytest.fixture
+def mock_hub_with_dsn_netloc():
+    """
+    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    """
+
+    mock_hub = mock.Mock(spec=sentry_sdk.Hub)
+    mock_hub.client = mock.Mock(spec=sentry_sdk.Client)
+    mock_hub.client.transport = mock.Mock(spec=sentry_sdk.Transport)
+    mock_hub.client.transport.parsed_dsn = mock.Mock(spec=Dsn)
+
+    mock_hub.client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
+
+    return mock_hub
+
+
+@pytest.mark.parametrize(
+    ["test_url", "is_sentry_url_expected"],
+    [
+        ["https://asdf@abcd1234.ingest.sentry.io/123456789", True],
+        ["https://asdf@abcd1234.ingest.notsentry.io/123456789", False],
+    ],
+)
+def test_is_sentry_url_true(test_url, is_sentry_url_expected, mock_hub_with_dsn_netloc):
+    ret_val = is_sentry_url(mock_hub_with_dsn_netloc, test_url)
+
+    assert ret_val == is_sentry_url_expected
+
+
+def test_is_sentry_url_no_client():
+    hub = mock.Mock()
+    hub.client = None
+
+    test_url = "https://asdf@abcd1234.ingest.sentry.io/123456789"
+
+    ret_val = is_sentry_url(hub, test_url)
+
+    assert not ret_val
 
 
 @pytest.mark.parametrize(
