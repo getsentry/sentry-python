@@ -224,9 +224,7 @@ class _Client(object):
 
             self.monitor = None
             if self.transport:
-                if self.options["_experiments"].get(
-                    "enable_backpressure_handling", False
-                ):
+                if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
@@ -580,6 +578,17 @@ class _Client(object):
             self.transport.capture_event(event_opt)
 
         return event_id
+
+    def is_sentry_url(self, url):
+        # type: (str) -> bool
+        """
+        Determines whether the given URL matches the Sentry DSN.
+        """
+        return (
+            self.transport is not None
+            and self.transport.parsed_dsn is not None
+            and self.transport.parsed_dsn.netloc in url
+        )
 
     def capture_session(
         self, session  # type: Session
