@@ -681,8 +681,8 @@ def get_errno(exc_value):
     return getattr(exc_value, "errno", None)
 
 
-def get_error_message(exc_value: BaseException):
-    # type: (BaseException) -> str
+def get_error_message(exc_value):
+    # type: (Optional[BaseException]) -> str
     return getattr(exc_value, "message", "") or getattr(exc_value, "detail", "")
 
 
