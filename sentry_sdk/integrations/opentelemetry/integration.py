@@ -107,7 +107,7 @@ def _patch_remaining_classes(original_classes):
     before importing anything that's supposed to be instrumented.
     """
     # check which classes have actually been instrumented
-    for package, original_cls in original_classes.copy().items():
+    for package in list(original_classes.keys()):
         original_path, instrumented_path = INSTRUMENTED_CLASSES[package]
 
         try:
