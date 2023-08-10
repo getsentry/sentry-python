@@ -132,7 +132,9 @@ def _patch_remaining_classes(original_classes):
         ):
             continue
 
-        for package, original_cls in original_classes.items():
+        for original_cls in original_classes.values():
+            _, instrumented_path = INSTRUMENTED_CLASSES[package]
+
             for var_name, var in vars(module).copy().items():
                 if var == original_cls:
                     logger.debug(
