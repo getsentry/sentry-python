@@ -5,11 +5,13 @@ import sys
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    get_error_message,
     is_valid_sample_rate,
     logger,
     match_regex_list,
     parse_url,
     parse_version,
+    safe_str,
     sanitize_url,
     serialize_frame,
     is_sentry_url,
@@ -467,3 +469,22 @@ def test_is_sentry_url_no_client():
     ret_val = is_sentry_url(hub, test_url)
 
     assert not ret_val
+
+
+@pytest.mark.parametrize(
+    "error,expected_result",
+    [
+        ["", lambda x: safe_str(x)],
+        ["some-string", lambda _: "some-string"],
+    ],
+)
+def test_get_error_message(error, expected_result):
+    with pytest.raises(BaseException) as exc_value:
+        exc_value.message = error
+        raise Exception
+    assert get_error_message(exc_value) == expected_result(exc_value)
+
+    with pytest.raises(BaseException) as exc_value:
+        exc_value.detail = error
+        raise Exception
+    assert get_error_message(exc_value) == expected_result(exc_value)

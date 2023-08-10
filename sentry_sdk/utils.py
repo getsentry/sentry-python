@@ -681,6 +681,15 @@ def get_errno(exc_value):
     return getattr(exc_value, "errno", None)
 
 
+def get_error_message(exc_value):
+    # type: (Optional[BaseException]) -> str
+    return (
+        getattr(exc_value, "message", "")
+        or getattr(exc_value, "detail", "")
+        or safe_str(exc_value)
+    )
+
+
 def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
@@ -734,7 +743,7 @@ def single_exception_from_error_tuple(
 
     exception_value["module"] = get_type_module(exc_type)
     exception_value["type"] = get_type_name(exc_type)
-    exception_value["value"] = getattr(exc_value, "message", safe_str(exc_value))
+    exception_value["value"] = get_error_message(exc_value)
 
     if client_options is None:
         include_local_variables = True
