@@ -588,17 +588,6 @@ class _Client(object):
 
         return event_id
 
-    def is_sentry_url(self, url):
-        # type: (str) -> bool
-        """
-        Determines whether the given URL matches the Sentry DSN.
-        """
-        return (
-            self.transport is not None
-            and self.transport.parsed_dsn is not None
-            and self.transport.parsed_dsn.netloc in url
-        )
-
     def capture_session(
         self, session  # type: Session
     ):

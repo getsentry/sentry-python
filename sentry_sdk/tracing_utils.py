@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     Dsn,
     match_regex_list,
     to_string,
+    is_sentry_url,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -377,7 +378,7 @@ def should_propagate_trace(hub, url):
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
-    if hub.is_sentry_url(url):
+    if is_sentry_url(hub, url):
         return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)

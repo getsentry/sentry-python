@@ -306,7 +306,7 @@ def test_should_propagate_trace(
     hub = MagicMock()
     hub.client = MagicMock()
 
-    # This test assumes the urls are not Sentry URLs. Use test_should_propogate_trace_to_sentry for sentry URLs.
+    # This test assumes the urls are not Sentry URLs. Use test_should_propagate_trace_to_sentry for sentry URLs.
     hub.is_sentry_url = lambda _: False
 
     hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
