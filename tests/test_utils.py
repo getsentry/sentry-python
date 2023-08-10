@@ -429,11 +429,11 @@ def test_parse_version(version, expected_result):
 @pytest.mark.parametrize(
     "error,expected_result",
     [
-        ["", ""],
+        ["", "<ExceptionInfo Exception() tblen=1>"],
         ["some-string", "some-string"],
     ],
 )
-def test_get_errror_message(error, expected_result):
+def test_get_error_message(error, expected_result):
     with pytest.raises(BaseException) as exc_value:
         exc_value.message = error
         raise Exception
