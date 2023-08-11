@@ -1,5 +1,93 @@
 # Changelog
 
+## 1.29.2
+
+### Various fixes & improvements
+
+- Revert GraphQL integration (#2287) by @sentrivana
+
+## 1.29.1
+
+### Various fixes & improvements
+
+- Fix GraphQL integration swallowing responses (#2286) by @sentrivana
+- Fix typo (#2283) by @sentrivana
+
+## 1.29.0
+
+### Various fixes & improvements
+
+- Capture GraphQL client errors (#2243) by @sentrivana
+  - The SDK will now create dedicated errors whenever an HTTP client makes a request to a `/graphql` endpoint and the response contains an error. You can opt out of this by providing `capture_graphql_errors=False` to the HTTP client integration.
+- Read MAX_VALUE_LENGTH from client options (#2121) (#2171) by @puittenbroek
+- Rename `request_bodies` to `max_request_body_size` (#2247) by @mgaligniana
+- Always sample checkin regardless of `sample_rate` (#2279) by @szokeasaurusrex
+- Add information to short-interval cron error message (#2246) by @lobsterkatie
+- Add DB connection attributes in spans (#2274) by @antonpirker
+- Add `db.system` to remaining Redis spans (#2271) by @AbhiPrasad
+- Clarified the procedure for running tests (#2276) by @szokeasaurusrex
+- Fix Chalice tests (#2278) by @sentrivana
+- Bump Black from 23.3.0 to 23.7.0 (#2256) by @dependabot
+- Remove py3.4 from tox.ini (#2248) by @sentrivana
+
+## 1.28.1
+
+### Various fixes & improvements
+
+- Redis: Add support for redis.asyncio (#1933) by @Zhenay
+- Make sure each task that is started by Celery Beat has its own trace. (#2249) by @antonpirker
+- Add Sampling Decision to Trace Envelope Header (#2239) by @antonpirker
+- Do not add trace headers (`sentry-trace` and `baggage`) to HTTP requests to Sentry (#2240) by @antonpirker
+- Prevent adding `sentry-trace` header multiple times (#2235) by @antonpirker
+- Skip distributions with incomplete metadata (#2231) by @rominf
+- Remove stale.yml (#2245) by @hubertdeng123
+- Django: Fix 404 Handler handler being labeled as "generic ASGI request" (#1277) by @BeryJu
+
+## 1.28.0
+
+### Various fixes & improvements
+
+- Add support for cron jobs in ARQ integration (#2088) by @lewazo
+- Backpressure handling prototype (#2189) by @sl0thentr0py
+- Add "replay" context to event payload (#2234) by @antonpirker
+- Update test Django app to be compatible for Django 4.x (#1794) by @DilLip-Chowdary-Codes
+
+## 1.27.1
+
+### Various fixes & improvements
+
+- Add Starlette/FastAPI template tag for adding Sentry tracing information (#2225) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Starlette/FastAPI Jinja2 templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+- Fixed generation of baggage when a DSC is already in propagation context (#2232) by @antonpirker
+- Handle explicitly passing `None` for `trace_configs` in `aiohttp` (#2230) by @Harmon758
+- Support newest Starlette versions (#2227) by @antonpirker
+
+## 1.27.0
+
+### Various fixes & improvements
+
+- Support for SQLAlchemy 2.0 (#2200) by @antonpirker
+- Add instrumentation of `aiohttp` client requests (#1761) by @md384
+- Add Django template tag for adding Sentry tracing information (#2222) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Django templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+
+- Update Flask HTML meta helper (#2203) by @antonpirker
+- Take trace ID always from propagation context (#2209) by @antonpirker
+- Fix trace context in event payload (#2205) by @antonpirker
+- Use new top level API in `trace_propagation_meta` (#2202) by @antonpirker
+- Do not overwrite existing baggage on outgoing requests (#2191, #2214) by @sentrivana
+- Set the transaction/span status from an OTel span (#2115) by @daniil-konovalenko
+- Fix propagation of OTel `NonRecordingSpan` (#2187) by @hartungstenio
+- Fix `TaskLockedException` handling in Huey integration (#2206) by @Zhenay
+- Add message format configuration arguments to Loguru integration (#2208) by @Gwill
+- Profiling: Add client reports for profiles (#2207) by @Zylphrex
+- CI: Fix CI (#2220) by @antonpirker
+- Dependencies: Bump `checkouts/data-schemas` from `7fdde87` to `1b85152` (#2218) by @dependabot
+- Dependencies: Bump `mypy` from 1.3.0 to 1.4.1 (#2194) by @dependabot
+- Docs: Change API doc theme (#2210) by @sentrivana
+- Docs: Allow (some) autocompletion for top-level API (#2213) by @sentrivana
+- Docs: Revert autocomplete hack (#2224) by @sentrivana
+
 ## 1.26.0
 
 ### Various fixes & improvements

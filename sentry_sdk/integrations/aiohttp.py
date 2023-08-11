@@ -12,7 +12,11 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_ROUTE,
+)
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -179,7 +183,7 @@ class AioHttpIntegration(Integration):
             if hub.get_integration(AioHttpIntegration) is None:
                 return old_client_session_init(*args, **kwargs)
 
-            client_trace_configs = list(kwargs.get("trace_configs", ()))
+            client_trace_configs = list(kwargs.get("trace_configs") or ())
             trace_config = create_trace_config()
             client_trace_configs.append(trace_config)
 
@@ -220,7 +224,13 @@ def create_trace_config():
                         key=key, value=value, url=params.url
                     )
                 )
-                params.headers[key] = value
+                if key == BAGGAGE_HEADER_NAME and params.headers.get(
+                    BAGGAGE_HEADER_NAME
+                ):
+                    # do not overwrite any existing baggage, just append to it
+                    params.headers[key] += "," + value
+                else:
+                    params.headers[key] = value
 
         trace_config_ctx.span = span
 

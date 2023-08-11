@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     Dsn,
     match_regex_list,
     to_string,
+    is_sentry_url,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -330,6 +331,9 @@ class Baggage(object):
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
 
+        if transaction.sampled is not None:
+            sentry_items["sampled"] = "true" if transaction.sampled else "false"
+
         # there's an existing baggage but it was mutable,
         # which is why we are creating this new baggage.
         # However, if by chance the user put some sentry items in there, give them precedence.
@@ -373,6 +377,9 @@ def should_propagate_trace(hub, url):
     """
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
+
+    if is_sentry_url(hub, url):
+        return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 

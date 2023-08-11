@@ -50,6 +50,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -75,7 +76,7 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
-MAX_STRING_LENGTH = 1024
+
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
@@ -387,7 +388,7 @@ class AnnotatedValue(object):
     @classmethod
     def removed_because_over_size_limit(cls):
         # type: () -> AnnotatedValue
-        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the request_bodies sdk option)"""
+        """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
         return AnnotatedValue(
             value="",
             metadata={
@@ -468,6 +469,7 @@ def iter_stacks(tb):
 def get_lines_from_file(
     filename,  # type: str
     lineno,  # type: int
+    max_length=None,  # type: Optional[int]
     loader=None,  # type: Optional[Any]
     module=None,  # type: Optional[str]
 ):
@@ -496,11 +498,12 @@ def get_lines_from_file(
 
     try:
         pre_context = [
-            strip_string(line.strip("\r\n")) for line in source[lower_bound:lineno]
+            strip_string(line.strip("\r\n"), max_length=max_length)
+            for line in source[lower_bound:lineno]
         ]
-        context_line = strip_string(source[lineno].strip("\r\n"))
+        context_line = strip_string(source[lineno].strip("\r\n"), max_length=max_length)
         post_context = [
-            strip_string(line.strip("\r\n"))
+            strip_string(line.strip("\r\n"), max_length=max_length)
             for line in source[(lineno + 1) : upper_bound]
         ]
         return pre_context, context_line, post_context
@@ -512,6 +515,7 @@ def get_lines_from_file(
 def get_source_context(
     frame,  # type: FrameType
     tb_lineno,  # type: int
+    max_value_length=None,  # type: Optional[int]
 ):
     # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
     try:
@@ -528,7 +532,9 @@ def get_source_context(
         loader = None
     lineno = tb_lineno - 1
     if lineno is not None and abs_path:
-        return get_lines_from_file(abs_path, lineno, loader, module)
+        return get_lines_from_file(
+            abs_path, lineno, max_value_length, loader=loader, module=module
+        )
     return [], None, []
 
 
@@ -602,9 +608,13 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(
-    frame, tb_lineno=None, include_local_variables=True, include_source_context=True
+    frame,
+    tb_lineno=None,
+    include_local_variables=True,
+    include_source_context=True,
+    max_value_length=None,
 ):
-    # type: (FrameType, Optional[int], bool, bool) -> Dict[str, Any]
+    # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -630,7 +640,7 @@ def serialize_frame(
 
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
-            frame, tb_lineno
+            frame, tb_lineno, max_value_length
         )
 
     if include_local_variables:
@@ -639,8 +649,12 @@ def serialize_frame(
     return rv
 
 
-def current_stacktrace(include_local_variables=True, include_source_context=True):
-    # type: (bool, bool) -> Any
+def current_stacktrace(
+    include_local_variables=True,  # type: bool
+    include_source_context=True,  # type: bool
+    max_value_length=None,  # type: Optional[int]
+):
+    # type: (...) -> Dict[str, Any]
     __tracebackhide__ = True
     frames = []
 
@@ -652,6 +666,7 @@ def current_stacktrace(include_local_variables=True, include_source_context=True
                     f,
                     include_local_variables=include_local_variables,
                     include_source_context=include_source_context,
+                    max_value_length=max_value_length,
                 )
             )
         f = f.f_back
@@ -664,6 +679,15 @@ def current_stacktrace(include_local_variables=True, include_source_context=True
 def get_errno(exc_value):
     # type: (BaseException) -> Optional[Any]
     return getattr(exc_value, "errno", None)
+
+
+def get_error_message(exc_value):
+    # type: (Optional[BaseException]) -> str
+    return (
+        getattr(exc_value, "message", "")
+        or getattr(exc_value, "detail", "")
+        or safe_str(exc_value)
+    )
 
 
 def single_exception_from_error_tuple(
@@ -719,14 +743,16 @@ def single_exception_from_error_tuple(
 
     exception_value["module"] = get_type_module(exc_type)
     exception_value["type"] = get_type_name(exc_type)
-    exception_value["value"] = getattr(exc_value, "message", safe_str(exc_value))
+    exception_value["value"] = get_error_message(exc_value)
 
     if client_options is None:
         include_local_variables = True
         include_source_context = True
+        max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
     else:
         include_local_variables = client_options["include_local_variables"]
         include_source_context = client_options["include_source_context"]
+        max_value_length = client_options["max_value_length"]
 
     frames = [
         serialize_frame(
@@ -734,6 +760,7 @@ def single_exception_from_error_tuple(
             tb_lineno=tb.tb_lineno,
             include_local_variables=include_local_variables,
             include_source_context=include_source_context,
+            max_value_length=max_value_length,
         )
         for tb in iter_stacks(tb)
     ]
@@ -819,9 +846,7 @@ def exceptions_from_error(
     parent_id = exception_id
     exception_id += 1
 
-    should_supress_context = (
-        hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
-    )
+    should_supress_context = hasattr(exc_value, "__suppress_context__") and exc_value.__suppress_context__  # type: ignore
     if should_supress_context:
         # Add direct cause.
         # The field `__cause__` is set when raised with the exception (using the `from` keyword).
@@ -1082,13 +1107,11 @@ def _is_in_project_root(abs_path, project_root):
 
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
-    # TODO: read max_length from config
     if not value:
         return value
 
     if max_length is None:
-        # This is intentionally not just the default such that one can patch `MAX_STRING_LENGTH` and affect `strip_string`.
-        max_length = MAX_STRING_LENGTH
+        max_length = DEFAULT_MAX_VALUE_LENGTH
 
     length = len(value.encode("utf-8"))
 
@@ -1473,6 +1496,19 @@ def match_regex_list(item, regex_list=None, substring_matching=False):
             return True
 
     return False
+
+
+def is_sentry_url(hub, url):
+    # type: (sentry_sdk.Hub, str) -> bool
+    """
+    Determines whether the given URL matches the Sentry DSN.
+    """
+    return (
+        hub.client is not None
+        and hub.client.transport is not None
+        and hub.client.transport.parsed_dsn is not None
+        and hub.client.transport.parsed_dsn.netloc in url
+    )
 
 
 def parse_version(version):

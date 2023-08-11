@@ -1,4 +1,5 @@
 import json
+import re
 import pytest
 import logging
 
@@ -393,7 +394,9 @@ def test_flask_formdata_request_appear_transaction_body(
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
 def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="small")
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="small"
+    )
 
     data = input_char * 2000
 
@@ -420,7 +423,9 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
 
 
 def test_flask_files_and_form(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 
@@ -448,10 +453,12 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     assert not event["request"]["data"]["file"]
 
 
-def test_json_not_truncated_if_request_bodies_is_always(
+def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app
 ):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], request_bodies="always")
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()], max_request_body_size="always"
+    )
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
@@ -806,22 +813,38 @@ def test_class_based_views(sentry_init, app, capture_events):
     assert event["transaction"] == "hello_class"
 
 
-def test_sentry_trace_context(sentry_init, app, capture_events):
+@pytest.mark.parametrize(
+    "template_string", ["{{ sentry_trace }}", "{{ sentry_trace_meta }}"]
+)
+def test_template_tracing_meta(sentry_init, app, capture_events, template_string):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
     @app.route("/")
     def index():
-        sentry_span = Hub.current.scope.span
-        capture_message(sentry_span.to_traceparent())
-        return render_template_string("{{ sentry_trace }}")
+        hub = Hub.current
+        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        return render_template_string(template_string)
 
     with app.test_client() as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert response.data.decode(
-            "utf-8"
-        ) == '<meta name="sentry-trace" content="%s" />' % (events[0]["message"],)
+
+        rendered_meta = response.data.decode("utf-8")
+        traceparent, baggage = events[0]["message"].split("\n")
+        assert traceparent != ""
+        assert baggage != ""
+
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
@@ -858,3 +881,34 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
 
     assert event["request"]["data"]["password"] == "[Filtered]"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
+
+
+@pytest.mark.parametrize("traces_sample_rate", [None, 1.0])
+def test_replay_event_context(sentry_init, capture_events, app, traces_sample_rate):
+    """
+    Tests that the replay context is added to the event context.
+    This is not strictly a Flask integration test, but it's the easiest way to test this.
+    """
+    sentry_init(traces_sample_rate=traces_sample_rate)
+
+    @app.route("/error")
+    def error():
+        return 1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    headers = {
+        "baggage": "other-vendor-value-1=foo;bar;baz,sentry-trace_id=771a43a4192642f0b136d5159a501700,sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,other-vendor-value-2=foo;bar,sentry-replay_id=12312012123120121231201212312012",
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+    }
+    with pytest.raises(ZeroDivisionError):
+        client.get("/error", headers=headers)
+
+    event = events[0]
+
+    assert event["contexts"]
+    assert event["contexts"]["replay"]
+    assert (
+        event["contexts"]["replay"]["replay_id"] == "12312012123120121231201212312012"
+    )
