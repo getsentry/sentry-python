@@ -11,6 +11,7 @@ from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
+    is_sentry_url,
     logger,
     safe_repr,
     parse_url,
@@ -69,12 +70,13 @@ def _install_httplib():
     def putrequest(self, method, url, *args, **kwargs):
         # type: (HTTPConnection, str, str, *Any, **Any) -> Any
         hub = Hub.current
-        if hub.get_integration(StdlibIntegration) is None:
-            return real_putrequest(self, method, url, *args, **kwargs)
 
         host = self.host
         port = self.port
         default_port = self.default_port
+
+        if hub.get_integration(StdlibIntegration) is None or is_sentry_url(hub, host):
+            return real_putrequest(self, method, url, *args, **kwargs)
 
         real_url = url
         if real_url is None or not real_url.startswith(("http://", "https://")):

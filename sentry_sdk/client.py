@@ -224,9 +224,7 @@ class _Client(object):
 
             self.monitor = None
             if self.transport:
-                if self.options["_experiments"].get(
-                    "enable_backpressure_handling", False
-                ):
+                if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
@@ -530,12 +528,16 @@ class _Client(object):
             self._update_session_from_event(session, event)
 
         is_transaction = event_opt.get("type") == "transaction"
+        is_checkin = event_opt.get("type") == "check_in"
 
-        if not is_transaction and not self._should_sample_error(event):
+        if (
+            not is_transaction
+            and not is_checkin
+            and not self._should_sample_error(event)
+        ):
             return None
 
         tracing_enabled = has_tracing_enabled(self.options)
-        is_checkin = event_opt.get("type") == "check_in"
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}

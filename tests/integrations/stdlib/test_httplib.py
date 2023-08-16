@@ -84,7 +84,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     }
 
 
-def test_empty_realurl(sentry_init, capture_events):
+def test_empty_realurl(sentry_init):
     """
     Ensure that after using sentry_sdk.init you can putrequest a
     None url.
