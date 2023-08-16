@@ -612,7 +612,13 @@ def install_sql_hook():
         with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
-            _set_db_data(span, self.db.vendor, self.db.get_connection_params())
+            connection_parameters = (
+                self.connection.get_dsn_parameters()
+                if hasattr(self.connection, "get_dsn_parameters")
+                else self.db.get_connection_params()
+            )
+            _set_db_data(span, self.db.vendor, connection_parameters)
+
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -624,7 +630,13 @@ def install_sql_hook():
         with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
-            _set_db_data(span, self.db.vendor, self.db.get_connection_params())
+            connection_parameters = (
+                self.connection.get_dsn_parameters()
+                if hasattr(self.connection, "get_dsn_parameters")
+                else self.db.get_connection_params()
+            )
+            _set_db_data(span, self.db.vendor, connection_parameters)
+
             return real_executemany(self, sql, param_list)
 
     def connect(self):
