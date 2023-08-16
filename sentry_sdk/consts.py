@@ -39,7 +39,6 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
-            "enable_backpressure_handling": Optional[bool],
         },
         total=False,
     )
@@ -66,6 +65,12 @@ class SPANDATA:
     """
     Additional information describing the type of the span.
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
+    """
+
+    DB_NAME = "db.name"
+    """
+    The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
+    Example: myDatabase
     """
 
     DB_OPERATION = "db.operation"
@@ -116,6 +121,31 @@ class SPANDATA:
     """
     The HTTP status code as an integer.
     Example: 418
+    """
+
+    SERVER_ADDRESS = "server.address"
+    """
+    Name of the database host.
+    Example: example.com
+    """
+
+    SERVER_PORT = "server.port"
+    """
+    Logical server port number
+    Example: 80; 8080; 443
+    """
+
+    SERVER_SOCKET_ADDRESS = "server.socket.address"
+    """
+    Physical server IP address or Unix socket address.
+    Example: 10.5.3.2
+    """
+
+    SERVER_SOCKET_PORT = "server.socket.port"
+    """
+    Physical server port.
+    Recommended: If different than server.port.
+    Example: 16456
     """
 
 
@@ -209,6 +239,7 @@ class ClientConstructor(object):
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
+        enable_backpressure_handling=True,  # type: bool
     ):
         # type: (...) -> None
         pass
@@ -232,4 +263,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.28.1"
+VERSION = "1.29.2"

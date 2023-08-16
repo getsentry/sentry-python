@@ -21,15 +21,16 @@ class UnhealthyTestTransport(HealthyTestTransport):
 
 
 def test_no_monitor_if_disabled(sentry_init):
-    sentry_init(transport=HealthyTestTransport())
+    sentry_init(
+        transport=HealthyTestTransport(),
+        enable_backpressure_handling=False,
+    )
+
     assert Hub.current.client.monitor is None
 
 
 def test_monitor_if_enabled(sentry_init):
-    sentry_init(
-        transport=HealthyTestTransport(),
-        _experiments={"enable_backpressure_handling": True},
-    )
+    sentry_init(transport=HealthyTestTransport())
 
     monitor = Hub.current.client.monitor
     assert monitor is not None
@@ -42,10 +43,7 @@ def test_monitor_if_enabled(sentry_init):
 
 
 def test_monitor_unhealthy(sentry_init):
-    sentry_init(
-        transport=UnhealthyTestTransport(),
-        _experiments={"enable_backpressure_handling": True},
-    )
+    sentry_init(transport=UnhealthyTestTransport())
 
     monitor = Hub.current.client.monitor
     monitor.interval = 0.1
@@ -64,7 +62,6 @@ def test_transaction_uses_downsampled_rate(
     sentry_init(
         traces_sample_rate=1.0,
         transport=UnhealthyTestTransport(),
-        _experiments={"enable_backpressure_handling": True},
     )
 
     reports = capture_client_reports()

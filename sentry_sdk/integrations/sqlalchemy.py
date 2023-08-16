@@ -67,9 +67,7 @@ def _before_cursor_execute(
     span = ctx_mgr.__enter__()
 
     if span is not None:
-        db_system = _get_db_system(conn.engine.name)
-        if db_system is not None:
-            span.set_data(SPANDATA.DB_SYSTEM, db_system)
+        _set_db_data(span, conn)
         context._sentry_sql_span = span
 
 
@@ -128,3 +126,22 @@ def _get_db_system(name):
         return "oracle"
 
     return None
+
+
+def _set_db_data(span, conn):
+    # type: (Span, Any) -> None
+    db_system = _get_db_system(conn.engine.name)
+    if db_system is not None:
+        span.set_data(SPANDATA.DB_SYSTEM, db_system)
+
+    db_name = conn.engine.url.database
+    if db_name is not None:
+        span.set_data(SPANDATA.DB_NAME, db_name)
+
+    server_address = conn.engine.url.host
+    if server_address is not None:
+        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+
+    server_port = conn.engine.url.port
+    if server_port is not None:
+        span.set_data(SPANDATA.SERVER_PORT, server_port)

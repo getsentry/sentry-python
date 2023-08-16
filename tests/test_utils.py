@@ -4,16 +4,20 @@ import sys
 
 from sentry_sdk.utils import (
     Components,
+    Dsn,
+    get_error_message,
     is_valid_sample_rate,
     logger,
     match_regex_list,
     parse_url,
     parse_version,
+    safe_str,
     sanitize_url,
     serialize_frame,
-    _get_graphql_operation_name,
-    _get_graphql_operation_type,
+    is_sentry_url,
 )
+
+import sentry_sdk
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -427,101 +431,60 @@ def test_parse_version(version, expected_result):
     assert parse_version(version) == expected_result
 
 
-@pytest.mark.parametrize(
-    "query,expected_result",
-    [
-        [{"query": '{cats(id: "7") {name}}'}, "anonymous"],
-        [{"query": 'query {cats(id: "7") {name}}'}, "anonymous"],
-        [{"query": 'query CatQuery {cats(id: "7") {name}}'}, "CatQuery"],
-        [
-            {
-                "query": 'mutation {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
-            },
-            "anonymous",
-        ],
-        [
-            {
-                "query": 'mutation categoryAdd {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
-            },
-            "categoryAdd",
-        ],
-        [
-            {
-                "query": "subscription {newLink {id url description postedBy {id name email}}}"
-            },
-            "anonymous",
-        ],
-        [
-            {
-                "query": "subscription PostSubcription {newLink {id url description postedBy {id name email}}}"
-            },
-            "PostSubcription",
-        ],
-        [
-            {
-                "query": 'query CatQuery {cats(id: "7") {name}}',
-                "operationName": "SomeOtherOperation",
-                "variables": {},
-            },
-            "SomeOtherOperation",
-        ],
-        [
-            {
-                "query": "mutation AddPet ($name: String!) {addPet(name: $name) {id name}}}"
-            },
-            "AddPet",
-        ],
-    ],
-)
-def test_graphql_operation_name_extraction(query, expected_result):
-    assert _get_graphql_operation_name(query) == expected_result
+@pytest.fixture
+def mock_hub_with_dsn_netloc():
+    """
+    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    """
+
+    mock_hub = mock.Mock(spec=sentry_sdk.Hub)
+    mock_hub.client = mock.Mock(spec=sentry_sdk.Client)
+    mock_hub.client.transport = mock.Mock(spec=sentry_sdk.Transport)
+    mock_hub.client.transport.parsed_dsn = mock.Mock(spec=Dsn)
+
+    mock_hub.client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
+
+    return mock_hub
 
 
 @pytest.mark.parametrize(
-    "query,expected_result",
+    ["test_url", "is_sentry_url_expected"],
     [
-        [{"query": '{cats(id: "7") {name}}'}, "query"],
-        [{"query": 'query {cats(id: "7") {name}}'}, "query"],
-        [{"query": 'query CatQuery {cats(id: "7") {name}}'}, "query"],
-        [
-            {
-                "query": 'mutation {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
-            },
-            "mutation",
-        ],
-        [
-            {
-                "query": 'mutation categoryAdd {addCategory(id: 6, name: "Lily", cats: [8, 2]) {name cats {name}}}'
-            },
-            "mutation",
-        ],
-        [
-            {
-                "query": "subscription {newLink {id url description postedBy {id name email}}}"
-            },
-            "subscription",
-        ],
-        [
-            {
-                "query": "subscription PostSubcription {newLink {id url description postedBy {id name email}}}"
-            },
-            "subscription",
-        ],
-        [
-            {
-                "query": 'query CatQuery {cats(id: "7") {name}}',
-                "operationName": "SomeOtherOperation",
-                "variables": {},
-            },
-            "query",
-        ],
-        [
-            {
-                "query": "mutation AddPet ($name: String!) {addPet(name: $name) {id name}}}"
-            },
-            "mutation",
-        ],
+        ["https://asdf@abcd1234.ingest.sentry.io/123456789", True],
+        ["https://asdf@abcd1234.ingest.notsentry.io/123456789", False],
     ],
 )
-def test_graphql_operation_type_extraction(query, expected_result):
-    assert _get_graphql_operation_type(query) == expected_result
+def test_is_sentry_url_true(test_url, is_sentry_url_expected, mock_hub_with_dsn_netloc):
+    ret_val = is_sentry_url(mock_hub_with_dsn_netloc, test_url)
+
+    assert ret_val == is_sentry_url_expected
+
+
+def test_is_sentry_url_no_client():
+    hub = mock.Mock()
+    hub.client = None
+
+    test_url = "https://asdf@abcd1234.ingest.sentry.io/123456789"
+
+    ret_val = is_sentry_url(hub, test_url)
+
+    assert not ret_val
+
+
+@pytest.mark.parametrize(
+    "error,expected_result",
+    [
+        ["", lambda x: safe_str(x)],
+        ["some-string", lambda _: "some-string"],
+    ],
+)
+def test_get_error_message(error, expected_result):
+    with pytest.raises(BaseException) as exc_value:
+        exc_value.message = error
+        raise Exception
+    assert get_error_message(exc_value) == expected_result(exc_value)
+
+    with pytest.raises(BaseException) as exc_value:
+        exc_value.detail = error
+        raise Exception
+    assert get_error_message(exc_value) == expected_result(exc_value)
