@@ -13,4 +13,3 @@ asttokens
 responses
 pysocks
 ipdb
-mockupdb

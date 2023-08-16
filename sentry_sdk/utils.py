@@ -681,6 +681,15 @@ def get_errno(exc_value):
     return getattr(exc_value, "errno", None)
 
 
+def get_error_message(exc_value):
+    # type: (Optional[BaseException]) -> str
+    return (
+        getattr(exc_value, "message", "")
+        or getattr(exc_value, "detail", "")
+        or safe_str(exc_value)
+    )
+
+
 def single_exception_from_error_tuple(
     exc_type,  # type: Optional[type]
     exc_value,  # type: Optional[BaseException]
@@ -734,7 +743,7 @@ def single_exception_from_error_tuple(
 
     exception_value["module"] = get_type_module(exc_type)
     exception_value["type"] = get_type_name(exc_type)
-    exception_value["value"] = getattr(exc_value, "message", safe_str(exc_value))
+    exception_value["value"] = get_error_message(exc_value)
 
     if client_options is None:
         include_local_variables = True
@@ -1287,39 +1296,6 @@ class ServerlessTimeoutWarning(Exception):  # noqa: N818
     pass
 
 
-class SentryGraphQLClientError(Exception):
-    """Synthetic exception for GraphQL client errors."""
-
-    pass
-
-
-def _get_graphql_operation_name(query):
-    # type: (Dict[str, Any]) -> str
-    if query.get("operationName"):
-        return query["operationName"]
-
-    query = query["query"].strip()
-
-    match = re.match(
-        r"((query|mutation|subscription) )(?P<name>[a-zA-Z0-9]+).*\{",
-        query,
-        flags=re.IGNORECASE,
-    )
-    if match:
-        return match.group("name")
-    return "anonymous"
-
-
-def _get_graphql_operation_type(query):
-    # type: (Dict[str, Any]) -> str
-    query = query["query"].strip().lower()
-    if query.startswith("mutation"):
-        return "mutation"
-    if query.startswith("subscription"):
-        return "subscription"
-    return "query"
-
-
 class TimeoutThread(threading.Thread):
     """Creates a Thread which runs (sleeps) for a time duration equal to
     waiting_time and raises a custom ServerlessTimeout exception.
@@ -1520,6 +1496,19 @@ def match_regex_list(item, regex_list=None, substring_matching=False):
             return True
 
     return False
+
+
+def is_sentry_url(hub, url):
+    # type: (sentry_sdk.Hub, str) -> bool
+    """
+    Determines whether the given URL matches the Sentry DSN.
+    """
+    return (
+        hub.client is not None
+        and hub.client.transport is not None
+        and hub.client.transport.parsed_dsn is not None
+        and hub.client.transport.parsed_dsn.netloc in url
+    )
 
 
 def parse_version(version):
