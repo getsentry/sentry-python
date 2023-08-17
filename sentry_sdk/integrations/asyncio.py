@@ -16,7 +16,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, CoroutineType
 
     from sentry_sdk._types import ExcInfo
 
@@ -38,7 +38,7 @@ def patch_asyncio():
         orig_task_factory = loop.get_task_factory()
 
         def _sentry_task_factory(loop, coro, **kwargs):
-            # type: (Any, Any, Any) -> Any
+            # type: (asyncio.AbstractEventLoop, CoroutineType, Any) -> asyncio.Future
 
             async def _coro_creating_hub_and_span():
                 # type: () -> Any
