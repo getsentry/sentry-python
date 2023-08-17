@@ -1,5 +1,4 @@
 import asyncio
-from contextvars import Context, ContextVar
 import inspect
 import sys
 
@@ -13,6 +12,11 @@ try:
     from unittest.mock import MagicMock, patch
 except ImportError:
     from mock import MagicMock, patch
+
+try:
+    from contextvars import Context, ContextVar
+except ImportError:
+    pass  # All tests will be skipped with incompatible versions
 
 
 minimum_python_37 = pytest.mark.skipif(
