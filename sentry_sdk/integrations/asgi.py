@@ -132,13 +132,36 @@ class SentryAsgiMiddleware:
         # type: (Any) -> Any
         async def inner(receive, send):
             # type: (Any, Any) -> Any
-            return await self._run_app(scope, lambda: self.app(scope)(receive, send))
+            def _sentry_asgi2_callback(transaction=None):
+                def _sentry_send(event):
+                    is_response = (
+                        event["type"] == "http.response.start"
+                        and transaction is not None
+                    )
+                    if is_response:
+                        transaction.set_http_status(event["status"])
+                    return send(event)
+
+                return self.app(scope)(receive, _sentry_send)
+
+            return await self._run_app(scope, _sentry_asgi2_callback)
 
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
         # type: (Any, Any, Any) -> Any
-        return await self._run_app(scope, lambda: self.app(scope, receive, send))
+        def _sentry_asgi3_callback(transaction=None):
+            def _sentry_send(event):
+                is_response = (
+                    event["type"] == "http.response.start" and transaction is not None
+                )
+                if is_response:
+                    transaction.set_http_status(event["status"])
+                return send(event)
+
+            return self.app(scope, receive, _sentry_send)
+
+        return await self._run_app(scope, _sentry_asgi3_callback)
 
     async def _run_app(self, scope, callback):
         # type: (Any, Any) -> Any
@@ -182,7 +205,7 @@ class SentryAsgiMiddleware:
                         # would have to wrap send(). That is a bit hard to do with
                         # the current abstraction over ASGI 2/3.
                         try:
-                            return await callback()
+                            return await callback(transaction)
                         except Exception as exc:
                             _capture_exception(
                                 hub, exc, mechanism_type=self.mechanism_type
