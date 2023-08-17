@@ -61,6 +61,7 @@ setup(
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
             "opentelemetry-distro~=0.40b0",
+            "opentelemetry-instrumentation-aiohttp-client~=0.40b0",
             "opentelemetry-instrumentation-django~=0.40b0",
             "opentelemetry-instrumentation-fastapi~=0.40b0",
             "opentelemetry-instrumentation-flask~=0.40b0",
