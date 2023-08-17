@@ -134,11 +134,11 @@ class SentryAsgiMiddleware:
             # type: (Any, Any) -> Any
             def _sentry_asgi2_callback(transaction=None):
                 def _sentry_send(event):
-                    is_response = (
+                    is_http_response = (
                         event["type"] == "http.response.start"
                         and transaction is not None
                     )
-                    if is_response:
+                    if is_http_response:
                         transaction.set_http_status(event["status"])
                     return send(event)
 
@@ -152,10 +152,10 @@ class SentryAsgiMiddleware:
         # type: (Any, Any, Any) -> Any
         def _sentry_asgi3_callback(transaction=None):
             def _sentry_send(event):
-                is_response = (
+                is_http_response = (
                     event["type"] == "http.response.start" and transaction is not None
                 )
-                if is_response:
+                if is_http_response:
                     transaction.set_http_status(event["status"])
                 return send(event)
 
