@@ -653,6 +653,7 @@ class Scope(object):
 
     def update_from_scope(self, scope):
         # type: (Scope) -> None
+        """Update the scope with another scope's data."""
         if scope._level is not None:
             self._level = scope._level
         if scope._fingerprint is not None:
@@ -690,6 +691,7 @@ class Scope(object):
         fingerprint=None,  # type: Optional[List[str]]
     ):
         # type: (...) -> None
+        """Update the scope's attributes."""
         if level is not None:
             self._level = level
         if user is not None:
