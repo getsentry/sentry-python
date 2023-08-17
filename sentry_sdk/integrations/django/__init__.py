@@ -6,7 +6,7 @@ import threading
 import weakref
 from importlib import import_module
 
-from sentry_sdk._compat import string_types
+from sentry_sdk._compat import string_types, text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -612,7 +612,7 @@ def install_sql_hook():
         with record_sql_queries(
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
-            _set_db_data(span, self.db.vendor, self.db.get_connection_params())
+            _set_db_data(span, self)
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -624,7 +624,7 @@ def install_sql_hook():
         with record_sql_queries(
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
-            _set_db_data(span, self.db.vendor, self.db.get_connection_params())
+            _set_db_data(span, self)
             return real_executemany(self, sql, param_list)
 
     def connect(self):
@@ -637,7 +637,7 @@ def install_sql_hook():
             hub.add_breadcrumb(message="connect", category="query")
 
         with hub.start_span(op=OP.DB, description="connect") as span:
-            _set_db_data(span, self.vendor, self.get_connection_params())
+            _set_db_data(span, self)
             return real_connect(self)
 
     CursorWrapper.execute = execute
@@ -646,10 +646,19 @@ def install_sql_hook():
     ignore_logger("django.db.backends")
 
 
-def _set_db_data(span, vendor, connection_params):
-    # type: (Span, str, Dict[str, str]) -> None
+def _set_db_data(span, cursor_or_db):
+    # type: (Span, Any) -> None
+
+    db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
+    vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
+    connection_params = (
+        cursor_or_db.connection.get_dsn_parameters()
+        if hasattr(cursor_or_db, "connection")
+        and hasattr(cursor_or_db.connection, "get_dsn_parameters")
+        else db.get_connection_params()
+    )
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
         span.set_data(SPANDATA.DB_NAME, db_name)
@@ -660,7 +669,7 @@ def _set_db_data(span, vendor, connection_params):
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, server_port)
+        span.set_data(SPANDATA.SERVER_PORT, text_type(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:
