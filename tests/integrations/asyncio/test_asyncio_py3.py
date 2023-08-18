@@ -5,7 +5,12 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
+
+try:
+    from unittest.mock import patch
+except ImportError:
+    from mock import patch
 
 
 minimum_python_37 = pytest.mark.skipif(
@@ -170,3 +175,22 @@ async def test_task_result(sentry_init):
 
     result = await asyncio.create_task(add(1, 2))
     assert result == 3, result
+
+
+@minimum_python_37
+@patch("asyncio.get_running_loop")
+def test_patch_asyncio(mock_get_running_loop):
+    """
+    Test that the patch_asyncio function will patch the task factory.
+    """
+    mock_loop = mock_get_running_loop.return_value
+
+    patch_asyncio()
+
+    assert mock_loop.set_task_factory.called
+
+    set_task_factory_args, _ = mock_loop.set_task_factory.call_args
+    assert len(set_task_factory_args) == 1
+
+    sentry_task_factory, *_ = set_task_factory_args
+    assert callable(sentry_task_factory)
