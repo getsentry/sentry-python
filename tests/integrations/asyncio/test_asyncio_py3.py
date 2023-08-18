@@ -56,7 +56,7 @@ def get_sentry_task_factory(mock_get_running_loop):
     """
     mock_loop = mock_get_running_loop.return_value
     patch_asyncio()
-    patched_factory = mock_loop.set_task_factory.call_args.args[0]
+    patched_factory = mock_loop.set_task_factory.call_args[0][0]
 
     return patched_factory
 
@@ -241,9 +241,11 @@ def test_patch_asyncio(mock_get_running_loop):
     patch_asyncio()
 
     assert mock_loop.set_task_factory.called
-    assert len(mock_loop.set_task_factory.call_args.args) == 1
 
-    sentry_task_factory = mock_loop.set_task_factory.call_args.args[0]
+    set_task_factory_args, _ = mock_loop.set_task_factory.call_args
+    assert len(set_task_factory_args) == 1
+
+    sentry_task_factory, *_ = set_task_factory_args
     assert callable(sentry_task_factory)
 
 
@@ -266,11 +268,12 @@ def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noq
     assert MockTask.called
     assert ret_val == MockTask.return_value
 
-    task_args = MockTask.call_args.args
+    task_args, task_kwargs = MockTask.call_args
     assert len(task_args) == 1
-    assert inspect.iscoroutine(task_args[0])
 
-    task_kwargs = MockTask.call_args.kwargs
+    coro_param, *_ = task_args
+    assert inspect.iscoroutine(coro_param)
+
     assert "loop" in task_kwargs
     assert task_kwargs["loop"] == mock_loop
 
@@ -293,10 +296,12 @@ def test_sentry_task_factory_with_factory(mock_get_running_loop):
     assert orig_task_factory.called
     assert ret_val == orig_task_factory.return_value
 
-    task_factory_args = orig_task_factory.call_args.args
+    task_factory_args, _ = orig_task_factory.call_args
     assert len(task_factory_args) == 2
-    assert task_factory_args[0] == mock_loop
-    assert inspect.iscoroutine(task_factory_args[1])
+
+    loop_arg, coro_arg = task_factory_args
+    assert loop_arg == mock_loop
+    assert inspect.iscoroutine(coro_arg)
 
 
 @minimum_python_311
@@ -321,11 +326,12 @@ def test_sentry_task_factory_context_no_factory(
     assert MockTask.called
     assert ret_val == MockTask.return_value
 
-    task_args = MockTask.call_args.args
+    task_args, task_kwargs = MockTask.call_args
     assert len(task_args) == 1
-    assert inspect.iscoroutine(task_args[0])
 
-    task_kwargs = MockTask.call_args.kwargs
+    coro_param, *_ = task_args
+    assert inspect.iscoroutine(coro_param)
+
     assert "loop" in task_kwargs
     assert task_kwargs["loop"] == mock_loop
     assert "context" in task_kwargs
@@ -351,11 +357,12 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
     assert orig_task_factory.called
     assert ret_val == orig_task_factory.return_value
 
-    task_factory_args = orig_task_factory.call_args.args
+    task_factory_args, task_factory_kwargs = orig_task_factory.call_args
     assert len(task_factory_args) == 2
-    assert task_factory_args[0] == mock_loop
-    assert inspect.iscoroutine(task_factory_args[1])
 
-    task_factory_kwargs = orig_task_factory.call_args.kwargs
+    loop_arg, coro_arg = task_factory_args
+    assert loop_arg == mock_loop
+    assert inspect.iscoroutine(coro_arg)
+
     assert "context" in task_factory_kwargs
     assert task_factory_kwargs["context"] == mock_context
