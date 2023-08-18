@@ -395,8 +395,8 @@ def _get_humanized_interval(seconds):
     return (int(seconds), "second")
 
 
-def _get_monitor_config(celery_schedule, app):
-    # type: (Any, Celery) -> Dict[str, Any]
+def _get_monitor_config(celery_schedule, app, monitor_name):
+    # type: (Any, Celery, str) -> Dict[str, Any]
     monitor_config = {}  # type: Dict[str, Any]
     schedule_type = None  # type: Optional[str]
     schedule_value = None  # type: Optional[Union[str, int]]
@@ -419,7 +419,9 @@ def _get_monitor_config(celery_schedule, app):
 
         if schedule_unit == "second":
             logger.warning(
-                "Intervals shorter than one minute are not supported by Sentry Crons."
+                "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+                monitor_name,
+                schedule_value,
             )
             return {}
 
@@ -466,7 +468,7 @@ def _patch_beat_apply_entry():
             # When tasks are started from Celery Beat, make sure each task has its own trace.
             scope.set_new_propagation_context()
 
-            monitor_config = _get_monitor_config(celery_schedule, app)
+            monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
 
             is_supported_schedule = bool(monitor_config)
             if is_supported_schedule:
