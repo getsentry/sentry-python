@@ -777,9 +777,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.receive",
-            "description": "_ASGIAdapter.send.<locals>.receive"
-            if STARLETTE_VERSION < (0, 21)
-            else "_TestClientTransport.handle_request.<locals>.receive",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
@@ -789,9 +787,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "_ASGIAdapter.send.<locals>.send"
-            if STARLETTE_VERSION < (0, 21)
-            else "_TestClientTransport.handle_request.<locals>.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
