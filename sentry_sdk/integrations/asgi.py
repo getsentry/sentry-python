@@ -132,43 +132,50 @@ class SentryAsgiMiddleware:
         # type: (Any) -> Any
         async def inner(receive, send):
             # type: (Any, Any) -> Any
-            def _sentry_asgi2_callback(transaction=None):
-                def _sentry_send(event):
-                    is_http_response = (
-                        event["type"] == "http.response.start"
-                        and transaction is not None
-                    )
-                    if is_http_response:
-                        transaction.set_http_status(event["status"])
-                    return send(event)
+            # def _sentry_asgi2_callback(transaction=None):
+            #     def _sentry_send(event):
+            #         is_http_response = (
+            #             event["type"] == "http.response.start"
+            #             and transaction is not None
+            #         )
+            #         if is_http_response:
+            #             transaction.set_http_status(event["status"])
+            #         return send(event)
 
-                return self.app(scope)(receive, _sentry_send)
+            #     return self.app(scope)(receive, _sentry_send)
 
-            return await self._run_app(scope, _sentry_asgi2_callback)
+            # return await self._run_app(scope, _sentry_asgi2_callback)
+            return await self._run_app(scope, receive, send)
 
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
         # type: (Any, Any, Any) -> Any
-        def _sentry_asgi3_callback(transaction=None):
-            def _sentry_send(event):
-                is_http_response = (
-                    event["type"] == "http.response.start" and transaction is not None
-                )
-                if is_http_response:
-                    transaction.set_http_status(event["status"])
-                return send(event)
+        # def _sentry_asgi3_callback(transaction=None):
+        #     def _sentry_send(event):
+        #         is_http_response = (
+        #             event["type"] == "http.response.start" and transaction is not None
+        #         )
+        #         if is_http_response:
+        #             transaction.set_http_status(event["status"])
+        #         return send(event)
 
-            return self.app(scope, receive, _sentry_send)
+        #     return self.app(scope, receive, _sentry_send)
 
-        return await self._run_app(scope, _sentry_asgi3_callback)
+        # return await self._run_app(scope, _sentry_asgi3_callback)
+        return await self._run_app(scope, receive, send)
 
-    async def _run_app(self, scope, callback):
-        # type: (Any, Any) -> Any
+    async def _run_app(self, scope, receive, send):
+        # type: (Any, Any, Any, Any) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         if is_recursive_asgi_middleware:
             try:
-                return await callback()
+                if _looks_like_asgi3(self):
+                    return self.app(scope, receive, send)
+                else:
+                    return self.app(scope)(receive, send)
+
+                # return await callback()
             except Exception as exc:
                 _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
                 raise exc from None
@@ -205,7 +212,13 @@ class SentryAsgiMiddleware:
                         # would have to wrap send(). That is a bit hard to do with
                         # the current abstraction over ASGI 2/3.
                         try:
-                            return await callback(transaction)
+                            if _looks_like_asgi3(self):
+                                return self.app(scope, receive, send)
+                            else:
+                                return self.app(scope)(receive, send)
+
+                            # return await callback(transaction)
+
                         except Exception as exc:
                             _capture_exception(
                                 hub, exc, mechanism_type=self.mechanism_type
