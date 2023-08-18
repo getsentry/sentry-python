@@ -777,7 +777,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.receive",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "description": "_TestClientTransport.handle_request.<locals>.receive",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
