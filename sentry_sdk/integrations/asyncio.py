@@ -17,6 +17,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from typing import Any
+    from collections.abc import Coroutine
 
     from sentry_sdk._types import ExcInfo
 
@@ -37,8 +38,8 @@ def patch_asyncio():
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop, coro):
-            # type: (Any, Any) -> Any
+        def _sentry_task_factory(loop, coro, **kwargs):
+            # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
 
             async def _coro_creating_hub_and_span():
                 # type: () -> Any
@@ -56,7 +57,7 @@ def patch_asyncio():
 
             # Trying to use user set task factory (if there is one)
             if orig_task_factory:
-                return orig_task_factory(loop, _coro_creating_hub_and_span())
+                return orig_task_factory(loop, _coro_creating_hub_and_span(), **kwargs)
 
             # The default task factory in `asyncio` does not have its own function
             # but is just a couple of lines in `asyncio.base_events.create_task()`
@@ -65,13 +66,13 @@ def patch_asyncio():
             # WARNING:
             # If the default behavior of the task creation in asyncio changes,
             # this will break!
-            task = Task(_coro_creating_hub_and_span(), loop=loop)
+            task = Task(_coro_creating_hub_and_span(), loop=loop, **kwargs)
             if task._source_traceback:  # type: ignore
                 del task._source_traceback[-1]  # type: ignore
 
             return task
 
-        loop.set_task_factory(_sentry_task_factory)
+        loop.set_task_factory(_sentry_task_factory)  # type: ignore
     except RuntimeError:
         # When there is no running loop, we have nothing to patch.
         pass
