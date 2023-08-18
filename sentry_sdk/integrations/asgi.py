@@ -131,6 +131,7 @@ class SentryAsgiMiddleware:
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
         async def inner(receive, send):
+            # type: (Any, Any) -> Any
             return await self._run_app(scope, receive, send)
 
         return inner
@@ -148,7 +149,6 @@ class SentryAsgiMiddleware:
                 else:
                     return await self.app(scope)(receive, send)
 
-                # return await callback()
             except Exception as exc:
                 _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
                 raise exc from None
@@ -186,7 +186,7 @@ class SentryAsgiMiddleware:
                         # the current abstraction over ASGI 2/3.
                         try:
 
-                            def _sentry_send(event):
+                            def _sentry_wrapped_send(event):
                                 is_http_response = (
                                     event["type"] == "http.response.start"
                                     and transaction is not None
@@ -196,9 +196,13 @@ class SentryAsgiMiddleware:
                                 return send(event)
 
                             if _looks_like_asgi3(self):
-                                return await self.app(scope, receive, _sentry_send)
+                                return await self.app(
+                                    scope, receive, _sentry_wrapped_send
+                                )
                             else:
-                                return await self.app(scope)(receive, _sentry_send)
+                                return await self.app(scope)(
+                                    receive, _sentry_wrapped_send
+                                )
 
                             # return await callback(transaction)
 
