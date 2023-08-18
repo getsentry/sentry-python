@@ -171,9 +171,9 @@ class SentryAsgiMiddleware:
         if is_recursive_asgi_middleware:
             try:
                 if _looks_like_asgi3(self):
-                    return self.app(scope, receive, send)
+                    return await self.app(scope, receive, send)
                 else:
-                    return self.app(scope)(receive, send)
+                    return await self.app(scope)(receive, send)
 
                 # return await callback()
             except Exception as exc:
@@ -212,10 +212,20 @@ class SentryAsgiMiddleware:
                         # would have to wrap send(). That is a bit hard to do with
                         # the current abstraction over ASGI 2/3.
                         try:
+
+                            def _sentry_send(event):
+                                is_http_response = (
+                                    event["type"] == "http.response.start"
+                                    and transaction is not None
+                                )
+                                if is_http_response:
+                                    transaction.set_http_status(event["status"])
+                                return send(event)
+
                             if _looks_like_asgi3(self):
-                                return self.app(scope, receive, send)
+                                return await self.app(scope, receive, _sentry_send)
                             else:
-                                return self.app(scope)(receive, send)
+                                return await self.app(scope)(receive, _sentry_send)
 
                             # return await callback(transaction)
 
