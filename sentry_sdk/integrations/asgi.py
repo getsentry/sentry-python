@@ -137,6 +137,7 @@ class SentryAsgiMiddleware:
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
+        # type: (Any, Any, Any) -> Any
         return await self._run_app(scope, receive, send)
 
     async def _run_app(self, scope, receive, send):
