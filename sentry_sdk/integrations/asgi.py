@@ -187,14 +187,15 @@ class SentryAsgiMiddleware:
                         # the current abstraction over ASGI 2/3.
                         try:
 
-                            def _sentry_wrapped_send(event):
+                            async def _sentry_wrapped_send(event):
                                 is_http_response = (
                                     event["type"] == "http.response.start"
                                     and transaction is not None
                                 )
                                 if is_http_response:
                                     transaction.set_http_status(event["status"])
-                                return send(event)
+
+                                return await send(event)
 
                             if _looks_like_asgi3(self):
                                 return await self.app(
