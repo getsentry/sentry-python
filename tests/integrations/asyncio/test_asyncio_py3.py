@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import sys
 
 import pytest
@@ -8,9 +9,9 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
 
 try:
-    from unittest.mock import patch
+    from unittest.mock import MagicMock, patch
 except ImportError:
-    from mock import patch
+    from mock import MagicMock, patch
 
 
 minimum_python_37 = pytest.mark.skipif(
@@ -28,6 +29,17 @@ async def bar():
 
 async def boom():
     1 / 0
+
+
+def get_sentry_task_factory(mock_get_running_loop):
+    """
+    Patches (mocked) asyncio and gets the sentry_task_factory.
+    """
+    mock_loop = mock_get_running_loop.return_value
+    patch_asyncio()
+    patched_factory = mock_loop.set_task_factory.call_args[0][0]
+
+    return patched_factory
 
 
 @pytest.fixture(scope="session")
@@ -194,3 +206,32 @@ def test_patch_asyncio(mock_get_running_loop):
 
     sentry_task_factory, *_ = set_task_factory_args
     assert callable(sentry_task_factory)
+
+
+@minimum_python_37
+@patch("asyncio.get_running_loop")
+@patch("sentry_sdk.integrations.asyncio.Task")
+def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noqa: N803
+    mock_loop = mock_get_running_loop.return_value
+    mock_coro = MagicMock()
+
+    # Set the original task factory to None
+    mock_loop.get_task_factory.return_value = None
+
+    # Retieve sentry task factory (since it is an inner function within patch_asyncio)
+    sentry_task_factory = get_sentry_task_factory(mock_get_running_loop)
+
+    # The call we are testing
+    ret_val = sentry_task_factory(mock_loop, mock_coro)
+
+    assert MockTask.called
+    assert ret_val == MockTask.return_value
+
+    task_args, task_kwargs = MockTask.call_args
+    assert len(task_args) == 1
+
+    coro_param, *_ = task_args
+    assert inspect.iscoroutine(coro_param)
+
+    assert "loop" in task_kwargs
+    assert task_kwargs["loop"] == mock_loop
