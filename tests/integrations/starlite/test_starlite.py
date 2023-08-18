@@ -221,12 +221,12 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlite.send",
-            "description": "TestClientTransport.create_send.<locals>.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
         {
             "op": "middleware.starlite.send",
-            "description": "TestClientTransport.create_send.<locals>.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
             "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
     ]
