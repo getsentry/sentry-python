@@ -131,38 +131,11 @@ class SentryAsgiMiddleware:
     def _run_asgi2(self, scope):
         # type: (Any) -> Any
         async def inner(receive, send):
-            # type: (Any, Any) -> Any
-            # def _sentry_asgi2_callback(transaction=None):
-            #     def _sentry_send(event):
-            #         is_http_response = (
-            #             event["type"] == "http.response.start"
-            #             and transaction is not None
-            #         )
-            #         if is_http_response:
-            #             transaction.set_http_status(event["status"])
-            #         return send(event)
-
-            #     return self.app(scope)(receive, _sentry_send)
-
-            # return await self._run_app(scope, _sentry_asgi2_callback)
             return await self._run_app(scope, receive, send)
 
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
-        # type: (Any, Any, Any) -> Any
-        # def _sentry_asgi3_callback(transaction=None):
-        #     def _sentry_send(event):
-        #         is_http_response = (
-        #             event["type"] == "http.response.start" and transaction is not None
-        #         )
-        #         if is_http_response:
-        #             transaction.set_http_status(event["status"])
-        #         return send(event)
-
-        #     return self.app(scope, receive, _sentry_send)
-
-        # return await self._run_app(scope, _sentry_asgi3_callback)
         return await self._run_app(scope, receive, send)
 
     async def _run_app(self, scope, receive, send):
