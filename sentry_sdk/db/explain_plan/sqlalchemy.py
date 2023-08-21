@@ -10,14 +10,28 @@ except ImportError:
 def attach_explain_plan_to_span(span, connection, statement, parameters, options):
     """
     Run EXPLAIN or EXPLAIN ANALYZE on the given statement and attach the explain plan to the span data.
+
+    Usage:
+    ```
+    sentry_sdk.init(
+        dsn="...",
+        _experiments={
+            "attach_explain_plans": {
+                "explain_cache_size": 1000,  # Run explain plan for the 1000 most run queries
+                "explain_cache_timeout_seconds": 60 * 60 * 24,  # Run the explain plan for each statement only every 24 hours
+                "use_explain_analyze": True,  # Run "explain analyze" instead of only "explain"
+            }
+        }
+    ```
     """
     if not statement.strip().upper().startswith("SELECT"):
         return
 
-    if not should_run_explain_plan(statement):
+    if not should_run_explain_plan(statement, options):
         return
 
-    explain_statement = ("EXPLAIN ANALYZE " + statement) % parameters
+    analyze = "ANALYZE" if options.get("use_explain_analyze", False) else ""
+    explain_statement = (("EXPLAIN %s " % analyze) + statement) % parameters
 
     result = connection.execute(text(explain_statement))
     explain_plan = [row for row in result]

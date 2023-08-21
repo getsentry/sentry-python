@@ -6,6 +6,19 @@ def attach_explain_plan_to_span(
 ):
     """
     Run EXPLAIN or EXPLAIN ANALYZE on the given statement and attach the explain plan to the span data.
+
+    Usage:
+    ```
+    sentry_sdk.init(
+        dsn="...",
+        _experiments={
+            "attach_explain_plans": {
+                "explain_cache_size": 1000,  # Run explain plan for the 1000 most run queries
+                "explain_cache_timeout_seconds": 60 * 60 * 24,  # Run the explain plan for each statement only every 24 hours
+                "use_explain_analyze": True,  # Run "explain analyze" instead of only "explain"
+            }
+        }
+    ```
     """
     if not statement.strip().upper().startswith("SELECT"):
         return
@@ -13,9 +26,10 @@ def attach_explain_plan_to_span(
     if not should_run_explain_plan(statement, options):
         return
 
-    explain_statement = "EXPLAIN ANALYZE " + mogrify(statement, parameters).decode(
-        "utf-8"
-    )
+    analyze = "ANALYZE" if options.get("use_explain_analyze", False) else ""
+    explain_statement = ("EXPLAIN %s " % analyze) + mogrify(
+        statement, parameters
+    ).decode("utf-8")
 
     with connection.cursor() as cursor:
         cursor.execute(explain_statement)
