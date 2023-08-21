@@ -647,7 +647,6 @@ class Transaction(Span):
             "spans": finished_spans,
         }  # type: Event
 
-        # logger.warning("~~~~ EVENT: %s", event)
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
             self._profile = None
