@@ -12,6 +12,7 @@ from sentry_sdk.utils import parse_version
 try:
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
+    from sqlalchemy.sql import text  # type: ignore
     from sqlalchemy import __version__ as SQLALCHEMY_VERSION  # type: ignore
 except ImportError:
     raise DidNotEnable("SQLAlchemy not installed.")
@@ -46,6 +47,18 @@ class SqlalchemyIntegration(Integration):
         listen(Engine, "handle_error", _handle_error)
 
 
+def _attach_explain_plan_to_span(span, connection, statement, parameters):
+    if not statement.strip().upper().startswith("SELECT"):
+        return
+
+    explain_statement = ("EXPLAIN ANALYZE " + statement) % parameters
+
+    result = connection.execute(text(explain_statement))
+    explain_plan = [row for row in result]
+
+    span.set_data("db.explain_plan", explain_plan)
+
+
 def _before_cursor_execute(
     conn, cursor, statement, parameters, context, executemany, *args
 ):
@@ -68,6 +81,7 @@ def _before_cursor_execute(
 
     if span is not None:
         _set_db_data(span, conn)
+        _attach_explain_plan_to_span(span, conn, statement, parameters)
         context._sentry_sql_span = span
 
 
