@@ -9,6 +9,7 @@ from importlib import import_module
 from sentry_sdk._compat import string_types, text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -580,21 +581,6 @@ def _set_user_info(request, event):
         pass
 
 
-def _attach_explain_plan_to_span(span, connection, statement, parameters, mogrify):
-    if not statement.strip().upper().startswith("SELECT"):
-        return
-
-    explain_statement = "EXPLAIN ANALYZE " + mogrify(statement, parameters).decode(
-        "utf-8"
-    )
-
-    with connection.cursor() as cursor:
-        cursor.execute(explain_statement)
-        explain_plan = [row for row in cursor.fetchall()]
-
-        span.set_data("db.explain_plan", explain_plan)
-
-
 def install_sql_hook():
     # type: () -> None
     """If installed this causes Django's queries to be captured."""
@@ -628,9 +614,18 @@ def install_sql_hook():
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
             _set_db_data(span, self)
-            _attach_explain_plan_to_span(
-                span, self.cursor.connection, sql, params, self.mogrify
-            )
+            if (
+                hub.client.options["_experiments"].get("attach_explain_plans")
+                is not None
+            ):
+                attach_explain_plan_to_span(
+                    span,
+                    self.cursor.connection,
+                    sql,
+                    params,
+                    self.mogrify,
+                    hub.client.options["_experiments"].get("attach_explain_plans"),
+                )
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
