@@ -76,8 +76,9 @@ class LayerBuilder:
 
         shutil.copy(
             os.path.join(self.base_dir, self.out_zip_filename),
-            os.path.abspath(DIST_PATH)
+            os.path.abspath(DIST_PATH),
         )
+
 
 def build_packaged_zip():
     with tempfile.TemporaryDirectory() as base_dir:
