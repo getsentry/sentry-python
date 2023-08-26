@@ -10,7 +10,6 @@ import pytest
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
-from sentry_sdk.integrations.grpc.server import ServerInterceptor
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
@@ -24,7 +23,7 @@ PORT += os.getpid() % 100  # avoid port conflicts when running tests in parallel
 
 @pytest.mark.forked
 def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
 
     server = _set_up()
@@ -49,7 +48,7 @@ def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
 
 @pytest.mark.forked
 def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
 
     server = _set_up()
@@ -155,7 +154,6 @@ def test_grpc_client_and_servers_interceptors_integration(
 def _set_up():
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=2),
-        interceptors=[ServerInterceptor(find_name=_find_name)],
     )
 
     add_gRPCTestServiceServicer_to_server(TestService, server)
