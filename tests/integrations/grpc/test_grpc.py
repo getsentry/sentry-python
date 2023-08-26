@@ -9,7 +9,7 @@ import pytest
 
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.grpc.client import ClientInterceptor
+from sentry_sdk.integrations.grpc import GRPCIntegration
 from sentry_sdk.integrations.grpc.server import ServerInterceptor
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
@@ -94,14 +94,12 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
 
 @pytest.mark.forked
 def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
-    interceptors = [ClientInterceptor()]
 
     server = _set_up()
 
     with grpc.insecure_channel(f"localhost:{PORT}") as channel:
-        channel = grpc.intercept_channel(channel, *interceptors)
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
@@ -131,14 +129,12 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
 def test_grpc_client_and_servers_interceptors_integration(
     sentry_init, capture_events_forksafe
 ):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
-    interceptors = [ClientInterceptor()]
 
     server = _set_up()
 
     with grpc.insecure_channel(f"localhost:{PORT}") as channel:
-        channel = grpc.intercept_channel(channel, *interceptors)
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
