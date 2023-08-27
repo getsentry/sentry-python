@@ -1,8 +1,9 @@
 from __future__ import absolute_import
 
 import os
-
+from typing import List, Optional
 from concurrent import futures
+from unittest.mock import Mock
 
 import grpc
 import pytest
@@ -33,6 +34,39 @@ def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
         stub.TestServe(gRPCTestMessage(text="test"))
 
     _tear_down(server=server)
+
+    events.write_file.close()
+    event = events.read_event()
+    span = event["spans"][0]
+
+    assert event["type"] == "transaction"
+    assert event["transaction_info"] == {
+        "source": "custom",
+    }
+    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+    assert span["op"] == "test"
+
+
+@pytest.mark.forked
+def test_grpc_server_other_interceptors(sentry_init, capture_events_forksafe):
+    """Ensure compatibility with additional server interceptors."""
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+    mock_intercept = lambda continuation, handler_call_details: continuation(
+        handler_call_details
+    )
+    mock_interceptor = Mock()
+    mock_interceptor.intercept_service.side_effect = mock_intercept
+
+    server = _set_up(interceptors=[mock_interceptor])
+
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        stub.TestServe(gRPCTestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    mock_interceptor.intercept_service.assert_called_once()
 
     events.write_file.close()
     event = events.read_event()
@@ -124,6 +158,53 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
     }
 
 
+# using unittest.mock.Mock not possible because grpc verifies
+# that the interceptor is of the correct type
+class MockClientInterceptor(grpc.UnaryUnaryClientInterceptor):
+    call_counter = 0
+
+    def intercept_unary_unary(self, continuation, client_call_details, request):
+        self.__class__.call_counter += 1
+        return continuation(client_call_details, request)
+
+
+@pytest.mark.forked
+def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
+    """Ensure compatibility with additional client interceptors."""
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server = _set_up()
+
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        channel = grpc.intercept_channel(channel, MockClientInterceptor())
+        stub = gRPCTestServiceStub(channel)
+
+        with start_transaction():
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    assert MockClientInterceptor.call_counter == 1
+
+    events.write_file.close()
+    events.read_event()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+    )
+    assert span["data"] == {
+        "type": "unary unary",
+        "method": "/grpc_test_server.gRPCTestService/TestServe",
+        "code": "OK",
+    }
+
+
 @pytest.mark.forked
 def test_grpc_client_and_servers_interceptors_integration(
     sentry_init, capture_events_forksafe
@@ -151,9 +232,10 @@ def test_grpc_client_and_servers_interceptors_integration(
     )
 
 
-def _set_up():
+def _set_up(interceptors: Optional[List[grpc.ServerInterceptor]] = None):
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=2),
+        interceptors=interceptors,
     )
 
     add_gRPCTestServiceServicer_to_server(TestService, server)
