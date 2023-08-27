@@ -10,7 +10,7 @@ import sentry_sdk
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.grpc.aio.server import ServerInterceptor
+from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
@@ -31,10 +31,9 @@ def event_loop(request):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def grpc_server(event_loop):
-    server = grpc.aio.server(
-        interceptors=[ServerInterceptor(find_name=lambda request: request.__class__)]
-    )
+async def grpc_server(sentry_init, event_loop):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    server = grpc.aio.server()
     server.add_insecure_port(f"[::]:{AIO_PORT}")
     add_gRPCTestServiceServicer_to_server(TestService, server)
 
@@ -47,8 +46,7 @@ async def grpc_server(event_loop):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_starts_transaction(sentry_init, capture_events, grpc_server):
-    sentry_init(traces_sample_rate=1.0)
+async def test_grpc_server_starts_transaction(capture_events, grpc_server):
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
@@ -67,10 +65,7 @@ async def test_grpc_server_starts_transaction(sentry_init, capture_events, grpc_
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_continues_transaction(
-    sentry_init, capture_events, grpc_server
-):
-    sentry_init(traces_sample_rate=1.0)
+async def test_grpc_server_continues_transaction(capture_events, grpc_server):
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:

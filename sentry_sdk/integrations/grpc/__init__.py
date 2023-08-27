@@ -5,6 +5,7 @@ from grpc import Channel, Server
 from sentry_sdk.integrations import Integration
 from .client import ClientInterceptor
 from .server import ServerInterceptor
+from .aio.server import ServerInterceptor as AsyncServerInterceptor
 
 
 def patch_grpc_channels() -> None:
@@ -47,7 +48,23 @@ def patch_grpc_server() -> None:
 
         return old_server(*args, interceptors=interceptors, **kwargs)
 
+    old_aio_server = grpc.aio.server
+
+    def sentry_patched_aio_server(
+        *args, interceptors: Optional[List[grpc.ServerInterceptor]] = None, **kwargs
+    ) -> Server:
+        server_interceptor = AsyncServerInterceptor(
+            find_name=lambda request: request.__class__
+        )
+        if interceptors is None:
+            interceptors = [server_interceptor]
+        else:
+            interceptors.append(server_interceptor)
+
+        return old_aio_server(*args, interceptors=interceptors, **kwargs)
+
     grpc.server = sentry_patched_server
+    grpc.aio.server = sentry_patched_aio_server
 
 
 class GRPCIntegration(Integration):
