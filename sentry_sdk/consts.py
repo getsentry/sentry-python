@@ -39,6 +39,7 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
+            "otel_powered_performance": Optional[bool],
         },
         total=False,
     )
