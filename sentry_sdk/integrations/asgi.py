@@ -182,9 +182,6 @@ class SentryAsgiMiddleware:
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"asgi_scope": scope}
                     ):
-                        # XXX: Would be cool to have correct span status, but we
-                        # would have to wrap send(). That is a bit hard to do with
-                        # the current abstraction over ASGI 2/3.
                         try:
 
                             async def _sentry_wrapped_send(event):
