@@ -203,9 +203,6 @@ class SentryAsgiMiddleware:
                                 return await self.app(scope)(
                                     receive, _sentry_wrapped_send
                                 )
-
-                            # return await callback(transaction)
-
                         except Exception as exc:
                             _capture_exception(
                                 hub, exc, mechanism_type=self.mechanism_type

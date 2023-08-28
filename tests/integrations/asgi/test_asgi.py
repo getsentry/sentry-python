@@ -48,8 +48,11 @@ def asgi3_app():
 
 @pytest.fixture
 def asgi3_app_with_error():
+    async def send_with_error(event):
+        1 / 0
+
     async def app(scope, receive, send):
-        await send(
+        await send_with_error(
             {
                 "type": "http.response.start",
                 "status": 200,
@@ -58,10 +61,7 @@ def asgi3_app_with_error():
                 ],
             }
         )
-
-        1 / 0
-
-        await send(
+        await send_with_error(
             {
                 "type": "http.response.body",
                 "body": b"Hello, world!",
@@ -167,9 +167,9 @@ async def test_capture_transaction_with_error(
     sentry_init(send_default_pii=True, traces_sample_rate=1.0)
     app = SentryAsgiMiddleware(asgi3_app_with_error)
 
+    events = capture_events()
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
-            events = capture_events()
             await client.get("/")
 
     (error_event, transaction_event) = events
@@ -395,7 +395,7 @@ async def test_auto_session_tracking_with_aggregates(
         (
             "/message",
             "endpoint",
-            "tests.integrations.asgi.test_asgi.asgi3_app_with_error.<locals>.app",
+            "tests.integrations.asgi.test_asgi.asgi3_app.<locals>.app",
             "component",
         ),
     ],
@@ -403,7 +403,7 @@ async def test_auto_session_tracking_with_aggregates(
 @pytest.mark.asyncio
 async def test_transaction_style(
     sentry_init,
-    asgi3_app_with_error,
+    asgi3_app,
     capture_events,
     url,
     transaction_style,
@@ -411,22 +411,19 @@ async def test_transaction_style(
     expected_source,
 ):
     sentry_init(send_default_pii=True, traces_sample_rate=1.0)
-    app = SentryAsgiMiddleware(
-        asgi3_app_with_error, transaction_style=transaction_style
-    )
+    app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     scope = {
-        "endpoint": asgi3_app_with_error,
+        "endpoint": asgi3_app,
         "route": url,
         "client": ("127.0.0.1", 60457),
     }
 
-    with pytest.raises(ZeroDivisionError):
-        async with TestClient(app, scope=scope) as client:
-            events = capture_events()
-            await client.get(url)
+    async with TestClient(app, scope=scope) as client:
+        events = capture_events()
+        await client.get(url)
 
-    (_, transaction_event) = events
+    (transaction_event,) = events
 
     assert transaction_event["transaction"] == expected_transaction
     assert transaction_event["transaction_info"] == {"source": expected_source}
