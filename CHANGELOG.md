@@ -36,6 +36,23 @@
     removed at any point.
 
 - Enable backpressure handling by default (#2298) by @sl0thentr0py
+
+    The SDK now dynamically downsamples transactions to reduce backpressure in high
+    throughput systems. It starts a new `Monitor` thread to perform some health checks
+    which decide to downsample (halved each time) in 10 second intervals till the system
+    is healthy again.
+
+    To disable this behavior, use:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        enable_backpressure_handling=False,
+    )
+    ```
+
+    If your system serves heavy load, please let us know how this feature works for you!
+
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso
 - Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
