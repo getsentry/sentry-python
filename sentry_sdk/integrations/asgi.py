@@ -132,20 +132,20 @@ class SentryAsgiMiddleware:
         # type: (Any) -> Any
         async def inner(receive, send):
             # type: (Any, Any) -> Any
-            return await self._run_app(scope, receive, send)
+            return await self._run_app(scope, receive, send, asgi_version=2)
 
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
         # type: (Any, Any, Any) -> Any
-        return await self._run_app(scope, receive, send)
+        return await self._run_app(scope, receive, send, asgi_version=3)
 
-    async def _run_app(self, scope, receive, send):
-        # type: (Any, Any, Any, Any) -> Any
+    async def _run_app(self, scope, receive, send, asgi_version):
+        # type: (Any, Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         if is_recursive_asgi_middleware:
             try:
-                if _looks_like_asgi3(self):
+                if asgi_version == 3:
                     return await self.app(scope, receive, send)
                 else:
                     return await self.app(scope)(receive, send)
@@ -195,7 +195,7 @@ class SentryAsgiMiddleware:
 
                                 return await send(event)
 
-                            if _looks_like_asgi3(self):
+                            if asgi_version == 3:
                                 return await self.app(
                                     scope, receive, _sentry_wrapped_send
                                 )
