@@ -26,7 +26,7 @@
     ```
 
     This enables OpenTelemetry performance monitoring support for some of the most
-    popular frameworks and libraries (Flask, Django, FastAPI, request...).
+    popular frameworks and libraries (Flask, Django, FastAPI, requests...).
 
     We're looking forward to your feedback! Please let us know about your experience
     in this discussion: https://github.com/getsentry/sentry/discussions/55023
@@ -56,7 +56,7 @@
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso
 - Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
-- Moved `is_sentry_url`` to utils (#2304) by @szokeasaurusrex
+- Moved `is_sentry_url` to utils (#2304) by @szokeasaurusrex
 - Fix: arq attribute error on settings, support worker args (#2260) by @rossmacarthur
 - Fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
 - build(deps): bump mypy from 1.4.1 to 1.5.1 (#2319) by @dependabot
