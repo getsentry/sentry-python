@@ -38,7 +38,7 @@
 - Enable backpressure handling by default (#2298) by @sl0thentr0py
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso
-- Add docstrings for Scope.update_from_* (#2311) by @sentrivana
+- Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
 - Moved `is_sentry_url`` to utils (#2304) by @szokeasaurusrex
 - Fix: arq attribute error on settings, support worker args (#2260) by @rossmacarthur
 - Fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
