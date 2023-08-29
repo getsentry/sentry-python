@@ -27,6 +27,7 @@ example_url_conf = (
     url(
         r"^(?P<slug>[$\\-_.+!*(),\\w//]+)/$", lambda x: ""
     ),  # example of complex regex from django-cms
+    url(r"^api/(?P<version>(v1|v2))/projects/(?P<project_id>[\w_-]+)/$", lambda x: ""),
 )
 
 
@@ -64,6 +65,12 @@ def test_complex_regex_from_django_cms():
     resolver = RavenResolver()
     result = resolver.resolve("/,/", example_url_conf)
     assert result == "/{slug}/"
+
+
+def test_resolving_several_named_groups_in_url():
+    resolver = RavenResolver()
+    result = resolver.resolve("/api/v1/projects/abc/", example_url_conf)
+    assert result == "/api/{version}/projects/{project_id}/"
 
 
 @pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
