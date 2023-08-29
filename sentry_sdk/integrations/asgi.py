@@ -132,20 +132,24 @@ class SentryAsgiMiddleware:
         # type: (Any) -> Any
         async def inner(receive, send):
             # type: (Any, Any) -> Any
-            return await self._run_app(scope, lambda: self.app(scope)(receive, send))
+            return await self._run_app(scope, receive, send, asgi_version=2)
 
         return inner
 
     async def _run_asgi3(self, scope, receive, send):
         # type: (Any, Any, Any) -> Any
-        return await self._run_app(scope, lambda: self.app(scope, receive, send))
+        return await self._run_app(scope, receive, send, asgi_version=3)
 
-    async def _run_app(self, scope, callback):
-        # type: (Any, Any) -> Any
+    async def _run_app(self, scope, receive, send, asgi_version):
+        # type: (Any, Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         if is_recursive_asgi_middleware:
             try:
-                return await callback()
+                if asgi_version == 2:
+                    return await self.app(scope)(receive, send)
+                else:
+                    return await self.app(scope, receive, send)
+
             except Exception as exc:
                 _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
                 raise exc from None
@@ -178,11 +182,28 @@ class SentryAsgiMiddleware:
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"asgi_scope": scope}
                     ):
-                        # XXX: Would be cool to have correct span status, but we
-                        # would have to wrap send(). That is a bit hard to do with
-                        # the current abstraction over ASGI 2/3.
                         try:
-                            return await callback()
+
+                            async def _sentry_wrapped_send(event):
+                                # type: (Dict[str, Any]) -> Any
+                                is_http_response = (
+                                    event.get("type") == "http.response.start"
+                                    and transaction is not None
+                                    and "status" in event
+                                )
+                                if is_http_response:
+                                    transaction.set_http_status(event["status"])
+
+                                return await send(event)
+
+                            if asgi_version == 2:
+                                return await self.app(scope)(
+                                    receive, _sentry_wrapped_send
+                                )
+                            else:
+                                return await self.app(
+                                    scope, receive, _sentry_wrapped_send
+                                )
                         except Exception as exc:
                             _capture_exception(
                                 hub, exc, mechanism_type=self.mechanism_type
