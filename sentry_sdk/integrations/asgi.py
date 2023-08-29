@@ -145,10 +145,10 @@ class SentryAsgiMiddleware:
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         if is_recursive_asgi_middleware:
             try:
-                if asgi_version == 3:
-                    return await self.app(scope, receive, send)
-                else:
+                if asgi_version == 2:
                     return await self.app(scope)(receive, send)
+                else:
+                    return await self.app(scope, receive, send)
 
             except Exception as exc:
                 _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
@@ -195,13 +195,13 @@ class SentryAsgiMiddleware:
 
                                 return await send(event)
 
-                            if asgi_version == 3:
-                                return await self.app(
-                                    scope, receive, _sentry_wrapped_send
-                                )
-                            else:
+                            if asgi_version == 2:
                                 return await self.app(scope)(
                                     receive, _sentry_wrapped_send
+                                )
+                            else:
+                                return await self.app(
+                                    scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
                             _capture_exception(
