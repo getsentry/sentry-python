@@ -828,7 +828,7 @@ sample_stacks = [
                 "stacks": [[0], [1, 0]],
                 "thread_metadata": thread_metadata,
             },
-            id="two identical stacks",
+            id="two different stacks",
         ),
     ],
 )
