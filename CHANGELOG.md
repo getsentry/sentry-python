@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.30.0
+
+### Various fixes & improvements
+
+- Set response status code in transaction "response" context. (#2312) by @antonpirker
+- Add missing context kwarg to _sentry_task_factory (#2267) by @JohnnyDeuss
+- build(deps): bump sphinx from 7.1.2 to 7.2.4 (#2322) by @dependabot
+- Allow to use OTel for performance instrumentation (experimental) (#2272) by @sentrivana
+- build(deps): bump mypy from 1.4.1 to 1.5.1 (#2319) by @dependabot
+- Add docstrings for Scope.update_from_* (#2311) by @sentrivana
+- In Postgres take the connection params from the connection  (#2308) by @antonpirker
+- build(deps): bump sphinx from 7.0.1 to 7.1.2 (#2296) by @dependabot
+- build(deps): bump checkouts/data-schemas from `1b85152` to `ebc77d3` (#2254) by @dependabot
+- Fix arq attribute error on settings, support worker args (#2260) by @rossmacarthur
+- test(threading): Add test for `ThreadPoolExecutor` (#2259) by @gggritso
+- Moved is_sentry_url to utils (#2304) by @szokeasaurusrex
+- fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
+- Officially support Python 3.11 (#2300) by @sentrivana
+- Enable backpressure handling by default (#2298) by @sl0thentr0py
+- Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
+- Context manager monitor (#2290) by @szokeasaurusrex
+
 ## 1.29.2
 
 ### Various fixes & improvements
