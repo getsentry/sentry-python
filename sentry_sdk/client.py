@@ -260,7 +260,6 @@ class _Client(object):
         finally:
             _client_init_debug.set(old_debug)
 
-
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
     @property
