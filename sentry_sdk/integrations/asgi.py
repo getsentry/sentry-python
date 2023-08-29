@@ -189,6 +189,7 @@ class SentryAsgiMiddleware:
                                 is_http_response = (
                                     event.get("type") == "http.response.start"
                                     and transaction is not None
+                                    and "status" in event
                                 )
                                 if is_http_response:
                                     transaction.set_http_status(event["status"])
