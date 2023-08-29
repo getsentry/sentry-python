@@ -187,7 +187,7 @@ class SentryAsgiMiddleware:
                             async def _sentry_wrapped_send(event):
                                 # type: (Dict[str, Any]) -> Any
                                 is_http_response = (
-                                    event["type"] == "http.response.start"
+                                    event.get("type") == "http.response.start"
                                     and transaction is not None
                                 )
                                 if is_http_response:
