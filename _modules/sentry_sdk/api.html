@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.api - sentry-python 1.29.2 documentation</title>
+      <title>sentry_sdk.api - sentry-python 1.30.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,9 +13,9 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css" />
+  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9cd6187f" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=ee381b95" />
     <style>
 :root {
   --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));--sy-c-link-weak:rgba(var(--sy-rc-theme), 0.86);
@@ -219,7 +219,9 @@ html.dark {
 </span><span id="1-77">    <span class="k">return</span> <span class="n">f</span>
 </span><span id="1-78">
 </span><span id="1-79">
-<div class="viewcode-block" id="capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_event">[docs]</a></span><span id="1-80"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="capture_event">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.capture_event">[docs]</a>
+</span><span id="1-80"><span class="nd">@hubmethod</span>
 </span><span id="1-81"><span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
 </span><span id="1-82">    <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
 </span><span id="1-83">    <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
@@ -228,9 +230,12 @@ html.dark {
 </span><span id="1-86"><span class="p">):</span>
 </span><span id="1-87">    <span class="c1"># type: (...) -&gt; Optional[str]</span>
 </span><span id="1-88">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">)</span></div>
+
 </span><span id="1-89">
 </span><span id="1-90">
-<div class="viewcode-block" id="capture_message"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_message">[docs]</a></span><span id="1-91"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="capture_message">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.capture_message">[docs]</a>
+</span><span id="1-91"><span class="nd">@hubmethod</span>
 </span><span id="1-92"><span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span>
 </span><span id="1-93">    <span class="n">message</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span id="1-94">    <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
@@ -239,9 +244,12 @@ html.dark {
 </span><span id="1-97"><span class="p">):</span>
 </span><span id="1-98">    <span class="c1"># type: (...) -&gt; Optional[str]</span>
 </span><span id="1-99">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">)</span></div>
+
 </span><span id="1-100">
 </span><span id="1-101">
-<div class="viewcode-block" id="capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.capture_exception">[docs]</a></span><span id="1-102"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="capture_exception">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.capture_exception">[docs]</a>
+</span><span id="1-102"><span class="nd">@hubmethod</span>
 </span><span id="1-103"><span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
 </span><span id="1-104">    <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
 </span><span id="1-105">    <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
@@ -249,9 +257,12 @@ html.dark {
 </span><span id="1-107"><span class="p">):</span>
 </span><span id="1-108">    <span class="c1"># type: (...) -&gt; Optional[str]</span>
 </span><span id="1-109">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">)</span></div>
+
 </span><span id="1-110">
 </span><span id="1-111">
-<div class="viewcode-block" id="add_breadcrumb"><a class="viewcode-back" href="../../api.html#sentry_sdk.add_breadcrumb">[docs]</a></span><span id="1-112"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="add_breadcrumb">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.add_breadcrumb">[docs]</a>
+</span><span id="1-112"><span class="nd">@hubmethod</span>
 </span><span id="1-113"><span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span>
 </span><span id="1-114">    <span class="n">crumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Breadcrumb]</span>
 </span><span id="1-115">    <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[BreadcrumbHint]</span>
@@ -259,6 +270,7 @@ html.dark {
 </span><span id="1-117"><span class="p">):</span>
 </span><span id="1-118">    <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-119">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span><span class="n">crumb</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
 </span><span id="1-120">
 </span><span id="1-121">
 </span><span id="1-122"><span class="nd">@overload</span>
@@ -275,12 +287,15 @@ html.dark {
 </span><span id="1-133">    <span class="k">pass</span>
 </span><span id="1-134">
 </span><span id="1-135">
-<div class="viewcode-block" id="configure_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.configure_scope">[docs]</a></span><span id="1-136"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="configure_scope">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.configure_scope">[docs]</a>
+</span><span id="1-136"><span class="nd">@hubmethod</span>
 </span><span id="1-137"><span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
 </span><span id="1-138">    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 </span><span id="1-139"><span class="p">):</span>
 </span><span id="1-140">    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
 </span><span id="1-141">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
+
 </span><span id="1-142">
 </span><span id="1-143">
 </span><span id="1-144"><span class="nd">@overload</span>
@@ -297,75 +312,105 @@ html.dark {
 </span><span id="1-155">    <span class="k">pass</span>
 </span><span id="1-156">
 </span><span id="1-157">
-<div class="viewcode-block" id="push_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.push_scope">[docs]</a></span><span id="1-158"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="push_scope">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.push_scope">[docs]</a>
+</span><span id="1-158"><span class="nd">@hubmethod</span>
 </span><span id="1-159"><span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
 </span><span id="1-160">    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 </span><span id="1-161"><span class="p">):</span>
 </span><span id="1-162">    <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
 </span><span id="1-163">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">push_scope</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
+
 </span><span id="1-164">
 </span><span id="1-165">
-<div class="viewcode-block" id="set_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_tag">[docs]</a></span><span id="1-166"><span class="nd">@scopemethod</span>
+<div class="viewcode-block" id="set_tag">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.set_tag">[docs]</a>
+</span><span id="1-166"><span class="nd">@scopemethod</span>
 </span><span id="1-167"><span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-168">    <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span id="1-169">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
 </span><span id="1-170">
 </span><span id="1-171">
-<div class="viewcode-block" id="set_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_context">[docs]</a></span><span id="1-172"><span class="nd">@scopemethod</span>
+<div class="viewcode-block" id="set_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.set_context">[docs]</a>
+</span><span id="1-172"><span class="nd">@scopemethod</span>
 </span><span id="1-173"><span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-174">    <span class="c1"># type: (str, Dict[str, Any]) -&gt; None</span>
 </span><span id="1-175">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
 </span><span id="1-176">
 </span><span id="1-177">
-<div class="viewcode-block" id="set_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_extra">[docs]</a></span><span id="1-178"><span class="nd">@scopemethod</span>
+<div class="viewcode-block" id="set_extra">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.set_extra">[docs]</a>
+</span><span id="1-178"><span class="nd">@scopemethod</span>
 </span><span id="1-179"><span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-180">    <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span id="1-181">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_extra</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
 </span><span id="1-182">
 </span><span id="1-183">
-<div class="viewcode-block" id="set_user"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_user">[docs]</a></span><span id="1-184"><span class="nd">@scopemethod</span>
+<div class="viewcode-block" id="set_user">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.set_user">[docs]</a>
+</span><span id="1-184"><span class="nd">@scopemethod</span>
 </span><span id="1-185"><span class="k">def</span> <span class="nf">set_user</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
 </span><span id="1-186">    <span class="c1"># type: (Optional[Dict[str, Any]]) -&gt; None</span>
 </span><span id="1-187">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_user</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
 </span><span id="1-188">
 </span><span id="1-189">
-<div class="viewcode-block" id="set_level"><a class="viewcode-back" href="../../api.html#sentry_sdk.set_level">[docs]</a></span><span id="1-190"><span class="nd">@scopemethod</span>
+<div class="viewcode-block" id="set_level">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.set_level">[docs]</a>
+</span><span id="1-190"><span class="nd">@scopemethod</span>
 </span><span id="1-191"><span class="k">def</span> <span class="nf">set_level</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
 </span><span id="1-192">    <span class="c1"># type: (str) -&gt; None</span>
 </span><span id="1-193">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">set_level</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
 </span><span id="1-194">
 </span><span id="1-195">
-<div class="viewcode-block" id="flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.flush">[docs]</a></span><span id="1-196"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="flush">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.flush">[docs]</a>
+</span><span id="1-196"><span class="nd">@hubmethod</span>
 </span><span id="1-197"><span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
 </span><span id="1-198">    <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
 </span><span id="1-199">    <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
 </span><span id="1-200"><span class="p">):</span>
 </span><span id="1-201">    <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-202">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
+
 </span><span id="1-203">
 </span><span id="1-204">
-<div class="viewcode-block" id="last_event_id"><a class="viewcode-back" href="../../api.html#sentry_sdk.last_event_id">[docs]</a></span><span id="1-205"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="last_event_id">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.last_event_id">[docs]</a>
+</span><span id="1-205"><span class="nd">@hubmethod</span>
 </span><span id="1-206"><span class="k">def</span> <span class="nf">last_event_id</span><span class="p">():</span>
 </span><span id="1-207">    <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-208">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span></div>
+
 </span><span id="1-209">
 </span><span id="1-210">
-<div class="viewcode-block" id="start_span"><a class="viewcode-back" href="../../api.html#sentry_sdk.start_span">[docs]</a></span><span id="1-211"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="start_span">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.start_span">[docs]</a>
+</span><span id="1-211"><span class="nd">@hubmethod</span>
 </span><span id="1-212"><span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span>
 </span><span id="1-213">    <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Span]</span>
 </span><span id="1-214">    <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
 </span><span id="1-215"><span class="p">):</span>
 </span><span id="1-216">    <span class="c1"># type: (...) -&gt; Span</span>
 </span><span id="1-217">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="n">span</span><span class="o">=</span><span class="n">span</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
 </span><span id="1-218">
 </span><span id="1-219">
-<div class="viewcode-block" id="start_transaction"><a class="viewcode-back" href="../../api.html#sentry_sdk.start_transaction">[docs]</a></span><span id="1-220"><span class="nd">@hubmethod</span>
+<div class="viewcode-block" id="start_transaction">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.start_transaction">[docs]</a>
+</span><span id="1-220"><span class="nd">@hubmethod</span>
 </span><span id="1-221"><span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
 </span><span id="1-222">    <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Transaction]</span>
 </span><span id="1-223">    <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
 </span><span id="1-224"><span class="p">):</span>
 </span><span id="1-225">    <span class="c1"># type: (...) -&gt; Union[Transaction, NoOpSpan]</span>
 </span><span id="1-226">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">transaction</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
 </span><span id="1-227">
 </span><span id="1-228">
 </span><span id="1-229"><span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
@@ -375,7 +420,9 @@ html.dark {
 </span><span id="1-233">        <span class="n">transaction</span><span class="o">.</span><span class="n">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
 </span><span id="1-234">
 </span><span id="1-235">
-<div class="viewcode-block" id="get_current_span"><a class="viewcode-back" href="../../api.html#sentry_sdk.get_current_span">[docs]</a></span><span id="1-236"><span class="k">def</span> <span class="nf">get_current_span</span><span class="p">(</span><span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="get_current_span">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.get_current_span">[docs]</a>
+</span><span id="1-236"><span class="k">def</span> <span class="nf">get_current_span</span><span class="p">(</span><span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-237">    <span class="c1"># type: (Optional[Hub]) -&gt; Optional[Span]</span>
 </span><span id="1-238"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-239"><span class="sd">    Returns the currently active span if there is one running, otherwise `None`</span>
@@ -385,30 +432,40 @@ html.dark {
 </span><span id="1-243">
 </span><span id="1-244">    <span class="n">current_span</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
 </span><span id="1-245">    <span class="k">return</span> <span class="n">current_span</span></div>
+
 </span><span id="1-246">
 </span><span id="1-247">
-<div class="viewcode-block" id="get_traceparent"><a class="viewcode-back" href="../../api.html#sentry_sdk.get_traceparent">[docs]</a></span><span id="1-248"><span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">():</span>
+<div class="viewcode-block" id="get_traceparent">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.get_traceparent">[docs]</a>
+</span><span id="1-248"><span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">():</span>
 </span><span id="1-249">    <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-250"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-251"><span class="sd">    Returns the traceparent either from the active span or from the scope.</span>
 </span><span id="1-252"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="1-253">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
+
 </span><span id="1-254">
 </span><span id="1-255">
-<div class="viewcode-block" id="get_baggage"><a class="viewcode-back" href="../../api.html#sentry_sdk.get_baggage">[docs]</a></span><span id="1-256"><span class="k">def</span> <span class="nf">get_baggage</span><span class="p">():</span>
+<div class="viewcode-block" id="get_baggage">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.get_baggage">[docs]</a>
+</span><span id="1-256"><span class="k">def</span> <span class="nf">get_baggage</span><span class="p">():</span>
 </span><span id="1-257">    <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-258"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-259"><span class="sd">    Returns Baggage either from the active span or from the scope.</span>
 </span><span id="1-260"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="1-261">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span></div>
+
 </span><span id="1-262">
 </span><span id="1-263">
-<div class="viewcode-block" id="continue_trace"><a class="viewcode-back" href="../../api.html#sentry_sdk.continue_trace">[docs]</a></span><span id="1-264"><span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="continue_trace">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.continue_trace">[docs]</a>
+</span><span id="1-264"><span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-265">    <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -&gt; Transaction</span>
 </span><span id="1-266"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-267"><span class="sd">    Sets the propagation context from environment or headers and returns a transaction.</span>
 </span><span id="1-268"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="1-269">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span></div>
+
 </span></pre></div>
         </article>
         
@@ -441,10 +498,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
-      <script src="../../_static/doctools.js"></script>
-      <script src="../../_static/sphinx_highlight.js"></script>
-      <script src="../../_static/shibuya.js"></script>
+      <script src="../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../_static/doctools.js?v=888ff710"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/shibuya.js?v=d7f4572f"></script>
     
 </body>
 </html>

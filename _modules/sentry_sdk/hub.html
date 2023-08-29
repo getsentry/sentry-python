@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.hub - sentry-python 1.29.2 documentation</title>
+      <title>sentry_sdk.hub - sentry-python 1.30.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,9 +13,9 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css" />
+  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9cd6187f" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=ee381b95" />
     <style>
 :root {
   --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));--sy-c-link-weak:rgba(var(--sy-rc-theme), 0.86);
@@ -364,7 +364,9 @@ html.dark {
 </span><span id="1-222">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">warning</span><span class="p">)</span>
 </span><span id="1-223">
 </span><span id="1-224">
-<div class="viewcode-block" id="Hub"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub">[docs]</a></span><span id="1-225"><span class="k">class</span> <span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>  <span class="c1"># type: ignore</span>
+<div class="viewcode-block" id="Hub">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub">[docs]</a>
+</span><span id="1-225"><span class="k">class</span> <span class="nc">Hub</span><span class="p">(</span><span class="n">with_metaclass</span><span class="p">(</span><span class="n">HubMeta</span><span class="p">)):</span>  <span class="c1"># type: ignore</span>
 </span><span id="1-226"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The hub wraps the concurrency management of the SDK.  Each thread has</span>
 </span><span id="1-227"><span class="sd">    its own hub but the hub might transfer with the flow of execution if</span>
 </span><span id="1-228"><span class="sd">    context vars are available.</span>
@@ -416,7 +418,9 @@ html.dark {
 </span><span id="1-274">        <span class="n">old</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_old_hubs</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
 </span><span id="1-275">        <span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old</span><span class="p">)</span>
 </span><span id="1-276">
-<div class="viewcode-block" id="Hub.run"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.run">[docs]</a></span><span id="1-277">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
+<div class="viewcode-block" id="Hub.run">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.run">[docs]</a>
+</span><span id="1-277">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
 </span><span id="1-278">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[], T]</span>
 </span><span id="1-279">    <span class="p">):</span>
 </span><span id="1-280">        <span class="c1"># type: (...) -&gt; T</span>
@@ -425,8 +429,11 @@ html.dark {
 </span><span id="1-283"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="1-284">        <span class="k">with</span> <span class="bp">self</span><span class="p">:</span>
 </span><span id="1-285">            <span class="k">return</span> <span class="n">callback</span><span class="p">()</span></div>
+
 </span><span id="1-286">
-<div class="viewcode-block" id="Hub.get_integration"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_integration">[docs]</a></span><span id="1-287">    <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span>
+<div class="viewcode-block" id="Hub.get_integration">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_integration">[docs]</a>
+</span><span id="1-287">    <span class="k">def</span> <span class="nf">get_integration</span><span class="p">(</span>
 </span><span id="1-288">        <span class="bp">self</span><span class="p">,</span> <span class="n">name_or_class</span>  <span class="c1"># type: Union[str, Type[Integration]]</span>
 </span><span id="1-289">    <span class="p">):</span>
 </span><span id="1-290">        <span class="c1"># type: (...) -&gt; Any</span>
@@ -449,6 +456,7 @@ html.dark {
 </span><span id="1-307">            <span class="n">rv</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">integrations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">integration_name</span><span class="p">)</span>
 </span><span id="1-308">            <span class="k">if</span> <span class="n">rv</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-309">                <span class="k">return</span> <span class="n">rv</span></div>
+
 </span><span id="1-310">
 </span><span id="1-311">    <span class="nd">@property</span>
 </span><span id="1-312">    <span class="k">def</span> <span class="nf">client</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -462,20 +470,28 @@ html.dark {
 </span><span id="1-320"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the current scope on the hub.&quot;&quot;&quot;</span>
 </span><span id="1-321">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="1-322">
-<div class="viewcode-block" id="Hub.last_event_id"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.last_event_id">[docs]</a></span><span id="1-323">    <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.last_event_id">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.last_event_id">[docs]</a>
+</span><span id="1-323">    <span class="k">def</span> <span class="nf">last_event_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-324">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-325"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the last event ID.&quot;&quot;&quot;</span>
 </span><span id="1-326">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span></div>
+
 </span><span id="1-327">
-<div class="viewcode-block" id="Hub.bind_client"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.bind_client">[docs]</a></span><span id="1-328">    <span class="k">def</span> <span class="nf">bind_client</span><span class="p">(</span>
+<div class="viewcode-block" id="Hub.bind_client">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.bind_client">[docs]</a>
+</span><span id="1-328">    <span class="k">def</span> <span class="nf">bind_client</span><span class="p">(</span>
 </span><span id="1-329">        <span class="bp">self</span><span class="p">,</span> <span class="n">new</span>  <span class="c1"># type: Optional[Client]</span>
 </span><span id="1-330">    <span class="p">):</span>
 </span><span id="1-331">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-332"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Binds a new client to the hub.&quot;&quot;&quot;</span>
 </span><span id="1-333">        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="1-334">        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+
 </span><span id="1-335">
-<div class="viewcode-block" id="Hub.capture_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_event">[docs]</a></span><span id="1-336">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.capture_event">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_event">[docs]</a>
+</span><span id="1-336">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">):</span>
 </span><span id="1-337">        <span class="c1"># type: (Event, Optional[Hint], Optional[Scope], Any) -&gt; Optional[str]</span>
 </span><span id="1-338"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-339"><span class="sd">        Captures an event.</span>
@@ -494,8 +510,11 @@ html.dark {
 </span><span id="1-352">                <span class="bp">self</span><span class="o">.</span><span class="n">_last_event_id</span> <span class="o">=</span> <span class="n">rv</span>
 </span><span id="1-353">            <span class="k">return</span> <span class="n">rv</span>
 </span><span id="1-354">        <span class="k">return</span> <span class="kc">None</span></div>
+
 </span><span id="1-355">
-<div class="viewcode-block" id="Hub.capture_message"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_message">[docs]</a></span><span id="1-356">    <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.capture_message">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_message">[docs]</a>
+</span><span id="1-356">    <span class="k">def</span> <span class="nf">capture_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">):</span>
 </span><span id="1-357">        <span class="c1"># type: (str, Optional[str], Optional[Scope], Any) -&gt; Optional[str]</span>
 </span><span id="1-358"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-359"><span class="sd">        Captures a message.</span>
@@ -518,8 +537,11 @@ html.dark {
 </span><span id="1-376">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span>
 </span><span id="1-377">            <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span> <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="n">level</span><span class="p">},</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span>
 </span><span id="1-378">        <span class="p">)</span></div>
+
 </span><span id="1-379">
-<div class="viewcode-block" id="Hub.capture_exception"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_exception">[docs]</a></span><span id="1-380">    <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.capture_exception">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.capture_exception">[docs]</a>
+</span><span id="1-380">    <span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">):</span>
 </span><span id="1-381">        <span class="c1"># type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -&gt; Optional[str]</span>
 </span><span id="1-382"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Captures an exception.</span>
 </span><span id="1-383">
@@ -545,6 +567,7 @@ html.dark {
 </span><span id="1-403">            <span class="bp">self</span><span class="o">.</span><span class="n">_capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
 </span><span id="1-404">
 </span><span id="1-405">        <span class="k">return</span> <span class="kc">None</span></div>
+
 </span><span id="1-406">
 </span><span id="1-407">    <span class="k">def</span> <span class="nf">_capture_internal_exception</span><span class="p">(</span>
 </span><span id="1-408">        <span class="bp">self</span><span class="p">,</span> <span class="n">exc_info</span>  <span class="c1"># type: Any</span>
@@ -558,7 +581,9 @@ html.dark {
 </span><span id="1-416"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="1-417">        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Internal error in sentry_sdk&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="n">exc_info</span><span class="p">)</span>
 </span><span id="1-418">
-<div class="viewcode-block" id="Hub.add_breadcrumb"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.add_breadcrumb">[docs]</a></span><span id="1-419">    <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.add_breadcrumb">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.add_breadcrumb">[docs]</a>
+</span><span id="1-419">    <span class="k">def</span> <span class="nf">add_breadcrumb</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">crumb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span id="1-420">        <span class="c1"># type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -&gt; None</span>
 </span><span id="1-421"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-422"><span class="sd">        Adds a breadcrumb.</span>
@@ -598,8 +623,11 @@ html.dark {
 </span><span id="1-456">        <span class="n">max_breadcrumbs</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;max_breadcrumbs&quot;</span><span class="p">]</span>  <span class="c1"># type: int</span>
 </span><span id="1-457">        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_breadcrumbs</span><span class="p">:</span>
 </span><span id="1-458">            <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span></div>
+
 </span><span id="1-459">
-<div class="viewcode-block" id="Hub.start_span"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_span">[docs]</a></span><span id="1-460">    <span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.start_span">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_span">[docs]</a>
+</span><span id="1-460">    <span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span id="1-461">        <span class="c1"># type: (Optional[Span], str, Any) -&gt; Span</span>
 </span><span id="1-462"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-463"><span class="sd">        Start a span whose parent is the currently active span or transaction, if any.</span>
@@ -654,8 +682,11 @@ html.dark {
 </span><span id="1-512">                <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span>
 </span><span id="1-513">
 </span><span id="1-514">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
 </span><span id="1-515">
-<div class="viewcode-block" id="Hub.start_transaction"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_transaction">[docs]</a></span><span id="1-516">    <span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
+<div class="viewcode-block" id="Hub.start_transaction">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_transaction">[docs]</a>
+</span><span id="1-516">    <span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
 </span><span id="1-517">        <span class="bp">self</span><span class="p">,</span> <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
 </span><span id="1-518">    <span class="p">):</span>
 </span><span id="1-519">        <span class="c1"># type: (Optional[Transaction], str, Any) -&gt; Union[Transaction, NoOpSpan]</span>
@@ -716,8 +747,11 @@ html.dark {
 </span><span id="1-574">            <span class="n">transaction</span><span class="o">.</span><span class="n">init_span_recorder</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
 </span><span id="1-575">
 </span><span id="1-576">        <span class="k">return</span> <span class="n">transaction</span></div>
+
 </span><span id="1-577">
-<div class="viewcode-block" id="Hub.continue_trace"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.continue_trace">[docs]</a></span><span id="1-578">    <span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.continue_trace">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.continue_trace">[docs]</a>
+</span><span id="1-578">    <span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-579">        <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -&gt; Transaction</span>
 </span><span id="1-580"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-581"><span class="sd">        Sets the propagation context from environment or headers and returns a transaction.</span>
@@ -732,6 +766,7 @@ html.dark {
 </span><span id="1-590">            <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
 </span><span id="1-591">        <span class="p">)</span>
 </span><span id="1-592">        <span class="k">return</span> <span class="n">transaction</span></div>
+
 </span><span id="1-593">
 </span><span id="1-594">    <span class="nd">@overload</span>
 </span><span id="1-595">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
@@ -747,7 +782,9 @@ html.dark {
 </span><span id="1-605">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-606">        <span class="k">pass</span>
 </span><span id="1-607">
-<div class="viewcode-block" id="Hub.push_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.push_scope">[docs]</a></span><span id="1-608">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+<div class="viewcode-block" id="Hub.push_scope">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.push_scope">[docs]</a>
+</span><span id="1-608">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
 </span><span id="1-609">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-610">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 </span><span id="1-611">        <span class="n">continue_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
@@ -778,8 +815,11 @@ html.dark {
 </span><span id="1-636">        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
 </span><span id="1-637">
 </span><span id="1-638">        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
 </span><span id="1-639">
-<div class="viewcode-block" id="Hub.pop_scope_unsafe"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a></span><span id="1-640">    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.pop_scope_unsafe">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a>
+</span><span id="1-640">    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-641">        <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
 </span><span id="1-642"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-643"><span class="sd">        Pops a scope layer from the stack.</span>
@@ -789,6 +829,7 @@ html.dark {
 </span><span id="1-647">        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
 </span><span id="1-648">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
 </span><span id="1-649">        <span class="k">return</span> <span class="n">rv</span></div>
+
 </span><span id="1-650">
 </span><span id="1-651">    <span class="nd">@overload</span>
 </span><span id="1-652">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
@@ -804,7 +845,9 @@ html.dark {
 </span><span id="1-662">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-663">        <span class="k">pass</span>
 </span><span id="1-664">
-<div class="viewcode-block" id="Hub.configure_scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.configure_scope">[docs]</a></span><span id="1-665">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+<div class="viewcode-block" id="Hub.configure_scope">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.configure_scope">[docs]</a>
+</span><span id="1-665">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
 </span><span id="1-666">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-667">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
 </span><span id="1-668">        <span class="n">continue_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
@@ -839,8 +882,11 @@ html.dark {
 </span><span id="1-697">                <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
 </span><span id="1-698">
 </span><span id="1-699">        <span class="k">return</span> <span class="n">inner</span><span class="p">()</span></div>
+
 </span><span id="1-700">
-<div class="viewcode-block" id="Hub.start_session"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_session">[docs]</a></span><span id="1-701">    <span class="k">def</span> <span class="nf">start_session</span><span class="p">(</span>
+<div class="viewcode-block" id="Hub.start_session">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_session">[docs]</a>
+</span><span id="1-701">    <span class="k">def</span> <span class="nf">start_session</span><span class="p">(</span>
 </span><span id="1-702">        <span class="bp">self</span><span class="p">,</span> <span class="n">session_mode</span><span class="o">=</span><span class="s2">&quot;application&quot;</span>  <span class="c1"># type: str</span>
 </span><span id="1-703">    <span class="p">):</span>
 </span><span id="1-704">        <span class="c1"># type: (...) -&gt; None</span>
@@ -853,8 +899,11 @@ html.dark {
 </span><span id="1-711">            <span class="n">user</span><span class="o">=</span><span class="n">scope</span><span class="o">.</span><span class="n">_user</span><span class="p">,</span>
 </span><span id="1-712">            <span class="n">session_mode</span><span class="o">=</span><span class="n">session_mode</span><span class="p">,</span>
 </span><span id="1-713">        <span class="p">)</span></div>
+
 </span><span id="1-714">
-<div class="viewcode-block" id="Hub.end_session"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.end_session">[docs]</a></span><span id="1-715">    <span class="k">def</span> <span class="nf">end_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.end_session">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.end_session">[docs]</a>
+</span><span id="1-715">    <span class="k">def</span> <span class="nf">end_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-716">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-717"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ends the current session if there is one.&quot;&quot;&quot;</span>
 </span><span id="1-718">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -865,8 +914,11 @@ html.dark {
 </span><span id="1-723">            <span class="n">session</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </span><span id="1-724">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-725">                <span class="n">client</span><span class="o">.</span><span class="n">capture_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span></div>
+
 </span><span id="1-726">
-<div class="viewcode-block" id="Hub.stop_auto_session_tracking"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.stop_auto_session_tracking">[docs]</a></span><span id="1-727">    <span class="k">def</span> <span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.stop_auto_session_tracking">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.stop_auto_session_tracking">[docs]</a>
+</span><span id="1-727">    <span class="k">def</span> <span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-728">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-729"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Stops automatic session tracking.</span>
 </span><span id="1-730">
@@ -876,8 +928,11 @@ html.dark {
 </span><span id="1-734">        <span class="bp">self</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
 </span><span id="1-735">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="1-736">        <span class="n">scope</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="kc">False</span></div>
+
 </span><span id="1-737">
-<div class="viewcode-block" id="Hub.resume_auto_session_tracking"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.resume_auto_session_tracking">[docs]</a></span><span id="1-738">    <span class="k">def</span> <span class="nf">resume_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.resume_auto_session_tracking">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.resume_auto_session_tracking">[docs]</a>
+</span><span id="1-738">    <span class="k">def</span> <span class="nf">resume_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-739">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-740"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Resumes automatic session tracking for the current scope if</span>
 </span><span id="1-741"><span class="sd">        disabled earlier.  This requires that generally automatic session</span>
@@ -885,8 +940,11 @@ html.dark {
 </span><span id="1-743"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="1-744">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="1-745">        <span class="n">scope</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="kc">None</span></div>
+
 </span><span id="1-746">
-<div class="viewcode-block" id="Hub.flush"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.flush">[docs]</a></span><span id="1-747">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+<div class="viewcode-block" id="Hub.flush">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.flush">[docs]</a>
+</span><span id="1-747">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
 </span><span id="1-748">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-749">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
 </span><span id="1-750">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
@@ -898,8 +956,11 @@ html.dark {
 </span><span id="1-756">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="1-757">        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-758">            <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
+
 </span><span id="1-759">
-<div class="viewcode-block" id="Hub.get_traceparent"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_traceparent">[docs]</a></span><span id="1-760">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.get_traceparent">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_traceparent">[docs]</a>
+</span><span id="1-760">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-761">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-762"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-763"><span class="sd">        Returns the traceparent either from the active span or from the scope.</span>
@@ -909,8 +970,11 @@ html.dark {
 </span><span id="1-767">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
 </span><span id="1-768">
 </span><span id="1-769">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
+
 </span><span id="1-770">
-<div class="viewcode-block" id="Hub.get_baggage"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_baggage">[docs]</a></span><span id="1-771">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.get_baggage">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_baggage">[docs]</a>
+</span><span id="1-771">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-772">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-773"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-774"><span class="sd">        Returns Baggage either from the active span or from the scope.</span>
@@ -928,8 +992,11 @@ html.dark {
 </span><span id="1-786">            <span class="k">return</span> <span class="n">baggage</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
 </span><span id="1-787">
 </span><span id="1-788">        <span class="k">return</span> <span class="kc">None</span></div>
+
 </span><span id="1-789">
-<div class="viewcode-block" id="Hub.iter_trace_propagation_headers"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.iter_trace_propagation_headers">[docs]</a></span><span id="1-790">    <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.iter_trace_propagation_headers">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.iter_trace_propagation_headers">[docs]</a>
+</span><span id="1-790">    <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-791">        <span class="c1"># type: (Optional[Span]) -&gt; Generator[Tuple[str, str], None, None]</span>
 </span><span id="1-792"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-793"><span class="sd">        Return HTTP headers which allow propagation of trace data. Data taken</span>
@@ -949,8 +1016,11 @@ html.dark {
 </span><span id="1-807">        <span class="k">else</span><span class="p">:</span>
 </span><span id="1-808">            <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">iter_headers</span><span class="p">():</span>
 </span><span id="1-809">                <span class="k">yield</span> <span class="n">header</span></div>
+
 </span><span id="1-810">
-<div class="viewcode-block" id="Hub.trace_propagation_meta"><a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.trace_propagation_meta">[docs]</a></span><span id="1-811">    <span class="k">def</span> <span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Hub.trace_propagation_meta">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.trace_propagation_meta">[docs]</a>
+</span><span id="1-811">    <span class="k">def</span> <span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-812">        <span class="c1"># type: (Optional[Span]) -&gt; str</span>
 </span><span id="1-813"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-814"><span class="sd">        Return meta tags which should be injected into HTML templates</span>
@@ -977,7 +1047,9 @@ html.dark {
 </span><span id="1-835">                <span class="n">baggage</span><span class="p">,</span>
 </span><span id="1-836">            <span class="p">)</span>
 </span><span id="1-837">
-</span><span id="1-838">        <span class="k">return</span> <span class="n">meta</span></div></div>
+</span><span id="1-838">        <span class="k">return</span> <span class="n">meta</span></div>
+</div>
+
 </span><span id="1-839">
 </span><span id="1-840">
 </span><span id="1-841"><span class="n">GLOBAL_HUB</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">()</span>
@@ -1014,10 +1086,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
-      <script src="../../_static/doctools.js"></script>
-      <script src="../../_static/sphinx_highlight.js"></script>
-      <script src="../../_static/shibuya.js"></script>
+      <script src="../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../_static/doctools.js?v=888ff710"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/shibuya.js?v=d7f4572f"></script>
     
 </body>
 </html>

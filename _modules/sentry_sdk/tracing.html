@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.tracing - sentry-python 1.29.2 documentation</title>
+      <title>sentry_sdk.tracing - sentry-python 1.30.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,9 +13,9 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css" />
+  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9cd6187f" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=ee381b95" />
     <style>
 :root {
   --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));--sy-c-link-weak:rgba(var(--sy-rc-theme), 0.86);
@@ -221,7 +221,9 @@ html.dark {
 </span><span id="1-79">            <span class="bp">self</span><span class="o">.</span><span class="n">spans</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">span</span><span class="p">)</span>
 </span><span id="1-80">
 </span><span id="1-81">
-<div class="viewcode-block" id="Span"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span">[docs]</a></span><span id="1-82"><span class="k">class</span> <span class="nc">Span</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Span">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span">[docs]</a>
+</span><span id="1-82"><span class="k">class</span> <span class="nc">Span</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 </span><span id="1-83">    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="1-84">        <span class="s2">&quot;trace_id&quot;</span><span class="p">,</span>
 </span><span id="1-85">        <span class="s2">&quot;span_id&quot;</span><span class="p">,</span>
@@ -349,7 +351,9 @@ html.dark {
 </span><span id="1-207">        <span class="c1"># referencing themselves)</span>
 </span><span id="1-208">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_containing_transaction</span>
 </span><span id="1-209">
-<div class="viewcode-block" id="Span.start_child"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.start_child">[docs]</a></span><span id="1-210">    <span class="k">def</span> <span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Span.start_child">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.start_child">[docs]</a>
+</span><span id="1-210">    <span class="k">def</span> <span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span id="1-211">        <span class="c1"># type: (str, **Any) -&gt; Span</span>
 </span><span id="1-212"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-213"><span class="sd">        Start a sub-span from the current span or transaction.</span>
@@ -380,14 +384,20 @@ html.dark {
 </span><span id="1-238">        <span class="k">if</span> <span class="n">span_recorder</span><span class="p">:</span>
 </span><span id="1-239">            <span class="n">span_recorder</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
 </span><span id="1-240">        <span class="k">return</span> <span class="n">child</span></div>
+
 </span><span id="1-241">
-<div class="viewcode-block" id="Span.new_span"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.new_span">[docs]</a></span><span id="1-242">    <span class="k">def</span> <span class="nf">new_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<div class="viewcode-block" id="Span.new_span">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.new_span">[docs]</a>
+</span><span id="1-242">    <span class="k">def</span> <span class="nf">new_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 </span><span id="1-243">        <span class="c1"># type: (**Any) -&gt; Span</span>
 </span><span id="1-244"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Deprecated: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead.&quot;&quot;&quot;</span>
 </span><span id="1-245">        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Deprecated: use Span.start_child instead of Span.new_span.&quot;</span><span class="p">)</span>
 </span><span id="1-246">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
 </span><span id="1-247">
-<div class="viewcode-block" id="Span.continue_from_environ"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.continue_from_environ">[docs]</a></span><span id="1-248">    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="Span.continue_from_environ">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.continue_from_environ">[docs]</a>
+</span><span id="1-248">    <span class="nd">@classmethod</span>
 </span><span id="1-249">    <span class="k">def</span> <span class="nf">continue_from_environ</span><span class="p">(</span>
 </span><span id="1-250">        <span class="bp">cls</span><span class="p">,</span>
 </span><span id="1-251">        <span class="n">environ</span><span class="p">,</span>  <span class="c1"># type: typing.Mapping[str, str]</span>
@@ -409,8 +419,11 @@ html.dark {
 </span><span id="1-267">                <span class="s2">&quot;instead of Span.continue_from_environ.&quot;</span>
 </span><span id="1-268">            <span class="p">)</span>
 </span><span id="1-269">        <span class="k">return</span> <span class="n">Transaction</span><span class="o">.</span><span class="n">continue_from_headers</span><span class="p">(</span><span class="n">EnvironHeaders</span><span class="p">(</span><span class="n">environ</span><span class="p">),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
 </span><span id="1-270">
-<div class="viewcode-block" id="Span.continue_from_headers"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.continue_from_headers">[docs]</a></span><span id="1-271">    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="Span.continue_from_headers">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.continue_from_headers">[docs]</a>
+</span><span id="1-271">    <span class="nd">@classmethod</span>
 </span><span id="1-272">    <span class="k">def</span> <span class="nf">continue_from_headers</span><span class="p">(</span>
 </span><span id="1-273">        <span class="bp">cls</span><span class="p">,</span>
 </span><span id="1-274">        <span class="n">headers</span><span class="p">,</span>  <span class="c1"># type: typing.Mapping[str, str]</span>
@@ -449,8 +462,11 @@ html.dark {
 </span><span id="1-307">        <span class="n">transaction</span><span class="o">.</span><span class="n">same_process_as_parent</span> <span class="o">=</span> <span class="kc">False</span>
 </span><span id="1-308">
 </span><span id="1-309">        <span class="k">return</span> <span class="n">transaction</span></div>
+
 </span><span id="1-310">
-<div class="viewcode-block" id="Span.iter_headers"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.iter_headers">[docs]</a></span><span id="1-311">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Span.iter_headers">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.iter_headers">[docs]</a>
+</span><span id="1-311">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-312">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
 </span><span id="1-313"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-314"><span class="sd">        Creates a generator which returns the span&#39;s `sentry-trace` and `baggage` headers.</span>
@@ -463,8 +479,11 @@ html.dark {
 </span><span id="1-321">            <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">containing_transaction</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
 </span><span id="1-322">            <span class="k">if</span> <span class="n">baggage</span><span class="p">:</span>
 </span><span id="1-323">                <span class="k">yield</span> <span class="n">BAGGAGE_HEADER_NAME</span><span class="p">,</span> <span class="n">baggage</span></div>
+
 </span><span id="1-324">
-<div class="viewcode-block" id="Span.from_traceparent"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.from_traceparent">[docs]</a></span><span id="1-325">    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="Span.from_traceparent">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Span.from_traceparent">[docs]</a>
+</span><span id="1-325">    <span class="nd">@classmethod</span>
 </span><span id="1-326">    <span class="k">def</span> <span class="nf">from_traceparent</span><span class="p">(</span>
 </span><span id="1-327">        <span class="bp">cls</span><span class="p">,</span>
 </span><span id="1-328">        <span class="n">traceparent</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
@@ -488,6 +507,7 @@ html.dark {
 </span><span id="1-346">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">continue_from_headers</span><span class="p">(</span>
 </span><span id="1-347">            <span class="p">{</span><span class="n">SENTRY_TRACE_HEADER_NAME</span><span class="p">:</span> <span class="n">traceparent</span><span class="p">},</span> <span class="o">**</span><span class="n">kwargs</span>
 </span><span id="1-348">        <span class="p">)</span></div>
+
 </span><span id="1-349">
 </span><span id="1-350">    <span class="k">def</span> <span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-351">        <span class="c1"># type: () -&gt; str</span>
@@ -630,9 +650,12 @@ html.dark {
 </span><span id="1-488">            <span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">containing_transaction</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span><span class="o">.</span><span class="n">dynamic_sampling_context</span><span class="p">()</span>
 </span><span id="1-489">
 </span><span id="1-490">        <span class="k">return</span> <span class="n">rv</span></div>
+
 </span><span id="1-491">
 </span><span id="1-492">
-<div class="viewcode-block" id="Transaction"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Transaction">[docs]</a></span><span id="1-493"><span class="k">class</span> <span class="nc">Transaction</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
+<div class="viewcode-block" id="Transaction">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Transaction">[docs]</a>
+</span><span id="1-493"><span class="k">class</span> <span class="nc">Transaction</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
 </span><span id="1-494">    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span>
 </span><span id="1-495">        <span class="s2">&quot;name&quot;</span><span class="p">,</span>
 </span><span id="1-496">        <span class="s2">&quot;source&quot;</span><span class="p">,</span>
@@ -805,233 +828,242 @@ html.dark {
 </span><span id="1-663">        <span class="c1"># type: (str, Any) -&gt; None</span>
 </span><span id="1-664">        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
 </span><span id="1-665">
-</span><span id="1-666">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-667">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
-</span><span id="1-668">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Transaction</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
-</span><span id="1-669">
-</span><span id="1-670">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
-</span><span id="1-671">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span>
-</span><span id="1-672">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;sampled&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span>
-</span><span id="1-673">
-</span><span id="1-674">        <span class="k">return</span> <span class="n">rv</span>
-</span><span id="1-675">
-<div class="viewcode-block" id="Transaction.get_baggage"><a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Transaction.get_baggage">[docs]</a></span><span id="1-676">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-677">        <span class="c1"># type: () -&gt; Baggage</span>
-</span><span id="1-678"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-679"><span class="sd">        The first time a new baggage with sentry items is made,</span>
-</span><span id="1-680"><span class="sd">        it will be frozen.</span>
-</span><span id="1-681"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-682">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span><span class="o">.</span><span class="n">mutable</span><span class="p">:</span>
-</span><span id="1-683">            <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span> <span class="o">=</span> <span class="n">Baggage</span><span class="o">.</span><span class="n">populate_from_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-</span><span id="1-684">
-</span><span id="1-685">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span></div>
-</span><span id="1-686">
-</span><span id="1-687">    <span class="k">def</span> <span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
-</span><span id="1-688">        <span class="c1"># type: (SamplingContext) -&gt; None</span>
-</span><span id="1-689"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-690"><span class="sd">        Sets the transaction&#39;s sampling decision, according to the following</span>
-</span><span id="1-691"><span class="sd">        precedence rules:</span>
-</span><span id="1-692">
-</span><span id="1-693"><span class="sd">        1. If a sampling decision is passed to `start_transaction`</span>
-</span><span id="1-694"><span class="sd">        (`start_transaction(name: &quot;my transaction&quot;, sampled: True)`), that</span>
-</span><span id="1-695"><span class="sd">        decision will be used, regardless of anything else</span>
-</span><span id="1-696">
-</span><span id="1-697"><span class="sd">        2. If `traces_sampler` is defined, its decision will be used. It can</span>
-</span><span id="1-698"><span class="sd">        choose to keep or ignore any parent sampling decision, or use the</span>
-</span><span id="1-699"><span class="sd">        sampling context data to make its own decision or to choose a sample</span>
-</span><span id="1-700"><span class="sd">        rate for the transaction.</span>
+</span><span id="1-666">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
+</span><span id="1-667">        <span class="c1"># type: (int) -&gt; None</span>
+</span><span id="1-668">        <span class="nb">super</span><span class="p">(</span><span class="n">Transaction</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">set_http_status</span><span class="p">(</span><span class="n">http_status</span><span class="p">)</span>
+</span><span id="1-669">        <span class="bp">self</span><span class="o">.</span><span class="n">set_context</span><span class="p">(</span><span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;status_code&quot;</span><span class="p">:</span> <span class="n">http_status</span><span class="p">})</span>
+</span><span id="1-670">
+</span><span id="1-671">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-672">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
+</span><span id="1-673">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Transaction</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+</span><span id="1-674">
+</span><span id="1-675">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+</span><span id="1-676">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span>
+</span><span id="1-677">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;sampled&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span>
+</span><span id="1-678">
+</span><span id="1-679">        <span class="k">return</span> <span class="n">rv</span>
+</span><span id="1-680">
+<div class="viewcode-block" id="Transaction.get_baggage">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.tracing.Transaction.get_baggage">[docs]</a>
+</span><span id="1-681">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-682">        <span class="c1"># type: () -&gt; Baggage</span>
+</span><span id="1-683"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-684"><span class="sd">        The first time a new baggage with sentry items is made,</span>
+</span><span id="1-685"><span class="sd">        it will be frozen.</span>
+</span><span id="1-686"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-687">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span><span class="o">.</span><span class="n">mutable</span><span class="p">:</span>
+</span><span id="1-688">            <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span> <span class="o">=</span> <span class="n">Baggage</span><span class="o">.</span><span class="n">populate_from_transaction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+</span><span id="1-689">
+</span><span id="1-690">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_baggage</span></div>
+
+</span><span id="1-691">
+</span><span id="1-692">    <span class="k">def</span> <span class="nf">_set_initial_sampling_decision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sampling_context</span><span class="p">):</span>
+</span><span id="1-693">        <span class="c1"># type: (SamplingContext) -&gt; None</span>
+</span><span id="1-694"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-695"><span class="sd">        Sets the transaction&#39;s sampling decision, according to the following</span>
+</span><span id="1-696"><span class="sd">        precedence rules:</span>
+</span><span id="1-697">
+</span><span id="1-698"><span class="sd">        1. If a sampling decision is passed to `start_transaction`</span>
+</span><span id="1-699"><span class="sd">        (`start_transaction(name: &quot;my transaction&quot;, sampled: True)`), that</span>
+</span><span id="1-700"><span class="sd">        decision will be used, regardless of anything else</span>
 </span><span id="1-701">
-</span><span id="1-702"><span class="sd">        3. If `traces_sampler` is not defined, but there&#39;s a parent sampling</span>
-</span><span id="1-703"><span class="sd">        decision, the parent sampling decision will be used.</span>
-</span><span id="1-704">
-</span><span id="1-705"><span class="sd">        4. If `traces_sampler` is not defined and there&#39;s no parent sampling</span>
-</span><span id="1-706"><span class="sd">        decision, `traces_sample_rate` will be used.</span>
-</span><span id="1-707"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-708">
-</span><span id="1-709">        <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub</span> <span class="ow">or</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-</span><span id="1-710">        <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>
-</span><span id="1-711">        <span class="n">options</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span id="1-712">        <span class="n">transaction_description</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{op}</span><span class="s2">transaction &lt;</span><span class="si">{name}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-</span><span id="1-713">            <span class="n">op</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">+</span> <span class="s2">&quot;&gt; &quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span>
-</span><span id="1-714">        <span class="p">)</span>
-</span><span id="1-715">
-</span><span id="1-716">        <span class="c1"># nothing to do if there&#39;s no client or if tracing is disabled</span>
-</span><span id="1-717">        <span class="k">if</span> <span class="ow">not</span> <span class="n">client</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
-</span><span id="1-718">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-719">            <span class="k">return</span>
+</span><span id="1-702"><span class="sd">        2. If `traces_sampler` is defined, its decision will be used. It can</span>
+</span><span id="1-703"><span class="sd">        choose to keep or ignore any parent sampling decision, or use the</span>
+</span><span id="1-704"><span class="sd">        sampling context data to make its own decision or to choose a sample</span>
+</span><span id="1-705"><span class="sd">        rate for the transaction.</span>
+</span><span id="1-706">
+</span><span id="1-707"><span class="sd">        3. If `traces_sampler` is not defined, but there&#39;s a parent sampling</span>
+</span><span id="1-708"><span class="sd">        decision, the parent sampling decision will be used.</span>
+</span><span id="1-709">
+</span><span id="1-710"><span class="sd">        4. If `traces_sampler` is not defined and there&#39;s no parent sampling</span>
+</span><span id="1-711"><span class="sd">        decision, `traces_sample_rate` will be used.</span>
+</span><span id="1-712"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-713">
+</span><span id="1-714">        <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub</span> <span class="ow">or</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+</span><span id="1-715">        <span class="n">client</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span>
+</span><span id="1-716">        <span class="n">options</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span id="1-717">        <span class="n">transaction_description</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{op}</span><span class="s2">transaction &lt;</span><span class="si">{name}</span><span class="s2">&gt;&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span id="1-718">            <span class="n">op</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">+</span> <span class="s2">&quot;&gt; &quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+</span><span id="1-719">        <span class="p">)</span>
 </span><span id="1-720">
-</span><span id="1-721">        <span class="c1"># if the user has forced a sampling decision by passing a `sampled`</span>
-</span><span id="1-722">        <span class="c1"># value when starting the transaction, go with that</span>
-</span><span id="1-723">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-724">            <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">)</span>
-</span><span id="1-725">            <span class="k">return</span>
-</span><span id="1-726">
-</span><span id="1-727">        <span class="c1"># we would have bailed already if neither `traces_sampler` nor</span>
-</span><span id="1-728">        <span class="c1"># `traces_sample_rate` were defined, so one of these should work; prefer</span>
-</span><span id="1-729">        <span class="c1"># the hook if so</span>
-</span><span id="1-730">        <span class="n">sample_rate</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-731">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sampler&quot;</span><span class="p">](</span><span class="n">sampling_context</span><span class="p">)</span>
-</span><span id="1-732">            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;traces_sampler&quot;</span><span class="p">))</span>
-</span><span id="1-733">            <span class="k">else</span> <span class="p">(</span>
-</span><span id="1-734">                <span class="c1"># default inheritance behavior</span>
-</span><span id="1-735">                <span class="n">sampling_context</span><span class="p">[</span><span class="s2">&quot;parent_sampled&quot;</span><span class="p">]</span>
-</span><span id="1-736">                <span class="k">if</span> <span class="n">sampling_context</span><span class="p">[</span><span class="s2">&quot;parent_sampled&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="1-737">                <span class="k">else</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span>
-</span><span id="1-738">            <span class="p">)</span>
-</span><span id="1-739">        <span class="p">)</span>
-</span><span id="1-740">
-</span><span id="1-741">        <span class="c1"># Since this is coming from the user (or from a function provided by the</span>
-</span><span id="1-742">        <span class="c1"># user), who knows what we might get. (The only valid values are</span>
-</span><span id="1-743">        <span class="c1"># booleans or numbers between 0 and 1.)</span>
-</span><span id="1-744">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_valid_sample_rate</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;Tracing&quot;</span><span class="p">):</span>
-</span><span id="1-745">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span id="1-746">                <span class="s2">&quot;[Tracing] Discarding </span><span class="si">{transaction_description}</span><span class="s2"> because of invalid sample rate.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-</span><span id="1-747">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
-</span><span id="1-748">                <span class="p">)</span>
-</span><span id="1-749">            <span class="p">)</span>
-</span><span id="1-750">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-751">            <span class="k">return</span>
-</span><span id="1-752">
-</span><span id="1-753">        <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">)</span>
-</span><span id="1-754">
-</span><span id="1-755">        <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">monitor</span><span class="p">:</span>
-</span><span id="1-756">            <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">/=</span> <span class="n">client</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">downsample_factor</span>
+</span><span id="1-721">        <span class="c1"># nothing to do if there&#39;s no client or if tracing is disabled</span>
+</span><span id="1-722">        <span class="k">if</span> <span class="ow">not</span> <span class="n">client</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
+</span><span id="1-723">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-724">            <span class="k">return</span>
+</span><span id="1-725">
+</span><span id="1-726">        <span class="c1"># if the user has forced a sampling decision by passing a `sampled`</span>
+</span><span id="1-727">        <span class="c1"># value when starting the transaction, go with that</span>
+</span><span id="1-728">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-729">            <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">)</span>
+</span><span id="1-730">            <span class="k">return</span>
+</span><span id="1-731">
+</span><span id="1-732">        <span class="c1"># we would have bailed already if neither `traces_sampler` nor</span>
+</span><span id="1-733">        <span class="c1"># `traces_sample_rate` were defined, so one of these should work; prefer</span>
+</span><span id="1-734">        <span class="c1"># the hook if so</span>
+</span><span id="1-735">        <span class="n">sample_rate</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-736">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sampler&quot;</span><span class="p">](</span><span class="n">sampling_context</span><span class="p">)</span>
+</span><span id="1-737">            <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;traces_sampler&quot;</span><span class="p">))</span>
+</span><span id="1-738">            <span class="k">else</span> <span class="p">(</span>
+</span><span id="1-739">                <span class="c1"># default inheritance behavior</span>
+</span><span id="1-740">                <span class="n">sampling_context</span><span class="p">[</span><span class="s2">&quot;parent_sampled&quot;</span><span class="p">]</span>
+</span><span id="1-741">                <span class="k">if</span> <span class="n">sampling_context</span><span class="p">[</span><span class="s2">&quot;parent_sampled&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="1-742">                <span class="k">else</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span>
+</span><span id="1-743">            <span class="p">)</span>
+</span><span id="1-744">        <span class="p">)</span>
+</span><span id="1-745">
+</span><span id="1-746">        <span class="c1"># Since this is coming from the user (or from a function provided by the</span>
+</span><span id="1-747">        <span class="c1"># user), who knows what we might get. (The only valid values are</span>
+</span><span id="1-748">        <span class="c1"># booleans or numbers between 0 and 1.)</span>
+</span><span id="1-749">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_valid_sample_rate</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="s2">&quot;Tracing&quot;</span><span class="p">):</span>
+</span><span id="1-750">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+</span><span id="1-751">                <span class="s2">&quot;[Tracing] Discarding </span><span class="si">{transaction_description}</span><span class="s2"> because of invalid sample rate.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span id="1-752">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
+</span><span id="1-753">                <span class="p">)</span>
+</span><span id="1-754">            <span class="p">)</span>
+</span><span id="1-755">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-756">            <span class="k">return</span>
 </span><span id="1-757">
-</span><span id="1-758">        <span class="c1"># if the function returned 0 (or false), or if `traces_sample_rate` is</span>
-</span><span id="1-759">        <span class="c1"># 0, it&#39;s a sign the transaction should be dropped</span>
-</span><span id="1-760">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">:</span>
-</span><span id="1-761">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="1-762">                <span class="s2">&quot;[Tracing] Discarding </span><span class="si">{transaction_description}</span><span class="s2"> because </span><span class="si">{reason}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-</span><span id="1-763">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
-</span><span id="1-764">                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
-</span><span id="1-765">                        <span class="s2">&quot;traces_sampler returned 0 or False&quot;</span>
-</span><span id="1-766">                        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;traces_sampler&quot;</span><span class="p">))</span>
-</span><span id="1-767">                        <span class="k">else</span> <span class="s2">&quot;traces_sample_rate is set to 0&quot;</span>
-</span><span id="1-768">                    <span class="p">),</span>
-</span><span id="1-769">                <span class="p">)</span>
-</span><span id="1-770">            <span class="p">)</span>
-</span><span id="1-771">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-772">            <span class="k">return</span>
-</span><span id="1-773">
-</span><span id="1-774">        <span class="c1"># Now we roll the dice. random.random is inclusive of 0, but not of 1,</span>
-</span><span id="1-775">        <span class="c1"># so strict &lt; is safe here. In case sample_rate is a boolean, cast it</span>
-</span><span id="1-776">        <span class="c1"># to a float (True becomes 1.0 and False becomes 0.0)</span>
-</span><span id="1-777">        <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span>
+</span><span id="1-758">        <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">)</span>
+</span><span id="1-759">
+</span><span id="1-760">        <span class="k">if</span> <span class="n">client</span><span class="o">.</span><span class="n">monitor</span><span class="p">:</span>
+</span><span id="1-761">            <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span> <span class="o">/=</span> <span class="n">client</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">downsample_factor</span>
+</span><span id="1-762">
+</span><span id="1-763">        <span class="c1"># if the function returned 0 (or false), or if `traces_sample_rate` is</span>
+</span><span id="1-764">        <span class="c1"># 0, it&#39;s a sign the transaction should be dropped</span>
+</span><span id="1-765">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">:</span>
+</span><span id="1-766">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span id="1-767">                <span class="s2">&quot;[Tracing] Discarding </span><span class="si">{transaction_description}</span><span class="s2"> because </span><span class="si">{reason}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span id="1-768">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
+</span><span id="1-769">                    <span class="n">reason</span><span class="o">=</span><span class="p">(</span>
+</span><span id="1-770">                        <span class="s2">&quot;traces_sampler returned 0 or False&quot;</span>
+</span><span id="1-771">                        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;traces_sampler&quot;</span><span class="p">))</span>
+</span><span id="1-772">                        <span class="k">else</span> <span class="s2">&quot;traces_sample_rate is set to 0&quot;</span>
+</span><span id="1-773">                    <span class="p">),</span>
+</span><span id="1-774">                <span class="p">)</span>
+</span><span id="1-775">            <span class="p">)</span>
+</span><span id="1-776">            <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-777">            <span class="k">return</span>
 </span><span id="1-778">
-</span><span id="1-779">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
-</span><span id="1-780">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="1-781">                <span class="s2">&quot;[Tracing] Starting </span><span class="si">{transaction_description}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-</span><span id="1-782">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
-</span><span id="1-783">                <span class="p">)</span>
-</span><span id="1-784">            <span class="p">)</span>
-</span><span id="1-785">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-786">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="1-787">                <span class="s2">&quot;[Tracing] Discarding </span><span class="si">{transaction_description}</span><span class="s2"> because it&#39;s not included in the random sample (sampling rate = </span><span class="si">{sample_rate}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-</span><span id="1-788">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
-</span><span id="1-789">                    <span class="n">sample_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span>
-</span><span id="1-790">                <span class="p">)</span>
-</span><span id="1-791">            <span class="p">)</span></div>
-</span><span id="1-792">
-</span><span id="1-793">
-</span><span id="1-794"><span class="k">class</span> <span class="nc">NoOpSpan</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
-</span><span id="1-795">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-796">        <span class="c1"># type: () -&gt; str</span>
-</span><span id="1-797">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+</span><span id="1-779">        <span class="c1"># Now we roll the dice. random.random is inclusive of 0, but not of 1,</span>
+</span><span id="1-780">        <span class="c1"># so strict &lt; is safe here. In case sample_rate is a boolean, cast it</span>
+</span><span id="1-781">        <span class="c1"># to a float (True becomes 1.0 and False becomes 0.0)</span>
+</span><span id="1-782">        <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span>
+</span><span id="1-783">
+</span><span id="1-784">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
+</span><span id="1-785">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span id="1-786">                <span class="s2">&quot;[Tracing] Starting </span><span class="si">{transaction_description}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span id="1-787">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
+</span><span id="1-788">                <span class="p">)</span>
+</span><span id="1-789">            <span class="p">)</span>
+</span><span id="1-790">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-791">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span id="1-792">                <span class="s2">&quot;[Tracing] Discarding </span><span class="si">{transaction_description}</span><span class="s2"> because it&#39;s not included in the random sample (sampling rate = </span><span class="si">{sample_rate}</span><span class="s2">)&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+</span><span id="1-793">                    <span class="n">transaction_description</span><span class="o">=</span><span class="n">transaction_description</span><span class="p">,</span>
+</span><span id="1-794">                    <span class="n">sample_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_rate</span><span class="p">,</span>
+</span><span id="1-795">                <span class="p">)</span>
+</span><span id="1-796">            <span class="p">)</span></div>
+
+</span><span id="1-797">
 </span><span id="1-798">
-</span><span id="1-799">    <span class="k">def</span> <span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-</span><span id="1-800">        <span class="c1"># type: (str, **Any) -&gt; NoOpSpan</span>
-</span><span id="1-801">        <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
-</span><span id="1-802">
-</span><span id="1-803">    <span class="k">def</span> <span class="nf">new_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-</span><span id="1-804">        <span class="c1"># type: (**Any) -&gt; NoOpSpan</span>
-</span><span id="1-805">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span id="1-806">
-</span><span id="1-807">    <span class="k">def</span> <span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-808">        <span class="c1"># type: () -&gt; str</span>
-</span><span id="1-809">        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-</span><span id="1-810">
-</span><span id="1-811">    <span class="k">def</span> <span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-812">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
-</span><span id="1-813">        <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-814">
-</span><span id="1-815">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-816">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
-</span><span id="1-817">        <span class="k">return</span> <span class="nb">iter</span><span class="p">(())</span>
-</span><span id="1-818">
-</span><span id="1-819">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-</span><span id="1-820">        <span class="c1"># type: (str, Any) -&gt; None</span>
-</span><span id="1-821">        <span class="k">pass</span>
-</span><span id="1-822">
-</span><span id="1-823">    <span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-</span><span id="1-824">        <span class="c1"># type: (str, Any) -&gt; None</span>
-</span><span id="1-825">        <span class="k">pass</span>
-</span><span id="1-826">
-</span><span id="1-827">    <span class="k">def</span> <span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-</span><span id="1-828">        <span class="c1"># type: (str) -&gt; None</span>
-</span><span id="1-829">        <span class="k">pass</span>
-</span><span id="1-830">
-</span><span id="1-831">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
-</span><span id="1-832">        <span class="c1"># type: (int) -&gt; None</span>
-</span><span id="1-833">        <span class="k">pass</span>
-</span><span id="1-834">
-</span><span id="1-835">    <span class="k">def</span> <span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-836">        <span class="c1"># type: () -&gt; bool</span>
-</span><span id="1-837">        <span class="k">return</span> <span class="kc">True</span>
-</span><span id="1-838">
-</span><span id="1-839">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-840">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
-</span><span id="1-841">        <span class="k">return</span> <span class="p">{}</span>
-</span><span id="1-842">
-</span><span id="1-843">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-844">        <span class="c1"># type: () -&gt; Any</span>
-</span><span id="1-845">        <span class="k">return</span> <span class="p">{}</span>
-</span><span id="1-846">
-</span><span id="1-847">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-848">        <span class="c1"># type: (Optional[sentry_sdk.Hub], Optional[datetime]) -&gt; Optional[str]</span>
-</span><span id="1-849">        <span class="k">pass</span>
-</span><span id="1-850">
+</span><span id="1-799"><span class="k">class</span> <span class="nc">NoOpSpan</span><span class="p">(</span><span class="n">Span</span><span class="p">):</span>
+</span><span id="1-800">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-801">        <span class="c1"># type: () -&gt; str</span>
+</span><span id="1-802">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
+</span><span id="1-803">
+</span><span id="1-804">    <span class="k">def</span> <span class="nf">start_child</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span id="1-805">        <span class="c1"># type: (str, **Any) -&gt; NoOpSpan</span>
+</span><span id="1-806">        <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
+</span><span id="1-807">
+</span><span id="1-808">    <span class="k">def</span> <span class="nf">new_span</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span id="1-809">        <span class="c1"># type: (**Any) -&gt; NoOpSpan</span>
+</span><span id="1-810">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="1-811">
+</span><span id="1-812">    <span class="k">def</span> <span class="nf">to_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-813">        <span class="c1"># type: () -&gt; str</span>
+</span><span id="1-814">        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+</span><span id="1-815">
+</span><span id="1-816">    <span class="k">def</span> <span class="nf">to_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-817">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
+</span><span id="1-818">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-819">
+</span><span id="1-820">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-821">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
+</span><span id="1-822">        <span class="k">return</span> <span class="nb">iter</span><span class="p">(())</span>
+</span><span id="1-823">
+</span><span id="1-824">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="1-825">        <span class="c1"># type: (str, Any) -&gt; None</span>
+</span><span id="1-826">        <span class="k">pass</span>
+</span><span id="1-827">
+</span><span id="1-828">    <span class="k">def</span> <span class="nf">set_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="1-829">        <span class="c1"># type: (str, Any) -&gt; None</span>
+</span><span id="1-830">        <span class="k">pass</span>
+</span><span id="1-831">
+</span><span id="1-832">    <span class="k">def</span> <span class="nf">set_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+</span><span id="1-833">        <span class="c1"># type: (str) -&gt; None</span>
+</span><span id="1-834">        <span class="k">pass</span>
+</span><span id="1-835">
+</span><span id="1-836">    <span class="k">def</span> <span class="nf">set_http_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">http_status</span><span class="p">):</span>
+</span><span id="1-837">        <span class="c1"># type: (int) -&gt; None</span>
+</span><span id="1-838">        <span class="k">pass</span>
+</span><span id="1-839">
+</span><span id="1-840">    <span class="k">def</span> <span class="nf">is_success</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-841">        <span class="c1"># type: () -&gt; bool</span>
+</span><span id="1-842">        <span class="k">return</span> <span class="kc">True</span>
+</span><span id="1-843">
+</span><span id="1-844">    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-845">        <span class="c1"># type: () -&gt; Dict[str, Any]</span>
+</span><span id="1-846">        <span class="k">return</span> <span class="p">{}</span>
+</span><span id="1-847">
+</span><span id="1-848">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-849">        <span class="c1"># type: () -&gt; Any</span>
+</span><span id="1-850">        <span class="k">return</span> <span class="p">{}</span>
 </span><span id="1-851">
-</span><span id="1-852"><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-853">    <span class="c1"># type: (Any) -&gt; Any</span>
-</span><span id="1-854"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-855"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
-</span><span id="1-856"><span class="sd">    If there is no current transaction, then nothing will be traced.</span>
-</span><span id="1-857">
-</span><span id="1-858"><span class="sd">    .. code-block::</span>
-</span><span id="1-859"><span class="sd">        :caption: Usage</span>
-</span><span id="1-860">
-</span><span id="1-861"><span class="sd">        import sentry_sdk</span>
+</span><span id="1-852">    <span class="k">def</span> <span class="nf">finish</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">end_timestamp</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-853">        <span class="c1"># type: (Optional[sentry_sdk.Hub], Optional[datetime]) -&gt; Optional[str]</span>
+</span><span id="1-854">        <span class="k">pass</span>
+</span><span id="1-855">
+</span><span id="1-856">
+</span><span id="1-857"><span class="k">def</span> <span class="nf">trace</span><span class="p">(</span><span class="n">func</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-858">    <span class="c1"># type: (Any) -&gt; Any</span>
+</span><span id="1-859"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-860"><span class="sd">    Decorator to start a child span under the existing current transaction.</span>
+</span><span id="1-861"><span class="sd">    If there is no current transaction, then nothing will be traced.</span>
 </span><span id="1-862">
-</span><span id="1-863"><span class="sd">        @sentry_sdk.trace</span>
-</span><span id="1-864"><span class="sd">        def my_function():</span>
-</span><span id="1-865"><span class="sd">            ...</span>
-</span><span id="1-866">
-</span><span id="1-867"><span class="sd">        @sentry_sdk.trace</span>
-</span><span id="1-868"><span class="sd">        async def my_async_function():</span>
-</span><span id="1-869"><span class="sd">            ...</span>
-</span><span id="1-870"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-871">    <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
-</span><span id="1-872">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py2</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
-</span><span id="1-873">    <span class="k">else</span><span class="p">:</span>
-</span><span id="1-874">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py3</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
-</span><span id="1-875">
-</span><span id="1-876">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
-</span><span id="1-877">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
-</span><span id="1-878">    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
-</span><span id="1-879">        <span class="k">return</span> <span class="n">start_child_span_decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
-</span><span id="1-880">    <span class="k">else</span><span class="p">:</span>
-</span><span id="1-881">        <span class="k">return</span> <span class="n">start_child_span_decorator</span>
-</span><span id="1-882">
-</span><span id="1-883">
-</span><span id="1-884"><span class="c1"># Circular imports</span>
-</span><span id="1-885">
-</span><span id="1-886"><span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils</span> <span class="kn">import</span> <span class="p">(</span>
-</span><span id="1-887">    <span class="n">Baggage</span><span class="p">,</span>
-</span><span id="1-888">    <span class="n">EnvironHeaders</span><span class="p">,</span>
-</span><span id="1-889">    <span class="n">extract_sentrytrace_data</span><span class="p">,</span>
-</span><span id="1-890">    <span class="n">has_tracing_enabled</span><span class="p">,</span>
-</span><span id="1-891">    <span class="n">maybe_create_breadcrumbs_from_span</span><span class="p">,</span>
-</span><span id="1-892"><span class="p">)</span>
+</span><span id="1-863"><span class="sd">    .. code-block::</span>
+</span><span id="1-864"><span class="sd">        :caption: Usage</span>
+</span><span id="1-865">
+</span><span id="1-866"><span class="sd">        import sentry_sdk</span>
+</span><span id="1-867">
+</span><span id="1-868"><span class="sd">        @sentry_sdk.trace</span>
+</span><span id="1-869"><span class="sd">        def my_function():</span>
+</span><span id="1-870"><span class="sd">            ...</span>
+</span><span id="1-871">
+</span><span id="1-872"><span class="sd">        @sentry_sdk.trace</span>
+</span><span id="1-873"><span class="sd">        async def my_async_function():</span>
+</span><span id="1-874"><span class="sd">            ...</span>
+</span><span id="1-875"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-876">    <span class="k">if</span> <span class="n">PY2</span><span class="p">:</span>
+</span><span id="1-877">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py2</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-878">    <span class="k">else</span><span class="p">:</span>
+</span><span id="1-879">        <span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils_py3</span> <span class="kn">import</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-880">
+</span><span id="1-881">    <span class="c1"># This patterns allows usage of both @sentry_traced and @sentry_traced(...)</span>
+</span><span id="1-882">    <span class="c1"># See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278</span>
+</span><span id="1-883">    <span class="k">if</span> <span class="n">func</span><span class="p">:</span>
+</span><span id="1-884">        <span class="k">return</span> <span class="n">start_child_span_decorator</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span id="1-885">    <span class="k">else</span><span class="p">:</span>
+</span><span id="1-886">        <span class="k">return</span> <span class="n">start_child_span_decorator</span>
+</span><span id="1-887">
+</span><span id="1-888">
+</span><span id="1-889"><span class="c1"># Circular imports</span>
+</span><span id="1-890">
+</span><span id="1-891"><span class="kn">from</span> <span class="nn">sentry_sdk.tracing_utils</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span id="1-892">    <span class="n">Baggage</span><span class="p">,</span>
+</span><span id="1-893">    <span class="n">EnvironHeaders</span><span class="p">,</span>
+</span><span id="1-894">    <span class="n">extract_sentrytrace_data</span><span class="p">,</span>
+</span><span id="1-895">    <span class="n">has_tracing_enabled</span><span class="p">,</span>
+</span><span id="1-896">    <span class="n">maybe_create_breadcrumbs_from_span</span><span class="p">,</span>
+</span><span id="1-897"><span class="p">)</span>
 </span></pre></div>
         </article>
         
@@ -1064,10 +1096,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
-      <script src="../../_static/doctools.js"></script>
-      <script src="../../_static/sphinx_highlight.js"></script>
-      <script src="../../_static/shibuya.js"></script>
+      <script src="../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../_static/doctools.js?v=888ff710"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/shibuya.js?v=d7f4572f"></script>
     
 </body>
 </html>

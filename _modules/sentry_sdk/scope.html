@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.scope - sentry-python 1.29.2 documentation</title>
+      <title>sentry_sdk.scope - sentry-python 1.30.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,9 +13,9 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css" />
+  </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9cd6187f" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=ee381b95" />
     <style>
 :root {
   --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));--sy-c-link-weak:rgba(var(--sy-rc-theme), 0.86);
@@ -223,7 +223,9 @@ html.dark {
 </span><span id="1-81">    <span class="k">return</span> <span class="n">wrapper</span>  <span class="c1"># type: ignore</span>
 </span><span id="1-82">
 </span><span id="1-83">
-<div class="viewcode-block" id="Scope"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope">[docs]</a></span><span id="1-84"><span class="k">class</span> <span class="nc">Scope</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope">[docs]</a>
+</span><span id="1-84"><span class="k">class</span> <span class="nc">Scope</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 </span><span id="1-85"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The scope holds extra information that should be sent with all</span>
 </span><span id="1-86"><span class="sd">    events that belong to it.</span>
 </span><span id="1-87"><span class="sd">    &quot;&quot;&quot;</span>
@@ -338,7 +340,9 @@ html.dark {
 </span><span id="1-196">            <span class="s2">&quot;dynamic_sampling_context&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="1-197">        <span class="p">}</span>
 </span><span id="1-198">
-<div class="viewcode-block" id="Scope.set_new_propagation_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_new_propagation_context">[docs]</a></span><span id="1-199">    <span class="k">def</span> <span class="nf">set_new_propagation_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.set_new_propagation_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_new_propagation_context">[docs]</a>
+</span><span id="1-199">    <span class="k">def</span> <span class="nf">set_new_propagation_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-200">        <span class="c1"># type: () -&gt; None</span>
 </span><span id="1-201"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-202"><span class="sd">        Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.</span>
@@ -348,8 +352,11 @@ html.dark {
 </span><span id="1-206">            <span class="s2">&quot;[Tracing] Create new propagation context: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
 </span><span id="1-207">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">,</span>
 </span><span id="1-208">        <span class="p">)</span></div>
+
 </span><span id="1-209">
-<div class="viewcode-block" id="Scope.generate_propagation_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.generate_propagation_context">[docs]</a></span><span id="1-210">    <span class="k">def</span> <span class="nf">generate_propagation_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">incoming_data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.generate_propagation_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.generate_propagation_context">[docs]</a>
+</span><span id="1-210">    <span class="k">def</span> <span class="nf">generate_propagation_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">incoming_data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-211">        <span class="c1"># type: (Optional[Dict[str, str]]) -&gt; None</span>
 </span><span id="1-212"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-213"><span class="sd">        Makes sure `_propagation_context` is set.</span>
@@ -368,8 +375,11 @@ html.dark {
 </span><span id="1-226">
 </span><span id="1-227">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-228">            <span class="bp">self</span><span class="o">.</span><span class="n">set_new_propagation_context</span><span class="p">()</span></div>
+
 </span><span id="1-229">
-<div class="viewcode-block" id="Scope.get_dynamic_sampling_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_dynamic_sampling_context">[docs]</a></span><span id="1-230">    <span class="k">def</span> <span class="nf">get_dynamic_sampling_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.get_dynamic_sampling_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_dynamic_sampling_context">[docs]</a>
+</span><span id="1-230">    <span class="k">def</span> <span class="nf">get_dynamic_sampling_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-231">        <span class="c1"># type: () -&gt; Optional[Dict[str, str]]</span>
 </span><span id="1-232"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-233"><span class="sd">        Returns the Dynamic Sampling Context from the Propagation Context.</span>
@@ -385,8 +395,11 @@ html.dark {
 </span><span id="1-243">            <span class="p">]</span> <span class="o">=</span> <span class="n">baggage</span><span class="o">.</span><span class="n">dynamic_sampling_context</span><span class="p">()</span>
 </span><span id="1-244">
 </span><span id="1-245">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">[</span><span class="s2">&quot;dynamic_sampling_context&quot;</span><span class="p">]</span></div>
+
 </span><span id="1-246">
-<div class="viewcode-block" id="Scope.get_traceparent"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_traceparent">[docs]</a></span><span id="1-247">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.get_traceparent">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_traceparent">[docs]</a>
+</span><span id="1-247">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-248">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-249"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-250"><span class="sd">        Returns the Sentry &quot;sentry-trace&quot; header (aka the traceparent) from the Propagation Context.</span>
@@ -399,6 +412,7 @@ html.dark {
 </span><span id="1-257">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">],</span>
 </span><span id="1-258">        <span class="p">)</span>
 </span><span id="1-259">        <span class="k">return</span> <span class="n">traceparent</span></div>
+
 </span><span id="1-260">
 </span><span id="1-261">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-262">        <span class="c1"># type: () -&gt; Optional[Baggage]</span>
@@ -413,7 +427,9 @@ html.dark {
 </span><span id="1-271">        <span class="k">else</span><span class="p">:</span>
 </span><span id="1-272">            <span class="k">return</span> <span class="n">Baggage</span><span class="p">(</span><span class="n">dynamic_sampling_context</span><span class="p">)</span>
 </span><span id="1-273">
-<div class="viewcode-block" id="Scope.get_trace_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_trace_context">[docs]</a></span><span id="1-274">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.get_trace_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_trace_context">[docs]</a>
+</span><span id="1-274">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-275">        <span class="c1"># type: () -&gt; Any</span>
 </span><span id="1-276"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-277"><span class="sd">        Returns the Sentry &quot;trace&quot; context from the Propagation Context.</span>
@@ -429,8 +445,11 @@ html.dark {
 </span><span id="1-287">        <span class="p">}</span>  <span class="c1"># type: Dict[str, Any]</span>
 </span><span id="1-288">
 </span><span id="1-289">        <span class="k">return</span> <span class="n">trace_context</span></div>
+
 </span><span id="1-290">
-<div class="viewcode-block" id="Scope.iter_headers"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.iter_headers">[docs]</a></span><span id="1-291">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.iter_headers">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.iter_headers">[docs]</a>
+</span><span id="1-291">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-292">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
 </span><span id="1-293"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-294"><span class="sd">        Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.</span>
@@ -444,8 +463,11 @@ html.dark {
 </span><span id="1-302">            <span class="k">if</span> <span class="n">dsc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-303">                <span class="n">baggage</span> <span class="o">=</span> <span class="n">Baggage</span><span class="p">(</span><span class="n">dsc</span><span class="p">)</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
 </span><span id="1-304">                <span class="k">yield</span> <span class="n">BAGGAGE_HEADER_NAME</span><span class="p">,</span> <span class="n">baggage</span></div>
+
 </span><span id="1-305">
-<div class="viewcode-block" id="Scope.clear"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear">[docs]</a></span><span id="1-306">    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.clear">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear">[docs]</a>
+</span><span id="1-306">    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-307">        <span class="c1"># type: () -&gt; None</span>
 </span><span id="1-308"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
 </span><span id="1-309">        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[str]</span>
@@ -469,6 +491,7 @@ html.dark {
 </span><span id="1-327">        <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Profile]</span>
 </span><span id="1-328">
 </span><span id="1-329">        <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="kc">None</span></div>
+
 </span><span id="1-330">
 </span><span id="1-331">    <span class="nd">@_attr_setter</span>
 </span><span id="1-332">    <span class="k">def</span> <span class="nf">level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -476,10 +499,13 @@ html.dark {
 </span><span id="1-334"><span class="w">        </span><span class="sd">&quot;&quot;&quot;When set this overrides the level. Deprecated in favor of set_level.&quot;&quot;&quot;</span>
 </span><span id="1-335">        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span>
 </span><span id="1-336">
-<div class="viewcode-block" id="Scope.set_level"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_level">[docs]</a></span><span id="1-337">    <span class="k">def</span> <span class="nf">set_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.set_level">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_level">[docs]</a>
+</span><span id="1-337">    <span class="k">def</span> <span class="nf">set_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-338">        <span class="c1"># type: (Optional[str]) -&gt; None</span>
 </span><span id="1-339"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the level for the scope.&quot;&quot;&quot;</span>
 </span><span id="1-340">        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span></div>
+
 </span><span id="1-341">
 </span><span id="1-342">    <span class="nd">@_attr_setter</span>
 </span><span id="1-343">    <span class="k">def</span> <span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -530,7 +556,9 @@ html.dark {
 </span><span id="1-388">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">containing_transaction</span><span class="p">:</span>
 </span><span id="1-389">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">containing_transaction</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">value</span>
 </span><span id="1-390">
-<div class="viewcode-block" id="Scope.set_transaction_name"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_transaction_name">[docs]</a></span><span id="1-391">    <span class="k">def</span> <span class="nf">set_transaction_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.set_transaction_name">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_transaction_name">[docs]</a>
+</span><span id="1-391">    <span class="k">def</span> <span class="nf">set_transaction_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-392">        <span class="c1"># type: (str, Optional[str]) -&gt; None</span>
 </span><span id="1-393"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the transaction name and optionally the transaction source.&quot;&quot;&quot;</span>
 </span><span id="1-394">        <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">name</span>
@@ -542,6 +570,7 @@ html.dark {
 </span><span id="1-400">
 </span><span id="1-401">        <span class="k">if</span> <span class="n">source</span><span class="p">:</span>
 </span><span id="1-402">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span></div>
+
 </span><span id="1-403">
 </span><span id="1-404">    <span class="nd">@_attr_setter</span>
 </span><span id="1-405">    <span class="k">def</span> <span class="nf">user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
@@ -549,12 +578,15 @@ html.dark {
 </span><span id="1-407"><span class="w">        </span><span class="sd">&quot;&quot;&quot;When set a specific user is bound to the scope. Deprecated in favor of set_user.&quot;&quot;&quot;</span>
 </span><span id="1-408">        <span class="bp">self</span><span class="o">.</span><span class="n">set_user</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 </span><span id="1-409">
-<div class="viewcode-block" id="Scope.set_user"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_user">[docs]</a></span><span id="1-410">    <span class="k">def</span> <span class="nf">set_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.set_user">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_user">[docs]</a>
+</span><span id="1-410">    <span class="k">def</span> <span class="nf">set_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-411">        <span class="c1"># type: (Optional[Dict[str, Any]]) -&gt; None</span>
 </span><span id="1-412"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets a user for the scope.&quot;&quot;&quot;</span>
 </span><span id="1-413">        <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">value</span>
 </span><span id="1-414">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 </span><span id="1-415">            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">value</span><span class="p">)</span></div>
+
 </span><span id="1-416">
 </span><span id="1-417">    <span class="nd">@property</span>
 </span><span id="1-418">    <span class="k">def</span> <span class="nf">span</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -584,7 +616,9 @@ html.dark {
 </span><span id="1-442">
 </span><span id="1-443">        <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">profile</span>
 </span><span id="1-444">
-<div class="viewcode-block" id="Scope.set_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_tag">[docs]</a></span><span id="1-445">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.set_tag">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_tag">[docs]</a>
+</span><span id="1-445">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
 </span><span id="1-446">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-447">        <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span id="1-448">        <span class="n">value</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -592,15 +626,21 @@ html.dark {
 </span><span id="1-450">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-451"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets a tag for a key to a specific value.&quot;&quot;&quot;</span>
 </span><span id="1-452">        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
 </span><span id="1-453">
-<div class="viewcode-block" id="Scope.remove_tag"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_tag">[docs]</a></span><span id="1-454">    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.remove_tag">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_tag">[docs]</a>
+</span><span id="1-454">    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
 </span><span id="1-455">        <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
 </span><span id="1-456">    <span class="p">):</span>
 </span><span id="1-457">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-458"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Removes a specific tag.&quot;&quot;&quot;</span>
 </span><span id="1-459">        <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
 </span><span id="1-460">
-<div class="viewcode-block" id="Scope.set_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_context">[docs]</a></span><span id="1-461">    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.set_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_context">[docs]</a>
+</span><span id="1-461">    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span>
 </span><span id="1-462">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-463">        <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span id="1-464">        <span class="n">value</span><span class="p">,</span>  <span class="c1"># type: Dict[str, Any]</span>
@@ -608,15 +648,21 @@ html.dark {
 </span><span id="1-466">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-467"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Binds a context at a certain key to a specific value.&quot;&quot;&quot;</span>
 </span><span id="1-468">        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
 </span><span id="1-469">
-<div class="viewcode-block" id="Scope.remove_context"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_context">[docs]</a></span><span id="1-470">    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.remove_context">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_context">[docs]</a>
+</span><span id="1-470">    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
 </span><span id="1-471">        <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
 </span><span id="1-472">    <span class="p">):</span>
 </span><span id="1-473">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-474"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Removes a context.&quot;&quot;&quot;</span>
 </span><span id="1-475">        <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
 </span><span id="1-476">
-<div class="viewcode-block" id="Scope.set_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_extra">[docs]</a></span><span id="1-477">    <span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.set_extra">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_extra">[docs]</a>
+</span><span id="1-477">    <span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span>
 </span><span id="1-478">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-479">        <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span id="1-480">        <span class="n">value</span><span class="p">,</span>  <span class="c1"># type: Any</span>
@@ -624,20 +670,29 @@ html.dark {
 </span><span id="1-482">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-483"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets an extra key to a specific value.&quot;&quot;&quot;</span>
 </span><span id="1-484">        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span></div>
+
 </span><span id="1-485">
-<div class="viewcode-block" id="Scope.remove_extra"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_extra">[docs]</a></span><span id="1-486">    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.remove_extra">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_extra">[docs]</a>
+</span><span id="1-486">    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
 </span><span id="1-487">        <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
 </span><span id="1-488">    <span class="p">):</span>
 </span><span id="1-489">        <span class="c1"># type: (...) -&gt; None</span>
 </span><span id="1-490"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Removes a specific extra key.&quot;&quot;&quot;</span>
 </span><span id="1-491">        <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
 </span><span id="1-492">
-<div class="viewcode-block" id="Scope.clear_breadcrumbs"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a></span><span id="1-493">    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="Scope.clear_breadcrumbs">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a>
+</span><span id="1-493">    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-494">        <span class="c1"># type: () -&gt; None</span>
 </span><span id="1-495"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Clears breadcrumb buffer.&quot;&quot;&quot;</span>
 </span><span id="1-496">        <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>  <span class="c1"># type: Deque[Breadcrumb]</span></div>
+
 </span><span id="1-497">
-<div class="viewcode-block" id="Scope.add_attachment"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_attachment">[docs]</a></span><span id="1-498">    <span class="k">def</span> <span class="nf">add_attachment</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.add_attachment">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_attachment">[docs]</a>
+</span><span id="1-498">    <span class="k">def</span> <span class="nf">add_attachment</span><span class="p">(</span>
 </span><span id="1-499">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-500">        <span class="nb">bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bytes]</span>
 </span><span id="1-501">        <span class="n">filename</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
@@ -656,8 +711,11 @@ html.dark {
 </span><span id="1-514">                <span class="n">add_to_transactions</span><span class="o">=</span><span class="n">add_to_transactions</span><span class="p">,</span>
 </span><span id="1-515">            <span class="p">)</span>
 </span><span id="1-516">        <span class="p">)</span></div>
+
 </span><span id="1-517">
-<div class="viewcode-block" id="Scope.add_event_processor"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_event_processor">[docs]</a></span><span id="1-518">    <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.add_event_processor">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_event_processor">[docs]</a>
+</span><span id="1-518">    <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span>
 </span><span id="1-519">        <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: EventProcessor</span>
 </span><span id="1-520">    <span class="p">):</span>
 </span><span id="1-521">        <span class="c1"># type: (...) -&gt; None</span>
@@ -673,8 +731,11 @@ html.dark {
 </span><span id="1-531">            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">[:]</span>
 </span><span id="1-532">
 </span><span id="1-533">        <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></div>
+
 </span><span id="1-534">
-<div class="viewcode-block" id="Scope.add_error_processor"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_error_processor">[docs]</a></span><span id="1-535">    <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span>
+<div class="viewcode-block" id="Scope.add_error_processor">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_error_processor">[docs]</a>
+</span><span id="1-535">    <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span>
 </span><span id="1-536">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-537">        <span class="n">func</span><span class="p">,</span>  <span class="c1"># type: ErrorProcessor</span>
 </span><span id="1-538">        <span class="bp">cls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Type[BaseException]]</span>
@@ -701,8 +762,11 @@ html.dark {
 </span><span id="1-559">                <span class="k">return</span> <span class="n">event</span>
 </span><span id="1-560">
 </span><span id="1-561">        <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></div>
+
 </span><span id="1-562">
-<div class="viewcode-block" id="Scope.apply_to_event"><a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.apply_to_event">[docs]</a></span><span id="1-563">    <span class="nd">@_disable_capture</span>
+<div class="viewcode-block" id="Scope.apply_to_event">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.apply_to_event">[docs]</a>
+</span><span id="1-563">    <span class="nd">@_disable_capture</span>
 </span><span id="1-564">    <span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span>
 </span><span id="1-565">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-566">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
@@ -792,96 +856,106 @@ html.dark {
 </span><span id="1-650">            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
 </span><span id="1-651">
 </span><span id="1-652">        <span class="k">return</span> <span class="n">event</span></div>
+
 </span><span id="1-653">
+<div class="viewcode-block" id="Scope.update_from_scope">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.update_from_scope">[docs]</a>
 </span><span id="1-654">    <span class="k">def</span> <span class="nf">update_from_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
 </span><span id="1-655">        <span class="c1"># type: (Scope) -&gt; None</span>
-</span><span id="1-656">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-657">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span>
-</span><span id="1-658">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-659">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span>
-</span><span id="1-660">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-661">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span>
-</span><span id="1-662">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-663">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
-</span><span id="1-664">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-665">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span>
-</span><span id="1-666">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
-</span><span id="1-667">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
-</span><span id="1-668">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
-</span><span id="1-669">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
-</span><span id="1-670">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
-</span><span id="1-671">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
-</span><span id="1-672">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">:</span>
-</span><span id="1-673">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
-</span><span id="1-674">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
-</span><span id="1-675">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span>
-</span><span id="1-676">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
-</span><span id="1-677">            <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
-</span><span id="1-678">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span><span class="p">:</span>
-</span><span id="1-679">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span>
-</span><span id="1-680">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">:</span>
-</span><span id="1-681">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span>
-</span><span id="1-682">
-</span><span id="1-683">    <span class="k">def</span> <span class="nf">update_from_kwargs</span><span class="p">(</span>
-</span><span id="1-684">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-685">        <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-686">        <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span id="1-687">        <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
-</span><span id="1-688">        <span class="n">contexts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
-</span><span id="1-689">        <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
-</span><span id="1-690">        <span class="n">fingerprint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[str]]</span>
-</span><span id="1-691">    <span class="p">):</span>
-</span><span id="1-692">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-693">        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-694">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">level</span>
-</span><span id="1-695">        <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-696">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">user</span>
-</span><span id="1-697">        <span class="k">if</span> <span class="n">extras</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-698">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span>
-</span><span id="1-699">        <span class="k">if</span> <span class="n">contexts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-700">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">contexts</span><span class="p">)</span>
-</span><span id="1-701">        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-702">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
-</span><span id="1-703">        <span class="k">if</span> <span class="n">fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-704">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">fingerprint</span>
-</span><span id="1-705">
-</span><span id="1-706">    <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-707">        <span class="c1"># type: () -&gt; Scope</span>
-</span><span id="1-708">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>  <span class="c1"># type: Scope</span>
-</span><span id="1-709">
-</span><span id="1-710">        <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
-</span><span id="1-711">        <span class="n">rv</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
-</span><span id="1-712">        <span class="n">rv</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
-</span><span id="1-713">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
-</span><span id="1-714">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
-</span><span id="1-715">        <span class="n">rv</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
-</span><span id="1-716">
-</span><span id="1-717">        <span class="n">rv</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
-</span><span id="1-718">        <span class="n">rv</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
-</span><span id="1-719">        <span class="n">rv</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
-</span><span id="1-720">
-</span><span id="1-721">        <span class="n">rv</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
-</span><span id="1-722">        <span class="n">rv</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">)</span>
-</span><span id="1-723">        <span class="n">rv</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">)</span>
-</span><span id="1-724">        <span class="n">rv</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span>
-</span><span id="1-725">
-</span><span id="1-726">        <span class="n">rv</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span>
-</span><span id="1-727">        <span class="n">rv</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
-</span><span id="1-728">        <span class="n">rv</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span>
-</span><span id="1-729">        <span class="n">rv</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span>
-</span><span id="1-730">        <span class="n">rv</span><span class="o">.</span><span class="n">_attachments</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
-</span><span id="1-731">
-</span><span id="1-732">        <span class="n">rv</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span>
+</span><span id="1-656"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope with another scope&#39;s data.&quot;&quot;&quot;</span>
+</span><span id="1-657">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-658">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span>
+</span><span id="1-659">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-660">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span>
+</span><span id="1-661">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-662">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span>
+</span><span id="1-663">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-664">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
+</span><span id="1-665">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-666">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span>
+</span><span id="1-667">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
+</span><span id="1-668">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
+</span><span id="1-669">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
+</span><span id="1-670">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
+</span><span id="1-671">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
+</span><span id="1-672">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
+</span><span id="1-673">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">:</span>
+</span><span id="1-674">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
+</span><span id="1-675">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
+</span><span id="1-676">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span>
+</span><span id="1-677">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
+</span><span id="1-678">            <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
+</span><span id="1-679">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span><span class="p">:</span>
+</span><span id="1-680">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span>
+</span><span id="1-681">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">:</span>
+</span><span id="1-682">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span></div>
+
+</span><span id="1-683">
+<div class="viewcode-block" id="Scope.update_from_kwargs">
+<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.update_from_kwargs">[docs]</a>
+</span><span id="1-684">    <span class="k">def</span> <span class="nf">update_from_kwargs</span><span class="p">(</span>
+</span><span id="1-685">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-686">        <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+</span><span id="1-687">        <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span id="1-688">        <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+</span><span id="1-689">        <span class="n">contexts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+</span><span id="1-690">        <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
+</span><span id="1-691">        <span class="n">fingerprint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[str]]</span>
+</span><span id="1-692">    <span class="p">):</span>
+</span><span id="1-693">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-694"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope&#39;s attributes.&quot;&quot;&quot;</span>
+</span><span id="1-695">        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-696">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">level</span>
+</span><span id="1-697">        <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-698">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">user</span>
+</span><span id="1-699">        <span class="k">if</span> <span class="n">extras</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-700">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span>
+</span><span id="1-701">        <span class="k">if</span> <span class="n">contexts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-702">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">contexts</span><span class="p">)</span>
+</span><span id="1-703">        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-704">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
+</span><span id="1-705">        <span class="k">if</span> <span class="n">fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-706">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">fingerprint</span></div>
+
+</span><span id="1-707">
+</span><span id="1-708">    <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-709">        <span class="c1"># type: () -&gt; Scope</span>
+</span><span id="1-710">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>  <span class="c1"># type: Scope</span>
+</span><span id="1-711">
+</span><span id="1-712">        <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
+</span><span id="1-713">        <span class="n">rv</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+</span><span id="1-714">        <span class="n">rv</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
+</span><span id="1-715">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
+</span><span id="1-716">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
+</span><span id="1-717">        <span class="n">rv</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
+</span><span id="1-718">
+</span><span id="1-719">        <span class="n">rv</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
+</span><span id="1-720">        <span class="n">rv</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
+</span><span id="1-721">        <span class="n">rv</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
+</span><span id="1-722">
+</span><span id="1-723">        <span class="n">rv</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
+</span><span id="1-724">        <span class="n">rv</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">)</span>
+</span><span id="1-725">        <span class="n">rv</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">)</span>
+</span><span id="1-726">        <span class="n">rv</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span>
+</span><span id="1-727">
+</span><span id="1-728">        <span class="n">rv</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span>
+</span><span id="1-729">        <span class="n">rv</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
+</span><span id="1-730">        <span class="n">rv</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span>
+</span><span id="1-731">        <span class="n">rv</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span>
+</span><span id="1-732">        <span class="n">rv</span><span class="o">.</span><span class="n">_attachments</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
 </span><span id="1-733">
-</span><span id="1-734">        <span class="k">return</span> <span class="n">rv</span>
+</span><span id="1-734">        <span class="n">rv</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span>
 </span><span id="1-735">
-</span><span id="1-736">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-737">        <span class="c1"># type: () -&gt; str</span>
-</span><span id="1-738">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
-</span><span id="1-739">            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-</span><span id="1-740">            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
-</span><span id="1-741">            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
-</span><span id="1-742">        <span class="p">)</span></div>
+</span><span id="1-736">        <span class="k">return</span> <span class="n">rv</span>
+</span><span id="1-737">
+</span><span id="1-738">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-739">        <span class="c1"># type: () -&gt; str</span>
+</span><span id="1-740">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+</span><span id="1-741">            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+</span><span id="1-742">            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
+</span><span id="1-743">            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+</span><span id="1-744">        <span class="p">)</span></div>
+
 </span></pre></div>
         </article>
         
@@ -914,10 +988,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
-      <script src="../../_static/doctools.js"></script>
-      <script src="../../_static/sphinx_highlight.js"></script>
-      <script src="../../_static/shibuya.js"></script>
+      <script src="../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../_static/doctools.js?v=888ff710"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/shibuya.js?v=d7f4572f"></script>
     
 </body>
 </html>

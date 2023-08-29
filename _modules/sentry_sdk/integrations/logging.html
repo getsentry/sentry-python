@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.integrations.logging - sentry-python 1.29.2 documentation</title>
+      <title>sentry_sdk.integrations.logging - sentry-python 1.30.0 documentation</title>
     <link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -13,9 +13,9 @@
     } else if (isDarkTheme) {
       document.documentElement.classList.add('dark')
     }
-  </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/shibuya.css" />
-    <link media="print" rel="stylesheet" type="text/css" href="../../../_static/print.css" />
+  </script><link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=aecf457f" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/shibuya.css?v=9cd6187f" />
+    <link media="print" rel="stylesheet" type="text/css" href="../../../_static/print.css?v=ee381b95" />
     <style>
 :root {
   --sy-f-sys:-apple-system, BlinkMacSystemFont, Segoe UI, Oxygen, Ubuntu, Droid Sans, Helvetica Neue;--sy-f-cjk:PingFang SC, Hiragino Sans GB, Droid Sans Fallback, Microsoft YaHei;--sy-f-heading:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-text:var(--sy-f-sys), var(--sy-f-cjk), sans-serif;--sy-f-mono:Menlo, Monaco, Consolas, "Courier New", monospace;--sy-c-divider:rgba(var(--sy-rc-text), 0.1);--sy-c-divider-weak:rgba(var(--sy-rc-text), 0.05);--sy-c-border:rgba(var(--sy-rc-text), 0.14);--sy-s-banner-height:0rem;--sy-s-navbar-height:56px;--sy-s-offset-top:calc(var(--sy-s-navbar-height) + var(--sy-s-banner-height));--sy-c-link:rgb(var(--sy-rc-theme));--sy-c-link-weak:rgba(var(--sy-rc-theme), 0.86);
@@ -188,7 +188,9 @@ html.dark {
 </span><span id="1-46"><span class="p">)</span>
 </span><span id="1-47">
 </span><span id="1-48">
-<div class="viewcode-block" id="ignore_logger"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.ignore_logger">[docs]</a></span><span id="1-49"><span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span>
+<div class="viewcode-block" id="ignore_logger">
+<a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.ignore_logger">[docs]</a>
+</span><span id="1-49"><span class="k">def</span> <span class="nf">ignore_logger</span><span class="p">(</span>
 </span><span id="1-50">    <span class="n">name</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span id="1-51"><span class="p">):</span>
 </span><span id="1-52">    <span class="c1"># type: (...) -&gt; None</span>
@@ -200,6 +202,7 @@ html.dark {
 </span><span id="1-58"><span class="sd">    :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).</span>
 </span><span id="1-59"><span class="sd">    &quot;&quot;&quot;</span>
 </span><span id="1-60">    <span class="n">_IGNORED_LOGGERS</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
 </span><span id="1-61">
 </span><span id="1-62">
 </span><span id="1-63"><span class="k">class</span> <span class="nc">LoggingIntegration</span><span class="p">(</span><span class="n">Integration</span><span class="p">):</span>
@@ -303,7 +306,9 @@ html.dark {
 </span><span id="1-161">        <span class="p">}</span>
 </span><span id="1-162">
 </span><span id="1-163">
-<div class="viewcode-block" id="EventHandler"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.EventHandler">[docs]</a></span><span id="1-164"><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
+<div class="viewcode-block" id="EventHandler">
+<a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.EventHandler">[docs]</a>
+</span><span id="1-164"><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
 </span><span id="1-165"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-166"><span class="sd">    A logging handler that emits Sentry events for each log record</span>
 </span><span id="1-167">
@@ -389,13 +394,16 @@ html.dark {
 </span><span id="1-247">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
 </span><span id="1-248">
 </span><span id="1-249">        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span></div>
+
 </span><span id="1-250">
 </span><span id="1-251">
 </span><span id="1-252"><span class="c1"># Legacy name</span>
 </span><span id="1-253"><span class="n">SentryHandler</span> <span class="o">=</span> <span class="n">EventHandler</span>
 </span><span id="1-254">
 </span><span id="1-255">
-<div class="viewcode-block" id="BreadcrumbHandler"><a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.BreadcrumbHandler">[docs]</a></span><span id="1-256"><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
+<div class="viewcode-block" id="BreadcrumbHandler">
+<a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.BreadcrumbHandler">[docs]</a>
+</span><span id="1-256"><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
 </span><span id="1-257"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="1-258"><span class="sd">    A logging handler that records breadcrumbs for each log record.</span>
 </span><span id="1-259">
@@ -427,6 +435,7 @@ html.dark {
 </span><span id="1-285">            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcfromtimestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
 </span><span id="1-286">            <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
 </span><span id="1-287">        <span class="p">}</span></div>
+
 </span></pre></div>
         </article>
         
@@ -459,10 +468,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
-      <script src="../../../_static/doctools.js"></script>
-      <script src="../../../_static/sphinx_highlight.js"></script>
-      <script src="../../../_static/shibuya.js"></script>
+      <script src="../../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../../_static/doctools.js?v=888ff710"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/shibuya.js?v=d7f4572f"></script>
     
 </body>
 </html>
