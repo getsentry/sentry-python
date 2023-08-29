@@ -27,7 +27,7 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
@@ -235,6 +235,15 @@ class _Client(object):
                     "Invalid value for max_request_body_size. Must be one of {}".format(
                         max_request_body_size
                     )
+                )
+
+            if self.options["_experiments"].get("otel_powered_performance", False):
+                logger.debug(
+                    "[OTel] Enabling experimental OTel-powered performance monitoring."
+                )
+                self.options["instrumenter"] = INSTRUMENTER.OTEL
+                _DEFAULT_INTEGRATIONS.append(
+                    "sentry_sdk.integrations.opentelemetry.OpenTelemetryIntegration",
                 )
 
             self.integrations = setup_integrations(
