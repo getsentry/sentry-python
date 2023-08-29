@@ -912,3 +912,61 @@ def test_replay_event_context(sentry_init, capture_events, app, traces_sample_ra
     assert (
         event["contexts"]["replay"]["replay_id"] == "12312012123120121231201212312012"
     )
+
+
+def test_response_status_code_ok_in_transaction_context(
+    sentry_init, capture_envelopes, app
+):
+    """
+    Tests that the response status code is added to the transaction context.
+    This also works for when there is an Exception during the request, but somehow the test flask app doesn't seem to trigger that.
+    """
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        release="demo-release",
+    )
+
+    envelopes = capture_envelopes()
+
+    client = app.test_client()
+    client.get("/message")
+
+    Hub.current.client.flush()
+
+    (_, transaction_envelope, _) = envelopes
+    transaction = transaction_envelope.get_transaction_event()
+
+    assert transaction["type"] == "transaction"
+    assert len(transaction["contexts"]) > 0
+    assert (
+        "response" in transaction["contexts"].keys()
+    ), "Response context not found in transaction"
+    assert transaction["contexts"]["response"]["status_code"] == 200
+
+
+def test_response_status_code_not_found_in_transaction_context(
+    sentry_init, capture_envelopes, app
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        release="demo-release",
+    )
+
+    envelopes = capture_envelopes()
+
+    client = app.test_client()
+    client.get("/not-existing-route")
+
+    Hub.current.client.flush()
+
+    (transaction_envelope, _) = envelopes
+    transaction = transaction_envelope.get_transaction_event()
+
+    assert transaction["type"] == "transaction"
+    assert len(transaction["contexts"]) > 0
+    assert (
+        "response" in transaction["contexts"].keys()
+    ), "Response context not found in transaction"
+    assert transaction["contexts"]["response"]["status_code"] == 404

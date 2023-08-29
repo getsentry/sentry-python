@@ -1,5 +1,69 @@
 # Changelog
 
+## 1.30.0
+
+### Various fixes & improvements
+
+- Officially support Python 3.11 (#2300) by @sentrivana
+- Context manager monitor (#2290) by @szokeasaurusrex
+- Set response status code in transaction `response` context. (#2312) by @antonpirker
+- Add missing context kwarg to `_sentry_task_factory` (#2267) by @JohnnyDeuss
+- In Postgres take the connection params from the connection  (#2308) by @antonpirker
+- Experimental: Allow using OTel for performance instrumentation (#2272) by @sentrivana
+
+    This release includes experimental support for replacing Sentry's default
+    performance monitoring solution with one powered by OpenTelemetry without having
+    to do any manual setup.
+
+    Try it out by installing `pip install sentry-sdk[opentelemetry-experimental]` and
+    then initializing the SDK with:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        _experiments={"otel_powered_performance": True},
+    )
+    ```
+
+    This enables OpenTelemetry performance monitoring support for some of the most
+    popular frameworks and libraries (Flask, Django, FastAPI, requests...).
+
+    We're looking forward to your feedback! Please let us know about your experience
+    in this discussion: https://github.com/getsentry/sentry/discussions/55023
+
+    **Important note:** Please note that this feature is experimental and in a
+    proof-of-concept stage and is not meant for production use. It may be changed or
+    removed at any point.
+
+- Enable backpressure handling by default (#2298) by @sl0thentr0py
+
+    The SDK now dynamically downsamples transactions to reduce backpressure in high
+    throughput systems. It starts a new `Monitor` thread to perform some health checks
+    which decide to downsample (halved each time) in 10 second intervals till the system
+    is healthy again.
+
+    To disable this behavior, use:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        enable_backpressure_handling=False,
+    )
+    ```
+
+    If your system serves heavy load, please let us know how this feature works for you!
+
+- Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
+- Add test for `ThreadPoolExecutor` (#2259) by @gggritso
+- Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
+- Moved `is_sentry_url` to utils (#2304) by @szokeasaurusrex
+- Fix: arq attribute error on settings, support worker args (#2260) by @rossmacarthur
+- Fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
+- build(deps): bump mypy from 1.4.1 to 1.5.1 (#2319) by @dependabot
+- build(deps): bump sphinx from 7.1.2 to 7.2.4 (#2322) by @dependabot
+- build(deps): bump sphinx from 7.0.1 to 7.1.2 (#2296) by @dependabot
+- build(deps): bump checkouts/data-schemas from `1b85152` to `ebc77d3` (#2254) by @dependabot
+
 ## 1.29.2
 
 ### Various fixes & improvements
