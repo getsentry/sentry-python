@@ -15,7 +15,7 @@
     performance monitoring solution with one powered by OpenTelemetry without having
     to do any manual setup.
 
-    Try it out by installing `pip install sentry_sdk[opentelemetry-experimental]` and
+    Try it out by installing `pip install sentry-sdk[opentelemetry-experimental]` and
     then initializing the SDK with:
 
     ```python
