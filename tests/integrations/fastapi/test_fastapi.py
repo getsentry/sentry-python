@@ -322,3 +322,32 @@ def test_response_status_code_not_found_in_transaction_context(
         "response" in transaction["contexts"].keys()
     ), "Response context not found in transaction"
     assert transaction["contexts"]["response"]["status_code"] == 404
+
+
+def test_transaction_name():
+    """
+    Tests that the transaction name is something meaningful.
+    """
+    # this: sampling_context["transaction_context"]["name"]
+    # for transaction_style "endpoint" and "url"
+    assert False
+
+
+def test_transaction_name_in_traces_sampler():
+    """
+    Tests that a custom traces_sampler has a meaningful the transaction name
+    In this case the URL or endpoint, because we do not have the route yet.
+    """
+    # this: sampling_context["transaction_context"]["name"]
+    # for transaction_style "endpoint" and "url"
+    assert False
+
+
+def test_transaction_name_in_middleware():
+    """
+    Tests that the transaction name in the middleware
+    (like CORSMiddleware) is something meaningful.
+    In this case the URL or endpoint, because we do not have the route yet.
+    """
+    # for transaction_style "endpoint" and "url"
+    assert False

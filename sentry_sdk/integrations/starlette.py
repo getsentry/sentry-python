@@ -14,7 +14,11 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_URL,
+)
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -647,14 +651,17 @@ class StarletteRequestExtractor:
 
 def _get_transaction_name_and_source(transaction_style, request):
     # type: (str, Any) -> None
-    name = ""
+    name = None
+    source = None
 
     if transaction_style == "endpoint":
         endpoint = request.scope.get("endpoint")
         if endpoint:
             name = transaction_from_function(endpoint) or ""
+            source = SOURCE_FOR_STYLE[transaction_style]
         else:
             name = request.scope.get("raw_path")
+            source = TRANSACTION_SOURCE_URL
 
     elif transaction_style == "url":
         router = request.scope.get("router")
@@ -665,17 +672,18 @@ def _get_transaction_name_and_source(transaction_style, request):
                 if match[0] == Match.FULL:
                     if transaction_style == "endpoint":
                         name = transaction_from_function(match[1]["endpoint"]) or ""
+                        source = SOURCE_FOR_STYLE[transaction_style]
                         break
                     elif transaction_style == "url":
                         name = route.path
+                        source = SOURCE_FOR_STYLE[transaction_style]
                         break
         else:
             name = request.scope.get("raw_path")
+            source = TRANSACTION_SOURCE_URL
 
-    if not name:
+    if name is None:
         name = _DEFAULT_TRANSACTION_NAME
         source = TRANSACTION_SOURCE_ROUTE
-    else:
-        source = SOURCE_FOR_STYLE[transaction_style]
 
     return name, source
