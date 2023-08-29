@@ -5,11 +5,36 @@
 ### Various fixes & improvements
 
 - Officially support Python 3.11 (#2300) by @sentrivana
-- Allow to use OTel for performance instrumentation (experimental) (#2272) by @sentrivana
 - Context manager monitor (#2290) by @szokeasaurusrex
 - Set response status code in transaction `response` context. (#2312) by @antonpirker
 - Add missing context kwarg to `_sentry_task_factory` (#2267) by @JohnnyDeuss
 - In Postgres take the connection params from the connection  (#2308) by @antonpirker
+- Experimental: Allow using OTel for performance instrumentation (#2272) by @sentrivana
+
+    This release includes experimental support for replacing Sentry's default
+    performance monitoring solution with one powered by OpenTelemetry without having
+    to do any manual setup.
+
+    Try it out by installing `pip install sentry_sdk[opentelemetry-experimental]` and
+    then initializing the SDK with:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        _experiments={"otel_powered_performance": True},
+    )
+    ```
+
+    This enables OpenTelemetry performance monitoring support for some of the most
+    popular frameworks and libraries (Flask, Django, FastAPI, request...).
+
+    We're looking forward to your feedback! Please let us know about your experience
+    in this discussion: https://github.com/getsentry/sentry/discussions/55023
+
+    **Important note:** Please note that this feature is experimental and in a
+    proof-of-concept stage and is not meant for production use. It may be changed or
+    removed at any point.
+
 - Enable backpressure handling by default (#2298) by @sl0thentr0py
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso
