@@ -220,6 +220,7 @@ def _get_span_description(name, *args):
 
 def _set_client_data(span, is_cluster, name, *args):
     # type: (Span, bool, str, *Any) -> None
+    span.set_data(SPANDATA.DB_SYSTEM, "redis")
     span.set_tag("redis.is_cluster", is_cluster)
     if name:
         span.set_tag("redis.command", name)

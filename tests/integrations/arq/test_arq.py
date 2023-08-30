@@ -40,9 +40,21 @@ def patch_fakeredis_info_command():
 
 @pytest.fixture
 def init_arq(sentry_init):
-    def inner(functions_=None, cron_jobs_=None, allow_abort_jobs_=False):
-        functions_ = functions_ or []
-        cron_jobs_ = cron_jobs_ or []
+    def inner(
+        cls_functions=None,
+        cls_cron_jobs=None,
+        kw_functions=None,
+        kw_cron_jobs=None,
+        allow_abort_jobs_=False,
+    ):
+        cls_functions = cls_functions or []
+        cls_cron_jobs = cls_cron_jobs or []
+
+        kwargs = {}
+        if kw_functions is not None:
+            kwargs["functions"] = kw_functions
+        if kw_cron_jobs is not None:
+            kwargs["cron_jobs"] = kw_cron_jobs
 
         sentry_init(
             integrations=[ArqIntegration()],
@@ -55,12 +67,17 @@ def init_arq(sentry_init):
         pool = ArqRedis(pool_or_conn=server.connection_pool)
 
         class WorkerSettings:
-            functions = functions_
-            cron_jobs = cron_jobs_
+            functions = cls_functions
+            cron_jobs = cls_cron_jobs
             redis_pool = pool
             allow_abort_jobs = allow_abort_jobs_
 
-        worker = arq.worker.create_worker(WorkerSettings)
+        if not WorkerSettings.functions:
+            del WorkerSettings.functions
+        if not WorkerSettings.cron_jobs:
+            del WorkerSettings.cron_jobs
+
+        worker = arq.worker.create_worker(WorkerSettings, **kwargs)
 
         return pool, worker
 
@@ -119,9 +136,12 @@ async def test_job_retry(capture_events, init_arq):
     assert event["extra"]["arq-job"]["retry"] == 2
 
 
+@pytest.mark.parametrize(
+    "source", [("cls_functions", "cls_cron_jobs"), ("kw_functions", "kw_cron_jobs")]
+)
 @pytest.mark.parametrize("job_fails", [True, False], ids=["error", "success"])
 @pytest.mark.asyncio
-async def test_job_transaction(capture_events, init_arq, job_fails):
+async def test_job_transaction(capture_events, init_arq, source, job_fails):
     async def division(_, a, b=0):
         return a / b
 
@@ -132,7 +152,8 @@ async def test_job_transaction(capture_events, init_arq, job_fails):
 
     cron_job = cron(cron_func, minute=0, run_at_startup=True)
 
-    pool, worker = init_arq(functions_=[division], cron_jobs_=[cron_job])
+    functions_key, cron_jobs_key = source
+    pool, worker = init_arq(**{functions_key: [division], cron_jobs_key: [cron_job]})
 
     events = capture_events()
 
@@ -192,12 +213,13 @@ async def test_job_transaction(capture_events, init_arq, job_fails):
     assert cron_extra["retry"] == 1
 
 
+@pytest.mark.parametrize("source", ["cls_functions", "kw_functions"])
 @pytest.mark.asyncio
-async def test_enqueue_job(capture_events, init_arq):
+async def test_enqueue_job(capture_events, init_arq, source):
     async def dummy_job(_):
         pass
 
-    pool, _ = init_arq([dummy_job])
+    pool, _ = init_arq(**{source: [dummy_job]})
 
     events = capture_events()
 

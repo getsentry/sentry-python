@@ -1,4 +1,4 @@
 shibuya
-sphinx==7.0.1
+sphinx==7.2.4
 sphinx-autodoc-typehints[type_comments]>=1.8.0
 typing-extensions
