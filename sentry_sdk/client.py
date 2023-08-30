@@ -258,14 +258,14 @@ class _Client(object):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
+            if has_profiling_enabled(self.options):
+                try:
+                    setup_profiler(self.options)
+                except Exception as e:
+                    logger.debug("Can not set up profiler. (%s)", e)
+
         finally:
             _client_init_debug.set(old_debug)
-
-        if has_profiling_enabled(self.options):
-            try:
-                setup_profiler(self.options)
-            except ValueError as e:
-                logger.debug(str(e))
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
