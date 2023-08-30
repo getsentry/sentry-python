@@ -39,6 +39,7 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
+            "otel_powered_performance": Optional[bool],
         },
         total=False,
     )
@@ -263,4 +264,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.29.2"
+VERSION = "1.30.0"

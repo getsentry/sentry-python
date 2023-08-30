@@ -27,7 +27,7 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
@@ -237,6 +237,15 @@ class _Client(object):
                     )
                 )
 
+            if self.options["_experiments"].get("otel_powered_performance", False):
+                logger.debug(
+                    "[OTel] Enabling experimental OTel-powered performance monitoring."
+                )
+                self.options["instrumenter"] = INSTRUMENTER.OTEL
+                _DEFAULT_INTEGRATIONS.append(
+                    "sentry_sdk.integrations.opentelemetry.OpenTelemetryIntegration",
+                )
+
             self.integrations = setup_integrations(
                 self.options["integrations"],
                 with_defaults=self.options["default_integrations"],
@@ -249,14 +258,14 @@ class _Client(object):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
+            if has_profiling_enabled(self.options):
+                try:
+                    setup_profiler(self.options)
+                except Exception as e:
+                    logger.debug("Can not set up profiler. (%s)", e)
+
         finally:
             _client_init_debug.set(old_debug)
-
-        if has_profiling_enabled(self.options):
-            try:
-                setup_profiler(self.options)
-            except ValueError as e:
-                logger.debug(str(e))
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 

@@ -663,6 +663,11 @@ class Transaction(Span):
         # type: (str, Any) -> None
         self._contexts[key] = value
 
+    def set_http_status(self, http_status):
+        # type: (int) -> None
+        super(Transaction, self).set_http_status(http_status)
+        self.set_context("response", {"status_code": http_status})
+
     def to_json(self):
         # type: () -> Dict[str, Any]
         rv = super(Transaction, self).to_json()
