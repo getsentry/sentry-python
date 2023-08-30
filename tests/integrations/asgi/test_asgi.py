@@ -19,7 +19,17 @@ minimum_python_36 = pytest.mark.skipif(
 @pytest.fixture
 def asgi3_app():
     async def app(scope, receive, send):
-        if (
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    ...  # Do some startup here!
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    ...  # Do some shutdown here!
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+        elif (
             scope["type"] == "http"
             and "route" in scope
             and scope["route"] == "/trigger/error"
@@ -52,21 +62,32 @@ def asgi3_app_with_error():
         1 / 0
 
     async def app(scope, receive, send):
-        await send_with_error(
-            {
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [
-                    [b"content-type", b"text/plain"],
-                ],
-            }
-        )
-        await send_with_error(
-            {
-                "type": "http.response.body",
-                "body": b"Hello, world!",
-            }
-        )
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    ...  # Do some startup here!
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    ...  # Do some shutdown here!
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+        else:
+            await send_with_error(
+                {
+                    "type": "http.response.start",
+                    "status": 200,
+                    "headers": [
+                        [b"content-type", b"text/plain"],
+                    ],
+                }
+            )
+            await send_with_error(
+                {
+                    "type": "http.response.body",
+                    "body": b"Hello, world!",
+                }
+            )
 
     return app
 
@@ -139,10 +160,11 @@ async def test_capture_transaction(
         events = capture_events()
         await client.get("/?somevalue=123")
 
-    (transaction_event,) = events
+    (transaction_event, lifespan_transaction_event) = events
 
     assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "http://localhost/"
+    assert transaction_event["transaction"] == "/"
+    assert transaction_event["transaction_info"] == {"source": "url"}
     assert transaction_event["contexts"]["trace"]["op"] == "http.server"
     assert transaction_event["request"] == {
         "headers": {
@@ -172,15 +194,17 @@ async def test_capture_transaction_with_error(
         async with TestClient(app) as client:
             await client.get("/")
 
-    (error_event, transaction_event) = events
+    (error_event, transaction_event, lifespan_transaction_event) = events
 
-    assert error_event["transaction"] == "http://localhost/"
+    assert error_event["transaction"] == "/"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
     assert error_event["exception"]["values"][0]["value"] == "division by zero"
     assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "asgi"
 
+    assert transaction_event["transaction"] == "/"
+    assert transaction_event["transaction_info"] == {"source": "url"}
     assert transaction_event["type"] == "transaction"
     assert transaction_event["contexts"]["trace"] == DictionaryContaining(
         error_event["contexts"]["trace"]
@@ -389,7 +413,7 @@ async def test_auto_session_tracking_with_aggregates(
         (
             "/message",
             "url",
-            "http://localhost/message",
+            "/message",
             "route",
         ),
         (
@@ -423,7 +447,7 @@ async def test_transaction_style(
         events = capture_events()
         await client.get(url)
 
-    (transaction_event,) = events
+    (transaction_event, lifespan_transaction_event) = events
 
     assert transaction_event["transaction"] == expected_transaction
     assert transaction_event["transaction_info"] == {"source": expected_source}

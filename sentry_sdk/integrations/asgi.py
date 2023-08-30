@@ -20,6 +20,7 @@ from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_URL,
 )
 from sentry_sdk.utils import (
     ContextVar,
@@ -168,15 +169,21 @@ class SentryAsgiMiddleware:
                     ty = scope["type"]
 
                     if ty in ("http", "websocket"):
+                        (
+                            transaction_name,
+                            transaction_source,
+                        ) = self._get_transaction_name_and_source(
+                            self.transaction_style, scope
+                        )
                         transaction = continue_trace(
                             self._get_headers(scope),
                             op="{}.server".format(ty),
+                            name=transaction_name,
+                            source=transaction_source,
                         )
                     else:
                         transaction = Transaction(op=OP.HTTP_SERVER)
 
-                    transaction.name = _DEFAULT_TRANSACTION_NAME
-                    transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
 
                     with hub.start_transaction(
@@ -232,7 +239,11 @@ class SentryAsgiMiddleware:
         if client and _should_send_default_pii():
             request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
 
-        self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
+        transaction_name, transaction_source = self._get_transaction_name_and_source(
+            self.transaction_style, asgi_scope
+        )
+        event["transaction"] = transaction_name
+        event["transaction_info"] = {"source": transaction_source}
 
         event["request"] = deepcopy(request_info)
 
@@ -244,16 +255,10 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
+    def _get_transaction_name_and_source(self, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> None
-        transaction_name_already_set = (
-            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
-            != _DEFAULT_TRANSACTION_NAME
-        )
-        if transaction_name_already_set:
-            return
-
-        name = ""
+        name = None
+        source = None
 
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
@@ -262,23 +267,41 @@ class SentryAsgiMiddleware:
             # an endpoint, overwrite our generic transaction name.
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
+                source = SOURCE_FOR_STYLE[transaction_style]
+            else:
+                ty = asgi_scope.get("type")
+                if ty in ("http", "websocket"):
+                    name = self._get_url(
+                        asgi_scope, "http" if ty == "http" else "ws", host=None
+                    )
+                    source = TRANSACTION_SOURCE_URL
+                else:
+                    name = _DEFAULT_TRANSACTION_NAME
+                    source = TRANSACTION_SOURCE_ROUTE
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
             # path from it for the transaction name
             route = asgi_scope.get("route")
             if route:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
+                name = route
+                source = SOURCE_FOR_STYLE[transaction_style]
+            else:
+                ty = asgi_scope.get("type")
+                if ty in ("http", "websocket"):
+                    name = self._get_url(
+                        asgi_scope, "http" if ty == "http" else "ws", host=None
+                    )
+                    source = TRANSACTION_SOURCE_URL
+                else:
+                    name = _DEFAULT_TRANSACTION_NAME
+                    source = TRANSACTION_SOURCE_ROUTE
 
-        if not name:
-            event["transaction"] = _DEFAULT_TRANSACTION_NAME
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
-            return
+        if name is None:
+            name = _DEFAULT_TRANSACTION_NAME
+            source = TRANSACTION_SOURCE_ROUTE
 
-        event["transaction"] = name
-        event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+        return name, source
 
     def _get_url(self, scope, default_scheme, host):
         # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str
