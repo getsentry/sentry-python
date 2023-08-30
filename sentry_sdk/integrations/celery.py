@@ -140,13 +140,21 @@ def _wrap_apply_async(f):
         # type: (*Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
-        if integration is not None and integration.propagate_traces:
+
+        # Note: kwargs can contain headers=None, so no setdefault!
+        # Unsure which backend though.
+        kwarg_headers = kwargs.get("headers") or {}
+        propagate_traces = kwarg_headers.pop("sentry-propagate-traces")
+        if propagate_traces is None and integration is not None:
+            propagate_traces = integration.propagate_traces
+
+        if propagate_traces:
             with hub.start_span(
                 op=OP.QUEUE_SUBMIT_CELERY, description=args[0].name
             ) as span:
                 with capture_internal_exceptions():
                     headers = dict(hub.iter_trace_propagation_headers(span))
-                    if integration.monitor_beat_tasks:
+                    if integration is not None and integration.monitor_beat_tasks:
                         headers.update(
                             {
                                 "sentry-monitor-start-timestamp-s": "%.9f"
@@ -155,10 +163,6 @@ def _wrap_apply_async(f):
                         )
 
                     if headers:
-                        # Note: kwargs can contain headers=None, so no setdefault!
-                        # Unsure which backend though.
-                        kwarg_headers = kwargs.get("headers") or {}
-
                         existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
                         sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
 
