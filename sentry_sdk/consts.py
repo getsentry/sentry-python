@@ -39,7 +39,7 @@ if TYPE_CHECKING:
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
-            "enable_backpressure_handling": Optional[bool],
+            "otel_powered_performance": Optional[bool],
         },
         total=False,
     )
@@ -240,6 +240,7 @@ class ClientConstructor(object):
         functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
+        enable_backpressure_handling=True,  # type: bool
     ):
         # type: (...) -> None
         pass
@@ -263,4 +264,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.28.1"
+VERSION = "1.30.0"

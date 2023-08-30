@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from sentry_sdk import Hub, start_span, start_transaction
+from sentry_sdk import Hub, start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
 
@@ -224,6 +224,18 @@ def test_passes_custom_samling_context_from_start_transaction_to_traces_sampler(
     traces_sampler.assert_any_call(
         DictionaryContaining({"dogs": "yes", "cats": "maybe"})
     )
+
+
+def test_sample_rate_affects_errors(sentry_init, capture_events):
+    sentry_init(sample_rate=0)
+    events = capture_events()
+
+    try:
+        1 / 0
+    except Exception:
+        capture_exception()
+
+    assert len(events) == 0
 
 
 @pytest.mark.parametrize(
