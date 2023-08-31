@@ -11,7 +11,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._asgi_common import _get_headers
+from sentry_sdk.integrations._asgi_common import _get_headers, _get_request_data
 from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
@@ -431,6 +431,7 @@ def patch_request_response():
                         source=transaction_source,
                     )
 
+                    asgi_request_data = _get_request_data(request.scope)
                     extractor = StarletteRequestExtractor(request)
                     info = await extractor.extract_request_info()
 
@@ -441,6 +442,7 @@ def patch_request_response():
 
                             # Add info from request to event
                             request_info = event.get("request", {})
+                            request_info.update(asgi_request_data)
                             if info:
                                 if "cookies" in info:
                                     request_info["cookies"] = info["cookies"]
@@ -474,6 +476,7 @@ def patch_request_response():
                         sentry_scope.profile.update_active_thread_id()
 
                     request = args[0]
+                    asgi_request_data = _get_request_data(request.scope)
                     extractor = StarletteRequestExtractor(request)
                     cookies = extractor.extract_cookies_from_request()
 
@@ -484,6 +487,7 @@ def patch_request_response():
 
                             # Extract information from request
                             request_info = event.get("request", {})
+                            request_info.update(asgi_request_data)
                             if cookies:
                                 request_info["cookies"] = cookies
 
