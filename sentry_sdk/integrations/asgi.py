@@ -6,15 +6,19 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import asyncio
 import inspect
-import urllib
+import logging
 from copy import deepcopy
 
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.hub import Hub
+from sentry_sdk.integrations._asgi_common import (
+    _get_headers,
+    _get_request_data,
+    _get_url,
+)
 from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
@@ -37,8 +41,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Optional
     from typing import Callable
-
-    from typing_extensions import Literal
 
     from sentry_sdk._types import Event, Hint
 
@@ -176,16 +178,28 @@ class SentryAsgiMiddleware:
                             self.transaction_style, scope
                         )
                         transaction = continue_trace(
-                            self._get_headers(scope),
+                            _get_headers(scope),
                             op="{}.server".format(ty),
                             name=transaction_name,
                             source=transaction_source,
+                        )
+                        logging.warning(
+                            "[ASGI] Created Transaction %s, %s, %s",
+                            transaction,
+                            transaction.sampled,
+                            transaction_name,
                         )
                     else:
                         transaction = Transaction(op=OP.HTTP_SERVER)
 
                     transaction.set_tag("asgi.type", ty)
 
+                    logging.warning(
+                        "[ASGI] Starting Transaction %s, %s, %s",
+                        transaction,
+                        transaction.sampled,
+                        transaction.name,
+                    )
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"asgi_scope": scope}
                     ):
@@ -221,23 +235,9 @@ class SentryAsgiMiddleware:
 
     def event_processor(self, event, hint, asgi_scope):
         # type: (Event, Hint, Any) -> Optional[Event]
-        request_info = event.get("request", {})
-
-        ty = asgi_scope["type"]
-        if ty in ("http", "websocket"):
-            request_info["method"] = asgi_scope.get("method")
-            request_info["headers"] = headers = _filter_headers(
-                self._get_headers(asgi_scope)
-            )
-            request_info["query_string"] = self._get_query(asgi_scope)
-
-            request_info["url"] = self._get_url(
-                asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
-            )
-
-        client = asgi_scope.get("client")
-        if client and _should_send_default_pii():
-            request_info["env"] = {"REMOTE_ADDR": self._get_ip(asgi_scope)}
+        request_data = event.get("request", {})
+        request_data.update(_get_request_data(asgi_scope))
+        event["request"] = deepcopy(request_data)
 
         transaction_name, transaction_source = self._get_transaction_name_and_source(
             self.transaction_style, asgi_scope
@@ -245,15 +245,7 @@ class SentryAsgiMiddleware:
         event["transaction"] = transaction_name
         event["transaction_info"] = {"source": transaction_source}
 
-        event["request"] = deepcopy(request_info)
-
         return event
-
-    # Helper functions for extracting request data.
-    #
-    # Note: Those functions are not public API. If you want to mutate request
-    # data to your liking it's recommended to use the `before_send` callback
-    # for that.
 
     def _get_transaction_name_and_source(self, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> None
@@ -271,7 +263,7 @@ class SentryAsgiMiddleware:
             else:
                 ty = asgi_scope.get("type")
                 if ty in ("http", "websocket"):
-                    name = self._get_url(
+                    name = _get_url(
                         asgi_scope, "http" if ty == "http" else "ws", host=None
                     )
                     source = TRANSACTION_SOURCE_URL
@@ -280,8 +272,6 @@ class SentryAsgiMiddleware:
                     source = TRANSACTION_SOURCE_ROUTE
 
         elif transaction_style == "url":
-            # FastAPI includes the route object in the scope to let Sentry extract the
-            # path from it for the transaction name
             route = asgi_scope.get("route")
             if route:
                 name = route
@@ -289,7 +279,7 @@ class SentryAsgiMiddleware:
             else:
                 ty = asgi_scope.get("type")
                 if ty in ("http", "websocket"):
-                    name = self._get_url(
+                    name = _get_url(
                         asgi_scope, "http" if ty == "http" else "ws", host=None
                     )
                     source = TRANSACTION_SOURCE_URL
@@ -302,67 +292,3 @@ class SentryAsgiMiddleware:
             source = TRANSACTION_SOURCE_ROUTE
 
         return name, source
-
-    def _get_url(self, scope, default_scheme, host):
-        # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str
-        """
-        Extract URL from the ASGI scope, without also including the querystring.
-        """
-        scheme = scope.get("scheme", default_scheme)
-
-        server = scope.get("server", None)
-        path = scope.get("root_path", "") + scope.get("path", "")
-
-        if host:
-            return "%s://%s%s" % (scheme, host, path)
-
-        if server is not None:
-            host, port = server
-            default_port = {"http": 80, "https": 443, "ws": 80, "wss": 443}[scheme]
-            if port != default_port:
-                return "%s://%s:%s%s" % (scheme, host, port, path)
-            return "%s://%s%s" % (scheme, host, path)
-        return path
-
-    def _get_query(self, scope):
-        # type: (Any) -> Any
-        """
-        Extract querystring from the ASGI scope, in the format that the Sentry protocol expects.
-        """
-        qs = scope.get("query_string")
-        if not qs:
-            return None
-        return urllib.parse.unquote(qs.decode("latin-1"))
-
-    def _get_ip(self, scope):
-        # type: (Any) -> str
-        """
-        Extract IP Address from the ASGI scope based on request headers with fallback to scope client.
-        """
-        headers = self._get_headers(scope)
-        try:
-            return headers["x-forwarded-for"].split(",")[0].strip()
-        except (KeyError, IndexError):
-            pass
-
-        try:
-            return headers["x-real-ip"]
-        except KeyError:
-            pass
-
-        return scope.get("client")[0]
-
-    def _get_headers(self, scope):
-        # type: (Any) -> Dict[str, str]
-        """
-        Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
-        """
-        headers = {}  # type: Dict[str, str]
-        for raw_key, raw_value in scope["headers"]:
-            key = raw_key.decode("latin-1")
-            value = raw_value.decode("latin-1")
-            if key in headers:
-                headers[key] = headers[key] + ", " + value
-            else:
-                headers[key] = value
-        return headers

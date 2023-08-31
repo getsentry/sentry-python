@@ -700,7 +700,9 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
@@ -715,7 +717,9 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
     ]
@@ -789,7 +793,9 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "description": "_ASGIAdapter.send.<locals>.send"
+            if STARLETTE_VERSION < (0, 21)
+            else "_TestClientTransport.handle_request.<locals>.send",
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
@@ -830,7 +836,7 @@ def test_last_event_id(sentry_init, capture_events):
     app = starlette_app_factory(debug=False)
     app.add_exception_handler(500, handler)
 
-    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
+    client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/custom_error")
     assert response.status_code == 500
 
@@ -858,7 +864,32 @@ def test_legacy_setup(
     client.get("/message/123456")
 
     (event,) = events
-    assert event["transaction"] == "/message/{message_id}"
+    assert (
+        event["transaction"]
+        == "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id"
+    )
+
+
+def test_legacy_setup_transaction_style_url(
+    sentry_init,
+    capture_events,
+):
+    # Check that behaviour does not change
+    # if the user just adds the new Integration
+    # and forgets to remove SentryAsgiMiddleware
+    sentry_init()
+    app = starlette_app_factory()
+    asgi_app = SentryAsgiMiddleware(app, transaction_style="url")
+
+    events = capture_events()
+
+    client = TestClient(asgi_app)
+    client.get("/message/123456")
+
+    (event,) = events
+    assert (
+        event["transaction"] == "http://testserver/message/123456"
+    )  # the url from AsgiMiddleware (because it does not know about routes)
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
@@ -869,11 +900,10 @@ def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, en
         _experiments={"profiles_sample_rate": 1.0},
     )
     app = starlette_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
 
     envelopes = capture_envelopes()
 
-    client = TestClient(asgi_app)
+    client = TestClient(app)
     response = client.get(endpoint)
     assert response.status_code == 200
 

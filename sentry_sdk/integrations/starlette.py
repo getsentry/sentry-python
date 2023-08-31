@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import asyncio
 import functools
 from copy import deepcopy
+import logging
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -10,10 +11,12 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._asgi_common import _get_headers
 from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
+
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
@@ -95,21 +98,6 @@ class StarletteIntegration(Integration):
         if version >= (0, 24):
             patch_templates()
 
-    def _get_headers(self, scope):
-        # type: (Any) -> Dict[str, str]
-        """
-        Extract headers from the ASGI scope, in the format that the Sentry protocol expects.
-        """
-        headers = {}  # type: Dict[str, str]
-        for raw_key, raw_value in scope["headers"]:
-            key = raw_key.decode("latin-1")
-            value = raw_value.decode("latin-1")
-            if key in headers:
-                headers[key] = headers[key] + ", " + value
-            else:
-                headers[key] = value
-        return headers
-
 
 def patch_starlette_application():
     # type: () -> None
@@ -119,6 +107,7 @@ def patch_starlette_application():
         async def __sentry_call__(self, scope, receive, send):
             # type: (Starlette, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]]) -> None
             hub = Hub.current
+
             integration = hub.get_integration(StarletteIntegration)
             if integration is None:
                 await func(self, scope, receive, send)
@@ -131,16 +120,32 @@ def patch_starlette_application():
 
             ty = scope["type"]
             transaction = continue_trace(
-                integration._get_headers(scope),
+                _get_headers(scope),
                 op="{}.server".format(ty),
                 name=transaction_name,
                 source=transaction_source,
             )
+            logging.warning(
+                "[Starlette] Created Transaction %s, %s, %s",
+                transaction,
+                transaction.sampled,
+                transaction_name,
+            )
 
+            logging.warning(
+                "[Starlette] Starting Transaction %s, %s, %s",
+                transaction,
+                transaction.sampled,
+                transaction_name,
+            )
             with hub.start_transaction(
                 transaction, custom_sampling_context={"asgi_scope": scope}
             ):
-                await func(self, scope, receive, send)
+                try:
+                    await func(self, scope, receive, send)
+                except Exception as exc:
+                    _capture_exception(exc, handled=False)
+                    raise exc from None
 
         return __sentry_call__
 
@@ -417,6 +422,10 @@ def patch_request_response():
                     ) = _get_transaction_name_and_source(
                         integration.transaction_style, request
                     )
+                    logging.warning(
+                        "[Starlette] Setting Transaction Name %s", transaction_name
+                    )
+
                     sentry_scope.set_transaction_name(
                         name=transaction_name,
                         source=transaction_source,

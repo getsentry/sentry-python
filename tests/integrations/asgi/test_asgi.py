@@ -6,6 +6,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
+from sentry_sdk.integrations.asgi import _get_ip, _get_headers
 
 async_asgi_testclient = pytest.importorskip("async_asgi_testclient")
 from async_asgi_testclient import TestClient
@@ -496,8 +497,7 @@ def test_get_ip_x_forwarded_for():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "8.8.8.8"
 
     # x-forwarded-for overrides x-real-ip
@@ -509,8 +509,7 @@ def test_get_ip_x_forwarded_for():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "8.8.8.8"
 
     # when multiple x-forwarded-for headers are, the first is taken
@@ -523,8 +522,7 @@ def test_get_ip_x_forwarded_for():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "5.5.5.5"
 
 
@@ -537,8 +535,7 @@ def test_get_ip_x_real_ip():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "10.10.10.10"
 
     # x-forwarded-for overrides x-real-ip
@@ -550,8 +547,7 @@ def test_get_ip_x_real_ip():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "8.8.8.8"
 
 
@@ -563,8 +559,7 @@ def test_get_ip():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "127.0.0.1"
 
     # x-forwarded-for header overides the ip from client
@@ -575,8 +570,7 @@ def test_get_ip():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "8.8.8.8"
 
     # x-real-for header overides the ip from client
@@ -587,8 +581,7 @@ def test_get_ip():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    ip = middleware._get_ip(scope)
+    ip = _get_ip(scope)
     assert ip == "10.10.10.10"
 
 
@@ -603,8 +596,7 @@ def test_get_headers():
         "client": ("127.0.0.1", 60457),
         "headers": headers,
     }
-    middleware = SentryAsgiMiddleware({})
-    headers = middleware._get_headers(scope)
+    headers = _get_headers(scope)
     assert headers == {
         "x-real-ip": "10.10.10.10",
         "some_header": "123, abc",
