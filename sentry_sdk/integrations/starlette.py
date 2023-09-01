@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    logger,
     parse_version,
     transaction_from_function,
 )
@@ -648,3 +649,6 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         source = SOURCE_FOR_STYLE[transaction_style]
 
     scope.set_transaction_name(name, source=source)
+    logger.debug(
+        "[Starlette] Set transaction name and source on scope: %s / %s", name, source
+    )

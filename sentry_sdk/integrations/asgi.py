@@ -173,16 +173,29 @@ class SentryAsgiMiddleware:
                             _get_headers(scope),
                             op="{}.server".format(ty),
                         )
+                        logger.debug(
+                            "[ASGI] Created transaction (continuing trace): %s",
+                            transaction,
+                        )
                     else:
                         transaction = Transaction(op=OP.HTTP_SERVER)
+                        logger.debug(
+                            "[ASGI] Created transaction (new): %s", transaction
+                        )
 
                     transaction.name = _DEFAULT_TRANSACTION_NAME
                     transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
+                    logger.debug(
+                        "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
+                        transaction.name,
+                        transaction.source,
+                    )
 
                     with hub.start_transaction(
                         transaction, custom_sampling_context={"asgi_scope": scope}
                     ):
+                        logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
 
                             async def _sentry_wrapped_send(event):
@@ -260,7 +273,17 @@ class SentryAsgiMiddleware:
         if not name:
             event["transaction"] = _DEFAULT_TRANSACTION_NAME
             event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
+            logger.debug(
+                "[ASGI] Set default transaction name and source on event: '%s' / '%s'",
+                event["transaction"],
+                event["transaction_info"]["source"],
+            )
             return
 
         event["transaction"] = name
         event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+        logger.debug(
+            "[ASGI] Set transaction name and source on event: '%s' / '%s'",
+            event["transaction"],
+            event["transaction_info"]["source"],
+        )
