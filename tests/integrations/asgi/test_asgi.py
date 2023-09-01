@@ -667,7 +667,6 @@ async def test_transaction_name_in_traces_sampler(
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
-    capture_envelopes,
 ):
     """
     Tests that a custom traces_sampler has a meaningful transaction name.
