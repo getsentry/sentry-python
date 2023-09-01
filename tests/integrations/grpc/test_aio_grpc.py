@@ -8,7 +8,7 @@ import pytest
 import pytest_asyncio
 import sentry_sdk
 
-from sentry_sdk import Hub
+from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
@@ -123,6 +123,33 @@ async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
     assert event["exception"]["values"][0]["value"] == "test"
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert event["exception"]["values"][0]["mechanism"]["type"] == "gRPC"
+
+
+@pytest.mark.asyncio
+async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
+    events = capture_events_forksafe()
+
+    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        with start_transaction():
+            await stub.TestServe(gRPCTestMessage(text="test"))
+
+    events.write_file.close()
+    events.read_event()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+    )
+    assert span["data"] == {
+        "type": "unary unary",
+        "method": "/grpc_test_server.gRPCTestService/TestServe",
+        "code": "OK",
+    }
 
 
 class TestService(gRPCTestServiceServicer):
