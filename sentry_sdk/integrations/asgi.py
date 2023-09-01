@@ -23,6 +23,8 @@ from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_URL,
+    TRANSACTION_SOURCE_COMPONENT,
 )
 from sentry_sdk.utils import (
     ContextVar,
@@ -239,18 +241,23 @@ class SentryAsgiMiddleware:
         request_data.update(_get_request_data(asgi_scope))
         event["request"] = deepcopy(request_data)
 
-        name, source = self._get_transaction_name_and_source(
-            self.transaction_style, asgi_scope
-        )
+        # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
+        already_set = event["transaction_info"]["source"] in [
+            TRANSACTION_SOURCE_COMPONENT,
+            TRANSACTION_SOURCE_ROUTE,
+        ]
+        if not already_set:
+            name, source = self._get_transaction_name_and_source(
+                self.transaction_style, asgi_scope
+            )
+            event["transaction"] = name
+            event["transaction_info"] = {"source": source}
 
-        event["transaction"] = name
-        event["transaction_info"] = {"source": source}
-
-        logger.debug(
-            "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
-            event["transaction"],
-            event["transaction_info"]["source"],
-        )
+            logger.debug(
+                "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
+                event["transaction"],
+                event["transaction_info"]["source"],
+            )
 
         return event
 
@@ -265,6 +272,7 @@ class SentryAsgiMiddleware:
         name = None
         source = SOURCE_FOR_STYLE[transaction_style]
 
+        # import ipdb; ipdb.set_trace()
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
             # Webframeworks like Starlette mutate the ASGI env once routing is
@@ -272,6 +280,9 @@ class SentryAsgiMiddleware:
             # an endpoint, overwrite our generic transaction name.
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
+            else:
+                name = asgi_scope.get("raw_path")
+                source = TRANSACTION_SOURCE_URL
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -281,6 +292,9 @@ class SentryAsgiMiddleware:
                 path = getattr(route, "path", None)
                 if path is not None:
                     name = path
+            else:
+                name = asgi_scope.get("raw_path")
+                source = TRANSACTION_SOURCE_URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME

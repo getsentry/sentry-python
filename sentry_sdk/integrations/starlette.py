@@ -337,12 +337,14 @@ def patch_asgi_app():
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Starlette, StarletteScope, Receive, Send) -> None
-        if Hub.current.get_integration(StarletteIntegration) is None:
+        integration = Hub.current.get_integration(StarletteIntegration)
+        if integration is None:
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
+            transaction_style=integration.transaction_style,
         )
 
         middleware.__call__ = middleware._run_asgi3
@@ -622,7 +624,8 @@ class StarletteRequestExtractor:
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (SentryScope, str, Any) -> None
-    name = ""
+    name = None
+    source = SOURCE_FOR_STYLE[transaction_style]
 
     if transaction_style == "endpoint":
         endpoint = request.scope.get("endpoint")
@@ -635,6 +638,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             match = route.matches(request.scope)
 
             if match[0] == Match.FULL:
+                # import ipdb; ipdb.set_trace()
                 if transaction_style == "endpoint":
                     name = transaction_from_function(match[1]["endpoint"]) or ""
                     break
@@ -642,11 +646,9 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
                     name = route.path
                     break
 
-    if not name:
+    if name is None:
         name = _DEFAULT_TRANSACTION_NAME
         source = TRANSACTION_SOURCE_ROUTE
-    else:
-        source = SOURCE_FOR_STYLE[transaction_style]
 
     scope.set_transaction_name(name, source=source)
     logger.debug(

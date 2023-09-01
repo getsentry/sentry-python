@@ -598,3 +598,106 @@ def test_get_headers():
         "x-real-ip": "10.10.10.10",
         "some_header": "123, abc",
     }
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction_name,expected_transaction_source",
+    [
+        (
+            "endpoint",
+            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
+            "component",
+        ),
+        (
+            "url",
+            "/message/123456",
+            "url",
+        ),
+    ],
+)
+async def test_transaction_name(
+    sentry_init,
+    asgi3_app,
+    transaction_style,
+    expected_transaction_name,
+    expected_transaction_source,
+    capture_envelopes,
+):
+    """
+    Tests that the transaction name is something meaningful.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    envelopes = capture_envelopes()
+
+    app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
+
+    async with TestClient(app) as client:
+        envelopes = capture_envelopes()
+        await client.get("/message/123456")
+
+    (_, transaction_envelope) = envelopes
+    transaction_event = transaction_envelope.get_transaction_event()
+
+    assert transaction_event["transaction"] == expected_transaction_name
+    assert (
+        transaction_event["transaction_info"]["source"] == expected_transaction_source
+    )
+
+
+@minimum_python_36
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction_name,expected_transaction_source",
+    [
+        ("endpoint", b"/message/123456", "url"),
+        ("url", b"/message/123456", "url"),
+    ],
+)
+async def test_transaction_name_in_traces_sampler(
+    sentry_init,
+    asgi3_app,
+    transaction_style,
+    expected_transaction_name,
+    expected_transaction_source,
+):
+    """
+    Tests that a custom traces_sampler has a meaningful transaction name.
+    In this case the URL or endpoint, because we do not have the route yet.
+    """
+
+    def dummy_traces_sampler(sampling_context):
+        assert (
+            sampling_context["transaction_context"]["name"] == expected_transaction_name
+        )
+        assert (
+            sampling_context["transaction_context"]["source"]
+            == expected_transaction_source
+        )
+
+    sentry_init(
+        traces_sampler=dummy_traces_sampler,
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
+
+    async with TestClient(app) as client:
+        await client.get("/message/123456")
+
+
+# @minimum_python_36
+# @pytest.mark.asyncio
+# async def test_transaction_name_in_middleware():
+#     """
+#     Tests that the transaction name in the middleware (like CORSMiddleware) is something meaningful.
+#     In this case the URL or endpoint, because we do not have the route yet.
+#     """
+#     # for transaction_style "endpoint" and "url"
+#     assert False
