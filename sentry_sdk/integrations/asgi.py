@@ -172,7 +172,6 @@ class SentryAsgiMiddleware:
                         sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
-                    print("ty", ty)
                     (
                         transaction_name,
                         transaction_source,
@@ -192,10 +191,6 @@ class SentryAsgiMiddleware:
                             "[ASGI] Created transaction (continuing trace): %s",
                             transaction,
                         )
-                        logger.debug(
-                            "[ASGI] Created transaction (continuing trace): %s",
-                            transaction,
-                        )
                     else:
                         transaction = Transaction(
                             op=OP.HTTP_SERVER,
@@ -207,12 +202,6 @@ class SentryAsgiMiddleware:
                         )
 
                     transaction.set_tag("asgi.type", ty)
-                    logger.debug(
-                        "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
-                        transaction.name,
-                        transaction.source,
-                    )
-
                     logger.debug(
                         "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
                         transaction.name,
