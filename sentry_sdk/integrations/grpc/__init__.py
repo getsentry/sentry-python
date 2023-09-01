@@ -1,11 +1,13 @@
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from grpc import Channel, Server
+from grpc.aio import Channel as AsyncChannel
 
 from sentry_sdk.integrations import Integration
 from .client import ClientInterceptor
 from .server import ServerInterceptor
 from .aio.server import ServerInterceptor as AsyncServerInterceptor
+from .aio.client import AsyncClientInterceptor
 
 
 def patch_grpc_channels() -> None:
@@ -29,6 +31,38 @@ def patch_grpc_channels() -> None:
         return grpc.intercept_channel(channel, ClientInterceptor())
 
     grpc.secure_channel = sentry_patched_secure_channel
+
+    old_aio_insecure_channel = grpc.aio.insecure_channel
+
+    def sentry_patched_insecure_aio_channel(
+        *args,
+        interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
+        **kwargs
+    ) -> AsyncChannel:
+        interceptor = AsyncClientInterceptor()
+        if interceptors is None:
+            interceptors = [interceptor]
+        else:
+            interceptors.append(interceptor)
+        return old_aio_insecure_channel(*args, interceptors=interceptors, **kwargs)
+
+    grpc.aio.insecure_channel = sentry_patched_insecure_aio_channel
+
+    old_aio_secure_channel = grpc.aio.secure_channel
+
+    def sentry_patched_secure_channel(
+        *args,
+        interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
+        **kwargs
+    ) -> AsyncChannel:
+        interceptor = AsyncClientInterceptor()
+        if interceptors is None:
+            interceptors = [interceptor]
+        else:
+            interceptors.append(interceptor)
+        return old_aio_secure_channel(*args, interceptors=interceptors, **kwargs)
+
+    grpc.aio.secure_channel = sentry_patched_secure_channel
 
 
 def patch_grpc_server() -> None:
