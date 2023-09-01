@@ -37,10 +37,11 @@ from sentry_sdk.utils import (
 from sentry_sdk.tracing import Transaction
 
 if TYPE_CHECKING:
-    from typing import Dict
     from typing import Any
-    from typing import Optional
     from typing import Callable
+    from typing import Dict
+    from typing import Optional
+    from typing import Tuple
 
     from sentry_sdk._types import Event, Hint
 
@@ -271,7 +272,7 @@ class SentryAsgiMiddleware:
     # for that.
 
     def _get_transaction_name_and_source(self, transaction_style, asgi_scope):
-        # type: (Event, str, Any) -> None
+        # type: (SentryAsgiMiddleware, str, Any) -> Tuple[str, str]
         name = None
         source = SOURCE_FOR_STYLE[transaction_style]
 
