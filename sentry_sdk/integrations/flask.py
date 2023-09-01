@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from importlib.metadata import version
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -28,7 +29,6 @@ except ImportError:
 
 try:
     from flask import Flask, Request  # type: ignore
-    from flask import __version__ as FLASK_VERSION
     from flask import request as flask_request
     from flask.signals import (
         before_render_template,
@@ -44,6 +44,7 @@ try:
 except ImportError:
     raise DidNotEnable("blinker is not installed")
 
+FLASK_VERSION = version("flask")
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
