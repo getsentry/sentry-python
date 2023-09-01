@@ -290,7 +290,6 @@ class SentryAsgiMiddleware:
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
             else:
-                name = asgi_scope.get("raw_path", asgi_scope.get("path"))
                 name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
                 source = TRANSACTION_SOURCE_URL
 
