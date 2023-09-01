@@ -954,11 +954,11 @@ def test_template_tracing_meta(sentry_init, capture_events):
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        # (
-        #     "endpoint",
-        #     "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
-        #     "component",
-        # ),
+        (
+            "endpoint",
+            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
+            "component",
+        ),
         (
             "url",
             "/message/{message_id}",
