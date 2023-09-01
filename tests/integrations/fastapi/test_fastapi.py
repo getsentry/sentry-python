@@ -378,8 +378,8 @@ def test_transaction_name(
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        ("endpoint", b"/message/123456", "url"),
-        ("url", b"/message/123456", "url"),
+        ("endpoint", "http://testserver/message/123456", "url"),
+        ("url", "http://testserver/message/123456", "url"),
     ],
 )
 def test_transaction_name_in_traces_sampler(

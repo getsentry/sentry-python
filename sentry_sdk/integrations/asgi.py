@@ -17,6 +17,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_request_data,
+    _get_url,
 )
 from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
@@ -171,31 +172,37 @@ class SentryAsgiMiddleware:
                         sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
+                    print("ty", ty)
+                    (
+                        transaction_name,
+                        transaction_source,
+                    ) = self._get_transaction_name_and_source(
+                        self.transaction_style,
+                        scope,
+                    )
 
                     if ty in ("http", "websocket"):
                         transaction = continue_trace(
                             _get_headers(scope),
                             op="{}.server".format(ty),
+                            name=transaction_name,
+                            source=transaction_source,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (continuing trace): %s",
                             transaction,
                         )
                     else:
-                        transaction = Transaction(op=OP.HTTP_SERVER)
+                        transaction = Transaction(
+                            op=OP.HTTP_SERVER,
+                            name=transaction_name,
+                            source=transaction_source,
+                        )
                         logger.debug(
                             "[ASGI] Created transaction (new): %s", transaction
                         )
 
                     transaction.set_tag("asgi.type", ty)
-
-                    (
-                        transaction.name,
-                        transaction.source,
-                    ) = self._get_transaction_name_and_source(
-                        self.transaction_style,
-                        scope,
-                    )
 
                     logger.debug(
                         "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
@@ -275,6 +282,7 @@ class SentryAsgiMiddleware:
         # type: (SentryAsgiMiddleware, str, Any) -> Tuple[str, str]
         name = None
         source = SOURCE_FOR_STYLE[transaction_style]
+        ty = asgi_scope.get("type")
 
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
@@ -285,6 +293,7 @@ class SentryAsgiMiddleware:
                 name = transaction_from_function(endpoint) or ""
             else:
                 name = asgi_scope.get("raw_path", asgi_scope.get("path"))
+                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
                 source = TRANSACTION_SOURCE_URL
 
         elif transaction_style == "url":
@@ -296,7 +305,7 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
             else:
-                name = asgi_scope.get("raw_path", asgi_scope.get("path"))
+                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
                 source = TRANSACTION_SOURCE_URL
 
         if name is None:
