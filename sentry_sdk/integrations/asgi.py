@@ -183,9 +183,16 @@ class SentryAsgiMiddleware:
                             "[ASGI] Created transaction (new): %s", transaction
                         )
 
-                    transaction.name = _DEFAULT_TRANSACTION_NAME
-                    transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
+
+                    (
+                        transaction.name,
+                        transaction.source,
+                    ) = self._get_transaction_name_and_source(
+                        self.transaction_style,
+                        scope,
+                    )
+
                     logger.debug(
                         "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
                         transaction.name,
@@ -232,7 +239,18 @@ class SentryAsgiMiddleware:
         request_data.update(_get_request_data(asgi_scope))
         event["request"] = deepcopy(request_data)
 
-        self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
+        name, source = self._get_transaction_name_and_source(
+            self.transaction_style, asgi_scope
+        )
+
+        event["transaction"] = name
+        event["transaction_info"] = {"source": source}
+
+        logger.debug(
+            "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
+            event["transaction"],
+            event["transaction_info"]["source"],
+        )
 
         return event
 
@@ -242,16 +260,10 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
+    def _get_transaction_name_and_source(self, transaction_style, asgi_scope):
         # type: (Event, str, Any) -> None
-        transaction_name_already_set = (
-            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
-            != _DEFAULT_TRANSACTION_NAME
-        )
-        if transaction_name_already_set:
-            return
-
-        name = ""
+        name = None
+        source = SOURCE_FOR_STYLE[transaction_style]
 
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
@@ -270,20 +282,9 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
 
-        if not name:
-            event["transaction"] = _DEFAULT_TRANSACTION_NAME
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
-            logger.debug(
-                "[ASGI] Set default transaction name and source on event: '%s' / '%s'",
-                event["transaction"],
-                event["transaction_info"]["source"],
-            )
-            return
+        if name is None:
+            name = _DEFAULT_TRANSACTION_NAME
+            source = TRANSACTION_SOURCE_ROUTE
+            return name, source
 
-        event["transaction"] = name
-        event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-        logger.debug(
-            "[ASGI] Set transaction name and source on event: '%s' / '%s'",
-            event["transaction"],
-            event["transaction_info"]["source"],
-        )
+        return name, source
