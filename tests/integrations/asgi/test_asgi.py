@@ -157,13 +157,13 @@ async def test_capture_transaction(
 
     async with TestClient(app) as client:
         events = capture_events()
-        await client.get("/?somevalue=123")
+        await client.get("/some_url?somevalue=123")
 
-    (transaction_event, lifespan_transaction_event) = events
+    (transaction_event,) = events
 
     assert transaction_event["type"] == "transaction"
-    assert transaction_event["transaction"] == "generic ASGI request"
-    assert transaction_event["transaction_info"] == {"source": "route"}
+    assert transaction_event["transaction"] == "/some_url"
+    assert transaction_event["transaction_info"] == {"source": "url"}
     assert transaction_event["contexts"]["trace"]["op"] == "http.server"
     assert transaction_event["request"] == {
         "headers": {
@@ -173,7 +173,7 @@ async def test_capture_transaction(
         },
         "method": "GET",
         "query_string": "somevalue=123",
-        "url": "http://localhost/",
+        "url": "http://localhost/some_url",
     }
 
 
@@ -191,12 +191,15 @@ async def test_capture_transaction_with_error(
     events = capture_events()
     with pytest.raises(ZeroDivisionError):
         async with TestClient(app) as client:
-            await client.get("/")
+            await client.get("/some_url")
 
-    (error_event, transaction_event, lifespan_transaction_event) = events
+    (
+        error_event,
+        transaction_event,
+    ) = events
 
-    assert error_event["transaction"] == "generic ASGI request"
-    assert error_event["transaction_info"] == {"source": "route"}
+    assert error_event["transaction"] == "/some_url"
+    assert error_event["transaction_info"] == {"source": "url"}
     assert error_event["contexts"]["trace"]["op"] == "http.server"
     assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
     assert error_event["exception"]["values"][0]["value"] == "division by zero"
@@ -393,13 +396,13 @@ async def test_auto_session_tracking_with_aggregates(
     for envelope in envelopes:
         count_item_types[envelope.items[0].type] += 1
 
-    assert count_item_types["transaction"] == 4
+    assert count_item_types["transaction"] == 3
     assert count_item_types["event"] == 1
     assert count_item_types["sessions"] == 1
-    assert len(envelopes) == 6
+    assert len(envelopes) == 5
 
     session_aggregates = envelopes[-1].items[0].payload.json["aggregates"]
-    assert session_aggregates[0]["exited"] == 3
+    assert session_aggregates[0]["exited"] == 2
     assert session_aggregates[0]["crashed"] == 1
     assert len(session_aggregates) == 1
 
@@ -445,7 +448,7 @@ async def test_transaction_style(
         events = capture_events()
         await client.get(url)
 
-    (transaction_event, lifespan_transaction_event) = events
+    (transaction_event,) = events
 
     assert transaction_event["transaction"] == expected_transaction
     assert transaction_event["transaction_info"] == {"source": expected_source}
@@ -607,8 +610,8 @@ def test_get_headers():
     [
         (
             "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
-            "component",
+            "/message/123456",
+            "url",
         ),
         (
             "url",
@@ -638,10 +641,9 @@ async def test_transaction_name(
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     async with TestClient(app) as client:
-        envelopes = capture_envelopes()
         await client.get("/message/123456")
 
-    (_, transaction_envelope) = envelopes
+    (transaction_envelope,) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
 
     assert transaction_event["transaction"] == expected_transaction_name
@@ -655,8 +657,8 @@ async def test_transaction_name(
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        ("endpoint", b"/message/123456", "url"),
-        ("url", b"/message/123456", "url"),
+        ("endpoint", "/message/123456", "url"),
+        ("url", "/message/123456", "url"),
     ],
 )
 async def test_transaction_name_in_traces_sampler(
@@ -665,6 +667,7 @@ async def test_transaction_name_in_traces_sampler(
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
+    capture_envelopes,
 ):
     """
     Tests that a custom traces_sampler has a meaningful transaction name.

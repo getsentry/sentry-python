@@ -146,7 +146,8 @@ class SentryAsgiMiddleware:
     async def _run_app(self, scope, receive, send, asgi_version):
         # type: (Any, Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
-        if is_recursive_asgi_middleware:
+        is_lifespan = scope["type"] == "lifespan"
+        if is_recursive_asgi_middleware or is_lifespan:
             try:
                 if asgi_version == 2:
                     return await self.app(scope)(receive, send)
@@ -242,7 +243,9 @@ class SentryAsgiMiddleware:
         event["request"] = deepcopy(request_data)
 
         # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
-        already_set = event["transaction_info"]["source"] in [
+        already_set = event["transaction"] != _DEFAULT_TRANSACTION_NAME and event[
+            "transaction_info"
+        ].get("source") in [
             TRANSACTION_SOURCE_COMPONENT,
             TRANSACTION_SOURCE_ROUTE,
         ]
@@ -272,7 +275,6 @@ class SentryAsgiMiddleware:
         name = None
         source = SOURCE_FOR_STYLE[transaction_style]
 
-        # import ipdb; ipdb.set_trace()
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
             # Webframeworks like Starlette mutate the ASGI env once routing is
@@ -281,7 +283,7 @@ class SentryAsgiMiddleware:
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
             else:
-                name = asgi_scope.get("raw_path")
+                name = asgi_scope.get("raw_path", asgi_scope.get("path"))
                 source = TRANSACTION_SOURCE_URL
 
         elif transaction_style == "url":
@@ -293,7 +295,7 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
             else:
-                name = asgi_scope.get("raw_path")
+                name = asgi_scope.get("raw_path", asgi_scope.get("path"))
                 source = TRANSACTION_SOURCE_URL
 
         if name is None:

@@ -638,7 +638,6 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             match = route.matches(request.scope)
 
             if match[0] == Match.FULL:
-                # import ipdb; ipdb.set_trace()
                 if transaction_style == "endpoint":
                     name = transaction_from_function(match[1]["endpoint"]) or ""
                     break

@@ -992,7 +992,6 @@ def test_transaction_name(
     (_, transaction_envelope) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
 
-    # import ipdb; ipdb.set_trace()
     assert transaction_event["transaction"] == expected_transaction_name
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source

@@ -329,7 +329,7 @@ def test_response_status_code_not_found_in_transaction_context(
     [
         (
             "endpoint",
-            "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
+            "tests.integrations.fastapi.test_fastapi.fastapi_app_factory.<locals>._message_with_id",
             "component",
         ),
         (
