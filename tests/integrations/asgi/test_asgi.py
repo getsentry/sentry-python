@@ -159,7 +159,7 @@ async def test_capture_transaction(
         events = capture_events()
         await client.get("/some_url?somevalue=123")
 
-    (transaction_event,) = events
+    (transaction_event, lifespan_transaction_event) = events
 
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "/some_url"
@@ -448,7 +448,7 @@ async def test_transaction_style(
         events = capture_events()
         await client.get(url)
 
-    (transaction_event,) = events
+    (transaction_event, lifespan_transaction_event) = events
 
     assert transaction_event["transaction"] == expected_transaction
     assert transaction_event["transaction_info"] == {"source": expected_source}
