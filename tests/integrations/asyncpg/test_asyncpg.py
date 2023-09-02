@@ -9,6 +9,7 @@ docker run --rm --name some-postgres -e POSTGRES_USER=foo -e POSTGRES_PASSWORD=b
 The tests use the following credentials to establish a database connection.
 """
 import os
+import re
 
 PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "foo")
@@ -195,7 +196,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
             ("Alice", "pw", datetime.date(1990, 12, 25)),
         ],
     )
-
+    #
     async with conn.transaction():
         # Postgres requires non-scrollable cursors to be created
         # and used in a transaction.
@@ -212,17 +213,116 @@ async def test_cursor(sentry_init, capture_events) -> None:
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
+        if "db.cursor" in crumb["data"]:
+            # asyncpg cursor's __repr__ adds the memory address - replace for testing purposes
+            crumb["data"]["db.cursor"] = re.sub(
+                r"0x.+>$", "0xdeadbeef1234>", crumb["data"]["db.cursor"]
+            )
 
     assert event["breadcrumbs"]["values"] == [
         {
             "category": "query",
-            "data": {},
+            "data": {"db.executemany": True},
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
         {
             "category": "query",
-            "data": {},
+            "data": {
+                "db.cursor": '<asyncpg.CursorIterator "SELECT * FROM users WHERE dob " '
+                "exhausted 0xdeadbeef1234>"
+            },
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {
+                "db.cursor": '<asyncpg.CursorIterator "SELECT * FROM users WHERE dob " '
+                "exhausted 0xdeadbeef1234>"
+            },
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {
+                "db.cursor": '<asyncpg.CursorIterator "SELECT * FROM users WHERE dob " '
+                "exhausted 0xdeadbeef1234>",
+                "db.cursor.exhausted": True,
+            },
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_cursor_manual(sentry_init, capture_events) -> None:
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        _experiments={"record_sql_params": True},
+    )
+    events = capture_events()
+
+    conn: Connection = await connect(PG_CONNECTION_URI)
+
+    await conn.executemany(
+        "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+        [
+            ("Bob", "secret_pw", datetime.date(1984, 3, 1)),
+            ("Alice", "pw", datetime.date(1990, 12, 25)),
+        ],
+    )
+    #
+    async with conn.transaction():
+        # Postgres requires non-scrollable cursors to be created
+        # and used in a transaction.
+        cur = await conn.cursor(
+            "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
+        )
+        record = await cur.fetchrow()
+        print(record)
+        while await cur.forward(1):
+            record = await cur.fetchrow()
+            print(record)
+
+    await conn.close()
+
+    capture_message("hi")
+
+    (event,) = events
+
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+        if "db.cursor" in crumb["data"]:
+            # asyncpg cursor's __repr__ adds the memory address - replace for testing purposes
+            crumb["data"]["db.cursor"] = re.sub(
+                r"0x.+>$", "0xdeadbeef1234>", crumb["data"]["db.cursor"]
+            )
+
+    assert event["breadcrumbs"]["values"] == [
+        {
+            "category": "query",
+            "data": {"db.executemany": True},
+            "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {
+                "db.cursor": '<asyncpg.Cursor "SELECT * FROM users WHERE dob " '
+                "exhausted 0xdeadbeef1234>"
+            },
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {
+                "db.cursor": '<asyncpg.Cursor "SELECT * FROM users WHERE dob " '
+                "exhausted 0xdeadbeef1234>"
+            },
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
