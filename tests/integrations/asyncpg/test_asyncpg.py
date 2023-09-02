@@ -132,7 +132,7 @@ async def test_execute_many(sentry_init, capture_events) -> None:
     assert event["breadcrumbs"]["values"] == [
         {
             "category": "query",
-            "data": {},
+            "data": {"db.executemany": True},
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         }
@@ -264,7 +264,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
     assert event["breadcrumbs"]["values"] == [
         {
             "category": "query",
-            "data": {},
+            "data": {"db.executemany": True},
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },

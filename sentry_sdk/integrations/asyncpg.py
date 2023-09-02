@@ -30,7 +30,7 @@ class AsyncPGIntegration(Integration):
             asyncpg.Connection._execute
         )
         asyncpg.Connection._executemany = _wrap_connection_method(
-            asyncpg.Connection._executemany
+            asyncpg.Connection._executemany, executemany=True
         )
         asyncpg.Connection.cursor = _wrap_connection_method(asyncpg.Connection.cursor)
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
@@ -40,8 +40,8 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def _wrap_connection_method(f: Callable[P, T]) -> Callable[P, T]:
     def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable[P, T]:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -54,7 +54,7 @@ def _wrap_connection_method(f: Callable[P, T]) -> Callable[P, T]:
         params_list = args[2] if record_params else None
         param_style = "pyformat" if params_list else None
         with record_sql_queries(
-            hub, None, query, params_list, param_style, executemany=False
+            hub, None, query, params_list, param_style, executemany=executemany
         ):
             res = f(*args, **kwargs)
         return res
