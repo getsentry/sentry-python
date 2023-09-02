@@ -40,13 +40,13 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-    def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
 def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable[P, T]:
+    async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
         if integration is None:
-            return f(*args, **kwargs)
+            return await f(*args, **kwargs)
 
         record_params = integration._record_params
 
@@ -56,7 +56,7 @@ def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable
         with record_sql_queries(
             hub, None, query, params_list, param_style, executemany=executemany
         ):
-            res = f(*args, **kwargs)
+            res = await f(*args, **kwargs)
         return res
 
     return _inner
