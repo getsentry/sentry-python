@@ -8,8 +8,13 @@ docker run --rm --name some-postgres -e POSTGRES_USER=foo -e POSTGRES_PASSWORD=b
 
 The tests use the following credentials to establish a database connection.
 """
-PG_USER = "foo"
-PG_PASSWORD = "bar"
+import os
+
+PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
+PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "foo")
+PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "bar")
+PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
+PG_PORT = 5432
 
 
 import datetime
@@ -22,7 +27,8 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from tests.integrations.asgi import pytest_asyncio
 
-PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@localhost/"
+
+PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -50,7 +56,7 @@ async def test_execute(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    conn: Connection = await connect("postgresql://foo:bar@localhost/")
+    conn: Connection = await connect(PG_CONNECTION_URI)
 
     await conn.execute(
         "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -104,7 +110,7 @@ async def test_execute_many(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    conn: Connection = await connect("postgresql://foo:bar@localhost/")
+    conn: Connection = await connect(PG_CONNECTION_URI)
 
     await conn.executemany(
         "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -141,7 +147,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    conn: Connection = await connect("postgresql://foo:bar@localhost/")
+    conn: Connection = await connect(PG_CONNECTION_URI)
 
     await conn.execute(
         "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -180,7 +186,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    conn: Connection = await connect("postgresql://foo:bar@localhost/")
+    conn: Connection = await connect(PG_CONNECTION_URI)
 
     await conn.executemany(
         "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -231,7 +237,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    conn: Connection = await connect("postgresql://foo:bar@localhost/")
+    conn: Connection = await connect(PG_CONNECTION_URI)
 
     await conn.executemany(
         "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
@@ -279,7 +285,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    pool = await asyncpg.create_pool("postgresql://foo:bar@localhost/")
+    pool = await asyncpg.create_pool(PG_CONNECTION_URI)
 
     async with pool.acquire() as conn:
         await conn.execute(
