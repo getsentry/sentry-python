@@ -28,6 +28,10 @@ class AsyncPGIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        asyncpg.Connection.execute = _wrap_execute(
+            asyncpg.Connection.execute,
+        )
+
         asyncpg.Connection._execute = _wrap_connection_method(
             asyncpg.Connection._execute
         )
@@ -45,6 +49,26 @@ class AsyncPGIntegration(Integration):
 
 P = ParamSpec("P")
 T = TypeVar("T")
+
+
+def _wrap_execute(f: Callable[P, T]) -> Callable[P, T]:
+    async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+        hub = Hub.current
+        integration = hub.get_integration(AsyncPGIntegration)
+
+        # Avoid recording calls to _execute twice.
+        # Calls to Connection.execute with args also call
+        # Connection._execute, which is recorded separately
+        # args[0] = the connection object, args[1] is the query
+        if integration is None or len(args) > 2:
+            return await f(*args, **kwargs)
+
+        query = args[1]
+        with record_sql_queries(hub, None, query, None, None, executemany=False):
+            res = await f(*args, **kwargs)
+        return res
+
+    return _inner
 
 
 def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable[P, T]:

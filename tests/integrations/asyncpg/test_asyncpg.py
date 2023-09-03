@@ -50,6 +50,28 @@ async def _clean_pg():
 
 
 @pytest.mark.asyncio
+async def test_connect(sentry_init, capture_events) -> None:
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        _experiments={"record_sql_params": True},
+    )
+    events = capture_events()
+
+    conn: Connection = await connect(PG_CONNECTION_URI)
+
+    await conn.close()
+
+    capture_message("hi")
+
+    (event,) = events
+
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"] != []
+
+
+@pytest.mark.asyncio
 async def test_execute(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
@@ -60,6 +82,10 @@ async def test_execute(sentry_init, capture_events) -> None:
     conn: Connection = await connect(PG_CONNECTION_URI)
 
     await conn.execute(
+        "INSERT INTO users(name, password, dob) VALUES ('Alice', 'pw', '1990-12-25')",
+    )
+
+    await conn.execute(
         "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
         "Bob",
         "secret_pw",
@@ -67,10 +93,10 @@ async def test_execute(sentry_init, capture_events) -> None:
     )
 
     row = await conn.fetchrow("SELECT * FROM users WHERE name = $1", "Bob")
-    assert row == (1, "Bob", "secret_pw", datetime.date(1984, 3, 1))
+    assert row == (2, "Bob", "secret_pw", datetime.date(1984, 3, 1))
 
     row = await conn.fetchrow("SELECT * FROM users WHERE name = 'Bob'")
-    assert row == (1, "Bob", "secret_pw", datetime.date(1984, 3, 1))
+    assert row == (2, "Bob", "secret_pw", datetime.date(1984, 3, 1))
 
     await conn.close()
 
@@ -82,6 +108,12 @@ async def test_execute(sentry_init, capture_events) -> None:
         del crumb["timestamp"]
 
     assert event["breadcrumbs"]["values"] == [
+        {
+            "category": "query",
+            "data": {},
+            "message": "INSERT INTO users(name, password, dob) VALUES ('Alice', 'pw', '1990-12-25')",
+            "type": "default",
+        },
         {
             "category": "query",
             "data": {},
@@ -226,6 +258,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
+        {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
         {
             "category": "query",
             "data": {
@@ -254,6 +287,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
+        {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
     ]
 
 
@@ -308,6 +342,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
         },
+        {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
         {
             "category": "query",
             "data": {
@@ -326,6 +361,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
+        {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
     ]
 
 
@@ -418,7 +454,25 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         {
             "category": "query",
             "data": {},
+            "message": "SELECT pg_advisory_unlock_all();\n"
+            "CLOSE ALL;\n"
+            "UNLISTEN *;\n"
+            "RESET ALL;",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {},
             "message": "SELECT * FROM users WHERE name = $1",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {},
+            "message": "SELECT pg_advisory_unlock_all();\n"
+            "CLOSE ALL;\n"
+            "UNLISTEN *;\n"
+            "RESET ALL;",
             "type": "default",
         },
     ]
