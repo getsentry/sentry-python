@@ -3,9 +3,10 @@ from typing import ParamSpec, TypeVar, Callable
 from asyncpg.cursor import BaseCursor, CursorIterator
 
 from sentry_sdk import Hub
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import parse_version, capture_internal_exceptions
 
 try:
     import asyncpg  # type: ignore[import]
@@ -45,6 +46,9 @@ class AsyncPGIntegration(Integration):
             asyncpg.connection.cursor.CursorIterator.__anext__
         )
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
+        asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
+            asyncpg.connect_utils._connect_addr
+        )
 
 
 P = ParamSpec("P")
@@ -146,9 +150,37 @@ def _wrap_cursoriterator_anext(f: Callable[P, T]) -> Callable[P, T]:
             try:
                 res = await f(self)
             except StopAsyncIteration:
+
                 span.set_data("db.cursor.exhausted", True)
                 raise StopAsyncIteration
 
         return res
 
     return __await__
+
+
+def _wrap_connect_addr(f: Callable[P, T]) -> Callable[P, T]:
+    async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+        hub = Hub.current
+        integration = hub.get_integration(AsyncPGIntegration)
+
+        if integration is None:
+            return await f(*args, **kwargs)
+
+        user = kwargs["params"].user
+        database = kwargs["params"].database
+        connect_timeout = kwargs["params"].connect_timeout
+
+        with hub.start_span(op=OP.DB, description="connect") as span:
+            span.set_data("connection.host", kwargs["addr"])
+            span.set_data("connection.user", user)
+            span.set_data("connection.database", database)
+            span.set_data("connection.connect_timeout", connect_timeout)
+            span.set_data("connection.config", repr(kwargs["config"]))
+            with capture_internal_exceptions():
+                hub.add_breadcrumb(message="connect", category="query", data=span._data)
+            res = await f(*args, **kwargs)
+
+        return res
+
+    return _inner

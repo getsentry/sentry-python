@@ -11,6 +11,7 @@ The tests use the following credentials to establish a database connection.
 import os
 import re
 
+
 PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "foo")
 PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "bar")
@@ -30,6 +31,21 @@ from tests.integrations.asgi import pytest_asyncio
 
 
 PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
+CRUMBS_CONNECT = {
+    "category": "query",
+    "data": {
+        "connection.config": "ConnectionConfiguration(command_timeout=None, "
+        "statement_cache_size=100, "
+        "max_cached_statement_lifetime=300, "
+        "max_cacheable_statement_size=15360)",
+        "connection.connect_timeout": 60,
+        "connection.database": PG_NAME,
+        "connection.host": [PG_HOST, PG_PORT],
+        "connection.user": PG_USER,
+    },
+    "message": "connect",
+    "type": "default",
+}
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -68,7 +84,7 @@ async def test_connect(sentry_init, capture_events) -> None:
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    assert event["breadcrumbs"]["values"] != []
+    assert event["breadcrumbs"]["values"] == [CRUMBS_CONNECT]
 
 
 @pytest.mark.asyncio
@@ -108,6 +124,7 @@ async def test_execute(sentry_init, capture_events) -> None:
         del crumb["timestamp"]
 
     assert event["breadcrumbs"]["values"] == [
+        CRUMBS_CONNECT,
         {
             "category": "query",
             "data": {},
@@ -163,12 +180,13 @@ async def test_execute_many(sentry_init, capture_events) -> None:
         del crumb["timestamp"]
 
     assert event["breadcrumbs"]["values"] == [
+        CRUMBS_CONNECT,
         {
             "category": "query",
             "data": {"db.executemany": True},
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
-        }
+        },
     ]
 
 
@@ -199,6 +217,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
         del crumb["timestamp"]
 
     assert event["breadcrumbs"]["values"] == [
+        CRUMBS_CONNECT,
         {
             "category": "query",
             "data": {
@@ -207,7 +226,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
             },
             "message": "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
             "type": "default",
-        }
+        },
     ]
 
 
@@ -228,7 +247,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
             ("Alice", "pw", datetime.date(1990, 12, 25)),
         ],
     )
-    #
+
     async with conn.transaction():
         # Postgres requires non-scrollable cursors to be created
         # and used in a transaction.
@@ -252,6 +271,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
             )
 
     assert event["breadcrumbs"]["values"] == [
+        CRUMBS_CONNECT,
         {
             "category": "query",
             "data": {"db.executemany": True},
@@ -336,6 +356,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             )
 
     assert event["breadcrumbs"]["values"] == [
+        CRUMBS_CONNECT,
         {
             "category": "query",
             "data": {"db.executemany": True},
@@ -398,6 +419,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
         del crumb["timestamp"]
 
     assert event["breadcrumbs"]["values"] == [
+        CRUMBS_CONNECT,
         {
             "category": "query",
             "data": {"db.executemany": True},
@@ -421,7 +443,11 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     )
     events = capture_events()
 
-    pool = await asyncpg.create_pool(PG_CONNECTION_URI)
+    pool_size = 2
+
+    pool = await asyncpg.create_pool(
+        PG_CONNECTION_URI, min_size=pool_size, max_size=pool_size
+    )
 
     async with pool.acquire() as conn:
         await conn.execute(
@@ -445,6 +471,8 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
         del crumb["timestamp"]
 
     assert event["breadcrumbs"]["values"] == [
+        # The connection pool opens pool_size connections so we have the crumbs pool_size times
+        *[CRUMBS_CONNECT] * pool_size,
         {
             "category": "query",
             "data": {},
