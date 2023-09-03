@@ -1,5 +1,5 @@
 import contextlib
-from typing import ParamSpec, TypeVar, Callable
+from typing import ParamSpec, TypeVar, Callable, Awaitable
 
 from asyncpg.cursor import BaseCursor, CursorIterator
 
@@ -56,7 +56,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def _wrap_execute(f: Callable[P, T]) -> Callable[P, T]:
+def _wrap_execute(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
@@ -106,7 +106,9 @@ def _record(
         yield span
 
 
-def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable[P, T]:
+def _wrap_connection_method(
+    f: Callable[P, Awaitable[T]], *, executemany=False
+) -> Callable[P, Awaitable[T]]:
     async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
@@ -123,8 +125,8 @@ def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable
     return _inner
 
 
-def _wrap_basecursor_exec(f: Callable[P, T]) -> Callable[P, T]:
-    async def _exec(self: BaseCursor, n, timeout):
+def _wrap_basecursor_exec(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+    async def _exec(self: BaseCursor, n, timeout) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -148,8 +150,10 @@ def _wrap_basecursor_exec(f: Callable[P, T]) -> Callable[P, T]:
     return _exec
 
 
-def _wrap_cursoriterator_anext(f: Callable[P, T]) -> Callable[P, T]:
-    async def __await__(self: CursorIterator):
+def _wrap_cursoriterator_anext(
+    f: Callable[P, Awaitable[T]]
+) -> Callable[P, Awaitable[T]]:
+    async def __await__(self: CursorIterator) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -177,7 +181,7 @@ def _wrap_cursoriterator_anext(f: Callable[P, T]) -> Callable[P, T]:
     return __await__
 
 
-def _wrap_connect_addr(f: Callable[P, T]) -> Callable[P, T]:
+def _wrap_connect_addr(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
