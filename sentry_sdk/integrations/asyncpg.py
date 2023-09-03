@@ -1,3 +1,4 @@
+import contextlib
 from typing import ParamSpec, TypeVar, Callable
 
 from asyncpg.cursor import BaseCursor, CursorIterator
@@ -75,6 +76,36 @@ def _wrap_execute(f: Callable[P, T]) -> Callable[P, T]:
     return _inner
 
 
+SubCursor = TypeVar("SubCursor", bound=BaseCursor)
+
+
+@contextlib.contextmanager
+def _record(
+    hub: Hub,
+    cursor: SubCursor | None,
+    query: str,
+    params_list: tuple | None,
+    *,
+    executemany: bool = False
+):
+    integration = hub.get_integration(AsyncPGIntegration)
+    if not integration._record_params:
+        params_list = None
+
+    param_style = "pyformat" if params_list else None
+
+    with record_sql_queries(
+        hub,
+        cursor,
+        query,
+        params_list,
+        param_style,
+        executemany=executemany,
+        record_cursor_repr=cursor is not None,
+    ) as span:
+        yield span
+
+
 def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable[P, T]:
     async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
         hub = Hub.current
@@ -83,14 +114,9 @@ def _wrap_connection_method(f: Callable[P, T], *, executemany=False) -> Callable
         if integration is None:
             return await f(*args, **kwargs)
 
-        record_params = integration._record_params
-
         query = args[1]
-        params_list = args[2] if record_params else None
-        param_style = "pyformat" if params_list else None
-        with record_sql_queries(
-            hub, None, query, params_list, param_style, executemany=executemany
-        ):
+        params_list = args[2] if len(args) > 2 else None
+        with _record(hub, None, query, params_list, executemany=executemany):
             res = await f(*args, **kwargs)
         return res
 
@@ -105,20 +131,16 @@ def _wrap_basecursor_exec(f: Callable[P, T]) -> Callable[P, T]:
         if integration is None:
             return await f(self, n, timeout)
 
-        record_params = integration._record_params
-        params_list = self._args[1] if record_params else None
-        param_style = "pyformat" if params_list else None
+        params_list = self._args[1] if len(self._args) > 1 else None
 
         executemany = n > 1
 
-        with record_sql_queries(
+        with _record(
             hub,
             self,
             self._query,
             params_list,
-            param_style,
             executemany=executemany,
-            record_cursor_repr=True,
         ):
             res = await f(self, n, timeout)
         return res
@@ -134,18 +156,14 @@ def _wrap_cursoriterator_anext(f: Callable[P, T]) -> Callable[P, T]:
         if integration is None:
             return await f(self)
 
-        record_params = integration._record_params
-        params_list = self._args[1] if record_params else None
-        param_style = "pyformat" if params_list else None
+        params_list = self._args[0]
 
-        with record_sql_queries(
+        with _record(
             hub,
             self,
             self._query,
             params_list,
-            param_style,
             executemany=False,
-            record_cursor_repr=True,
         ) as span:
             try:
                 res = await f(self)
