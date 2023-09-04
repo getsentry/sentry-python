@@ -14,7 +14,11 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+)
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -105,6 +109,14 @@ def _enable_span_for_middleware(middleware_class):
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
             middleware_name = app.__class__.__name__
+
+            with hub.configure_scope() as sentry_scope:
+                if integration.transaction_style == "endpoint":
+                    name = transaction_from_function(app.__class__)
+                    if name is not None:
+                        sentry_scope.set_transaction_name(
+                            name, source=TRANSACTION_SOURCE_COMPONENT
+                        )
 
             with hub.start_span(
                 op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
@@ -630,20 +642,21 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
     if transaction_style == "endpoint":
         endpoint = request.scope.get("endpoint")
         if endpoint:
-            name = transaction_from_function(endpoint) or ""
+            name = transaction_from_function(endpoint) or None
 
     elif transaction_style == "url":
-        router = request.scope["router"]
-        for route in router.routes:
-            match = route.matches(request.scope)
+        router = request.scope.get("router")
+        if router:
+            for route in router.routes:
+                match = route.matches(request.scope)
 
-            if match[0] == Match.FULL:
-                if transaction_style == "endpoint":
-                    name = transaction_from_function(match[1]["endpoint"]) or ""
-                    break
-                elif transaction_style == "url":
-                    name = route.path
-                    break
+                if match[0] == Match.FULL:
+                    if transaction_style == "endpoint":
+                        name = transaction_from_function(match[1]["endpoint"]) or None
+                        break
+                    elif transaction_style == "url":
+                        name = route.path
+                        break
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME

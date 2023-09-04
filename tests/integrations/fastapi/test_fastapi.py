@@ -420,7 +420,11 @@ def test_transaction_name_in_traces_sampler(
 @pytest.mark.parametrize(
     "transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        ("endpoint", "http://testserver/message/123456", "url"),
+        (
+            "endpoint",
+            "starlette.middleware.trustedhost.TrustedHostMiddleware",
+            "component",
+        ),
         ("url", "http://testserver/message/123456", "url"),
     ],
 )
@@ -458,7 +462,6 @@ def test_transaction_name_in_middleware(
     client = TestClient(app)
     client.get("/message/123456")
 
-    # import ipdb; ipdb.set_trace()
     (transaction_envelope,) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
 
