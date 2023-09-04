@@ -29,7 +29,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional
+    from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
     from sentry_sdk.scope import Scope as SentryScope
 
@@ -112,12 +112,12 @@ def _enable_span_for_middleware(middleware_class):
 
             # Update transaction name with middleware name
             with hub.configure_scope() as sentry_scope:
-                if integration.transaction_style == "endpoint":
-                    name = transaction_from_function(app.__class__)
-                    if name is not None:
-                        sentry_scope.set_transaction_name(
-                            name, source=TRANSACTION_SOURCE_COMPONENT
-                        )
+                name, source = _get_transaction_from_middleware(app, scope, integration)
+                if name is not None:
+                    sentry_scope.set_transaction_name(
+                        name,
+                        source=source,
+                    )
 
             with hub.start_span(
                 op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
@@ -635,6 +635,23 @@ class StarletteRequestExtractor:
         return await self.request.json()
 
 
+def _transaction_name_from_router(scope):
+    # type: (StarletteScope) -> Optional[str]
+    name = None
+
+    router = scope.get("router")
+    if not router:
+        return name
+
+    for route in router.routes:
+        match = route.matches(scope)
+
+        if match[0] == Match.FULL:
+            return route.path
+
+    return name
+
+
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (SentryScope, str, Any) -> None
     name = None
@@ -646,18 +663,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             name = transaction_from_function(endpoint) or None
 
     elif transaction_style == "url":
-        router = request.scope.get("router")
-        if router:
-            for route in router.routes:
-                match = route.matches(request.scope)
-
-                if match[0] == Match.FULL:
-                    if transaction_style == "endpoint":
-                        name = transaction_from_function(match[1]["endpoint"]) or None
-                        break
-                    elif transaction_style == "url":
-                        name = route.path
-                        break
+        name = _transaction_name_from_router(request.scope)
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
@@ -667,3 +673,18 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
     logger.debug(
         "[Starlette] Set transaction name and source on scope: %s / %s", name, source
     )
+
+
+def _get_transaction_from_middleware(app, asgi_scope, integration):
+    # type: (Any, Dict[str, Any], StarletteIntegration) -> Tuple[Optional[str], Optional[str]]
+    name = None
+    source = None
+
+    if integration.transaction_style == "endpoint":
+        name = transaction_from_function(app.__class__)
+        source = TRANSACTION_SOURCE_COMPONENT
+    elif integration.transaction_style == "url":
+        name = _transaction_name_from_router(asgi_scope)
+        source = TRANSACTION_SOURCE_ROUTE
+
+    return name, source
