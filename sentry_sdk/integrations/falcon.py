@@ -100,7 +100,7 @@ class FalconRequestExtractor(RequestExtractor):
 class SentryFalconMiddleware(object):
     """Captures exceptions in Falcon requests and send to Sentry"""
 
-    async def process_request(self, req, resp, *args, **kwargs):
+    def process_request(self, req, resp, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> None
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
@@ -110,6 +110,10 @@ class SentryFalconMiddleware(object):
         with hub.configure_scope() as scope:
             scope._name = "falcon"
             scope.add_event_processor(_make_request_event_processor(req, integration))
+
+    async def process_request_async(self, req, resp, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> None
+        self.process_request(req, resp, *args, **kwargs)
 
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
