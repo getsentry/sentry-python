@@ -692,14 +692,3 @@ async def test_transaction_name_in_traces_sampler(
 
     async with TestClient(app) as client:
         await client.get("/message/123456")
-
-
-# @minimum_python_36
-# @pytest.mark.asyncio
-# async def test_transaction_name_in_middleware():
-#     """
-#     Tests that the transaction name in the middleware (like CORSMiddleware) is something meaningful.
-#     In this case the URL or endpoint, because we do not have the route yet.
-#     """
-#     # for transaction_style "endpoint" and "url"
-#     assert False

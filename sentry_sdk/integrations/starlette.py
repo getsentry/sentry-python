@@ -110,6 +110,7 @@ def _enable_span_for_middleware(middleware_class):
         if integration is not None:
             middleware_name = app.__class__.__name__
 
+            # Update transaction name with middleware name
             with hub.configure_scope() as sentry_scope:
                 if integration.transaction_style == "endpoint":
                     name = transaction_from_function(app.__class__)
