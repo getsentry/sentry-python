@@ -398,6 +398,7 @@ def test_transaction_name(
 )
 def test_transaction_name_in_traces_sampler(
     sentry_init,
+    request_url,
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
@@ -427,7 +428,7 @@ def test_transaction_name_in_traces_sampler(
     app = fastapi_app_factory()
 
     client = TestClient(app)
-    client.get("/message/123456")
+    client.get(request_url)
 
 
 @pytest.mark.parametrize(

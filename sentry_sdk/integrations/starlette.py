@@ -111,9 +111,6 @@ def _enable_span_for_middleware(middleware_class):
             middleware_name = app.__class__.__name__
 
             # Update transaction name with middleware name
-            import ipdb
-
-            ipdb.set_trace()
             with hub.configure_scope() as sentry_scope:
                 if integration.transaction_style == "endpoint":
                     name = transaction_from_function(app.__class__)
