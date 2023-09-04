@@ -326,14 +326,16 @@ def test_response_status_code_not_found_in_transaction_context(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
         (
+            "/message/123456",
             "endpoint",
             "tests.integrations.fastapi.test_fastapi.fastapi_app_factory.<locals>._message_with_id",
             "component",
         ),
         (
+            "/message/123456",
             "url",
             "/message/{message_id}",
             "route",
@@ -342,10 +344,11 @@ def test_response_status_code_not_found_in_transaction_context(
 )
 def test_transaction_name(
     sentry_init,
+    request_url,
     transaction_style,
-    capture_envelopes,
     expected_transaction_name,
     expected_transaction_source,
+    capture_envelopes,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -365,7 +368,7 @@ def test_transaction_name(
     app = fastapi_app_factory()
 
     client = TestClient(app)
-    client.get("/message/123456")
+    client.get(request_url)
 
     (_, transaction_envelope) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
@@ -377,10 +380,20 @@ def test_transaction_name(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        ("endpoint", "http://testserver/message/123456", "url"),
-        ("url", "http://testserver/message/123456", "url"),
+        (
+            "/message/123456",
+            "endpoint",
+            "http://testserver/message/123456",
+            "url",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "http://testserver/message/123456",
+            "url",
+        ),
     ],
 )
 def test_transaction_name_in_traces_sampler(
@@ -418,22 +431,29 @@ def test_transaction_name_in_traces_sampler(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
         (
+            "/message/123456",
             "endpoint",
             "starlette.middleware.trustedhost.TrustedHostMiddleware",
             "component",
         ),
-        ("url", "http://testserver/message/123456", "url"),
+        (
+            "/message/123456",
+            "url",
+            "http://testserver/message/123456",
+            "url",
+        ),
     ],
 )
 def test_transaction_name_in_middleware(
     sentry_init,
+    request_url,
     transaction_style,
-    capture_envelopes,
     expected_transaction_name,
     expected_transaction_source,
+    capture_envelopes,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -460,7 +480,7 @@ def test_transaction_name_in_middleware(
     )
 
     client = TestClient(app)
-    client.get("/message/123456")
+    client.get(request_url)
 
     (transaction_envelope,) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()

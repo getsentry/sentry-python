@@ -606,14 +606,16 @@ def test_get_headers():
 @minimum_python_36
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
         (
+            "/message/123456",
             "endpoint",
             "/message/123456",
             "url",
         ),
         (
+            "/message/123456",
             "url",
             "/message/123456",
             "url",
@@ -622,10 +624,11 @@ def test_get_headers():
 )
 async def test_transaction_name(
     sentry_init,
-    asgi3_app,
+    request_url,
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
+    asgi3_app,
     capture_envelopes,
 ):
     """
@@ -641,7 +644,7 @@ async def test_transaction_name(
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     async with TestClient(app) as client:
-        await client.get("/message/123456")
+        await client.get(request_url)
 
     (transaction_envelope,) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
@@ -655,18 +658,29 @@ async def test_transaction_name(
 @minimum_python_36
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url, transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        ("endpoint", "/message/123456", "url"),
-        ("url", "/message/123456", "url"),
+        (
+            "/message/123456",
+            "endpoint",
+            "/message/123456",
+            "url",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "/message/123456",
+            "url",
+        ),
     ],
 )
 async def test_transaction_name_in_traces_sampler(
     sentry_init,
-    asgi3_app,
+    request_url,
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
+    asgi3_app,
 ):
     """
     Tests that a custom traces_sampler has a meaningful transaction name.
@@ -691,4 +705,4 @@ async def test_transaction_name_in_traces_sampler(
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
     async with TestClient(app) as client:
-        await client.get("/message/123456")
+        await client.get(request_url)

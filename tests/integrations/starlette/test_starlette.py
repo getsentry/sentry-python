@@ -954,14 +954,16 @@ def test_template_tracing_meta(sentry_init, capture_events):
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
         (
+            "/message/123456",
             "endpoint",
             "tests.integrations.starlette.test_starlette.starlette_app_factory.<locals>._message_with_id",
             "component",
         ),
         (
+            "/message/123456",
             "url",
             "/message/{message_id}",
             "route",
@@ -970,10 +972,11 @@ def test_template_tracing_meta(sentry_init, capture_events):
 )
 def test_transaction_name(
     sentry_init,
+    request_url,
     transaction_style,
-    capture_envelopes,
     expected_transaction_name,
     expected_transaction_source,
+    capture_envelopes,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -989,7 +992,7 @@ def test_transaction_name(
 
     app = starlette_app_factory()
     client = TestClient(app)
-    client.get("/message/123456")
+    client.get(request_url)
 
     (_, transaction_envelope) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
@@ -1001,14 +1004,25 @@ def test_transaction_name(
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
-        ("endpoint", "http://testserver/message/123456", "url"),
-        ("url", "http://testserver/message/123456", "url"),
+        (
+            "/message/123456",
+            "endpoint",
+            "http://testserver/message/123456",
+            "url",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "http://testserver/message/123456",
+            "url",
+        ),
     ],
 )
 def test_transaction_name_in_traces_sampler(
     sentry_init,
+    request_url,
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
@@ -1037,26 +1051,33 @@ def test_transaction_name_in_traces_sampler(
 
     app = starlette_app_factory()
     client = TestClient(app)
-    client.get("/message/123456")
+    client.get(request_url)
 
 
 @pytest.mark.parametrize(
-    "transaction_style,expected_transaction_name,expected_transaction_source",
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
         (
+            "/message/123456",
             "endpoint",
             "starlette.middleware.trustedhost.TrustedHostMiddleware",
             "component",
         ),
-        ("url", "http://testserver/message/123456", "url"),
+        (
+            "/message/123456",
+            "url",
+            "http://testserver/message/123456",
+            "url",
+        ),
     ],
 )
 def test_transaction_name_in_middleware(
     sentry_init,
+    request_url,
     transaction_style,
-    capture_envelopes,
     expected_transaction_name,
     expected_transaction_source,
+    capture_envelopes,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -1081,7 +1102,7 @@ def test_transaction_name_in_middleware(
 
     app = starlette_app_factory(middleware=middleware)
     client = TestClient(app)
-    client.get("/message/123456")
+    client.get(request_url)
 
     (transaction_envelope,) = envelopes
     transaction_event = transaction_envelope.get_transaction_event()
