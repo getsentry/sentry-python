@@ -100,7 +100,7 @@ class FalconRequestExtractor(RequestExtractor):
 class SentryFalconMiddleware(object):
     """Captures exceptions in Falcon requests and send to Sentry"""
 
-    def process_request(self, req, resp, *args, **kwargs):
+    async def process_request(self, req, resp, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> None
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
@@ -205,15 +205,13 @@ def _patch_prepare_middleware():
     # type: () -> None
     original_prepare_middleware = falcon_helpers.prepare_middleware
 
-    def sentry_patched_prepare_middleware(
-        middleware=None, independent_middleware=False
-    ):
-        # type: (Any, Any) -> Any
+    def sentry_patched_prepare_middleware(middleware=None, *args, **kwargs):
+        # type: (Any, *Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
         if integration is not None:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
-        return original_prepare_middleware(middleware, independent_middleware)
+        return original_prepare_middleware(middleware, *args, **kwargs)
 
     falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
