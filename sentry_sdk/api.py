@@ -44,6 +44,7 @@ __all__ = [
     "push_scope",
     "flush",
     "last_event_id",
+    "start_active_span",
     "start_span",
     "start_transaction",
     "set_tag",
@@ -215,6 +216,15 @@ def start_span(
 ):
     # type: (...) -> Span
     return Hub.current.start_span(span=span, **kwargs)
+
+
+@hubmethod
+def start_active_span(
+    span=None,  # type: Optional[Span]
+    **kwargs  # type: Any
+):
+    # type: (...) -> Span
+    return Hub.current.start_active_span(span=span, **kwargs)
 
 
 @hubmethod

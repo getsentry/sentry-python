@@ -502,6 +502,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         span = self.scope.span
         if span is not None:
+            name = kwargs.pop("name", None)
+            if name is not None:
+                kwargs["description"] = name
             return span.start_child(**kwargs)
 
         # If there is already a trace_id in the propagation context, use it.
@@ -512,6 +515,20 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 kwargs["trace_id"] = trace_id
 
         return Span(**kwargs)
+
+    def start_active_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        from sentry_sdk.api import get_current_span
+
+        span = get_current_span()
+
+        # i no active transaction, create active transaction
+        if span is None:
+            return self.start_transaction(**kwargs)
+
+        # add child span to active transaction
+        name = kwargs.pop("name")
+        kwargs["description"] = name
+        return span.start_child(**kwargs)
 
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
