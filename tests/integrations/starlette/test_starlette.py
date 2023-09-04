@@ -33,7 +33,9 @@ from starlette.authentication import (
 )
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.testclient import TestClient
+
 
 STARLETTE_VERSION = parse_version(starlette.__version__)
 
@@ -1038,10 +1040,54 @@ def test_transaction_name_in_traces_sampler(
     client.get("/message/123456")
 
 
-# def test_transaction_name_in_middleware():
-#     """
-#     Tests that the transaction name in the middleware (like CORSMiddleware) is something meaningful.
-#     In this case the URL or endpoint, because we do not have the route yet.
-#     """
-#     # for transaction_style "endpoint" and "url"
-#     assert False
+@pytest.mark.parametrize(
+    "transaction_style,expected_transaction_name,expected_transaction_source",
+    [
+        (
+            "endpoint",
+            "starlette.middleware.trustedhost.TrustedHostMiddleware",
+            "component",
+        ),
+        ("url", "http://testserver/message/123456", "url"),
+    ],
+)
+def test_transaction_name_in_middleware(
+    sentry_init,
+    transaction_style,
+    capture_envelopes,
+    expected_transaction_name,
+    expected_transaction_source,
+):
+    """
+    Tests that the transaction name is something meaningful.
+    """
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[
+            StarletteIntegration(transaction_style=transaction_style),
+        ],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    envelopes = capture_envelopes()
+
+    middleware = [
+        Middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=["example.com", "*.example.com"],
+        ),
+    ]
+
+    app = starlette_app_factory(middleware=middleware)
+    client = TestClient(app)
+    client.get("/message/123456")
+
+    (transaction_envelope,) = envelopes
+    transaction_event = transaction_envelope.get_transaction_event()
+
+    assert transaction_event["contexts"]["response"]["status_code"] == 400
+    assert transaction_event["transaction"] == expected_transaction_name
+    assert (
+        transaction_event["transaction_info"]["source"] == expected_transaction_source
+    )
