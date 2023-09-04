@@ -637,19 +637,16 @@ class StarletteRequestExtractor:
 
 def _transaction_name_from_router(scope):
     # type: (StarletteScope) -> Optional[str]
-    name = None
-
     router = scope.get("router")
     if not router:
-        return name
+        return None
 
     for route in router.routes:
         match = route.matches(scope)
-
         if match[0] == Match.FULL:
             return route.path
 
-    return name
+    return None
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
