@@ -160,7 +160,7 @@ def _wrap_basecursor_exec(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable
 def _wrap_cursoriterator_anext(
     f: Callable[P, Awaitable[T]]
 ) -> Callable[P, Awaitable[T]]:
-    async def __await__(self: CursorIterator) -> T:
+    async def __await__(self: CursorIterator) -> T:  # noqa: N807
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
