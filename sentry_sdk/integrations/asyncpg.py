@@ -1,5 +1,5 @@
 import contextlib
-from typing import ParamSpec, TypeVar, Callable, Awaitable
+from typing import TypeVar, Callable, Awaitable
 
 from asyncpg.cursor import BaseCursor, CursorIterator
 
@@ -19,7 +19,7 @@ except ImportError:
 # asyncpg.__version__ is a string containing the semantic version in the form of "<major>.<minor>.<patch>"
 asyncpg_version = parse_version(asyncpg.__version__)
 
-if asyncpg_version < (0, 23, 0):
+if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
     raise DidNotEnable("asyncpg >= 0.23.0 required")
 
 if TYPE_CHECKING:
@@ -58,12 +58,11 @@ class AsyncPGIntegration(Integration):
         )
 
 
-P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def _wrap_execute(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
-    async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    async def _inner(*args: Any, **kwargs: Any) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -113,9 +112,9 @@ def _record(
 
 
 def _wrap_connection_method(
-    f: Callable[P, Awaitable[T]], *, executemany=False
-) -> Callable[P, Awaitable[T]]:
-    async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+    f: Callable[..., Awaitable[T]], *, executemany=False
+) -> Callable[..., Awaitable[T]]:
+    async def _inner(*args: Any, **kwargs: Any) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -132,7 +131,9 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_basecursor_exec(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+def _wrap_basecursor_exec(
+    f: Callable[..., Awaitable[T]]
+) -> Callable[..., Awaitable[T]]:
     async def _exec(self: BaseCursor, n, timeout) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
@@ -158,8 +159,8 @@ def _wrap_basecursor_exec(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable
 
 
 def _wrap_cursoriterator_anext(
-    f: Callable[P, Awaitable[T]]
-) -> Callable[P, Awaitable[T]]:
+    f: Callable[..., Awaitable[T]]
+) -> Callable[..., Awaitable[T]]:
     async def __await__(self: CursorIterator) -> T:  # noqa: N807
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
@@ -188,8 +189,8 @@ def _wrap_cursoriterator_anext(
     return __await__
 
 
-def _wrap_connect_addr(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
-    async def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
+def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    async def _inner(*args: Any, **kwargs: Any) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
