@@ -1,13 +1,13 @@
 import contextlib
-from typing import TypeVar, Callable, Awaitable
+from typing import Any, TypeVar, Callable, Awaitable
 
 from asyncpg.cursor import BaseCursor, CursorIterator
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import parse_version, capture_internal_exceptions
 
 try:
@@ -21,11 +21,6 @@ asyncpg_version = parse_version(asyncpg.__version__)
 
 if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
     raise DidNotEnable("asyncpg >= 0.23.0 required")
-
-if TYPE_CHECKING:
-    from typing import Any
-
-    from sentry_sdk.tracing import Span
 
 
 class AsyncPGIntegration(Integration):
@@ -62,7 +57,7 @@ T = TypeVar("T")
 
 
 def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    async def _inner(*args: Any, **kwargs: Any) -> T:
+    async def _inner(*args, **kwargs) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -178,6 +173,7 @@ def _wrap_cursoriterator_anext(
             executemany=False,
         ) as span:
             try:
+                _set_db_data(span, self._connection)
                 res = await f(self)
             except StopAsyncIteration:
                 span.set_data("db.cursor.exhausted", True)
@@ -220,8 +216,7 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
     return _inner
 
 
-def _set_db_data(span, conn):
-    # type: (Span, Any) -> None
+def _set_db_data(span: Span, conn: Any) -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
 
     addr = conn._addr
