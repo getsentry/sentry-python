@@ -180,7 +180,6 @@ def _wrap_cursoriterator_anext(
             try:
                 res = await f(self)
             except StopAsyncIteration:
-
                 span.set_data("db.cursor.exhausted", True)
                 raise StopAsyncIteration
 
