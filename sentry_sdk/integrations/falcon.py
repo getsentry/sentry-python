@@ -16,11 +16,11 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._compat import PY2
 
 if PY2:
-    SentryFalconMiddlewareBase = object
+    _SentryFalconMiddlewareBase = object
 else:
     # Support ASGI with a process_request_async method, which can only be loaded in Python 3,
     # since async methods are invalid syntax in Python 2.7.
-    from sentry_sdk.integrations._falcon_async_py3 import SentryFalconMiddlewareBase
+    from sentry_sdk.integrations._falcon_async_py3 import _SentryFalconMiddlewareBase
 
 if TYPE_CHECKING:
     from typing import Any
@@ -106,7 +106,7 @@ class FalconRequestExtractor(RequestExtractor):
                 return self.request._media
 
 
-class SentryFalconMiddleware(SentryFalconMiddlewareBase):
+class SentryFalconMiddleware(_SentryFalconMiddlewareBase):
     """Captures exceptions in Falcon requests and send to Sentry"""
 
     def process_request(self, req, resp, *args, **kwargs):
