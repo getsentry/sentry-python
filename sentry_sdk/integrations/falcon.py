@@ -13,6 +13,15 @@ from sentry_sdk.utils import (
 
 from sentry_sdk._types import TYPE_CHECKING
 
+from sentry_sdk._compat import PY2
+
+if PY2:
+    SentryFalconMiddlewareBase = object
+else:
+    # Support ASGI with a process_request_async method, which can only be loaded in Python 3,
+    # since async methods are invalid syntax in Python 2.7.
+    from sentry_sdk.integrations._falcon_async_py3 import SentryFalconMiddlewareBase
+
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
@@ -97,7 +106,7 @@ class FalconRequestExtractor(RequestExtractor):
                 return self.request._media
 
 
-class SentryFalconMiddleware(object):
+class SentryFalconMiddleware(SentryFalconMiddlewareBase):
     """Captures exceptions in Falcon requests and send to Sentry"""
 
     def process_request(self, req, resp, *args, **kwargs):
@@ -110,10 +119,6 @@ class SentryFalconMiddleware(object):
         with hub.configure_scope() as scope:
             scope._name = "falcon"
             scope.add_event_processor(_make_request_event_processor(req, integration))
-
-    async def process_request_async(self, req, resp, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> None
-        self.process_request(req, resp, *args, **kwargs)
 
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
