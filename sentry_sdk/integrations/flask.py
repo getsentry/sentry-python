@@ -44,8 +44,7 @@ try:
 except ImportError:
     raise DidNotEnable("blinker is not installed")
 
-installed_packages = _get_installed_modules()
-FLASK_VERSION = installed_packages("flask")
+FLASK_VERSION = None
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
@@ -66,7 +65,10 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
+        global FLASK_VERSION
 
+        installed_packages = _get_installed_modules()
+        FLASK_VERSION = installed_packages["flask"]
         version = parse_version(FLASK_VERSION)
 
         if version is None:
