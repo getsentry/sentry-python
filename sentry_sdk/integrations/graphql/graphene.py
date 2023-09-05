@@ -26,6 +26,9 @@ if TYPE_CHECKING:
 class GrapheneIntegration(Integration):
     identifier = "graphene"
 
+    # XXX add an option to turn on error monitoring so that people who are instrumenting
+    # both the server and the client side can turn one of them off if they want
+
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -41,22 +44,22 @@ class GrapheneIntegration(Integration):
             raise DidNotEnable("graphql-core 3.2 or newer required.")
 
         # XXX: a guard against patching multiple times?
-        old_execute_sync = graphene_schema.graphql_sync
-        old_execute_async = graphene_schema.graphql
+        old_graphql_sync = graphene_schema.graphql_sync
+        old_graphql_async = graphene_schema.graphql
 
         def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
             # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
             hub = Hub.current
             integration = hub.get_integration(GrapheneIntegration)
             if integration is None or hub.client is None:
-                return old_execute_sync(schema, source, *args, **kwargs)
+                return old_graphql_sync(schema, source, *args, **kwargs)
 
             scope = hub.scope  # XXX
             if scope is not None:
                 event_processor = _make_event_processor(source)
                 scope.add_event_processor(event_processor)
 
-            result = old_execute_sync(schema, source, *args, **kwargs)
+            result = old_graphql_sync(schema, source, *args, **kwargs)
 
             _raise_graphql_errors(result)
 
@@ -67,14 +70,14 @@ class GrapheneIntegration(Integration):
             hub = Hub.current
             integration = hub.get_integration(GrapheneIntegration)
             if integration is None or hub.client is None:
-                return await old_execute_async(schema, source, *args, **kwargs)
+                return await old_graphql_async(schema, source, *args, **kwargs)
 
             scope = hub.scope  # XXX
             if scope is not None:
                 event_processor = _make_event_processor(source)
                 scope.add_event_processor(event_processor)
 
-            result = await old_execute_async(schema, source, *args, **kwargs)
+            result = await old_graphql_async(schema, source, *args, **kwargs)
 
             _raise_graphql_errors(result)
 
