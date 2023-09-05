@@ -4,9 +4,10 @@ from typing import ParamSpec, TypeVar, Callable, Awaitable
 from asyncpg.cursor import BaseCursor, CursorIterator
 
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import parse_version, capture_internal_exceptions
 
 try:
@@ -20,6 +21,11 @@ asyncpg_version = parse_version(asyncpg.__version__)
 
 if asyncpg_version < (0, 23, 0):
     raise DidNotEnable("asyncpg >= 0.23.0 required")
+
+if TYPE_CHECKING:
+    from typing import Any
+
+    from sentry_sdk.tracing import Span
 
 
 class AsyncPGIntegration(Integration):
@@ -118,7 +124,8 @@ def _wrap_connection_method(
 
         query = args[1]
         params_list = args[2] if len(args) > 2 else None
-        with _record(hub, None, query, params_list, executemany=executemany):
+        with _record(hub, None, query, params_list, executemany=executemany) as span:
+            _set_db_data(span, args[0])
             res = await f(*args, **kwargs)
         return res
 
@@ -191,14 +198,19 @@ def _wrap_connect_addr(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]
 
         user = kwargs["params"].user
         database = kwargs["params"].database
-        connect_timeout = kwargs["params"].connect_timeout
 
         with hub.start_span(op=OP.DB, description="connect") as span:
-            span.set_data("connection.host", kwargs["addr"])
-            span.set_data("connection.user", user)
-            span.set_data("connection.database", database)
-            span.set_data("connection.connect_timeout", connect_timeout)
-            span.set_data("connection.config", repr(kwargs["config"]))
+            span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+            addr = kwargs.get("addr")
+            if addr:
+                try:
+                    span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+                    span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                except IndexError:
+                    pass
+            span.set_data(SPANDATA.DB_NAME, database)
+            span.set_data(SPANDATA.DB_USER, user)
+
             with capture_internal_exceptions():
                 hub.add_breadcrumb(message="connect", category="query", data=span._data)
             res = await f(*args, **kwargs)
@@ -206,3 +218,24 @@ def _wrap_connect_addr(f: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]
         return res
 
     return _inner
+
+
+def _set_db_data(span, conn):
+    # type: (Span, Any) -> None
+    span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+
+    addr = conn._addr
+    if addr:
+        try:
+            span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+            span.set_data(SPANDATA.SERVER_PORT, addr[1])
+        except IndexError:
+            pass
+
+    database = conn._params.database
+    if database:
+        span.set_data(SPANDATA.DB_NAME, database)
+
+    user = conn._params.user
+    if user:
+        span.set_data(SPANDATA.DB_USER, user)
