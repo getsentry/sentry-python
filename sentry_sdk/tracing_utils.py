@@ -107,8 +107,7 @@ def record_sql_queries(
     params_list,  # type:  Any
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
-    *,
-    record_cursor_repr: bool = False
+    record_cursor_repr=False,  # type: bool
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
