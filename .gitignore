@@ -24,3 +24,4 @@ venv
 relay
 pip-wheel-metadata
 .mypy_cache
+.vscode/
