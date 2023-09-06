@@ -12,6 +12,9 @@ updates:
   - dependency-name: pytest
     versions:
     - "> 3.7.3"
+  - dependency-name: flake8
+    versions:
+    - "> 5.0.4"
   - dependency-name: pytest-cov
     versions:
     - "> 2.8.1"
@@ -43,6 +46,6 @@ updates:
   open-pull-requests-limit: 10
 - package-ecosystem: "github-actions"
   directory: "/"
-  schedule: 
+  schedule:
     interval: weekly
   open-pull-requests-limit: 10
