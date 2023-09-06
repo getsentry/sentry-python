@@ -66,8 +66,8 @@ class FlaskIntegration(Integration):
         # type: () -> None
 
         installed_packages = _get_installed_modules()
-        FLASK_VERSION = installed_packages["flask"]
-        version = parse_version(FLASK_VERSION)
+        flask_version = installed_packages["flask"]
+        version = parse_version(flask_version)
 
         if version is None:
             raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
