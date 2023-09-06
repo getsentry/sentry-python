@@ -144,7 +144,7 @@ def _wrap_apply_async(f):
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
         kwarg_headers = kwargs.get("headers") or {}
-        propagate_traces = kwarg_headers.pop("sentry-propagate-traces")
+        propagate_traces = kwarg_headers.pop("sentry-propagate-traces", None)
         if propagate_traces is None and integration is not None:
             propagate_traces = integration.propagate_traces
 
