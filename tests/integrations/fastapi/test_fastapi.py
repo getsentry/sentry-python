@@ -9,6 +9,7 @@ fastapi = pytest.importorskip("fastapi")
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -322,3 +323,171 @@ def test_response_status_code_not_found_in_transaction_context(
         "response" in transaction["contexts"].keys()
     ), "Response context not found in transaction"
     assert transaction["contexts"]["response"]["status_code"] == 404
+
+
+@pytest.mark.parametrize(
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
+    [
+        (
+            "/message/123456",
+            "endpoint",
+            "tests.integrations.fastapi.test_fastapi.fastapi_app_factory.<locals>._message_with_id",
+            "component",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "/message/{message_id}",
+            "route",
+        ),
+    ],
+)
+def test_transaction_name(
+    sentry_init,
+    request_url,
+    transaction_style,
+    expected_transaction_name,
+    expected_transaction_source,
+    capture_envelopes,
+):
+    """
+    Tests that the transaction name is something meaningful.
+    """
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[
+            StarletteIntegration(transaction_style=transaction_style),
+            FastApiIntegration(transaction_style=transaction_style),
+        ],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    envelopes = capture_envelopes()
+
+    app = fastapi_app_factory()
+
+    client = TestClient(app)
+    client.get(request_url)
+
+    (_, transaction_envelope) = envelopes
+    transaction_event = transaction_envelope.get_transaction_event()
+
+    assert transaction_event["transaction"] == expected_transaction_name
+    assert (
+        transaction_event["transaction_info"]["source"] == expected_transaction_source
+    )
+
+
+@pytest.mark.parametrize(
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
+    [
+        (
+            "/message/123456",
+            "endpoint",
+            "http://testserver/message/123456",
+            "url",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "http://testserver/message/123456",
+            "url",
+        ),
+    ],
+)
+def test_transaction_name_in_traces_sampler(
+    sentry_init,
+    request_url,
+    transaction_style,
+    expected_transaction_name,
+    expected_transaction_source,
+):
+    """
+    Tests that a custom traces_sampler retrieves a meaningful transaction name.
+    In this case the URL or endpoint, because we do not have the route yet.
+    """
+
+    def dummy_traces_sampler(sampling_context):
+        assert (
+            sampling_context["transaction_context"]["name"] == expected_transaction_name
+        )
+        assert (
+            sampling_context["transaction_context"]["source"]
+            == expected_transaction_source
+        )
+
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[StarletteIntegration(transaction_style=transaction_style)],
+        traces_sampler=dummy_traces_sampler,
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    app = fastapi_app_factory()
+
+    client = TestClient(app)
+    client.get(request_url)
+
+
+@pytest.mark.parametrize(
+    "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
+    [
+        (
+            "/message/123456",
+            "endpoint",
+            "starlette.middleware.trustedhost.TrustedHostMiddleware",
+            "component",
+        ),
+        (
+            "/message/123456",
+            "url",
+            "http://testserver/message/123456",
+            "url",
+        ),
+    ],
+)
+def test_transaction_name_in_middleware(
+    sentry_init,
+    request_url,
+    transaction_style,
+    expected_transaction_name,
+    expected_transaction_source,
+    capture_envelopes,
+):
+    """
+    Tests that the transaction name is something meaningful.
+    """
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[
+            StarletteIntegration(transaction_style=transaction_style),
+            FastApiIntegration(transaction_style=transaction_style),
+        ],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    envelopes = capture_envelopes()
+
+    app = fastapi_app_factory()
+
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[
+            "example.com",
+        ],
+    )
+
+    client = TestClient(app)
+    client.get(request_url)
+
+    (transaction_envelope,) = envelopes
+    transaction_event = transaction_envelope.get_transaction_event()
+
+    assert transaction_event["contexts"]["response"]["status_code"] == 400
+    assert transaction_event["transaction"] == expected_transaction_name
+    assert (
+        transaction_event["transaction_info"]["source"] == expected_transaction_source
+    )
