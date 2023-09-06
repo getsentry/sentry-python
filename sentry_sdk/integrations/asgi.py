@@ -17,12 +17,15 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_request_data,
+    _get_url,
 )
 from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_URL,
+    TRANSACTION_SOURCE_COMPONENT,
 )
 from sentry_sdk.utils import (
     ContextVar,
@@ -35,10 +38,11 @@ from sentry_sdk.utils import (
 from sentry_sdk.tracing import Transaction
 
 if TYPE_CHECKING:
-    from typing import Dict
     from typing import Any
-    from typing import Optional
     from typing import Callable
+    from typing import Dict
+    from typing import Optional
+    from typing import Tuple
 
     from sentry_sdk._types import Event, Hint
 
@@ -144,7 +148,8 @@ class SentryAsgiMiddleware:
     async def _run_app(self, scope, receive, send, asgi_version):
         # type: (Any, Any, Any, Any, int) -> Any
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
-        if is_recursive_asgi_middleware:
+        is_lifespan = scope["type"] == "lifespan"
+        if is_recursive_asgi_middleware or is_lifespan:
             try:
                 if asgi_version == 2:
                     return await self.app(scope)(receive, send)
@@ -167,24 +172,35 @@ class SentryAsgiMiddleware:
                         sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
+                    (
+                        transaction_name,
+                        transaction_source,
+                    ) = self._get_transaction_name_and_source(
+                        self.transaction_style,
+                        scope,
+                    )
 
                     if ty in ("http", "websocket"):
                         transaction = continue_trace(
                             _get_headers(scope),
                             op="{}.server".format(ty),
+                            name=transaction_name,
+                            source=transaction_source,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (continuing trace): %s",
                             transaction,
                         )
                     else:
-                        transaction = Transaction(op=OP.HTTP_SERVER)
+                        transaction = Transaction(
+                            op=OP.HTTP_SERVER,
+                            name=transaction_name,
+                            source=transaction_source,
+                        )
                         logger.debug(
                             "[ASGI] Created transaction (new): %s", transaction
                         )
 
-                    transaction.name = _DEFAULT_TRANSACTION_NAME
-                    transaction.source = TRANSACTION_SOURCE_ROUTE
                     transaction.set_tag("asgi.type", ty)
                     logger.debug(
                         "[ASGI] Set transaction name and source on transaction: '%s' / '%s'",
@@ -232,7 +248,25 @@ class SentryAsgiMiddleware:
         request_data.update(_get_request_data(asgi_scope))
         event["request"] = deepcopy(request_data)
 
-        self._set_transaction_name_and_source(event, self.transaction_style, asgi_scope)
+        # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
+        already_set = event["transaction"] != _DEFAULT_TRANSACTION_NAME and event[
+            "transaction_info"
+        ].get("source") in [
+            TRANSACTION_SOURCE_COMPONENT,
+            TRANSACTION_SOURCE_ROUTE,
+        ]
+        if not already_set:
+            name, source = self._get_transaction_name_and_source(
+                self.transaction_style, asgi_scope
+            )
+            event["transaction"] = name
+            event["transaction_info"] = {"source": source}
+
+            logger.debug(
+                "[ASGI] Set transaction name and source in event_processor: '%s' / '%s'",
+                event["transaction"],
+                event["transaction_info"]["source"],
+            )
 
         return event
 
@@ -242,16 +276,11 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _set_transaction_name_and_source(self, event, transaction_style, asgi_scope):
-        # type: (Event, str, Any) -> None
-        transaction_name_already_set = (
-            event.get("transaction", _DEFAULT_TRANSACTION_NAME)
-            != _DEFAULT_TRANSACTION_NAME
-        )
-        if transaction_name_already_set:
-            return
-
-        name = ""
+    def _get_transaction_name_and_source(self, transaction_style, asgi_scope):
+        # type: (SentryAsgiMiddleware, str, Any) -> Tuple[str, str]
+        name = None
+        source = SOURCE_FOR_STYLE[transaction_style]
+        ty = asgi_scope.get("type")
 
         if transaction_style == "endpoint":
             endpoint = asgi_scope.get("endpoint")
@@ -260,6 +289,9 @@ class SentryAsgiMiddleware:
             # an endpoint, overwrite our generic transaction name.
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
+            else:
+                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                source = TRANSACTION_SOURCE_URL
 
         elif transaction_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -269,21 +301,13 @@ class SentryAsgiMiddleware:
                 path = getattr(route, "path", None)
                 if path is not None:
                     name = path
+            else:
+                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                source = TRANSACTION_SOURCE_URL
 
-        if not name:
-            event["transaction"] = _DEFAULT_TRANSACTION_NAME
-            event["transaction_info"] = {"source": TRANSACTION_SOURCE_ROUTE}
-            logger.debug(
-                "[ASGI] Set default transaction name and source on event: '%s' / '%s'",
-                event["transaction"],
-                event["transaction_info"]["source"],
-            )
-            return
+        if name is None:
+            name = _DEFAULT_TRANSACTION_NAME
+            source = TRANSACTION_SOURCE_ROUTE
+            return name, source
 
-        event["transaction"] = name
-        event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-        logger.debug(
-            "[ASGI] Set transaction name and source on event: '%s' / '%s'",
-            event["transaction"],
-            event["transaction_info"]["source"],
-        )
+        return name, source
