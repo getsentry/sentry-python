@@ -70,7 +70,7 @@ class FlaskIntegration(Integration):
         version = parse_version(flask_version)
 
         if version is None:
-            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
+            raise DidNotEnable("Unparsable Flask version: {}".format(flask_version))
 
         if version < (0, 10):
             raise DidNotEnable("Flask 0.10 or newer is required.")
