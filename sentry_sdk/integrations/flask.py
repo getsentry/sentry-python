@@ -5,6 +5,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
@@ -28,7 +29,6 @@ except ImportError:
 
 try:
     from flask import Flask, Request  # type: ignore
-    from flask import __version__ as FLASK_VERSION
     from flask import request as flask_request
     from flask.signals import (
         before_render_template,
@@ -65,10 +65,12 @@ class FlaskIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        version = parse_version(FLASK_VERSION)
+        installed_packages = _get_installed_modules()
+        flask_version = installed_packages["flask"]
+        version = parse_version(flask_version)
 
         if version is None:
-            raise DidNotEnable("Unparsable Flask version: {}".format(FLASK_VERSION))
+            raise DidNotEnable("Unparsable Flask version: {}".format(flask_version))
 
         if version < (0, 10):
             raise DidNotEnable("Flask 0.10 or newer is required.")
