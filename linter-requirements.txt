@@ -1,6 +1,6 @@
 mypy==1.5.1
 black==23.7.0
-flake8==6.1.0
+flake8==6.0.0
 types-certifi
 types-redis
 types-setuptools
@@ -9,4 +9,3 @@ loguru # There is no separate types module.
 flake8-bugbear==23.7.10
 pep8-naming==0.13.3
 pre-commit # local linting
-pycodestyle==2.9.1
