@@ -9,3 +9,4 @@ loguru # There is no separate types module.
 flake8-bugbear==23.7.10
 pep8-naming==0.13.3
 pre-commit # local linting
+pyflakes==2.5.0
