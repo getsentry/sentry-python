@@ -14,7 +14,11 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+)
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -25,7 +29,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional
+    from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
     from sentry_sdk.scope import Scope as SentryScope
 
@@ -105,6 +109,15 @@ def _enable_span_for_middleware(middleware_class):
         integration = hub.get_integration(StarletteIntegration)
         if integration is not None:
             middleware_name = app.__class__.__name__
+
+            # Update transaction name with middleware name
+            with hub.configure_scope() as sentry_scope:
+                name, source = _get_transaction_from_middleware(app, scope, integration)
+                if name is not None:
+                    sentry_scope.set_transaction_name(
+                        name,
+                        source=source,
+                    )
 
             with hub.start_span(
                 op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
@@ -337,12 +350,14 @@ def patch_asgi_app():
 
     async def _sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Starlette, StarletteScope, Receive, Send) -> None
-        if Hub.current.get_integration(StarletteIntegration) is None:
+        integration = Hub.current.get_integration(StarletteIntegration)
+        if integration is None:
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
+            transaction_style=integration.transaction_style,
         )
 
         middleware.__call__ = middleware._run_asgi3
@@ -620,35 +635,53 @@ class StarletteRequestExtractor:
         return await self.request.json()
 
 
+def _transaction_name_from_router(scope):
+    # type: (StarletteScope) -> Optional[str]
+    router = scope.get("router")
+    if not router:
+        return None
+
+    for route in router.routes:
+        match = route.matches(scope)
+        if match[0] == Match.FULL:
+            return route.path
+
+    return None
+
+
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (SentryScope, str, Any) -> None
-    name = ""
+    name = None
+    source = SOURCE_FOR_STYLE[transaction_style]
 
     if transaction_style == "endpoint":
         endpoint = request.scope.get("endpoint")
         if endpoint:
-            name = transaction_from_function(endpoint) or ""
+            name = transaction_from_function(endpoint) or None
 
     elif transaction_style == "url":
-        router = request.scope["router"]
-        for route in router.routes:
-            match = route.matches(request.scope)
+        name = _transaction_name_from_router(request.scope)
 
-            if match[0] == Match.FULL:
-                if transaction_style == "endpoint":
-                    name = transaction_from_function(match[1]["endpoint"]) or ""
-                    break
-                elif transaction_style == "url":
-                    name = route.path
-                    break
-
-    if not name:
+    if name is None:
         name = _DEFAULT_TRANSACTION_NAME
         source = TRANSACTION_SOURCE_ROUTE
-    else:
-        source = SOURCE_FOR_STYLE[transaction_style]
 
     scope.set_transaction_name(name, source=source)
     logger.debug(
         "[Starlette] Set transaction name and source on scope: %s / %s", name, source
     )
+
+
+def _get_transaction_from_middleware(app, asgi_scope, integration):
+    # type: (Any, Dict[str, Any], StarletteIntegration) -> Tuple[Optional[str], Optional[str]]
+    name = None
+    source = None
+
+    if integration.transaction_style == "endpoint":
+        name = transaction_from_function(app.__class__)
+        source = TRANSACTION_SOURCE_COMPONENT
+    elif integration.transaction_style == "url":
+        name = _transaction_name_from_router(asgi_scope)
+        source = TRANSACTION_SOURCE_ROUTE
+
+    return name, source
