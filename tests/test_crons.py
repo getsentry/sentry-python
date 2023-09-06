@@ -61,7 +61,7 @@ def test_decorator_error(sentry_init):
     with mock.patch(
         "sentry_sdk.crons.decorator.capture_checkin"
     ) as fake_capture_checking:
-        with pytest.raises(Exception):
+        with pytest.raises(ZeroDivisionError):
             result = _break_world("Grace")
 
         assert "result" not in locals()
@@ -109,7 +109,7 @@ def test_contextmanager_error(sentry_init):
     with mock.patch(
         "sentry_sdk.crons.decorator.capture_checkin"
     ) as fake_capture_checking:
-        with pytest.raises(Exception):
+        with pytest.raises(ZeroDivisionError):
             result = _break_world_contextmanager("Grace")
 
         assert "result" not in locals()
