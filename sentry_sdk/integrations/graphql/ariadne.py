@@ -1,12 +1,15 @@
 from importlib import import_module
+from inspect import iscoroutinefunction
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from graphql import version as GRAPHQL_CORE_VERSION
+    from graphql.execution.execute import ExecutionContext
+    from graphql.pyutils import is_awaitable
 except ImportError:
     raise DidNotEnable("graphql-core not installed")
 
@@ -26,7 +29,14 @@ except ImportError:
 
 if TYPE_CHECKING:
     from typing import Any, List
-    from ariadne.types import ContextValue, GraphQLError, GraphQLResult, GraphQLSchema
+    from ariadne.types import (
+        ContextValue,
+        GraphQLError,
+        GraphQLResult,
+        GraphQLSchema,
+        Resolver,
+    )
+    from graphql import GraphQLResolveInfo
     from sentry_sdk._types import EventProcessor
 
 
@@ -36,11 +46,15 @@ class AriadneIntegration(Integration):
     # XXX add an option to turn on error monitoring so that people who are instrumenting
     # both the server and the client side can turn one of them off if they want
     # XXX double patching
+    # XXX capture internal exceptions
+    # XXX capture request/response? to override pii?
+    # XXX max_request_body_size?
+    # XXX version guard for ariadne
+    # XXX if we end up patching graphql-core, we need guards
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        # XXX version guard for ariadne
         version = parse_version(GRAPHQL_CORE_VERSION)
 
         if version is None:
@@ -52,6 +66,7 @@ class AriadneIntegration(Integration):
             raise DidNotEnable("graphql-core 3.2 or newer required.")
 
         _patch_graphql()
+        _patch_execution_context()
         _inject_tracing_extension()
 
 
@@ -59,6 +74,7 @@ def _patch_graphql():
     # type: () -> None
     old_graphql_sync = ariadne_graphql.graphql_sync
     old_graphql_async = ariadne_graphql.graphql
+    old_handle_errors = ariadne_graphql.handle_graphql_errors
 
     def _sentry_patched_graphql_sync(schema, data, *args, **kwargs):
         # type: (GraphQLSchema, Any, Any, Any) -> GraphQLResult
@@ -70,13 +86,10 @@ def _patch_graphql():
 
         scope = hub.scope  # XXX
         if scope is not None:
-            event_processor = _make_event_processor(schema, data)
+            event_processor = _make_request_event_processor(schema, data)
             scope.add_event_processor(event_processor)
 
         result = old_graphql_sync(schema, data, *args, **kwargs)
-
-        _capture_graphql_errors(result, hub)
-
         return result
 
     async def _sentry_patched_graphql_async(schema, data, *args, **kwargs):
@@ -89,28 +102,60 @@ def _patch_graphql():
 
         scope = hub.scope  # XXX
         if scope is not None:
-            event_processor = _make_event_processor(schema, data)
+            event_processor = _make_request_event_processor(schema, data)
             scope.add_event_processor(event_processor)
 
         result = await old_graphql_async(schema, data, *args, **kwargs)
-        # XXX no result available in event processor like this
+        return result
 
-        # XXX two options.
-        # a) Handle the exceptions in has_errors. Then it's actual exceptions that
-        #    can be raised properly. But there is no response and it'd have to be
-        #    constructed manually
-        # b) Handle the exceptions here once they've already been formatted. Then
-        #    we need to reconstruct the exceptions instead before raising them.
-        # c?) Remember the exception somehow
-        # d) monkeypatch handle_graphql_errors
+    def _sentry_patched_handle_graphql_errors(errors, *args, **kwargs):
+        hub = Hub.current
+        integration = hub.get_integration(AriadneIntegration)
 
-        _capture_graphql_errors(result, hub)
+        if integration is None or hub.client is None:
+            return old_handle_errors(errors, *args, **kwargs)
+
+        result = old_handle_errors(errors, *args, **kwargs)
+
+        scope = hub.scope  # XXX
+        if scope is not None:
+            event_processor = _make_response_event_processor(result[1])
+            scope.add_event_processor(event_processor)
+
+        for error in errors:
+            event, hint = event_from_exception(
+                error,
+                client_options=hub.client.options,
+                mechanism={
+                    "type": hub.get_integration(AriadneIntegration).identifier,
+                    "handled": False,
+                },
+            )
+            hub.capture_event(event, hint=hint)
 
         return result
 
     ariadne_graphql.graphql_sync = _sentry_patched_graphql_sync
     ariadne_graphql.graphql = _sentry_patched_graphql_async
     ariadne_http.graphql = _sentry_patched_graphql_async
+    ariadne_graphql.handle_graphql_errors = _sentry_patched_handle_graphql_errors
+
+
+def _patch_execution_context():
+    # type: () -> None
+    old_execution_context_init = ExecutionContext.__init__
+
+    def _sentry_execution_context_init_wrapper(self, *args, **kwargs):
+        print("exec context init")
+
+        hub = Hub.current
+        integration = hub.get_integration(AriadneIntegration)
+        if integration is None:
+            return old_execution_context_init(self, *args, **kwargs)
+
+        return old_execution_context_init(self, *args, **kwargs)
+
+    ExecutionContext.__init__ = _sentry_execution_context_init_wrapper
 
 
 def _inject_tracing_extension():
@@ -147,6 +192,7 @@ def _inject_tracing_extension():
 
 
 class SentryTracingExtension(Extension):
+    # XXX this probably doesn't have enough granularity
     def __init__(self):
         pass
 
@@ -168,39 +214,66 @@ class SentryTracingExtension(Extension):
 
     def has_errors(self, errors, context):
         # type: (List[GraphQLError], ContextValue) -> None
-        # XXX could use this to capture exceptions but we don't have access
-        # to the response here
         print("has errors ctx", context)
         hub = Hub.current
         integration = hub.get_integration(AriadneIntegration)
         if integration is None or hub.client is None:
             return
 
-    # XXX def resolve()
+    def resolve(self, next_, obj, info, **kwargs):
+        # type: (Resolver, Any, GraphQLResolveInfo, Any) -> Any
+        # Fast implementation for synchronous resolvers
+        hub = Hub.current
+        integration = hub.get_integration(AriadneIntegration)
+        if integration is not None:
+            hub.add_breadcrumb(
+                type="graphql",
+                category="graphql.fetcher",
+                data={
+                    "operation_name": "",
+                    "operation_type": "",
+                    "operation_id": "",
+                },
+            )
+
+        if not iscoroutinefunction(next_):
+            result = next_(obj, info, **kwargs)
+            return result
+
+        # Create async closure for async `next_` that GraphQL
+        # query executor will handle for us.
+        async def async_my_extension():
+            result = await next_(obj, info, **kwargs)
+            if is_awaitable(result):
+                result = await result
+            return result
+
+        # GraphQL query executor will execute this closure for us
+        return async_my_extension()
 
 
-def _capture_graphql_errors(result, hub):
-    result = result[1]
-    if not isinstance(result, dict):
-        return
-
-    for error in result.get("errors") or []:
-        # have to reconstruct the exceptions here since they've already been
-        # formatted
-        hub.capture_exception(error)
-
-
-def _make_event_processor(schema, data):
+def _make_request_event_processor(schema, data):
     # type: (GraphQLSchema, Any) -> EventProcessor
     def inner(event, hint):
-        print("in event processor")
-        print(schema)
-        print(data)
         if _should_send_default_pii():
             if isinstance(data, dict) and data.get("query"):
                 request_info = event.setdefault("request", {})
                 request_info["api_target"] = "graphql"
                 request_info["data"] = str(data["query"])
+
+        return event
+
+    return inner
+
+
+def _make_response_event_processor(response):
+    # type: (dict) -> EventProcessor
+    def inner(event, hint):
+        if _should_send_default_pii():
+            request_info = event.setdefault("contexts", {})
+            request_info["response"] = {
+                "data": response,
+            }
 
         return event
 
