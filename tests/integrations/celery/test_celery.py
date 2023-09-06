@@ -538,7 +538,7 @@ def test_sentry_propagate_traces_override(init_celery):
     )
 
     @celery.task(name="dummy_task", bind=True)
-    def dummy_task(self, x, y):
+    def dummy_task(self, message):
         trace_id = get_current_span().trace_id
         return trace_id
 
@@ -547,13 +547,13 @@ def test_sentry_propagate_traces_override(init_celery):
 
         # should propagate trace
         task_transaction_id = dummy_task.apply_async(
-            args=(1, 0),
+            args=("some message",),
         ).get()
         assert transaction_trace_id == task_transaction_id
 
         # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
         task_transaction_id = dummy_task.apply_async(
-            args=(1, 0),
+            args=("another message",),
             headers={"sentry-propagate-traces": False},
         ).get()
         assert transaction_trace_id != task_transaction_id
