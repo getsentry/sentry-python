@@ -126,21 +126,21 @@ def test_transaction_with_error(
     sentry_init, crashing_app, capture_events, DictionaryContaining  # noqa:N803
 ):
     def dogpark(environ, start_response):
-        raise Exception("Fetch aborted. The ball was not returned.")
+        raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(send_default_pii=True, traces_sample_rate=1.0)
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     error_event, envelope = events
 
     assert error_event["transaction"] == "generic WSGI request"
     assert error_event["contexts"]["trace"]["op"] == "http.server"
-    assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert error_event["exception"]["values"][0]["type"] == "ValueError"
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
     assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
     assert (
@@ -189,14 +189,14 @@ def test_has_trace_if_performance_enabled(
 ):
     def dogpark(environ, start_response):
         capture_message("Attempting to fetch the ball")
-        raise Exception("Fetch aborted. The ball was not returned.")
+        raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(traces_sample_rate=1.0)
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     msg_event, error_event, transaction_event = events
@@ -223,14 +223,14 @@ def test_has_trace_if_performance_disabled(
 ):
     def dogpark(environ, start_response):
         capture_message("Attempting to fetch the ball")
-        raise Exception("Fetch aborted. The ball was not returned.")
+        raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init()
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
     events = capture_events()
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         client.get("http://dogs.are.great/sit/stay/rollover/")
 
     msg_event, error_event = events
@@ -248,7 +248,7 @@ def test_trace_from_headers_if_performance_enabled(
 ):
     def dogpark(environ, start_response):
         capture_message("Attempting to fetch the ball")
-        raise Exception("Fetch aborted. The ball was not returned.")
+        raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init(traces_sample_rate=1.0)
     app = SentryWsgiMiddleware(dogpark)
@@ -258,7 +258,7 @@ def test_trace_from_headers_if_performance_enabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         client.get(
             "http://dogs.are.great/sit/stay/rollover/",
             headers={"sentry-trace": sentry_trace_header},
@@ -286,7 +286,7 @@ def test_trace_from_headers_if_performance_disabled(
 ):
     def dogpark(environ, start_response):
         capture_message("Attempting to fetch the ball")
-        raise Exception("Fetch aborted. The ball was not returned.")
+        raise ValueError("Fetch aborted. The ball was not returned.")
 
     sentry_init()
     app = SentryWsgiMiddleware(dogpark)
@@ -296,7 +296,7 @@ def test_trace_from_headers_if_performance_disabled(
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         client.get(
             "http://dogs.are.great/sit/stay/rollover/",
             headers={"sentry-trace": sentry_trace_header},
