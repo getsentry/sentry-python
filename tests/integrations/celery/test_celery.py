@@ -375,7 +375,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         # Celery 4.1 raises a gibberish exception
         res.wait()
 
