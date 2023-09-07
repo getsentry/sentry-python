@@ -286,6 +286,8 @@ class _Client(object):
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.utcnow()
 
+        logger.debug("[Lifecycle] event_prepare (event=)")
+
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
             event_ = scope.apply_to_event(event, hint, self.options)
@@ -365,6 +367,10 @@ class _Client(object):
         ):
             new_event = None
             with capture_internal_exceptions():
+                logger.debug(
+                    "[Lifecycle] event_before_send (before_send=%s,j event=)",
+                    str(before_send),
+                )
                 new_event = before_send(event, hint or {})
             if new_event is None:
                 logger.info("before send dropped event")
@@ -382,6 +388,10 @@ class _Client(object):
         ):
             new_event = None
             with capture_internal_exceptions():
+                logger.debug(
+                    "[Lifecycle] event_before_send_transaction (before_send_transaction=%s,j event=)",
+                    str(before_send_transaction),
+                )
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
                 logger.info("before send transaction dropped event")
@@ -578,6 +588,7 @@ class _Client(object):
                 envelope.add_event(event_opt)
 
             for attachment in attachments or ():
+                logger.debug("[Lifecycle] envelope_add_attachment (attachment=)")
                 envelope.add_item(attachment.to_envelope_item())
 
             self.transport.capture_envelope(envelope)

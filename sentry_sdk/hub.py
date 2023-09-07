@@ -431,6 +431,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             logger.info("Dropped breadcrumb because no client bound")
             return
 
+        logger.debug("[Lifecycle] breadcrumb_add (crumb=%s, hint=%s)", crumb, hint)
+
         crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
         if not crumb:
@@ -502,6 +504,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         span = self.scope.span
         if span is not None:
+            logger.debug("[Lifecycle] span_start_child (parent=%s, child=)", span)
             return span.start_child(**kwargs)
 
         # If there is already a trace_id in the propagation context, use it.
@@ -511,6 +514,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             if trace_id is not None:
                 kwargs["trace_id"] = trace_id
 
+        logger.debug(
+            "[Lifecycle] span_start (span=)",
+        )
         return Span(**kwargs)
 
     def start_transaction(
@@ -564,6 +570,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         profile = Profile(transaction, hub=self)
         profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
+        logger.debug("[Lifecycle] transaction_start (%s)", transaction)
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction

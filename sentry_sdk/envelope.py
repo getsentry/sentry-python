@@ -5,7 +5,7 @@ import mimetypes
 from sentry_sdk._compat import text_type, PY2
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.session import Session
-from sentry_sdk.utils import json_dumps, capture_internal_exceptions
+from sentry_sdk.utils import json_dumps, capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
     from typing import Any
@@ -33,6 +33,7 @@ class Envelope(object):
         items=None,  # type: Optional[List[Item]]
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_create ()")
         if headers is not None:
             headers = dict(headers)
         self.headers = headers or {}
@@ -54,30 +55,35 @@ class Envelope(object):
         self, event  # type: Event
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_add_event (event=)")
         self.add_item(Item(payload=PayloadRef(json=event), type="event"))
 
     def add_transaction(
         self, transaction  # type: Event
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_add_transaction (transaction=)")
         self.add_item(Item(payload=PayloadRef(json=transaction), type="transaction"))
 
     def add_profile(
         self, profile  # type: Any
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_add_profile (profile=)")
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
 
     def add_checkin(
         self, checkin  # type: Any
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_add_checkin (checkin=)")
         self.add_item(Item(payload=PayloadRef(json=checkin), type="check_in"))
 
     def add_session(
         self, session  # type: Union[Session, Any]
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_add_session (session=)")
         if isinstance(session, Session):
             session = session.to_json()
         self.add_item(Item(payload=PayloadRef(json=session), type="session"))
@@ -86,6 +92,7 @@ class Envelope(object):
         self, sessions  # type: Any
     ):
         # type: (...) -> None
+        logger.debug("[Lifecycle] envelope_add_sessions (plural!) (sessions=)")
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
 
     def add_item(
