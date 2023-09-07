@@ -213,7 +213,7 @@ def _format_sql(cursor, sql):
 
 class Baggage(object):
     """
-    The W3C Baggage header information. (see https://www.w3.org/TR/baggage/)
+    The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
     """
 
     __slots__ = ("sentry_items", "third_party_items", "mutable")
