@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("celery")
 
-from sentry_sdk import Hub, configure_scope, start_transaction
+from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
 
 from sentry_sdk._compat import text_type
@@ -375,7 +375,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         # Celery 4.1 raises a gibberish exception
         res.wait()
 
@@ -526,3 +526,34 @@ def test_baggage_propagation(init_celery):
                 "custom=value",
             ]
         )
+
+
+def test_sentry_propagate_traces_override(init_celery):
+    """
+    Test if the `sentry-propagate-traces` header given to `apply_async`
+    overrides the `propagate_traces` parameter in the integration constructor.
+    """
+    celery = init_celery(
+        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
+    )
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, message):
+        trace_id = get_current_span().trace_id
+        return trace_id
+
+    with start_transaction() as transaction:
+        transaction_trace_id = transaction.trace_id
+
+        # should propagate trace
+        task_transaction_id = dummy_task.apply_async(
+            args=("some message",),
+        ).get()
+        assert transaction_trace_id == task_transaction_id
+
+        # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
+        task_transaction_id = dummy_task.apply_async(
+            args=("another message",),
+            headers={"sentry-propagate-traces": False},
+        ).get()
+        assert transaction_trace_id != task_transaction_id
