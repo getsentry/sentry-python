@@ -271,7 +271,7 @@ class Span(object):
         such as you would get from a WSGI/ASGI environ -
         rather than the form ``header-name``.
 
-        :param envrion: The ASGI/WSGI environ to pull information from.
+        :param environ: The ASGI/WSGI environ to pull information from.
         """
         if cls is Span:
             logger.warning(
