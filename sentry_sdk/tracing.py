@@ -554,7 +554,7 @@ class Transaction(Span):
             If True this transaction will be kept, if False it will be discarded.
         :param baggage: The W3C baggage header value.
             (see https://www.w3.org/TR/baggage/)
-        :param source: A string describing the source of the transactions name.
+        :param source: A string describing the source of the transaction name.
             This will be used to determine the transaction's type.
             See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
             for more information. Default "custom".
