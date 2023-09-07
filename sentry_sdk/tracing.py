@@ -616,7 +616,7 @@ class Transaction(Span):
     def containing_transaction(self):
         # type: () -> Transaction
         """The root element of the span tree.
-        In the case of the transaction, it is the transaction itself.
+        In the case of a transaction it is the transaction itself.
         """
 
         # Transactions (as spans) belong to themselves (as transactions). This
