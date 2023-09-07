@@ -523,7 +523,7 @@ class Span(object):
 
 class Transaction(Span):
     """The Transaction is the root element that holds all the spans
-    for the Sentry performance instrumentation."""
+    for Sentry performance instrumentation."""
 
     __slots__ = (
         "name",
