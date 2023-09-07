@@ -501,7 +501,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # THIS BLOCK IS DEPRECATED
         # We do not pass a span into start_span in our code base, so I deprecate this.
         if span is not None:
-            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future. "
+            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future."
             logger.warning(deprecation_msg)
             return span
 
