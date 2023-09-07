@@ -53,6 +53,8 @@
 
     If your system serves heavy load, please let us know how this feature works for you!
 
+    Check out the [documentation](https://docs.sentry.io/platforms/python/configuration/options/#enable-backpressure-handling) for more information.
+
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso
 - Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
