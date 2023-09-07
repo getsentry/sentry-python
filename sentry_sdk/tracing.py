@@ -755,7 +755,7 @@ class Transaction(Span):
         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`
         associated with the Transaction.
 
-        The first time a new baggage with sentry items is made,
+        The first time a new baggage with Sentry items is made,
         it will be frozen."""
 
         if not self._baggage or self._baggage.mutable:
