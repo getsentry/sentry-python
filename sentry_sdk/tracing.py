@@ -442,7 +442,7 @@ class Span(object):
         # to incompatible return types for Span.finish and Transaction.finish.
         """Sets the end timestamp of the span.
         Additionally it also creates a breadcrumb from the span,
-        if the span represents a database or http request.
+        if the span represents a database or HTTP request.
 
         :param hub: The hub to use for this transaction.
             If not provided, the current hub will be used.
