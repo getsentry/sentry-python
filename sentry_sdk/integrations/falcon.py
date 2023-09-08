@@ -206,14 +206,20 @@ def _patch_prepare_middleware():
     original_prepare_middleware = falcon_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
-        middleware=None, independent_middleware=False
+        middleware=None,
+        independent_middleware=False,
+        asgi=False,
+        *args,  # args and kwargs for future compatibility
+        **kwargs,
     ):
-        # type: (Any, Any) -> Any
+        # type: (Any, Any, bool, *Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
-        if integration is not None:
+        if integration is not None and not asgi:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
-        return original_prepare_middleware(middleware, independent_middleware)
+        return original_prepare_middleware(
+            middleware, independent_middleware, asgi, *args, **kwargs
+        )
 
     falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
