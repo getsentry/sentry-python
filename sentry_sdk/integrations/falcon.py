@@ -210,7 +210,7 @@ def _patch_prepare_middleware():
         independent_middleware=False,
         asgi=False,
         *args,  # args and kwargs for future compatibility
-        **kwargs,
+        **kwargs
     ):
         # type: (Any, Any, bool, *Any, **Any) -> Any
         hub = Hub.current
