@@ -379,7 +379,8 @@ class Span(object):
     def to_baggage(self):
         # type: () -> Optional[Baggage]
         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`
-        associated with this ``Span``, if any. (Taken from the root of the span tree.)"""
+        associated with this ``Span``, if any. (Taken from the root of the span tree.)
+        """
         if self.containing_transaction:
             return self.containing_transaction.get_baggage()
         return None
