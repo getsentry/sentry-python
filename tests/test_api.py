@@ -120,6 +120,10 @@ def test_continue_trace(sentry_init):
 
 
 def test_start_span_creates_new_transaction(sentry_init):
+    """
+    Test that `start_span` creates and starts a new Transaction
+    if there is no active transaction.
+    """
     sentry_init(traces_sample_rate=1.0)
     hub = Hub.current
     now = datetime.utcnow()
@@ -160,6 +164,7 @@ def test_start_span_creates_new_transaction(sentry_init):
     }
 
     with start_span(**start_span_parameters) as span:
+        # Enhance the span/transaction with some data
         span.set_data("some_key", "some_value")
         span.set_tag("some_tag_key", "some_tag_value")
 
@@ -169,6 +174,9 @@ def test_start_span_creates_new_transaction(sentry_init):
 
 
 def test_start_span_uses_existing_transaction(sentry_init):
+    """
+    Test that `start_span` uses an existing transaction if there is one.
+    """
     sentry_init(traces_sample_rate=1.0)
     hub = Hub.current
     now = datetime.utcnow()
@@ -210,12 +218,67 @@ def test_start_span_uses_existing_transaction(sentry_init):
 
     with start_transaction(name="some-existing-transaction") as transaction:
         with start_span(**start_span_parameters) as span:
+            # Enhance the span/transaction with some data
             span.set_data("some_key", "some_value")
             span.set_tag("some_tag_key", "some_tag_value")
 
+            # We except the span to be a child of the existing transaction
             expected_result_json["trace_id"] = transaction.trace_id
             expected_result_json["parent_span_id"] = transaction.span_id
 
             assert type(span) == Span
             assert span.containing_transaction == transaction
             assert span.to_json() == expected_result_json
+
+
+def test_start_span_accepts_name_parameter(sentry_init):
+    """
+    Test that ``start_span`` accepts a ``name`` parameter.
+    Behind the scenes everything is still called ``description``.
+    """
+    sentry_init(traces_sample_rate=1.0)
+
+    with start_transaction(name="some-existing-transaction"):
+        with start_span(op="test_op", name="test_name") as span:
+            assert type(span) == Span
+            assert not hasattr(span, "name")
+            assert span.description == "test_name"
+            assert span.to_json()["description"] == "test_name"
+
+    # When there is no active transaction, a transaction will be
+    # created and thus behind the scenes it is ``name``.
+    # (Because transactions have a ``name``, no ``description``)
+    with start_span(op="test_op", name="test_name") as span:
+        assert type(span) == Transaction
+        assert hasattr(
+            span, "description"
+        )  # Transactions have a description (because the inherit from Span) ...
+        assert span.description is None  # ... but is is not set
+        assert span.name == "test_name"
+        assert span.to_json()["name"] == "test_name"
+
+
+def test_start_span_accepts_description_parameter(sentry_init):
+    """
+    Test that ``start_span`` accepts a ``description`` parameter.
+    """
+    sentry_init(traces_sample_rate=1.0)
+
+    with start_transaction(name="some-existing-transaction"):
+        with start_span(op="test_op", description="test_description") as span:
+            assert type(span) == Span
+            assert not hasattr(span, "name")
+            assert span.description == "test_description"
+            assert span.to_json()["description"] == "test_description"
+
+    # When there is no active transaction, a transaction will be
+    # created and thus behind the scenes it is ``name``.
+    # (Because transactions have a ``name``, no ``description``)
+    with start_span(op="test_op", description="test_description") as span:
+        assert type(span) == Transaction
+        assert hasattr(
+            span, "description"
+        )  # Transactions have a description (because the inherit from Span) ...
+        assert span.description is None  # ... but is is not set
+        assert span.name == "test_description"
+        assert span.to_json()["name"] == "test_description"
