@@ -512,6 +512,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             name = kwargs.pop("name", None)
             if name is not None:
                 kwargs["description"] = name
+            if "trace_id" in kwargs:
+                kwargs.pop("trace_id")
+            if "parent_span_id" in kwargs:
+                kwargs.pop("parent_span_id")
+            if "containing_transaction" in kwargs:
+                kwargs.pop("containing_transaction")
             new_child_span = active_span.start_child(**kwargs)
             return new_child_span
 
@@ -524,21 +530,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             if trace_id is not None:
                 kwargs["trace_id"] = trace_id
 
-        return Span(**kwargs)
+        description = kwargs.pop("description", None)
+        if description is not None:
+            kwargs["name"] = description
+        transaction = Transaction(**kwargs)
+        active_transaction = self.start_transaction(transaction)
+        return active_transaction
 
-    def start_active_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        from sentry_sdk.api import get_current_span
+    def start_inactive_span(
+        self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
+    ):
+        """
+        Start a span but do not make it the active span.
 
-        span = get_current_span()
-
-        # i no active transaction, create active transaction
-        if span is None:
-            return self.start_transaction(**kwargs)
-
-        # add child span to active transaction
-        name = kwargs.pop("name")
-        kwargs["description"] = name
-        return span.start_child(**kwargs)
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
+        """
+        self.start_span(span=span, instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs

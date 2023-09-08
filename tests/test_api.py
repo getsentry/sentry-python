@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sentry_sdk import (
     configure_scope,
     continue_trace,
@@ -5,8 +7,10 @@ from sentry_sdk import (
     get_current_span,
     get_traceparent,
     start_transaction,
+    start_span,
 )
 from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import Span, Transaction
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -113,3 +117,105 @@ def test_continue_trace(sentry_init):
         assert propagation_context["dynamic_sampling_context"] == {
             "trace_id": "566e3688a61d4bc888951642d6f14a19"
         }
+
+
+def test_start_span_creates_new_transaction(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+    hub = Hub.current
+    now = datetime.utcnow()
+
+    start_span_parameters = {
+        "op": "test_op",
+        "description": "test_description",
+        "span_id": "1111111111111111",
+        "parent_span_id": "2222222222222222",
+        "trace_id": "33333333333333333333333333333333",
+        "same_process_as_parent": True,
+        "sampled": False,
+        "hub": hub,
+        "status": "dummy-status",
+        "containing_transaction": None,  # todo add some transaction
+        "start_timestamp": now,
+    }
+
+    expected_result_json = {
+        "op": "test_op",
+        "name": "test_description",
+        "description": None,  # The transaction having a None description in the JSON is existing behaviour
+        "span_id": "1111111111111111",
+        "parent_span_id": "2222222222222222",
+        "trace_id": "33333333333333333333333333333333",
+        "same_process_as_parent": True,
+        "start_timestamp": now,
+        "timestamp": None,  # transaction not finished yet, thus None
+        "tags": {
+            "status": "dummy-status",
+            "some_tag_key": "some_tag_value",
+        },
+        "data": {
+            "some_key": "some_value",
+        },
+        "source": "custom",
+        "sampled": False,
+    }
+
+    with start_span(**start_span_parameters) as span:
+        span.set_data("some_key", "some_value")
+        span.set_tag("some_tag_key", "some_tag_value")
+
+        assert type(span) == Transaction
+        assert span.containing_transaction == span
+        assert span.to_json() == expected_result_json
+
+
+def test_start_span_uses_existing_transaction(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+    hub = Hub.current
+    now = datetime.utcnow()
+
+    start_span_parameters = {
+        "op": "test_op",
+        "description": "test_description",
+        "span_id": "1111111111111111",
+        "parent_span_id": "2222222222222222",
+        "trace_id": "33333333333333333333333333333333",
+        "same_process_as_parent": True,
+        "sampled": False,
+        "hub": hub,
+        "status": "dummy-status",
+        "containing_transaction": None,  # todo add some transaction
+        "start_timestamp": now,
+    }
+
+    expected_result_json = {
+        "op": "test_op",
+        # there is no "name" in a span
+        "description": "test_description",
+        "span_id": "1111111111111111",
+        "parent_span_id": None,  # will be set from transaciton, see below
+        "trace_id": None,  # will be set from transaciton, see below
+        "same_process_as_parent": True,
+        "start_timestamp": now,
+        "timestamp": None,  # Span not finished yet, thus None
+        "tags": {
+            "status": "dummy-status",
+            "some_tag_key": "some_tag_value",
+        },
+        "data": {
+            "some_key": "some_value",
+        },
+        # there is no "source" in a span
+        # there is no "sampled" in a span
+    }
+
+    with start_transaction(name="some-existing-transaction") as transaction:
+        with start_span(**start_span_parameters) as span:
+            span.set_data("some_key", "some_value")
+            span.set_tag("some_tag_key", "some_tag_value")
+
+            expected_result_json["trace_id"] = transaction.trace_id
+            expected_result_json["parent_span_id"] = transaction.span_id
+
+            assert type(span) == Span
+            assert span.containing_transaction == transaction
+            assert span.to_json() == expected_result_json
