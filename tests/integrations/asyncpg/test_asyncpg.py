@@ -34,14 +34,11 @@ PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
 CRUMBS_CONNECT = {
     "category": "query",
     "data": {
-        "connection.config": "ConnectionConfiguration(command_timeout=None, "
-        "statement_cache_size=100, "
-        "max_cached_statement_lifetime=300, "
-        "max_cacheable_statement_size=15360)",
-        "connection.connect_timeout": 60,
-        "connection.database": PG_NAME,
-        "connection.host": [PG_HOST, PG_PORT],
-        "connection.user": PG_USER,
+        "db.name": "postgres",
+        "db.system": "postgresql",
+        "db.user": "foo",
+        "server.address": "localhost",
+        "server.port": 5432,
     },
     "message": "connect",
     "type": "default",
