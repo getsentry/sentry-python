@@ -1,7 +1,7 @@
 import contextlib
 from typing import Any, TypeVar, Callable, Awaitable
 
-from asyncpg.cursor import BaseCursor, CursorIterator
+from asyncpg.cursor import BaseCursor
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
@@ -41,12 +41,7 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection._executemany = _wrap_connection_method(
             asyncpg.Connection._executemany, executemany=True
         )
-        asyncpg.connection.cursor.BaseCursor._exec = _wrap_basecursor_exec(
-            asyncpg.connection.cursor.BaseCursor._exec
-        )
-        asyncpg.connection.cursor.CursorIterator.__anext__ = _wrap_cursoriterator_anext(
-            asyncpg.connection.cursor.CursorIterator.__anext__
-        )
+        asyncpg.Connection.cursor = _wrap_cursor_creation(asyncpg.Connection.cursor)
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
             asyncpg.connect_utils._connect_addr
@@ -126,62 +121,34 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_basecursor_exec(
+def _wrap_cursor_creation(
     f: Callable[..., Awaitable[T]]
 ) -> Callable[..., Awaitable[T]]:
-    async def _exec(self: BaseCursor, n, timeout) -> T:
+    def _inner(*args, **kwargs) -> T:  # noqa: N807
+
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
         if integration is None:
-            return await f(self, n, timeout)
+            return f(*args, **kwargs)
 
-        params_list = self._args[1] if len(self._args) > 1 else None
-
-        executemany = n > 1
-
-        with _record(
-            hub,
-            self,
-            self._query,
-            params_list,
-            executemany=executemany,
-        ):
-            res = await f(self, n, timeout)
-        return res
-
-    return _exec
-
-
-def _wrap_cursoriterator_anext(
-    f: Callable[..., Awaitable[T]]
-) -> Callable[..., Awaitable[T]]:
-    async def __await__(self: CursorIterator) -> T:  # noqa: N807
-        hub = Hub.current
-        integration = hub.get_integration(AsyncPGIntegration)
-
-        if integration is None:
-            return await f(self)
-
-        params_list = self._args[0]
+        query = args[1]
+        params_list = args[2] if len(args) > 2 else None
 
         with _record(
             hub,
-            self,
-            self._query,
+            None,
+            query,
             params_list,
             executemany=False,
         ) as span:
-            try:
-                _set_db_data(span, self._connection)
-                res = await f(self)
-            except StopAsyncIteration:
-                span.set_data("db.cursor.exhausted", True)
-                raise StopAsyncIteration
+            _set_db_data(span, args[0])
+            res = f(*args, **kwargs)
+            span.set_data("db.cursor", res)
 
         return res
 
-    return __await__
+    return _inner
 
 
 def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:

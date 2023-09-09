@@ -9,7 +9,6 @@ docker run --rm --name some-postgres -e POSTGRES_USER=foo -e POSTGRES_PASSWORD=b
 The tests use the following credentials to establish a database connection.
 """
 import os
-import re
 
 
 PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
@@ -261,11 +260,6 @@ async def test_cursor(sentry_init, capture_events) -> None:
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
-        if "db.cursor" in crumb["data"]:
-            # asyncpg cursor's __repr__ adds the memory address - replace for testing purposes
-            crumb["data"]["db.cursor"] = re.sub(
-                r"0x.+>$", "0xdeadbeef1234>", crumb["data"]["db.cursor"]
-            )
 
     assert event["breadcrumbs"]["values"] == [
         CRUMBS_CONNECT,
@@ -278,29 +272,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
         {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
         {
             "category": "query",
-            "data": {
-                "db.cursor": '<asyncpg.CursorIterator "SELECT * FROM users WHERE dob " '
-                "exhausted 0xdeadbeef1234>"
-            },
-            "message": "SELECT * FROM users WHERE dob > $1",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.cursor": '<asyncpg.CursorIterator "SELECT * FROM users WHERE dob " '
-                "exhausted 0xdeadbeef1234>"
-            },
-            "message": "SELECT * FROM users WHERE dob > $1",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.cursor": '<asyncpg.CursorIterator "SELECT * FROM users WHERE dob " '
-                "exhausted 0xdeadbeef1234>",
-                "db.cursor.exhausted": True,
-            },
+            "data": {},
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
@@ -346,11 +318,6 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
-        if "db.cursor" in crumb["data"]:
-            # asyncpg cursor's __repr__ adds the memory address - replace for testing purposes
-            crumb["data"]["db.cursor"] = re.sub(
-                r"0x.+>$", "0xdeadbeef1234>", crumb["data"]["db.cursor"]
-            )
 
     assert event["breadcrumbs"]["values"] == [
         CRUMBS_CONNECT,
@@ -363,19 +330,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
         {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
         {
             "category": "query",
-            "data": {
-                "db.cursor": '<asyncpg.Cursor "SELECT * FROM users WHERE dob " '
-                "exhausted 0xdeadbeef1234>"
-            },
-            "message": "SELECT * FROM users WHERE dob > $1",
-            "type": "default",
-        },
-        {
-            "category": "query",
-            "data": {
-                "db.cursor": '<asyncpg.Cursor "SELECT * FROM users WHERE dob " '
-                "exhausted 0xdeadbeef1234>"
-            },
+            "data": {},
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
