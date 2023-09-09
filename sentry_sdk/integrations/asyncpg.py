@@ -1,8 +1,8 @@
 from __future__ import annotations
 import contextlib
-from typing import Any, TypeVar, Callable, Awaitable
+from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
-from asyncpg.cursor import BaseCursor
+from asyncpg.cursor import BaseCursor  # type: ignore
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
@@ -26,8 +26,9 @@ if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
 
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
+    _record_params = False
 
-    def __init__(self, *, record_params=False):
+    def __init__(self, *, record_params: bool = False):
         AsyncPGIntegration._record_params = record_params
 
     @staticmethod
@@ -53,7 +54,7 @@ T = TypeVar("T")
 
 
 def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-    async def _inner(*args, **kwargs) -> T:
+    async def _inner(*args: Any, **kwargs: Any) -> T:
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
@@ -80,10 +81,10 @@ def _record(
     hub: Hub,
     cursor: SubCursor | None,
     query: str,
-    params_list: tuple | None,
+    params_list: tuple[Any, ...] | None,
     *,
     executemany: bool = False,
-):
+) -> Iterator[Span]:
     integration = hub.get_integration(AsyncPGIntegration)
     if not integration._record_params:
         params_list = None
@@ -103,7 +104,7 @@ def _record(
 
 
 def _wrap_connection_method(
-    f: Callable[..., Awaitable[T]], *, executemany=False
+    f: Callable[..., Awaitable[T]], *, executemany: bool = False
 ) -> Callable[..., Awaitable[T]]:
     async def _inner(*args: Any, **kwargs: Any) -> T:
         hub = Hub.current
@@ -122,11 +123,8 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_cursor_creation(
-    f: Callable[..., Awaitable[T]]
-) -> Callable[..., Awaitable[T]]:
-    def _inner(*args, **kwargs) -> T:  # noqa: N807
-
+def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
+    def _inner(*args: Any, **kwargs: Any) -> T:  # noqa: N807
         hub = Hub.current
         integration = hub.get_integration(AsyncPGIntegration)
 
