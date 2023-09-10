@@ -26,6 +26,9 @@ class AsyncClientInterceptor(UnaryUnaryClientInterceptor):
             span.set_data("method", method)
 
             for key, value in hub.iter_trace_propagation_headers():
+                # Currently broken
+                # Waiting for response here
+                # https://github.com/grpc/grpc/issues/34298
                 client_call_details.metadata.add(key, value)
 
             response = await continuation(client_call_details, request)
