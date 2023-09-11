@@ -113,6 +113,11 @@ def write_yaml_file(
                 out += "".join(lines)
                 f.close()
 
+        elif template_line.strip() == "{{ setup_postgres }}":
+            if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
+                out += "          psql -V\n"
+                out += "          psql -c create 'database somethingstupid;'\n"
+
         elif template_line.strip() == "{{ check_needs }}":
             if py27_supported:
                 out += CHECK_NEEDS_PY27
