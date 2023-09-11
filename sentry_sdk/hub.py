@@ -479,6 +479,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
+        # THIS BLOCK IS DEPRECATED
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before
         # start_transaction existed, to allow for a smoother transition.
@@ -487,24 +488,33 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "Deprecated: use start_transaction to start transactions and "
                 "Transaction.start_child to start spans."
             )
+
             if isinstance(span, Transaction):
                 logger.warning(deprecation_msg)
                 return self.start_transaction(span)
+
             if "transaction" in kwargs:
                 logger.warning(deprecation_msg)
                 name = kwargs.pop("transaction")
                 return self.start_transaction(name=name, **kwargs)
 
+        # THIS BLOCK IS DEPRECATED
+        # We do not pass a span into start_span in our code base, so I deprecate this.
         if span is not None:
+            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future."
+            logger.warning(deprecation_msg)
             return span
 
         kwargs.setdefault("hub", self)
 
-        span = self.scope.span
-        if span is not None:
-            return span.start_child(**kwargs)
+        active_span = self.scope.span
+        if active_span is not None:
+            new_child_span = active_span.start_child(**kwargs)
+            return new_child_span
 
         # If there is already a trace_id in the propagation context, use it.
+        # This does not need to be done for `start_child` above because it takes
+        # the trace_id from the parent span.
         if "trace_id" not in kwargs:
             traceparent = self.get_traceparent()
             trace_id = traceparent.split("-")[0] if traceparent else None

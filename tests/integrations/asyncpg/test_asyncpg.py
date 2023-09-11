@@ -33,11 +33,11 @@ PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
 CRUMBS_CONNECT = {
     "category": "query",
     "data": {
-        "db.name": "postgres",
+        "db.name": PG_NAME,
         "db.system": "postgresql",
-        "db.user": "foo",
-        "server.address": "localhost",
-        "server.port": 5432,
+        "db.user": PG_USER,
+        "server.address": PG_HOST,
+        "server.port": PG_PORT,
     },
     "message": "connect",
     "type": "default",
