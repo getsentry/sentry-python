@@ -121,8 +121,14 @@ DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memor
 try:
     import psycopg2  # noqa
 
+    db_engine = "django.db.backends.postgresql"
+    try:
+        from django.db.backends import postgresql  # noqa: F401
+    except ImportError:
+        db_engine = "django.db.backends.postgresql_psycopg2"
+
     DATABASES["postgres"] = {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": db_engine,
         "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
         "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
         "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
@@ -130,7 +136,9 @@ try:
         "PORT": 5432,
     }
 except (ImportError, KeyError):
-    pass
+    from sentry_sdk.utils import logger
+
+    logger.warn("No psycopg2 found, testing with SQLite.")
 
 
 # Password validation
