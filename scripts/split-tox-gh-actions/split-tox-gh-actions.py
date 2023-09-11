@@ -117,10 +117,10 @@ def write_yaml_file(
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 out += "          echo '##############################'\n"
                 out += "          printenv | grep SENTRY\n"
-                out += "          psql postgresql://postgres:sentry@localhost:5432 -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'\n"
-                out += "          psql postgresql://postgres:sentry@localhost:5432 -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'\n"
-                out += "          psql postgresql://postgres:sentry@localhost:5432 -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'\n"
-                out += "          psql postgresql://postgres:sentry@localhost:5432 -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'\n"
+                out += '          psql postgresql://postgres:sentry@localhost:5432 -c "create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};"\n'
+                out += '          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};"\n'
+                out += "          psql postgresql://postgres:sentry@localhost:5432 -c \"alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';\"\n"
+                out += '          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};"\n'
 
         elif template_line.strip() == "{{ check_needs }}":
             if py27_supported:
