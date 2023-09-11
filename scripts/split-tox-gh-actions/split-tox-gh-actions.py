@@ -30,7 +30,10 @@ TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
 TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
 TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
 
-FRAMEWORKS_NEEDING_POSTGRES = ["django"]
+FRAMEWORKS_NEEDING_POSTGRES = [
+    "django",
+    "asyncpg",
+]
 
 MATRIX_DEFINITION = """
     strategy:
