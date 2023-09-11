@@ -115,6 +115,7 @@ def write_yaml_file(
 
         elif template_line.strip() == "{{ setup_postgres }}":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
+                out += "          printenv | grep SENTRY\n"
                 out += "          psql -V\n"
                 out += "          psql -c create 'database somethingstupid;'\n"
 
