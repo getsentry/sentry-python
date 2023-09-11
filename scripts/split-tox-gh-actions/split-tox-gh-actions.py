@@ -118,10 +118,10 @@ def write_yaml_file(
                 out += "          echo '##############################'\n"
                 out += "          printenv | grep SENTRY\n"
                 out += "          export POSTGRES_PASSWORD=sentry\n"
-                out += "          psql -h localhost -h localhost -U postgres -w -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'\n"
-                out += "          psql -h localhost -h localhost -U postgres -w -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'\n"
-                out += "          psql -h localhost -h localhost -U postgres -w -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'\n"
-                out += "          psql -h localhost -h localhost -U postgres -w -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'\n"
+                out += "          psql -h localhost -U postgres -w -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'\n"
+                out += "          psql -h localhost -U postgres -w -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'\n"
+                out += "          psql -h localhost -U postgres -w -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'\n"
+                out += "          psql -h localhost -U postgres -w -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'\n"
 
         elif template_line.strip() == "{{ check_needs }}":
             if py27_supported:
