@@ -74,6 +74,13 @@ class SPANDATA:
     Example: myDatabase
     """
 
+    DB_USER = "db.user"
+    """
+    The name of the database user used for connecting to the database.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: my_user
+    """
+
     DB_OPERATION = "db.operation"
     """
     The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
