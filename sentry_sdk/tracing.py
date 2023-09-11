@@ -424,6 +424,8 @@ class Span(object):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         # XXX: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
+        logger.debug("[Lifecycle] span_finish (span=%s)", self)
+
         if self.timestamp is not None:
             # This span is already finished, ignore.
             return None
@@ -576,6 +578,8 @@ class Transaction(Span):
 
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        logger.debug("[Lifecycle] transaction_finish (transaction=%s)", self)
+
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
@@ -635,6 +639,11 @@ class Transaction(Span):
         contexts = {}
         contexts.update(self._contexts)
         contexts.update({"trace": self.get_trace_context()})
+
+        logger.debug(
+            "[Lifecycle] event_create_from_transaction (and/or span?) (transaction=%s)",
+            self,
+        )
 
         event = {
             "type": "transaction",

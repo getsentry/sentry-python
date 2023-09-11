@@ -342,6 +342,7 @@ class HttpTransport(Transport):
             f.write(json_dumps(event))
 
         assert self.parsed_dsn is not None
+        logger.debug("[Lifecycle] transport_send_event (event=)")
         logger.debug(
             "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
             % (
@@ -394,6 +395,7 @@ class HttpTransport(Transport):
             envelope.serialize_into(f)
 
         assert self.parsed_dsn is not None
+        logger.debug("[Lifecycle] transport_send_envelope (envelope=)")
         logger.debug(
             "Sending envelope [%s] project:%s host:%s",
             envelope.description,
@@ -482,6 +484,10 @@ class HttpTransport(Transport):
         self, event  # type: Event
     ):
         # type: (...) -> None
+        logger.debug(
+            "[Lifecycle] transport_before_send_event (/store endpointm, DEPRECATED) (event=)"
+        )
+
         hub = self.hub_cls.current
 
         def send_event_wrapper():
@@ -499,6 +505,9 @@ class HttpTransport(Transport):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
+        logger.debug(
+            "[Lifecycle] transport_before_send_envelope (/envelope endpoint) (event=)"
+        )
         hub = self.hub_cls.current
 
         def send_envelope_wrapper():

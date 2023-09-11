@@ -569,6 +569,7 @@ class Scope(object):
     ):
         # type: (...) -> Optional[Event]
         """Applies the information contained on the scope to the given event."""
+        logger.debug("[Lifecycle] scope_apply_to_event (event=, scope=%s)", self)
 
         def _drop(cause, ty):
             # type: (Any, str) -> Optional[Any]
