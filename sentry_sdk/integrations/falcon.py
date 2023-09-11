@@ -206,18 +206,12 @@ def _patch_prepare_middleware():
     original_prepare_middleware = falcon_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
-        middleware=None,
-        independent_middleware=False,
-        asgi=False,
-        *args,  # args and kwargs for future compatibility
-        **kwargs
+        middleware=None, independent_middleware=False, asgi=False
     ):
-        # type: (Any, Any, bool, *Any, **Any) -> Any
+        # type: (Any, Any, bool) -> Any
         if asgi:
             # We don't support ASGI Falcon apps, so we don't patch anything here
-            return original_prepare_middleware(
-                middleware, independent_middleware, asgi, *args, **kwargs
-            )
+            return original_prepare_middleware(middleware, independent_middleware, asgi)
 
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
@@ -226,9 +220,7 @@ def _patch_prepare_middleware():
 
         # We intentionally omit the asgi argument here, since the default is False anyways,
         # and this way, we remain backwards-compatible with pre-3.0.0 Falcon versions.
-        return original_prepare_middleware(
-            middleware, independent_middleware, *args, **kwargs
-        )
+        return original_prepare_middleware(middleware, independent_middleware)
 
     falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
