@@ -68,11 +68,11 @@ jobs:
           pip install coverage "tox>=3,<4"
           echo '##############################'
           printenv | grep SENTRY
-          psql -V
-          psql -h localhost -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
-          psql -h localhost -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'
-          psql -h localhost -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'
-          psql -h localhost -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
+          export POSTGRES_PASSWORD=sentry
+          psql -h localhost -h localhost -U postgres -w -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
+          psql -h localhost -h localhost -U postgres -w -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'
+          psql -h localhost -h localhost -U postgres -w -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'
+          psql -h localhost -h localhost -U postgres -w -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
 
       - name: Test django
         uses: nick-fields/retry@v2
