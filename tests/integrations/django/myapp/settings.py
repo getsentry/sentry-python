@@ -118,19 +118,19 @@ WSGI_APPLICATION = "tests.integrations.django.myapp.wsgi.application"
 
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 
-try:
-    import psycopg2  # noqa
+# try:
+import psycopg2  # noqa
 
-    DATABASES["postgres"] = {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
-        "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
-        "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
-        "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
-        "PORT": 5432,
-    }
-except (ImportError, KeyError):
-    pass
+DATABASES["postgres"] = {
+    "ENGINE": "django.db.backends.postgresql",
+    "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
+    "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
+    "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
+    "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
+    "PORT": 5432,
+}
+# except (ImportError, KeyError):
+#     pass
 
 
 # Password validation
