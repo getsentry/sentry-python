@@ -69,10 +69,10 @@ jobs:
           echo '##############################'
           printenv | grep SENTRY
           psql -V
-          psql -h postgres -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
-          psql -h postgres -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'
-          psql -h postgres -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'
-          psql -h postgres -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
+          psql -h localhost -c 'create user ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
+          psql -h localhost -c 'create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};'
+          psql -h localhost -c 'alter user ${SENTRY_PYTHON_TEST_POSTGRES_USER} with encrypted password '${SENTRY_PYTHON_TEST_POSTGRES_PASSWORD}';'
+          psql -h localhost -c 'grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};'
 
       - name: Test asyncpg
         uses: nick-fields/retry@v2
