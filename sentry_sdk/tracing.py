@@ -853,6 +853,14 @@ class NoOpSpan(Span):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
         pass
 
+    def set_measurement(self, name, value, unit=""):
+        # type: (str, float, MeasurementUnit) -> None
+        pass
+
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        pass
+
 
 def trace(func=None):
     # type: (Any) -> Any
