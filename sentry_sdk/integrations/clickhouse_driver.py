@@ -1,9 +1,10 @@
 from typing import ParamSpec, TypeVar, Callable
 
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 
@@ -60,6 +61,8 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
 
         instance._sentry_span = span  # type: ignore[attr-defined]
 
+        _set_db_data(span, instance)
+
         span.set_data("query", query)
 
         if query_id:
@@ -104,6 +107,8 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
         data = args[2]
         span = instance.connection._sentry_span  # type: ignore[attr-defined]
 
+        _set_db_data(span, instance)
+
         if _should_send_default_pii():
             db_params = span._data.get("db.params", [])
             db_params.extend(data)
@@ -112,3 +117,11 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
         return f(*args, **kwargs)
 
     return _inner_send_data
+
+
+def _set_db_data(span: Span, instance: clickhouse_driver.connection.Connection) -> None:
+    span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
+    span.set_data(SPANDATA.SERVER_ADDRESS, instance.host)
+    span.set_data(SPANDATA.SERVER_PORT, instance.port)
+    span.set_data(SPANDATA.DB_NAME, instance.database)
+    span.set_data(SPANDATA.DB_USER, instance.user)
