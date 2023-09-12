@@ -2,6 +2,7 @@ from typing import ParamSpec, TypeVar, Callable
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
+from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions
 
@@ -64,7 +65,7 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
         if query_id:
             span.set_data("db.query_id", query_id)
 
-        if params:
+        if params and _should_send_default_pii():
             span.set_data("db.params", params)
 
         # run the original code
@@ -82,12 +83,14 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
         span = instance.connection._sentry_span  # type: ignore[attr-defined]
 
         if span is not None:
-            if res is not None:
+            if res is not None and _should_send_default_pii():
                 span.set_data("db.result", res)
+
             with capture_internal_exceptions():
                 span.hub.add_breadcrumb(
                     message=span._data.pop("query"), category="query", data=span._data
                 )
+
             span.finish()
 
         return res
@@ -101,9 +104,11 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
         data = args[2]
         span = instance.connection._sentry_span  # type: ignore[attr-defined]
 
-        db_params = span._data.get("db.params", [])
-        db_params.extend(data)
-        span.set_data("db.params", db_params)
+        if _should_send_default_pii():
+            db_params = span._data.get("db.params", [])
+            db_params.extend(data)
+            span.set_data("db.params", db_params)
+
         return f(*args, **kwargs)
 
     return _inner_send_data
