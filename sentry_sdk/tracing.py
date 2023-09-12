@@ -872,25 +872,9 @@ class Transaction(Span):
 
 
 class NoOpSpan(Span):
-    def __init__(
-        self,
-        *args,  # type: Any
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> None
-        pass
-
     def __repr__(self):
         # type: () -> str
         return self.__class__.__name__
-
-    def __enter__(self):
-        # type: () -> Span
-        return self
-
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
-        pass
 
     @property
     def containing_transaction(self):
