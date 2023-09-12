@@ -52,16 +52,16 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
         hub = Hub.current
         if hub.get_integration(ClickhouseDriverIntegration) is None:
             return f(*args, **kwargs)
-        instance = args[0]
+        connection = args[0]
         query = args[1]
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
         span = hub.start_span(op=OP.DB, description=query)
 
-        instance._sentry_span = span  # type: ignore[attr-defined]
+        connection._sentry_span = span  # type: ignore[attr-defined]
 
-        _set_db_data(span, instance)
+        _set_db_data(span, connection)
 
         span.set_data("query", query)
 
@@ -107,7 +107,7 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
         data = args[2]
         span = instance.connection._sentry_span  # type: ignore[attr-defined]
 
-        _set_db_data(span, instance)
+        _set_db_data(span, instance.connection)
 
         if _should_send_default_pii():
             db_params = span._data.get("db.params", [])
@@ -119,9 +119,11 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     return _inner_send_data
 
 
-def _set_db_data(span: Span, instance: clickhouse_driver.connection.Connection) -> None:
+def _set_db_data(
+    span: Span, connection: clickhouse_driver.connection.Connection
+) -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
-    span.set_data(SPANDATA.SERVER_ADDRESS, instance.host)
-    span.set_data(SPANDATA.SERVER_PORT, instance.port)
-    span.set_data(SPANDATA.DB_NAME, instance.database)
-    span.set_data(SPANDATA.DB_USER, instance.user)
+    span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
+    span.set_data(SPANDATA.SERVER_PORT, connection.port)
+    span.set_data(SPANDATA.DB_NAME, connection.database)
+    span.set_data(SPANDATA.DB_USER, connection.user)
