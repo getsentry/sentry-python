@@ -797,9 +797,30 @@ class Transaction(Span):
 
 
 class NoOpSpan(Span):
+    def __init__(
+        self,
+        *args,  # type: Any
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> None
+        pass
+
     def __repr__(self):
         # type: () -> str
         return self.__class__.__name__
+
+    def __enter__(self):
+        # type: () -> Span
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        pass
+
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+        return None
 
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, **Any) -> NoOpSpan
@@ -814,6 +835,10 @@ class NoOpSpan(Span):
         return ""
 
     def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        return None
+
+    def get_baggage(self):
         # type: () -> Optional[Baggage]
         return None
 
@@ -859,6 +884,14 @@ class NoOpSpan(Span):
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
+        pass
+
+    def init_span_recorder(self, maxlen):
+        # type: (int) -> None
+        pass
+
+    def _set_initial_sampling_decision(self, sampling_context):
+        # type: (SamplingContext) -> None
         pass
 
 
