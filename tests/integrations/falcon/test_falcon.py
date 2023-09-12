@@ -13,6 +13,14 @@ from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
+try:
+    import falcon.asgi
+except ImportError:
+    pass
+else:
+    import falcon.inspect  # We only need this module for the ASGI test
+
+
 @pytest.fixture
 def make_app(sentry_init):
     def inner():
@@ -391,3 +399,24 @@ def test_does_not_leak_scope(sentry_init, capture_events):
 
     with sentry_sdk.configure_scope() as scope:
         assert not scope._tags["request_data"]
+
+
+@pytest.mark.skipif(
+    not hasattr(falcon, "asgi"), reason="This Falcon version lacks ASGI support."
+)
+def test_falcon_not_breaking_asgi(sentry_init):
+    """
+    This test simply verifies that the Falcon integration does not break ASGI
+    Falcon apps.
+
+    The test does not verify ASGI Falcon support, since our Falcon integration
+    currently lacks support for ASGI Falcon apps.
+    """
+    sentry_init(integrations=[FalconIntegration()])
+
+    asgi_app = falcon.asgi.App()
+
+    try:
+        falcon.inspect.inspect_app(asgi_app)
+    except TypeError:
+        pytest.fail("Falcon integration causing errors in ASGI apps.")
