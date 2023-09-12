@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from typing import Optional
 
 
+MAX_DOWNSAMPLE_FACTOR = 10
+
+
 class Monitor(object):
     """
     Performs health checks in a separate thread once every interval seconds
@@ -25,7 +28,7 @@ class Monitor(object):
         self.interval = interval  # type: float
 
         self._healthy = True
-        self._downsample_factor = 1  # type: int
+        self._downsample_factor = 0  # type: int
 
         self._thread = None  # type: Optional[Thread]
         self._thread_lock = Lock()
@@ -64,13 +67,14 @@ class Monitor(object):
     def set_downsample_factor(self):
         # type: () -> None
         if self._healthy:
-            if self._downsample_factor > 1:
+            if self._downsample_factor > 0:
                 logger.debug(
                     "[Monitor] health check positive, reverting to normal sampling"
                 )
-            self._downsample_factor = 1
+            self._downsample_factor = 0
         else:
-            self._downsample_factor *= 2
+            if self.downsample_factor < MAX_DOWNSAMPLE_FACTOR:
+                self._downsample_factor += 1
             logger.debug(
                 "[Monitor] health check negative, downsampling with a factor of %d",
                 self._downsample_factor,

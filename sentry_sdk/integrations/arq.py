@@ -200,11 +200,23 @@ def patch_create_worker():
 
         settings_cls = args[0]
 
-        functions = settings_cls.functions
-        cron_jobs = settings_cls.cron_jobs
+        if hasattr(settings_cls, "functions"):
+            settings_cls.functions = [
+                _get_arq_function(func) for func in settings_cls.functions
+            ]
+        if hasattr(settings_cls, "cron_jobs"):
+            settings_cls.cron_jobs = [
+                _get_arq_cron_job(cron_job) for cron_job in settings_cls.cron_jobs
+            ]
 
-        settings_cls.functions = [_get_arq_function(func) for func in functions]
-        settings_cls.cron_jobs = [_get_arq_cron_job(cron_job) for cron_job in cron_jobs]
+        if "functions" in kwargs:
+            kwargs["functions"] = [
+                _get_arq_function(func) for func in kwargs["functions"]
+            ]
+        if "cron_jobs" in kwargs:
+            kwargs["cron_jobs"] = [
+                _get_arq_cron_job(cron_job) for cron_job in kwargs["cron_jobs"]
+            ]
 
         return old_create_worker(*args, **kwargs)
 

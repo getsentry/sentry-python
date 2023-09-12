@@ -8,6 +8,7 @@ from sentry_sdk.utils import (
     Dsn,
     match_regex_list,
     to_string,
+    is_sentry_url,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -106,6 +107,7 @@ def record_sql_queries(
     params_list,  # type:  Any
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
+    record_cursor_repr=False,  # type: bool
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -131,6 +133,8 @@ def record_sql_queries(
         data["db.paramstyle"] = paramstyle
     if executemany:
         data["db.executemany"] = True
+    if record_cursor_repr and cursor is not None:
+        data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
         hub.add_breadcrumb(message=query, category="query", data=data)
@@ -211,6 +215,10 @@ def _format_sql(cursor, sql):
 
 
 class Baggage(object):
+    """
+    The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
+    """
+
     __slots__ = ("sentry_items", "third_party_items", "mutable")
 
     SENTRY_PREFIX = "sentry-"
@@ -377,13 +385,7 @@ def should_propagate_trace(hub, url):
     client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
-    if client.transport and client.transport.parsed_dsn:
-        dsn_url = client.transport.parsed_dsn.netloc
-    else:
-        dsn_url = None
-
-    is_request_to_sentry = dsn_url and dsn_url in url
-    if is_request_to_sentry:
+    if is_sentry_url(hub, url):
         return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)

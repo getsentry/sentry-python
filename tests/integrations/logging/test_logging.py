@@ -185,11 +185,11 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     events = capture_events()
 
     logging.captureWarnings(True)
-    warnings.warn("first")
-    warnings.warn("second")
+    warnings.warn("first", stacklevel=2)
+    warnings.warn("second", stacklevel=2)
     logging.captureWarnings(False)
 
-    warnings.warn("third")
+    warnings.warn("third", stacklevel=2)
 
     assert len(events) == 2
 

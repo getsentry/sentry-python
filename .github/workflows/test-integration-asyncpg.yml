@@ -1,4 +1,4 @@
-name: Test starlite
+name: Test asyncpg
 
 on:
   push:
@@ -24,19 +24,38 @@ env:
 
 jobs:
   test:
-    name: starlite, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: asyncpg, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9","3.10","3.11"]
+        python-version: ["3.7","3.8","3.9","3.10","3.11"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
 
     steps:
       - uses: actions/checkout@v4
@@ -47,8 +66,10 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
+          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
 
-      - name: Test starlite
+      - name: Test asyncpg
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 15
@@ -60,7 +81,7 @@ jobs:
             coverage erase
 
             # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
 
@@ -71,7 +92,7 @@ jobs:
 
 
   check_required_tests:
-    name: All starlite tests passed or skipped
+    name: All asyncpg tests passed or skipped
     needs: test
     # Always run this, even if a dependent job failed
     if: always()

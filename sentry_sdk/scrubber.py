@@ -84,16 +84,6 @@ class EventScrubber(object):
                 if "data" in event["request"]:
                     self.scrub_dict(event["request"]["data"])
 
-    def scrub_response(self, event):
-        # type: (Event) -> None
-        with capture_internal_exceptions():
-            if (
-                "contexts" in event
-                and "response" in event["contexts"]
-                and "data" in event["contexts"]["response"]
-            ):
-                self.scrub_dict(event["contexts"]["response"]["data"])
-
     def scrub_extra(self, event):
         # type: (Event) -> None
         with capture_internal_exceptions():
@@ -133,7 +123,6 @@ class EventScrubber(object):
     def scrub_event(self, event):
         # type: (Event) -> None
         self.scrub_request(event)
-        self.scrub_response(event)
         self.scrub_extra(event)
         self.scrub_user(event)
         self.scrub_breadcrumbs(event)
