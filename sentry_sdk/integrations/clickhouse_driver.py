@@ -6,16 +6,24 @@ from sentry_sdk.tracing import Span
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import capture_internal_exceptions
 
-from typing import TypeVar, Callable
+from typing import TypeVar
 
 if TYPE_CHECKING:
-    from typing import ParamSpec
+    from typing import ParamSpec, Callable
 else:
     # Fake ParamSpec
     class ParamSpec:
         def __init__(self, _):
             self.args = None
             self.kwargs = None
+
+    # Callable[anything] will return None
+    class _Callable:
+        def __getitem__(self, _):
+            return None
+
+    # Make instances
+    Callable = _Callable()
 
 
 try:
