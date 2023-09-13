@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.31.0
+
+### Various fixes & improvements
+
+-  feat(integrations): Add integration for clickhouse-driver (#2167) by @mimre25
+- Made NoOpSpan compatible to Transactions. (#2364) by @antonpirker
+- build(deps): bump actions/checkout from 3 to 4 (#2361) by @dependabot
+- Prevent Falcon integration from breaking ASGI apps (#2359) by @szokeasaurusrex
+- Documenting Spans and Transactions (#2358) by @antonpirker
+- Fix tests using Postgres (#2362) by @antonpirker
+- feat(integrations): Add integration for asyncpg (#2314) by @mimre25
+- Added link to backpressure section in docs. (#2354) by @antonpirker
+- build(deps): bump actions/checkout from 2 to 4 (#2352) by @dependabot
+- build(deps): bump checkouts/data-schemas from `ebc77d3` to `68def1e` (#2351) by @dependabot
+- Updated linting tooling (#2350) by @antonpirker
+- feat(celery): Allow to override propagate_traces per task (#2331) by @jan-auer
+- Fixing deprecated version attribute (#2338) by @vagi8
+- build(deps): bump sphinx from 7.2.4 to 7.2.5 (#2344) by @dependabot
+- Fix transaction name in Starlette and FastAPI (#2341) by @antonpirker
+- Enhancement/add .vscode to .gitignore (#2317) by @shoaib-mohd
+- Backpressure: only downsample a max of 10 times (#2347) by @sl0thentr0py
+- Cleanup ASGI integration (#2335) by @antonpirker
+- Pin anyio in tests (dep of httpx), because new major 4.0.0 breaks tests. (#2336) by @antonpirker
+- fix(profiler): Do not call getcwd from module root (#2329) by @Zylphrex
+- Update changelog (#2327) by @sentrivana
+
 ## 1.30.0
 
 ### Various fixes & improvements
