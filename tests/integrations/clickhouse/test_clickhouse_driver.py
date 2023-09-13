@@ -35,10 +35,7 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
 
     (event,) = events
 
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
+    expected_breadcrumbs = [
         {
             "category": "query",
             "data": {
@@ -101,6 +98,11 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
         },
     ]
 
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
+
 
 def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
     sentry_init(
@@ -123,10 +125,7 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
 
     (event,) = events
 
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
+    expected_breadcrumbs = [
         {
             "category": "query",
             "data": {
@@ -190,11 +189,15 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
                 "db.result": [[370]],
                 "db.params": {"minv": 150},
             },
-            # if EXPECT_PARAMS_IN_SELECT
             "message": "SELECT sum(x) FROM test WHERE x > 150",
             "type": "default",
         },
     ]
+
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
 def test_clickhouse_client_spans(
@@ -227,12 +230,7 @@ def test_clickhouse_client_spans(
 
     (event,) = events
 
-    for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
-
-    assert event["spans"] == [
+    expected_spans = [
         {
             "op": "db",
             "description": "DROP TABLE IF EXISTS test",
@@ -304,6 +302,13 @@ def test_clickhouse_client_spans(
             "parent_span_id": transaction_span_id,
         },
     ]
+
+    for span in event["spans"]:
+        del span["span_id"]
+        del span["start_timestamp"]
+        del span["timestamp"]
+
+    assert event["spans"] == expected_spans
 
 
 def test_clickhouse_client_spans_with_pii(
@@ -337,12 +342,7 @@ def test_clickhouse_client_spans_with_pii(
 
     (event,) = events
 
-    for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
-
-    assert event["spans"] == [
+    expected_spans = [
         {
             "op": "db",
             "description": "DROP TABLE IF EXISTS test",
@@ -421,6 +421,13 @@ def test_clickhouse_client_spans_with_pii(
         },
     ]
 
+    for span in event["spans"]:
+        del span["span_id"]
+        del span["start_timestamp"]
+        del span["timestamp"]
+
+    assert event["spans"] == expected_spans
+
 
 def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
     sentry_init(
@@ -443,10 +450,7 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
 
     (event,) = events
 
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
+    expected_breadcrumbs = [
         {
             "category": "query",
             "data": {
@@ -509,6 +513,11 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
         },
     ]
 
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
+
 
 def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
     sentry_init(
@@ -532,10 +541,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
 
     (event,) = events
 
-    for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
-
-    assert event["breadcrumbs"]["values"] == [
+    expected_breadcrumbs = [
         {
             "category": "query",
             "data": {
@@ -604,6 +610,11 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
         },
     ]
 
+    for crumb in event["breadcrumbs"]["values"]:
+        del crumb["timestamp"]
+
+    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
+
 
 def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) -> None:
     sentry_init(
@@ -633,12 +644,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
 
     (event,) = events
 
-    for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
-
-    assert event["spans"] == [
+    expected_spans = [
         {
             "op": "db",
             "description": "DROP TABLE IF EXISTS test",
@@ -711,6 +717,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
     ]
 
+    for span in event["spans"]:
+        del span["span_id"]
+        del span["start_timestamp"]
+        del span["timestamp"]
+
+    assert event["spans"] == expected_spans
+
 
 def test_clickhouse_dbapi_spans_with_pii(
     sentry_init, capture_events, capture_envelopes
@@ -743,12 +756,7 @@ def test_clickhouse_dbapi_spans_with_pii(
 
     (event,) = events
 
-    for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
-
-    assert event["spans"] == [
+    expected_spans = [
         {
             "op": "db",
             "description": "DROP TABLE IF EXISTS test",
@@ -826,3 +834,10 @@ def test_clickhouse_dbapi_spans_with_pii(
             "parent_span_id": transaction_span_id,
         },
     ]
+
+    for span in event["spans"]:
+        del span["span_id"]
+        del span["start_timestamp"]
+        del span["timestamp"]
+
+    assert event["spans"] == expected_spans
