@@ -36,6 +36,10 @@ FRAMEWORKS_NEEDING_POSTGRES = [
     "asyncpg",
 ]
 
+FRAMEWORKS_NEEDING_CLICKHOUSE = [
+    "clickhouse_driver",
+]
+
 MATRIX_DEFINITION = """
     strategy:
       fail-fast: false
@@ -46,6 +50,11 @@ MATRIX_DEFINITION = """
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+"""
+
+ADDITIONAL_USES_CLICKHOUSE = """\
+
+      - uses: getsentry/action-clickhouse-in-ci@v1
 """
 
 CHECK_NEEDS = """\
@@ -118,6 +127,10 @@ def write_yaml_file(
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SETUP_DB, "r")
                 out += "".join(f.readlines())
+
+        elif template_line.strip() == "{{ additional_uses }}":
+            if current_framework in FRAMEWORKS_NEEDING_CLICKHOUSE:
+                out += ADDITIONAL_USES_CLICKHOUSE
 
         elif template_line.strip() == "{{ check_needs }}":
             if py27_supported:
