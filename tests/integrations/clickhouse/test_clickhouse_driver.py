@@ -98,8 +98,11 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
         },
     ]
 
+    if not EXPECT_PARAMS_IN_SELECT:
+        expected_breadcrumbs[-1]["data"].pop("db.params", None)
+
     for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
+        crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
@@ -195,11 +198,10 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
     ]
 
     if not EXPECT_PARAMS_IN_SELECT:
-        for crumb in expected_breadcrumbs:
-            del crumb["data"]["db.params"]
+        expected_breadcrumbs[-1]["data"].pop("db.params", None)
 
     for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
+        crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
@@ -307,10 +309,13 @@ def test_clickhouse_client_spans(
         },
     ]
 
+    if not EXPECT_PARAMS_IN_SELECT:
+        expected_spans[-1]["data"].pop("db.params", None)
+
     for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
+        span.pop("span_id", None)
+        span.pop("start_timestamp", None)
+        span.pop("timestamp", None)
 
     assert event["spans"] == expected_spans
 
@@ -426,13 +431,12 @@ def test_clickhouse_client_spans_with_pii(
     ]
 
     if not EXPECT_PARAMS_IN_SELECT:
-        for span in expected_spans:
-            del span["data"]["db.params"]
+        expected_spans[-1]["data"].pop("db.params", None)
 
     for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
+        span.pop("span_id", None)
+        span.pop("start_timestamp", None)
+        span.pop("timestamp", None)
 
     assert event["spans"] == expected_spans
 
@@ -521,8 +525,11 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
         },
     ]
 
+    if not EXPECT_PARAMS_IN_SELECT:
+        expected_breadcrumbs[-1]["data"].pop("db.params", None)
+
     for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
+        crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
@@ -619,11 +626,10 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
     ]
 
     if not EXPECT_PARAMS_IN_SELECT:
-        for crumb in expected_breadcrumbs:
-            del crumb["data"]["db.params"]
+        expected_breadcrumbs[-1]["data"].pop("db.params", None)
 
     for crumb in event["breadcrumbs"]["values"]:
-        del crumb["timestamp"]
+        crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
@@ -729,10 +735,13 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
     ]
 
+    if not EXPECT_PARAMS_IN_SELECT:
+        expected_spans[-1]["data"].pop("db.params", None)
+
     for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
+        span.pop("span_id", None)
+        span.pop("start_timestamp", None)
+        span.pop("timestamp", None)
 
     assert event["spans"] == expected_spans
 
@@ -848,12 +857,11 @@ def test_clickhouse_dbapi_spans_with_pii(
     ]
 
     if not EXPECT_PARAMS_IN_SELECT:
-        for span in expected_spans:
-            del span["data"]["db.params"]
+        expected_spans[-1]["data"].pop("db.params", None)
 
     for span in event["spans"]:
-        del span["span_id"]
-        del span["start_timestamp"]
-        del span["timestamp"]
+        span.pop("span_id", None)
+        span.pop("start_timestamp", None)
+        span.pop("timestamp", None)
 
     assert event["spans"] == expected_spans
