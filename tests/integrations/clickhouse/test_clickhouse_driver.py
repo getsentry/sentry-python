@@ -194,6 +194,10 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
         },
     ]
 
+    if not EXPECT_PARAMS_IN_SELECT:
+        for crumb in expected_breadcrumbs:
+            del crumb["data"]["db.params"]
+
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
@@ -421,6 +425,10 @@ def test_clickhouse_client_spans_with_pii(
         },
     ]
 
+    if not EXPECT_PARAMS_IN_SELECT:
+        for span in expected_spans:
+            del span["data"]["db.params"]
+
     for span in event["spans"]:
         del span["span_id"]
         del span["start_timestamp"]
@@ -609,6 +617,10 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
             "type": "default",
         },
     ]
+
+    if not EXPECT_PARAMS_IN_SELECT:
+        for crumb in expected_breadcrumbs:
+            del crumb["data"]["db.params"]
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -834,6 +846,10 @@ def test_clickhouse_dbapi_spans_with_pii(
             "parent_span_id": transaction_span_id,
         },
     ]
+
+    if not EXPECT_PARAMS_IN_SELECT:
+        for span in expected_spans:
+            del span["data"]["db.params"]
 
     for span in event["spans"]:
         del span["span_id"]
