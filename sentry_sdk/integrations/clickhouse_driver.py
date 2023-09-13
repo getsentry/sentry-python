@@ -8,6 +8,9 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 from typing import TypeVar
 
+# Hack to get new Python features working in older versions
+# without introducing a hard dependency on `typing_extensions`
+# from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
     from typing import ParamSpec, Callable
 else:
