@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Index - sentry-python 1.30.0 documentation</title>
+      <title>Index - sentry-python 1.31.0 documentation</title>
     <link rel="index" title="Index" href="#" /><link rel="search" title="Search" href="search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -14,7 +14,7 @@
       document.documentElement.classList.add('dark')
     }
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=aecf457f" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=9cd6187f" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=2981b36d" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=ee381b95" />
     <style>
 :root {
@@ -178,10 +178,10 @@ html.dark {
         <li><a href="api.html#sentry_sdk.Hub.capture_message">(sentry_sdk.Hub method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#sentry_sdk.Scope.clear">clear() (sentry_sdk.Scope method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#sentry_sdk.Scope.clear_breadcrumbs">clear_breadcrumbs() (sentry_sdk.Scope method)</a>
 </li>
       <li><a href="api.html#sentry_sdk.Client">Client (class in sentry_sdk)</a>
@@ -194,6 +194,12 @@ html.dark {
 
       <ul>
         <li><a href="api.html#sentry_sdk.Hub.configure_scope">(sentry_sdk.Hub method)</a>
+</li>
+      </ul></li>
+      <li><a href="api.html#sentry_sdk.tracing.Span.containing_transaction">containing_transaction (sentry_sdk.tracing.Span property)</a>
+
+      <ul>
+        <li><a href="api.html#sentry_sdk.tracing.Transaction.containing_transaction">(sentry_sdk.tracing.Transaction property)</a>
 </li>
       </ul></li>
       <li><a href="api.html#sentry_sdk.tracing.Span.continue_from_environ">continue_from_environ() (sentry_sdk.tracing.Span class method)</a>
@@ -234,6 +240,12 @@ html.dark {
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#sentry_sdk.Scope.fingerprint">fingerprint (sentry_sdk.Scope property)</a>
 </li>
+      <li><a href="api.html#sentry_sdk.tracing.Span.finish">finish() (sentry_sdk.tracing.Span method)</a>
+
+      <ul>
+        <li><a href="api.html#sentry_sdk.tracing.Transaction.finish">(sentry_sdk.tracing.Transaction method)</a>
+</li>
+      </ul></li>
       <li><a href="api.html#sentry_sdk.flush">flush() (in module sentry_sdk)</a>
 
       <ul>
@@ -434,6 +446,8 @@ html.dark {
       <ul>
         <li><a href="api.html#sentry_sdk.Scope.set_context">(sentry_sdk.Scope method)</a>
 </li>
+        <li><a href="api.html#sentry_sdk.tracing.Transaction.set_context">(sentry_sdk.tracing.Transaction method)</a>
+</li>
       </ul></li>
       <li><a href="api.html#sentry_sdk.set_extra">set_extra() (in module sentry_sdk)</a>
 
@@ -441,16 +455,18 @@ html.dark {
         <li><a href="api.html#sentry_sdk.Scope.set_extra">(sentry_sdk.Scope method)</a>
 </li>
       </ul></li>
+      <li><a href="api.html#sentry_sdk.tracing.Transaction.set_http_status">set_http_status() (sentry_sdk.tracing.Transaction method)</a>
+</li>
       <li><a href="api.html#sentry_sdk.set_level">set_level() (in module sentry_sdk)</a>
 
       <ul>
         <li><a href="api.html#sentry_sdk.Scope.set_level">(sentry_sdk.Scope method)</a>
 </li>
       </ul></li>
-      <li><a href="api.html#sentry_sdk.Scope.set_new_propagation_context">set_new_propagation_context() (sentry_sdk.Scope method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#sentry_sdk.Scope.set_new_propagation_context">set_new_propagation_context() (sentry_sdk.Scope method)</a>
+</li>
       <li><a href="api.html#sentry_sdk.set_tag">set_tag() (in module sentry_sdk)</a>
 
       <ul>
@@ -495,10 +511,18 @@ html.dark {
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#sentry_sdk.tracing.Span.timestamp">timestamp (sentry_sdk.tracing.Span attribute)</a>
 </li>
-      <li><a href="api.html#sentry_sdk.Hub.trace_propagation_meta">trace_propagation_meta() (sentry_sdk.Hub method)</a>
+      <li><a href="api.html#sentry_sdk.tracing.Span.to_baggage">to_baggage() (sentry_sdk.tracing.Span method)</a>
 </li>
+      <li><a href="api.html#sentry_sdk.tracing.Span.to_json">to_json() (sentry_sdk.tracing.Span method)</a>
+
+      <ul>
+        <li><a href="api.html#sentry_sdk.tracing.Transaction.to_json">(sentry_sdk.tracing.Transaction method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api.html#sentry_sdk.Hub.trace_propagation_meta">trace_propagation_meta() (sentry_sdk.Hub method)</a>
+</li>
       <li><a href="api.html#sentry_sdk.tracing.Transaction">Transaction (class in sentry_sdk.tracing)</a>
 </li>
       <li><a href="api.html#sentry_sdk.Scope.transaction">transaction (sentry_sdk.Scope property)</a>
@@ -546,10 +570,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="_static/documentation_options.js?v=497d83b4"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="_static/shibuya.js?v=d7f4572f"></script>
+      <script src="_static/shibuya.js?v=3e5c8598"></script>
     
 </body>
 </html>

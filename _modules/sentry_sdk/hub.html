@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.hub - sentry-python 1.30.0 documentation</title>
+      <title>sentry_sdk.hub - sentry-python 1.31.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -14,7 +14,7 @@
       document.documentElement.classList.add('dark')
     }
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9cd6187f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=2981b36d" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=ee381b95" />
     <style>
 :root {
@@ -89,8 +89,7 @@ html.dark {
   <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
     <div class="sy-lside-inner md:sticky">
       <div class="sy-scrollbar p-6">
-        <div class="globaltoc">
-          <ul>
+        <div class="globaltoc" data-expand-depth="0"><ul>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">Main API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../integrations.html">Integrations</a></li>
 </ul>
@@ -105,7 +104,7 @@ html.dark {
     <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
       <i class="i-icon close"></i>
     </button>
-    <div class="sy-scrollbar px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div>
     </div>
   </aside>
   <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
@@ -649,411 +648,421 @@ html.dark {
 </span><span id="1-479">        <span class="k">if</span> <span class="n">instrumenter</span> <span class="o">!=</span> <span class="n">configuration_instrumenter</span><span class="p">:</span>
 </span><span id="1-480">            <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
 </span><span id="1-481">
-</span><span id="1-482">        <span class="c1"># TODO: consider removing this in a future release.</span>
-</span><span id="1-483">        <span class="c1"># This is for backwards compatibility with releases before</span>
-</span><span id="1-484">        <span class="c1"># start_transaction existed, to allow for a smoother transition.</span>
-</span><span id="1-485">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-</span><span id="1-486">            <span class="n">deprecation_msg</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-487">                <span class="s2">&quot;Deprecated: use start_transaction to start transactions and &quot;</span>
-</span><span id="1-488">                <span class="s2">&quot;Transaction.start_child to start spans.&quot;</span>
-</span><span id="1-489">            <span class="p">)</span>
-</span><span id="1-490">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">):</span>
-</span><span id="1-491">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
-</span><span id="1-492">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">span</span><span class="p">)</span>
-</span><span id="1-493">            <span class="k">if</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-</span><span id="1-494">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
-</span><span id="1-495">                <span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;transaction&quot;</span><span class="p">)</span>
-</span><span id="1-496">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span id="1-497">
-</span><span id="1-498">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-499">            <span class="k">return</span> <span class="n">span</span>
+</span><span id="1-482">        <span class="c1"># THIS BLOCK IS DEPRECATED</span>
+</span><span id="1-483">        <span class="c1"># TODO: consider removing this in a future release.</span>
+</span><span id="1-484">        <span class="c1"># This is for backwards compatibility with releases before</span>
+</span><span id="1-485">        <span class="c1"># start_transaction existed, to allow for a smoother transition.</span>
+</span><span id="1-486">        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+</span><span id="1-487">            <span class="n">deprecation_msg</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-488">                <span class="s2">&quot;Deprecated: use start_transaction to start transactions and &quot;</span>
+</span><span id="1-489">                <span class="s2">&quot;Transaction.start_child to start spans.&quot;</span>
+</span><span id="1-490">            <span class="p">)</span>
+</span><span id="1-491">
+</span><span id="1-492">            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">Transaction</span><span class="p">):</span>
+</span><span id="1-493">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
+</span><span id="1-494">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">span</span><span class="p">)</span>
+</span><span id="1-495">
+</span><span id="1-496">            <span class="k">if</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+</span><span id="1-497">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
+</span><span id="1-498">                <span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;transaction&quot;</span><span class="p">)</span>
+</span><span id="1-499">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 </span><span id="1-500">
-</span><span id="1-501">        <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
-</span><span id="1-502">
-</span><span id="1-503">        <span class="n">span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
-</span><span id="1-504">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-505">            <span class="k">return</span> <span class="n">span</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span id="1-506">
-</span><span id="1-507">        <span class="c1"># If there is already a trace_id in the propagation context, use it.</span>
-</span><span id="1-508">        <span class="k">if</span> <span class="s2">&quot;trace_id&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
-</span><span id="1-509">            <span class="n">traceparent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span>
-</span><span id="1-510">            <span class="n">trace_id</span> <span class="o">=</span> <span class="n">traceparent</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">traceparent</span> <span class="k">else</span> <span class="kc">None</span>
-</span><span id="1-511">            <span class="k">if</span> <span class="n">trace_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-512">                <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span>
-</span><span id="1-513">
-</span><span id="1-514">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</span><span id="1-501">        <span class="c1"># THIS BLOCK IS DEPRECATED</span>
+</span><span id="1-502">        <span class="c1"># We do not pass a span into start_span in our code base, so I deprecate this.</span>
+</span><span id="1-503">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-504">            <span class="n">deprecation_msg</span> <span class="o">=</span> <span class="s2">&quot;Deprecated: passing a span into `start_span` is deprecated and will be removed in the future.&quot;</span>
+</span><span id="1-505">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">deprecation_msg</span><span class="p">)</span>
+</span><span id="1-506">            <span class="k">return</span> <span class="n">span</span>
+</span><span id="1-507">
+</span><span id="1-508">        <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+</span><span id="1-509">
+</span><span id="1-510">        <span class="n">active_span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
+</span><span id="1-511">        <span class="k">if</span> <span class="n">active_span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-512">            <span class="n">new_child_span</span> <span class="o">=</span> <span class="n">active_span</span><span class="o">.</span><span class="n">start_child</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="1-513">            <span class="k">return</span> <span class="n">new_child_span</span>
+</span><span id="1-514">
+</span><span id="1-515">        <span class="c1"># If there is already a trace_id in the propagation context, use it.</span>
+</span><span id="1-516">        <span class="c1"># This does not need to be done for `start_child` above because it takes</span>
+</span><span id="1-517">        <span class="c1"># the trace_id from the parent span.</span>
+</span><span id="1-518">        <span class="k">if</span> <span class="s2">&quot;trace_id&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+</span><span id="1-519">            <span class="n">traceparent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span>
+</span><span id="1-520">            <span class="n">trace_id</span> <span class="o">=</span> <span class="n">traceparent</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">traceparent</span> <span class="k">else</span> <span class="kc">None</span>
+</span><span id="1-521">            <span class="k">if</span> <span class="n">trace_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-522">                <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span>
+</span><span id="1-523">
+</span><span id="1-524">        <span class="k">return</span> <span class="n">Span</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
-</span><span id="1-515">
+</span><span id="1-525">
 <div class="viewcode-block" id="Hub.start_transaction">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_transaction">[docs]</a>
-</span><span id="1-516">    <span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
-</span><span id="1-517">        <span class="bp">self</span><span class="p">,</span> <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
-</span><span id="1-518">    <span class="p">):</span>
-</span><span id="1-519">        <span class="c1"># type: (Optional[Transaction], str, Any) -&gt; Union[Transaction, NoOpSpan]</span>
-</span><span id="1-520"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-521"><span class="sd">        Start and return a transaction.</span>
-</span><span id="1-522">
-</span><span id="1-523"><span class="sd">        Start an existing transaction if given, otherwise create and start a new</span>
-</span><span id="1-524"><span class="sd">        transaction with kwargs.</span>
-</span><span id="1-525">
-</span><span id="1-526"><span class="sd">        This is the entry point to manual tracing instrumentation.</span>
-</span><span id="1-527">
-</span><span id="1-528"><span class="sd">        A tree structure can be built by adding child spans to the transaction,</span>
-</span><span id="1-529"><span class="sd">        and child spans to other spans. To start a new child span within the</span>
-</span><span id="1-530"><span class="sd">        transaction or any span, call the respective `.start_child()` method.</span>
-</span><span id="1-531">
-</span><span id="1-532"><span class="sd">        Every child span must be finished before the transaction is finished,</span>
-</span><span id="1-533"><span class="sd">        otherwise the unfinished spans are discarded.</span>
-</span><span id="1-534">
-</span><span id="1-535"><span class="sd">        When used as context managers, spans and transactions are automatically</span>
-</span><span id="1-536"><span class="sd">        finished at the end of the `with` block. If not using context managers,</span>
-</span><span id="1-537"><span class="sd">        call the `.finish()` method.</span>
-</span><span id="1-538">
-</span><span id="1-539"><span class="sd">        When the transaction is finished, it will be sent to Sentry with all its</span>
-</span><span id="1-540"><span class="sd">        finished child spans.</span>
+</span><span id="1-526">    <span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
+</span><span id="1-527">        <span class="bp">self</span><span class="p">,</span> <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">instrumenter</span><span class="o">=</span><span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+</span><span id="1-528">    <span class="p">):</span>
+</span><span id="1-529">        <span class="c1"># type: (Optional[Transaction], str, Any) -&gt; Union[Transaction, NoOpSpan]</span>
+</span><span id="1-530"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-531"><span class="sd">        Start and return a transaction.</span>
+</span><span id="1-532">
+</span><span id="1-533"><span class="sd">        Start an existing transaction if given, otherwise create and start a new</span>
+</span><span id="1-534"><span class="sd">        transaction with kwargs.</span>
+</span><span id="1-535">
+</span><span id="1-536"><span class="sd">        This is the entry point to manual tracing instrumentation.</span>
+</span><span id="1-537">
+</span><span id="1-538"><span class="sd">        A tree structure can be built by adding child spans to the transaction,</span>
+</span><span id="1-539"><span class="sd">        and child spans to other spans. To start a new child span within the</span>
+</span><span id="1-540"><span class="sd">        transaction or any span, call the respective `.start_child()` method.</span>
 </span><span id="1-541">
-</span><span id="1-542"><span class="sd">        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.</span>
-</span><span id="1-543"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-544">        <span class="n">configuration_instrumenter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span>
-</span><span id="1-545">
-</span><span id="1-546">        <span class="k">if</span> <span class="n">instrumenter</span> <span class="o">!=</span> <span class="n">configuration_instrumenter</span><span class="p">:</span>
-</span><span id="1-547">            <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
+</span><span id="1-542"><span class="sd">        Every child span must be finished before the transaction is finished,</span>
+</span><span id="1-543"><span class="sd">        otherwise the unfinished spans are discarded.</span>
+</span><span id="1-544">
+</span><span id="1-545"><span class="sd">        When used as context managers, spans and transactions are automatically</span>
+</span><span id="1-546"><span class="sd">        finished at the end of the `with` block. If not using context managers,</span>
+</span><span id="1-547"><span class="sd">        call the `.finish()` method.</span>
 </span><span id="1-548">
-</span><span id="1-549">        <span class="n">custom_sampling_context</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;custom_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="1-550">
-</span><span id="1-551">        <span class="c1"># if we haven&#39;t been given a transaction, make one</span>
-</span><span id="1-552">        <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-553">            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
-</span><span id="1-554">            <span class="n">transaction</span> <span class="o">=</span> <span class="n">Transaction</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="1-549"><span class="sd">        When the transaction is finished, it will be sent to Sentry with all its</span>
+</span><span id="1-550"><span class="sd">        finished child spans.</span>
+</span><span id="1-551">
+</span><span id="1-552"><span class="sd">        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.</span>
+</span><span id="1-553"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-554">        <span class="n">configuration_instrumenter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span>
 </span><span id="1-555">
-</span><span id="1-556">        <span class="c1"># use traces_sample_rate, traces_sampler, and/or inheritance to make a</span>
-</span><span id="1-557">        <span class="c1"># sampling decision</span>
-</span><span id="1-558">        <span class="n">sampling_context</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-559">            <span class="s2">&quot;transaction_context&quot;</span><span class="p">:</span> <span class="n">transaction</span><span class="o">.</span><span class="n">to_json</span><span class="p">(),</span>
-</span><span id="1-560">            <span class="s2">&quot;parent_sampled&quot;</span><span class="p">:</span> <span class="n">transaction</span><span class="o">.</span><span class="n">parent_sampled</span><span class="p">,</span>
-</span><span id="1-561">        <span class="p">}</span>
-</span><span id="1-562">        <span class="n">sampling_context</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">custom_sampling_context</span><span class="p">)</span>
-</span><span id="1-563">        <span class="n">transaction</span><span class="o">.</span><span class="n">_set_initial_sampling_decision</span><span class="p">(</span><span class="n">sampling_context</span><span class="o">=</span><span class="n">sampling_context</span><span class="p">)</span>
-</span><span id="1-564">
-</span><span id="1-565">        <span class="n">profile</span> <span class="o">=</span> <span class="n">Profile</span><span class="p">(</span><span class="n">transaction</span><span class="p">,</span> <span class="n">hub</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
-</span><span id="1-566">        <span class="n">profile</span><span class="o">.</span><span class="n">_set_initial_sampling_decision</span><span class="p">(</span><span class="n">sampling_context</span><span class="o">=</span><span class="n">sampling_context</span><span class="p">)</span>
-</span><span id="1-567">
-</span><span id="1-568">        <span class="c1"># we don&#39;t bother to keep spans if we already know we&#39;re not going to</span>
-</span><span id="1-569">        <span class="c1"># send the transaction</span>
-</span><span id="1-570">        <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
-</span><span id="1-571">            <span class="n">max_spans</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-572">                <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_spans&quot;</span><span class="p">)</span>
-</span><span id="1-573">            <span class="p">)</span> <span class="ow">or</span> <span class="mi">1000</span>
-</span><span id="1-574">            <span class="n">transaction</span><span class="o">.</span><span class="n">init_span_recorder</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
-</span><span id="1-575">
-</span><span id="1-576">        <span class="k">return</span> <span class="n">transaction</span></div>
-
+</span><span id="1-556">        <span class="k">if</span> <span class="n">instrumenter</span> <span class="o">!=</span> <span class="n">configuration_instrumenter</span><span class="p">:</span>
+</span><span id="1-557">            <span class="k">return</span> <span class="n">NoOpSpan</span><span class="p">()</span>
+</span><span id="1-558">
+</span><span id="1-559">        <span class="n">custom_sampling_context</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;custom_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="1-560">
+</span><span id="1-561">        <span class="c1"># if we haven&#39;t been given a transaction, make one</span>
+</span><span id="1-562">        <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-563">            <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;hub&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+</span><span id="1-564">            <span class="n">transaction</span> <span class="o">=</span> <span class="n">Transaction</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="1-565">
+</span><span id="1-566">        <span class="c1"># use traces_sample_rate, traces_sampler, and/or inheritance to make a</span>
+</span><span id="1-567">        <span class="c1"># sampling decision</span>
+</span><span id="1-568">        <span class="n">sampling_context</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-569">            <span class="s2">&quot;transaction_context&quot;</span><span class="p">:</span> <span class="n">transaction</span><span class="o">.</span><span class="n">to_json</span><span class="p">(),</span>
+</span><span id="1-570">            <span class="s2">&quot;parent_sampled&quot;</span><span class="p">:</span> <span class="n">transaction</span><span class="o">.</span><span class="n">parent_sampled</span><span class="p">,</span>
+</span><span id="1-571">        <span class="p">}</span>
+</span><span id="1-572">        <span class="n">sampling_context</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">custom_sampling_context</span><span class="p">)</span>
+</span><span id="1-573">        <span class="n">transaction</span><span class="o">.</span><span class="n">_set_initial_sampling_decision</span><span class="p">(</span><span class="n">sampling_context</span><span class="o">=</span><span class="n">sampling_context</span><span class="p">)</span>
+</span><span id="1-574">
+</span><span id="1-575">        <span class="n">profile</span> <span class="o">=</span> <span class="n">Profile</span><span class="p">(</span><span class="n">transaction</span><span class="p">,</span> <span class="n">hub</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
+</span><span id="1-576">        <span class="n">profile</span><span class="o">.</span><span class="n">_set_initial_sampling_decision</span><span class="p">(</span><span class="n">sampling_context</span><span class="o">=</span><span class="n">sampling_context</span><span class="p">)</span>
 </span><span id="1-577">
+</span><span id="1-578">        <span class="c1"># we don&#39;t bother to keep spans if we already know we&#39;re not going to</span>
+</span><span id="1-579">        <span class="c1"># send the transaction</span>
+</span><span id="1-580">        <span class="k">if</span> <span class="n">transaction</span><span class="o">.</span><span class="n">sampled</span><span class="p">:</span>
+</span><span id="1-581">            <span class="n">max_spans</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-582">                <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_spans&quot;</span><span class="p">)</span>
+</span><span id="1-583">            <span class="p">)</span> <span class="ow">or</span> <span class="mi">1000</span>
+</span><span id="1-584">            <span class="n">transaction</span><span class="o">.</span><span class="n">init_span_recorder</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="n">max_spans</span><span class="p">)</span>
+</span><span id="1-585">
+</span><span id="1-586">        <span class="k">return</span> <span class="n">transaction</span></div>
+
+</span><span id="1-587">
 <div class="viewcode-block" id="Hub.continue_trace">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.continue_trace">[docs]</a>
-</span><span id="1-578">    <span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-579">        <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -&gt; Transaction</span>
-</span><span id="1-580"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-581"><span class="sd">        Sets the propagation context from environment or headers and returns a transaction.</span>
-</span><span id="1-582"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-583">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-</span><span id="1-584">            <span class="n">scope</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">)</span>
-</span><span id="1-585">
-</span><span id="1-586">        <span class="n">transaction</span> <span class="o">=</span> <span class="n">Transaction</span><span class="o">.</span><span class="n">continue_from_headers</span><span class="p">(</span>
-</span><span id="1-587">            <span class="n">normalize_incoming_data</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">),</span>
-</span><span id="1-588">            <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span>
-</span><span id="1-589">            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-</span><span id="1-590">            <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-</span><span id="1-591">        <span class="p">)</span>
-</span><span id="1-592">        <span class="k">return</span> <span class="n">transaction</span></div>
+</span><span id="1-588">    <span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-589">        <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -&gt; Transaction</span>
+</span><span id="1-590"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-591"><span class="sd">        Sets the propagation context from environment or headers and returns a transaction.</span>
+</span><span id="1-592"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-593">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">configure_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+</span><span id="1-594">            <span class="n">scope</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">)</span>
+</span><span id="1-595">
+</span><span id="1-596">        <span class="n">transaction</span> <span class="o">=</span> <span class="n">Transaction</span><span class="o">.</span><span class="n">continue_from_headers</span><span class="p">(</span>
+</span><span id="1-597">            <span class="n">normalize_incoming_data</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">),</span>
+</span><span id="1-598">            <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span>
+</span><span id="1-599">            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+</span><span id="1-600">            <span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
+</span><span id="1-601">        <span class="p">)</span>
+</span><span id="1-602">        <span class="k">return</span> <span class="n">transaction</span></div>
 
-</span><span id="1-593">
-</span><span id="1-594">    <span class="nd">@overload</span>
-</span><span id="1-595">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
-</span><span id="1-596">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
-</span><span id="1-597">    <span class="p">):</span>
-</span><span id="1-598">        <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
-</span><span id="1-599">        <span class="k">pass</span>
-</span><span id="1-600">
-</span><span id="1-601">    <span class="nd">@overload</span>
-</span><span id="1-602">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
-</span><span id="1-603">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
-</span><span id="1-604">    <span class="p">):</span>
-</span><span id="1-605">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-606">        <span class="k">pass</span>
-</span><span id="1-607">
+</span><span id="1-603">
+</span><span id="1-604">    <span class="nd">@overload</span>
+</span><span id="1-605">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>
+</span><span id="1-606">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
+</span><span id="1-607">    <span class="p">):</span>
+</span><span id="1-608">        <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
+</span><span id="1-609">        <span class="k">pass</span>
+</span><span id="1-610">
+</span><span id="1-611">    <span class="nd">@overload</span>
+</span><span id="1-612">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
+</span><span id="1-613">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
+</span><span id="1-614">    <span class="p">):</span>
+</span><span id="1-615">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-616">        <span class="k">pass</span>
+</span><span id="1-617">
 <div class="viewcode-block" id="Hub.push_scope">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.push_scope">[docs]</a>
-</span><span id="1-608">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
-</span><span id="1-609">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-610">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
-</span><span id="1-611">        <span class="n">continue_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span id="1-612">    <span class="p">):</span>
-</span><span id="1-613">        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-</span><span id="1-614"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-615"><span class="sd">        Pushes a new layer on the scope stack.</span>
-</span><span id="1-616">
-</span><span id="1-617"><span class="sd">        :param callback: If provided, this method pushes a scope, calls</span>
-</span><span id="1-618"><span class="sd">            `callback`, and pops the scope again.</span>
-</span><span id="1-619">
-</span><span id="1-620"><span class="sd">        :returns: If no `callback` is provided, a context manager that should</span>
-</span><span id="1-621"><span class="sd">            be used to pop the scope again.</span>
-</span><span id="1-622"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-623">        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-624">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-</span><span id="1-625">                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-</span><span id="1-626">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-627">
-</span><span id="1-628">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-618">    <span class="k">def</span> <span class="nf">push_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+</span><span id="1-619">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-620">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+</span><span id="1-621">        <span class="n">continue_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span id="1-622">    <span class="p">):</span>
+</span><span id="1-623">        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
+</span><span id="1-624"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-625"><span class="sd">        Pushes a new layer on the scope stack.</span>
+</span><span id="1-626">
+</span><span id="1-627"><span class="sd">        :param callback: If provided, this method pushes a scope, calls</span>
+</span><span id="1-628"><span class="sd">            `callback`, and pops the scope again.</span>
 </span><span id="1-629">
-</span><span id="1-630">        <span class="n">new_scope</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-</span><span id="1-631">
-</span><span id="1-632">        <span class="k">if</span> <span class="n">continue_trace</span><span class="p">:</span>
-</span><span id="1-633">            <span class="n">new_scope</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">()</span>
-</span><span id="1-634">
-</span><span id="1-635">        <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">)</span>
-</span><span id="1-636">        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
+</span><span id="1-630"><span class="sd">        :returns: If no `callback` is provided, a context manager that should</span>
+</span><span id="1-631"><span class="sd">            be used to pop the scope again.</span>
+</span><span id="1-632"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-633">        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-634">            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">push_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+</span><span id="1-635">                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+</span><span id="1-636">            <span class="k">return</span> <span class="kc">None</span>
 </span><span id="1-637">
-</span><span id="1-638">        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
-
+</span><span id="1-638">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="1-639">
+</span><span id="1-640">        <span class="n">new_scope</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+</span><span id="1-641">
+</span><span id="1-642">        <span class="k">if</span> <span class="n">continue_trace</span><span class="p">:</span>
+</span><span id="1-643">            <span class="n">new_scope</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">()</span>
+</span><span id="1-644">
+</span><span id="1-645">        <span class="n">new_layer</span> <span class="o">=</span> <span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">new_scope</span><span class="p">)</span>
+</span><span id="1-646">        <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_layer</span><span class="p">)</span>
+</span><span id="1-647">
+</span><span id="1-648">        <span class="k">return</span> <span class="n">_ScopeManager</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+
+</span><span id="1-649">
 <div class="viewcode-block" id="Hub.pop_scope_unsafe">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.pop_scope_unsafe">[docs]</a>
-</span><span id="1-640">    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-641">        <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
-</span><span id="1-642"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-643"><span class="sd">        Pops a scope layer from the stack.</span>
-</span><span id="1-644">
-</span><span id="1-645"><span class="sd">        Try to use the context manager :py:meth:`push_scope` instead.</span>
-</span><span id="1-646"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-647">        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-</span><span id="1-648">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
-</span><span id="1-649">        <span class="k">return</span> <span class="n">rv</span></div>
+</span><span id="1-650">    <span class="k">def</span> <span class="nf">pop_scope_unsafe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-651">        <span class="c1"># type: () -&gt; Tuple[Optional[Client], Scope]</span>
+</span><span id="1-652"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-653"><span class="sd">        Pops a scope layer from the stack.</span>
+</span><span id="1-654">
+</span><span id="1-655"><span class="sd">        Try to use the context manager :py:meth:`push_scope` instead.</span>
+</span><span id="1-656"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-657">        <span class="n">rv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+</span><span id="1-658">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">,</span> <span class="s2">&quot;stack must have at least one layer&quot;</span>
+</span><span id="1-659">        <span class="k">return</span> <span class="n">rv</span></div>
 
-</span><span id="1-650">
-</span><span id="1-651">    <span class="nd">@overload</span>
-</span><span id="1-652">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
-</span><span id="1-653">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
-</span><span id="1-654">    <span class="p">):</span>
-</span><span id="1-655">        <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
-</span><span id="1-656">        <span class="k">pass</span>
-</span><span id="1-657">
-</span><span id="1-658">    <span class="nd">@overload</span>
-</span><span id="1-659">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
-</span><span id="1-660">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
-</span><span id="1-661">    <span class="p">):</span>
-</span><span id="1-662">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-663">        <span class="k">pass</span>
-</span><span id="1-664">
+</span><span id="1-660">
+</span><span id="1-661">    <span class="nd">@overload</span>
+</span><span id="1-662">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>
+</span><span id="1-663">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[None]</span>
+</span><span id="1-664">    <span class="p">):</span>
+</span><span id="1-665">        <span class="c1"># type: (...) -&gt; ContextManager[Scope]</span>
+</span><span id="1-666">        <span class="k">pass</span>
+</span><span id="1-667">
+</span><span id="1-668">    <span class="nd">@overload</span>
+</span><span id="1-669">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa: F811</span>
+</span><span id="1-670">        <span class="bp">self</span><span class="p">,</span> <span class="n">callback</span>  <span class="c1"># type: Callable[[Scope], None]</span>
+</span><span id="1-671">    <span class="p">):</span>
+</span><span id="1-672">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-673">        <span class="k">pass</span>
+</span><span id="1-674">
 <div class="viewcode-block" id="Hub.configure_scope">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.configure_scope">[docs]</a>
-</span><span id="1-665">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
-</span><span id="1-666">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-667">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
-</span><span id="1-668">        <span class="n">continue_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
-</span><span id="1-669">    <span class="p">):</span>
-</span><span id="1-670">        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
-</span><span id="1-671">
-</span><span id="1-672"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-673"><span class="sd">        Reconfigures the scope.</span>
-</span><span id="1-674">
-</span><span id="1-675"><span class="sd">        :param callback: If provided, call the callback with the current scope.</span>
-</span><span id="1-676">
-</span><span id="1-677"><span class="sd">        :returns: If no callback is provided, returns a context manager that returns the scope.</span>
-</span><span id="1-678"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-679">
-</span><span id="1-680">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-675">    <span class="k">def</span> <span class="nf">configure_scope</span><span class="p">(</span>  <span class="c1"># noqa</span>
+</span><span id="1-676">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-677">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[Scope], None]]</span>
+</span><span id="1-678">        <span class="n">continue_trace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+</span><span id="1-679">    <span class="p">):</span>
+</span><span id="1-680">        <span class="c1"># type: (...) -&gt; Optional[ContextManager[Scope]]</span>
 </span><span id="1-681">
-</span><span id="1-682">        <span class="k">if</span> <span class="n">continue_trace</span><span class="p">:</span>
-</span><span id="1-683">            <span class="n">scope</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">()</span>
+</span><span id="1-682"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-683"><span class="sd">        Reconfigures the scope.</span>
 </span><span id="1-684">
-</span><span id="1-685">        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-686">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-687">                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-</span><span id="1-688">
-</span><span id="1-689">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-690">
-</span><span id="1-691">        <span class="nd">@contextmanager</span>
-</span><span id="1-692">        <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
-</span><span id="1-693">            <span class="c1"># type: () -&gt; Generator[Scope, None, None]</span>
-</span><span id="1-694">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-695">                <span class="k">yield</span> <span class="n">scope</span>
-</span><span id="1-696">            <span class="k">else</span><span class="p">:</span>
-</span><span id="1-697">                <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
+</span><span id="1-685"><span class="sd">        :param callback: If provided, call the callback with the current scope.</span>
+</span><span id="1-686">
+</span><span id="1-687"><span class="sd">        :returns: If no callback is provided, returns a context manager that returns the scope.</span>
+</span><span id="1-688"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-689">
+</span><span id="1-690">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-691">
+</span><span id="1-692">        <span class="k">if</span> <span class="n">continue_trace</span><span class="p">:</span>
+</span><span id="1-693">            <span class="n">scope</span><span class="o">.</span><span class="n">generate_propagation_context</span><span class="p">()</span>
+</span><span id="1-694">
+</span><span id="1-695">        <span class="k">if</span> <span class="n">callback</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-696">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-697">                <span class="n">callback</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
 </span><span id="1-698">
-</span><span id="1-699">        <span class="k">return</span> <span class="n">inner</span><span class="p">()</span></div>
-
+</span><span id="1-699">            <span class="k">return</span> <span class="kc">None</span>
 </span><span id="1-700">
+</span><span id="1-701">        <span class="nd">@contextmanager</span>
+</span><span id="1-702">        <span class="k">def</span> <span class="nf">inner</span><span class="p">():</span>
+</span><span id="1-703">            <span class="c1"># type: () -&gt; Generator[Scope, None, None]</span>
+</span><span id="1-704">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-705">                <span class="k">yield</span> <span class="n">scope</span>
+</span><span id="1-706">            <span class="k">else</span><span class="p">:</span>
+</span><span id="1-707">                <span class="k">yield</span> <span class="n">Scope</span><span class="p">()</span>
+</span><span id="1-708">
+</span><span id="1-709">        <span class="k">return</span> <span class="n">inner</span><span class="p">()</span></div>
+
+</span><span id="1-710">
 <div class="viewcode-block" id="Hub.start_session">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.start_session">[docs]</a>
-</span><span id="1-701">    <span class="k">def</span> <span class="nf">start_session</span><span class="p">(</span>
-</span><span id="1-702">        <span class="bp">self</span><span class="p">,</span> <span class="n">session_mode</span><span class="o">=</span><span class="s2">&quot;application&quot;</span>  <span class="c1"># type: str</span>
-</span><span id="1-703">    <span class="p">):</span>
-</span><span id="1-704">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-705"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Starts a new session.&quot;&quot;&quot;</span>
-</span><span id="1-706">        <span class="bp">self</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
-</span><span id="1-707">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-</span><span id="1-708">        <span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">Session</span><span class="p">(</span>
-</span><span id="1-709">            <span class="n">release</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">client</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="1-710">            <span class="n">environment</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">client</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="1-711">            <span class="n">user</span><span class="o">=</span><span class="n">scope</span><span class="o">.</span><span class="n">_user</span><span class="p">,</span>
-</span><span id="1-712">            <span class="n">session_mode</span><span class="o">=</span><span class="n">session_mode</span><span class="p">,</span>
-</span><span id="1-713">        <span class="p">)</span></div>
+</span><span id="1-711">    <span class="k">def</span> <span class="nf">start_session</span><span class="p">(</span>
+</span><span id="1-712">        <span class="bp">self</span><span class="p">,</span> <span class="n">session_mode</span><span class="o">=</span><span class="s2">&quot;application&quot;</span>  <span class="c1"># type: str</span>
+</span><span id="1-713">    <span class="p">):</span>
+</span><span id="1-714">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-715"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Starts a new session.&quot;&quot;&quot;</span>
+</span><span id="1-716">        <span class="bp">self</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
+</span><span id="1-717">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-718">        <span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">Session</span><span class="p">(</span>
+</span><span id="1-719">            <span class="n">release</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">client</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="1-720">            <span class="n">environment</span><span class="o">=</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">client</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="1-721">            <span class="n">user</span><span class="o">=</span><span class="n">scope</span><span class="o">.</span><span class="n">_user</span><span class="p">,</span>
+</span><span id="1-722">            <span class="n">session_mode</span><span class="o">=</span><span class="n">session_mode</span><span class="p">,</span>
+</span><span id="1-723">        <span class="p">)</span></div>
 
-</span><span id="1-714">
+</span><span id="1-724">
 <div class="viewcode-block" id="Hub.end_session">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.end_session">[docs]</a>
-</span><span id="1-715">    <span class="k">def</span> <span class="nf">end_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-716">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-717"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ends the current session if there is one.&quot;&quot;&quot;</span>
-</span><span id="1-718">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-</span><span id="1-719">        <span class="n">session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span>
-</span><span id="1-720">        <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="1-721">
-</span><span id="1-722">        <span class="k">if</span> <span class="n">session</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-723">            <span class="n">session</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</span><span id="1-724">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-725">                <span class="n">client</span><span class="o">.</span><span class="n">capture_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span></div>
+</span><span id="1-725">    <span class="k">def</span> <span class="nf">end_session</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-726">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-727"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Ends the current session if there is one.&quot;&quot;&quot;</span>
+</span><span id="1-728">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-729">        <span class="n">session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span>
+</span><span id="1-730">        <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-731">
+</span><span id="1-732">        <span class="k">if</span> <span class="n">session</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-733">            <span class="n">session</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span><span id="1-734">            <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-735">                <span class="n">client</span><span class="o">.</span><span class="n">capture_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span></div>
 
-</span><span id="1-726">
+</span><span id="1-736">
 <div class="viewcode-block" id="Hub.stop_auto_session_tracking">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.stop_auto_session_tracking">[docs]</a>
-</span><span id="1-727">    <span class="k">def</span> <span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-728">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-729"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Stops automatic session tracking.</span>
-</span><span id="1-730">
-</span><span id="1-731"><span class="sd">        This temporarily session tracking for the current scope when called.</span>
-</span><span id="1-732"><span class="sd">        To resume session tracking call `resume_auto_session_tracking`.</span>
-</span><span id="1-733"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-734">        <span class="bp">self</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
-</span><span id="1-735">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-</span><span id="1-736">        <span class="n">scope</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="kc">False</span></div>
+</span><span id="1-737">    <span class="k">def</span> <span class="nf">stop_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-738">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-739"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Stops automatic session tracking.</span>
+</span><span id="1-740">
+</span><span id="1-741"><span class="sd">        This temporarily session tracking for the current scope when called.</span>
+</span><span id="1-742"><span class="sd">        To resume session tracking call `resume_auto_session_tracking`.</span>
+</span><span id="1-743"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-744">        <span class="bp">self</span><span class="o">.</span><span class="n">end_session</span><span class="p">()</span>
+</span><span id="1-745">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-746">        <span class="n">scope</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="kc">False</span></div>
 
-</span><span id="1-737">
+</span><span id="1-747">
 <div class="viewcode-block" id="Hub.resume_auto_session_tracking">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.resume_auto_session_tracking">[docs]</a>
-</span><span id="1-738">    <span class="k">def</span> <span class="nf">resume_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-739">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-740"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Resumes automatic session tracking for the current scope if</span>
-</span><span id="1-741"><span class="sd">        disabled earlier.  This requires that generally automatic session</span>
-</span><span id="1-742"><span class="sd">        tracking is enabled.</span>
-</span><span id="1-743"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-744">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-</span><span id="1-745">        <span class="n">scope</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="kc">None</span></div>
+</span><span id="1-748">    <span class="k">def</span> <span class="nf">resume_auto_session_tracking</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-749">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-750"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Resumes automatic session tracking for the current scope if</span>
+</span><span id="1-751"><span class="sd">        disabled earlier.  This requires that generally automatic session</span>
+</span><span id="1-752"><span class="sd">        tracking is enabled.</span>
+</span><span id="1-753"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-754">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-755">        <span class="n">scope</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="kc">None</span></div>
 
-</span><span id="1-746">
+</span><span id="1-756">
 <div class="viewcode-block" id="Hub.flush">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.flush">[docs]</a>
-</span><span id="1-747">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
-</span><span id="1-748">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-749">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span id="1-750">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
-</span><span id="1-751">    <span class="p">):</span>
-</span><span id="1-752">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-753"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-754"><span class="sd">        Alias for :py:meth:`sentry_sdk.Client.flush`</span>
-</span><span id="1-755"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-756">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-</span><span id="1-757">        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-758">            <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
+</span><span id="1-757">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span id="1-758">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-759">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span id="1-760">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+</span><span id="1-761">    <span class="p">):</span>
+</span><span id="1-762">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-763"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-764"><span class="sd">        Alias for :py:meth:`sentry_sdk.Client.flush`</span>
+</span><span id="1-765"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-766">        <span class="n">client</span><span class="p">,</span> <span class="n">scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="1-767">        <span class="k">if</span> <span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-768">            <span class="k">return</span> <span class="n">client</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span></div>
 
-</span><span id="1-759">
+</span><span id="1-769">
 <div class="viewcode-block" id="Hub.get_traceparent">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_traceparent">[docs]</a>
-</span><span id="1-760">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-761">        <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span id="1-762"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-763"><span class="sd">        Returns the traceparent either from the active span or from the scope.</span>
-</span><span id="1-764"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-765">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-766">            <span class="k">if</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-767">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
-</span><span id="1-768">
-</span><span id="1-769">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
+</span><span id="1-770">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-771">        <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span id="1-772"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-773"><span class="sd">        Returns the traceparent either from the active span or from the scope.</span>
+</span><span id="1-774"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-775">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-776">            <span class="k">if</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-777">                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">to_traceparent</span><span class="p">()</span>
+</span><span id="1-778">
+</span><span id="1-779">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
 
-</span><span id="1-770">
+</span><span id="1-780">
 <div class="viewcode-block" id="Hub.get_baggage">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.get_baggage">[docs]</a>
-</span><span id="1-771">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-772">        <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span id="1-773"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-774"><span class="sd">        Returns Baggage either from the active span or from the scope.</span>
-</span><span id="1-775"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-776">        <span class="k">if</span> <span class="p">(</span>
-</span><span id="1-777">            <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="1-778">            <span class="ow">and</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-</span><span id="1-779">            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="1-780">        <span class="p">):</span>
-</span><span id="1-781">            <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">to_baggage</span><span class="p">()</span>
-</span><span id="1-782">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-783">            <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
-</span><span id="1-784">
-</span><span id="1-785">        <span class="k">if</span> <span class="n">baggage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-786">            <span class="k">return</span> <span class="n">baggage</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
-</span><span id="1-787">
-</span><span id="1-788">        <span class="k">return</span> <span class="kc">None</span></div>
+</span><span id="1-781">    <span class="k">def</span> <span class="nf">get_baggage</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-782">        <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span id="1-783"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-784"><span class="sd">        Returns Baggage either from the active span or from the scope.</span>
+</span><span id="1-785"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-786">        <span class="k">if</span> <span class="p">(</span>
+</span><span id="1-787">            <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="1-788">            <span class="ow">and</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+</span><span id="1-789">            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="1-790">        <span class="p">):</span>
+</span><span id="1-791">            <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span><span class="o">.</span><span class="n">to_baggage</span><span class="p">()</span>
+</span><span id="1-792">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-793">            <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
+</span><span id="1-794">
+</span><span id="1-795">        <span class="k">if</span> <span class="n">baggage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-796">            <span class="k">return</span> <span class="n">baggage</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
+</span><span id="1-797">
+</span><span id="1-798">        <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span id="1-789">
+</span><span id="1-799">
 <div class="viewcode-block" id="Hub.iter_trace_propagation_headers">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.iter_trace_propagation_headers">[docs]</a>
-</span><span id="1-790">    <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-791">        <span class="c1"># type: (Optional[Span]) -&gt; Generator[Tuple[str, str], None, None]</span>
-</span><span id="1-792"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-793"><span class="sd">        Return HTTP headers which allow propagation of trace data. Data taken</span>
-</span><span id="1-794"><span class="sd">        from the span representing the request, if available, or the current</span>
-</span><span id="1-795"><span class="sd">        span on the scope if not.</span>
-</span><span id="1-796"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-797">        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-</span><span id="1-798">        <span class="n">propagate_traces</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;propagate_traces&quot;</span><span class="p">]</span>
-</span><span id="1-799">        <span class="k">if</span> <span class="ow">not</span> <span class="n">propagate_traces</span><span class="p">:</span>
-</span><span id="1-800">            <span class="k">return</span>
-</span><span id="1-801">
-</span><span id="1-802">        <span class="n">span</span> <span class="o">=</span> <span class="n">span</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
-</span><span id="1-803">
-</span><span id="1-804">        <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span> <span class="ow">and</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-805">            <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">span</span><span class="o">.</span><span class="n">iter_headers</span><span class="p">():</span>
-</span><span id="1-806">                <span class="k">yield</span> <span class="n">header</span>
-</span><span id="1-807">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-808">            <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">iter_headers</span><span class="p">():</span>
-</span><span id="1-809">                <span class="k">yield</span> <span class="n">header</span></div>
+</span><span id="1-800">    <span class="k">def</span> <span class="nf">iter_trace_propagation_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-801">        <span class="c1"># type: (Optional[Span]) -&gt; Generator[Tuple[str, str], None, None]</span>
+</span><span id="1-802"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-803"><span class="sd">        Return HTTP headers which allow propagation of trace data. Data taken</span>
+</span><span id="1-804"><span class="sd">        from the span representing the request, if available, or the current</span>
+</span><span id="1-805"><span class="sd">        span on the scope if not.</span>
+</span><span id="1-806"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-807">        <span class="n">client</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="1-808">        <span class="n">propagate_traces</span> <span class="o">=</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;propagate_traces&quot;</span><span class="p">]</span>
+</span><span id="1-809">        <span class="k">if</span> <span class="ow">not</span> <span class="n">propagate_traces</span><span class="p">:</span>
+</span><span id="1-810">            <span class="k">return</span>
+</span><span id="1-811">
+</span><span id="1-812">        <span class="n">span</span> <span class="o">=</span> <span class="n">span</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
+</span><span id="1-813">
+</span><span id="1-814">        <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span> <span class="ow">and</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-815">            <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">span</span><span class="o">.</span><span class="n">iter_headers</span><span class="p">():</span>
+</span><span id="1-816">                <span class="k">yield</span> <span class="n">header</span>
+</span><span id="1-817">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-818">            <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">iter_headers</span><span class="p">():</span>
+</span><span id="1-819">                <span class="k">yield</span> <span class="n">header</span></div>
 
-</span><span id="1-810">
+</span><span id="1-820">
 <div class="viewcode-block" id="Hub.trace_propagation_meta">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.Hub.trace_propagation_meta">[docs]</a>
-</span><span id="1-811">    <span class="k">def</span> <span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-812">        <span class="c1"># type: (Optional[Span]) -&gt; str</span>
-</span><span id="1-813"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-814"><span class="sd">        Return meta tags which should be injected into HTML templates</span>
-</span><span id="1-815"><span class="sd">        to allow propagation of trace information.</span>
-</span><span id="1-816"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-817">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-818">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span id="1-819">                <span class="s2">&quot;The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.&quot;</span>
-</span><span id="1-820">            <span class="p">)</span>
-</span><span id="1-821">
-</span><span id="1-822">        <span class="n">meta</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
-</span><span id="1-823">
-</span><span id="1-824">        <span class="n">sentry_trace</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span>
-</span><span id="1-825">        <span class="k">if</span> <span class="n">sentry_trace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-826">            <span class="n">meta</span> <span class="o">+=</span> <span class="s1">&#39;&lt;meta name=&quot;</span><span class="si">%s</span><span class="s1">&quot; content=&quot;</span><span class="si">%s</span><span class="s1">&quot;&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span>
-</span><span id="1-827">                <span class="n">SENTRY_TRACE_HEADER_NAME</span><span class="p">,</span>
-</span><span id="1-828">                <span class="n">sentry_trace</span><span class="p">,</span>
-</span><span id="1-829">            <span class="p">)</span>
-</span><span id="1-830">
-</span><span id="1-831">        <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
-</span><span id="1-832">        <span class="k">if</span> <span class="n">baggage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-833">            <span class="n">meta</span> <span class="o">+=</span> <span class="s1">&#39;&lt;meta name=&quot;</span><span class="si">%s</span><span class="s1">&quot; content=&quot;</span><span class="si">%s</span><span class="s1">&quot;&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span>
-</span><span id="1-834">                <span class="n">BAGGAGE_HEADER_NAME</span><span class="p">,</span>
-</span><span id="1-835">                <span class="n">baggage</span><span class="p">,</span>
-</span><span id="1-836">            <span class="p">)</span>
-</span><span id="1-837">
-</span><span id="1-838">        <span class="k">return</span> <span class="n">meta</span></div>
+</span><span id="1-821">    <span class="k">def</span> <span class="nf">trace_propagation_meta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-822">        <span class="c1"># type: (Optional[Span]) -&gt; str</span>
+</span><span id="1-823"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-824"><span class="sd">        Return meta tags which should be injected into HTML templates</span>
+</span><span id="1-825"><span class="sd">        to allow propagation of trace information.</span>
+</span><span id="1-826"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-827">        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-828">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+</span><span id="1-829">                <span class="s2">&quot;The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future.&quot;</span>
+</span><span id="1-830">            <span class="p">)</span>
+</span><span id="1-831">
+</span><span id="1-832">        <span class="n">meta</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+</span><span id="1-833">
+</span><span id="1-834">        <span class="n">sentry_trace</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span>
+</span><span id="1-835">        <span class="k">if</span> <span class="n">sentry_trace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-836">            <span class="n">meta</span> <span class="o">+=</span> <span class="s1">&#39;&lt;meta name=&quot;</span><span class="si">%s</span><span class="s1">&quot; content=&quot;</span><span class="si">%s</span><span class="s1">&quot;&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span>
+</span><span id="1-837">                <span class="n">SENTRY_TRACE_HEADER_NAME</span><span class="p">,</span>
+</span><span id="1-838">                <span class="n">sentry_trace</span><span class="p">,</span>
+</span><span id="1-839">            <span class="p">)</span>
+</span><span id="1-840">
+</span><span id="1-841">        <span class="n">baggage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
+</span><span id="1-842">        <span class="k">if</span> <span class="n">baggage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-843">            <span class="n">meta</span> <span class="o">+=</span> <span class="s1">&#39;&lt;meta name=&quot;</span><span class="si">%s</span><span class="s1">&quot; content=&quot;</span><span class="si">%s</span><span class="s1">&quot;&gt;&#39;</span> <span class="o">%</span> <span class="p">(</span>
+</span><span id="1-844">                <span class="n">BAGGAGE_HEADER_NAME</span><span class="p">,</span>
+</span><span id="1-845">                <span class="n">baggage</span><span class="p">,</span>
+</span><span id="1-846">            <span class="p">)</span>
+</span><span id="1-847">
+</span><span id="1-848">        <span class="k">return</span> <span class="n">meta</span></div>
 </div>
 
-</span><span id="1-839">
-</span><span id="1-840">
-</span><span id="1-841"><span class="n">GLOBAL_HUB</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">()</span>
-</span><span id="1-842"><span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">GLOBAL_HUB</span><span class="p">)</span>
+</span><span id="1-849">
+</span><span id="1-850">
+</span><span id="1-851"><span class="n">GLOBAL_HUB</span> <span class="o">=</span> <span class="n">Hub</span><span class="p">()</span>
+</span><span id="1-852"><span class="n">_local</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">GLOBAL_HUB</span><span class="p">)</span>
 </span></pre></div>
         </article>
         
@@ -1086,10 +1095,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../_static/documentation_options.js?v=497d83b4"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=d7f4572f"></script>
+      <script src="../../_static/shibuya.js?v=3e5c8598"></script>
     
 </body>
 </html>

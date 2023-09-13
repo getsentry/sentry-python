@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Main API - sentry-python 1.30.0 documentation</title>
+      <title>Main API - sentry-python 1.31.0 documentation</title>
     <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -14,7 +14,7 @@
       document.documentElement.classList.add('dark')
     }
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=aecf457f" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=9cd6187f" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=2981b36d" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=ee381b95" />
     <style>
 :root {
@@ -89,8 +89,7 @@ html.dark {
   <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
     <div class="sy-lside-inner md:sticky">
       <div class="sy-scrollbar p-6">
-        <div class="globaltoc">
-          <ul class="current">
+        <div class="globaltoc" data-expand-depth="0"><ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Main API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="integrations.html">Integrations</a></li>
 </ul>
@@ -105,7 +104,7 @@ html.dark {
     <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
       <i class="i-icon close"></i>
     </button>
-    <div class="sy-scrollbar px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4">
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4">
   <div class="localtoc">
     <h3>On this page</h3>
     <ul>
@@ -211,17 +210,26 @@ html.dark {
 <li><a class="reference internal" href="#sentry_sdk.start_span"><code class="docutils literal notranslate"><span class="pre">start_span()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.start_transaction"><code class="docutils literal notranslate"><span class="pre">start_transaction()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span"><code class="docutils literal notranslate"><span class="pre">Span</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.containing_transaction"><code class="docutils literal notranslate"><span class="pre">Span.containing_transaction</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_environ"><code class="docutils literal notranslate"><span class="pre">Span.continue_from_environ()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_headers"><code class="docutils literal notranslate"><span class="pre">Span.continue_from_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.finish"><code class="docutils literal notranslate"><span class="pre">Span.finish()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.from_traceparent"><code class="docutils literal notranslate"><span class="pre">Span.from_traceparent()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.iter_headers"><code class="docutils literal notranslate"><span class="pre">Span.iter_headers()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.new_span"><code class="docutils literal notranslate"><span class="pre">Span.new_span()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.start_child"><code class="docutils literal notranslate"><span class="pre">Span.start_child()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span.timestamp"><code class="docutils literal notranslate"><span class="pre">Span.timestamp</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.to_baggage"><code class="docutils literal notranslate"><span class="pre">Span.to_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.to_json"><code class="docutils literal notranslate"><span class="pre">Span.to_json()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Transaction"><code class="docutils literal notranslate"><span class="pre">Transaction</span></code></a><ul>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.containing_transaction"><code class="docutils literal notranslate"><span class="pre">Transaction.containing_transaction</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.finish"><code class="docutils literal notranslate"><span class="pre">Transaction.finish()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.get_baggage"><code class="docutils literal notranslate"><span class="pre">Transaction.get_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.set_context"><code class="docutils literal notranslate"><span class="pre">Transaction.set_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.set_http_status"><code class="docutils literal notranslate"><span class="pre">Transaction.set_http_status()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.to_json"><code class="docutils literal notranslate"><span class="pre">Transaction.to_json()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -1415,18 +1423,32 @@ finished child spans.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.tracing.</span></span><span class="sig-name descname"><span class="pre">Span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span" title="Link to this definition">¶</a></dt>
-<dd><dl class="py method">
+<dd><p>A span holds timing information of a block of code.
+Spans can have multiple child spans thus forming a span tree.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.containing_transaction">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">containing_transaction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><span class="pre">Transaction</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><span class="pre">None</span></a></em><a class="headerlink" href="#sentry_sdk.tracing.Span.containing_transaction" title="Link to this definition">¶</a></dt>
+<dd><p>The <code class="docutils literal notranslate"><span class="pre">Transaction</span></code> that this span belongs to.
+The <code class="docutils literal notranslate"><span class="pre">Transaction</span></code> is the root of the span tree,
+so one could also think of this <code class="docutils literal notranslate"><span class="pre">Transaction</span></code> as the “root span”.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span.continue_from_environ">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">continue_from_environ</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environ</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.continue_from_environ"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.continue_from_environ" title="Link to this definition">¶</a></dt>
 <dd><p>Create a Transaction with the given params, then add in data pulled from
-the ‘sentry-trace’ and ‘baggage’ headers from the environ (if any)
+the <code class="docutils literal notranslate"><span class="pre">sentry-trace</span></code> and <code class="docutils literal notranslate"><span class="pre">baggage</span></code> headers from the environ (if any)
 before returning the Transaction.</p>
-<p>This is different from <cite>continue_from_headers</cite> in that it assumes header
-names in the form “HTTP_HEADER_NAME” - such as you would get from a wsgi
-environ - rather than the form “header-name”.</p>
+<p>This is different from <a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_headers" title="sentry_sdk.tracing.Span.continue_from_headers"><code class="xref py py-meth docutils literal notranslate"><span class="pre">continue_from_headers()</span></code></a>
+in that it assumes header names in the form <code class="docutils literal notranslate"><span class="pre">HTTP_HEADER_NAME</span></code> -
+such as you would get from a WSGI/ASGI environ -
+rather than the form <code class="docutils literal notranslate"><span class="pre">header-name</span></code>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>environ</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Mapping" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mapping</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]) – The ASGI/WSGI environ to pull information from.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1435,10 +1457,38 @@ environ - rather than the form “header-name”.</p>
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span.continue_from_headers">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">continue_from_headers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">headers</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.continue_from_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.continue_from_headers" title="Link to this definition">¶</a></dt>
 <dd><p>Create a transaction with the given params (including any data pulled from
-the ‘sentry-trace’ and ‘baggage’ headers).</p>
+the <code class="docutils literal notranslate"><span class="pre">sentry-trace</span></code> and <code class="docutils literal notranslate"><span class="pre">baggage</span></code> headers).</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>headers</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Mapping" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mapping</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]) – The dictionary with the HTTP headers to pull information from.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.finish">
+<span class="sig-name descname"><span class="pre">finish</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_timestamp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.finish"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.finish" title="Link to this definition">¶</a></dt>
+<dd><p>Sets the end timestamp of the span.
+Additionally it also creates a breadcrumb from the span,
+if the span represents a database or HTTP request.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hub</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Hub" title="sentry_sdk.hub.Hub"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hub</span></code></a>]) – The hub to use for this transaction.
+If not provided, the current hub will be used.</p></li>
+<li><p><strong>end_timestamp</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>]) – Optional timestamp that should
+be used as timestamp instead of the current time.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Always <code class="docutils literal notranslate"><span class="pre">None</span></code>. The type is <code class="docutils literal notranslate"><span class="pre">Optional[str]</span></code> to match
+the return value of <a class="reference internal" href="#sentry_sdk.tracing.Transaction.finish" title="sentry_sdk.tracing.Transaction.finish"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction.finish()</span></code></a>.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1446,9 +1496,9 @@ the ‘sentry-trace’ and ‘baggage’ headers).</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span.from_traceparent">
 <em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_traceparent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">traceparent</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.from_traceparent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.from_traceparent" title="Link to this definition">¶</a></dt>
-<dd><p>DEPRECATED: Use <code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction.continue_from_headers()</span></code>.</p>
-<p>Create a <cite>Transaction</cite> with the given params, then add in data pulled from
-the given ‘sentry-trace’ header value before returning the <cite>Transaction</cite>.</p>
+<dd><p>DEPRECATED: Use <a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_headers" title="sentry_sdk.tracing.Span.continue_from_headers"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span.continue_from_headers()</span></code></a>.</p>
+<p>Create a <code class="docutils literal notranslate"><span class="pre">Transaction</span></code> with the given params, then add in data pulled from
+the given <code class="docutils literal notranslate"><span class="pre">sentry-trace</span></code> header value before returning the <code class="docutils literal notranslate"><span class="pre">Transaction</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>]</p>
@@ -1459,8 +1509,8 @@ the given ‘sentry-trace’ header value before returning the <cite>Transaction
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span.iter_headers">
 <span class="sig-name descname"><span class="pre">iter_headers</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.iter_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.iter_headers" title="Link to this definition">¶</a></dt>
-<dd><p>Creates a generator which returns the span’s <cite>sentry-trace</cite> and <cite>baggage</cite> headers.
-If the span’s containing transaction doesn’t yet have a <cite>baggage</cite> value,
+<dd><p>Creates a generator which returns the span’s <code class="docutils literal notranslate"><span class="pre">sentry-trace</span></code> and <code class="docutils literal notranslate"><span class="pre">baggage</span></code> headers.
+If the span’s containing transaction doesn’t yet have a <code class="docutils literal notranslate"><span class="pre">baggage</span></code> value,
 this will cause one to be generated and stored.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -1472,7 +1522,7 @@ this will cause one to be generated and stored.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span.new_span">
 <span class="sig-name descname"><span class="pre">new_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.new_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.new_span" title="Link to this definition">¶</a></dt>
-<dd><p>Deprecated: use <a class="reference internal" href="#sentry_sdk.tracing.Span.start_child" title="sentry_sdk.tracing.Span.start_child"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span.start_child()</span></code></a> instead.</p>
+<dd><p>DEPRECATED: use <a class="reference internal" href="#sentry_sdk.tracing.Span.start_child" title="sentry_sdk.tracing.Span.start_child"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span.start_child()</span></code></a> instead.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference internal" href="#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">Span</span></code></a></p>
@@ -1500,19 +1550,121 @@ inherited from the current span/transaction.</p>
 <dd><p>End timestamp of span</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.to_baggage">
+<span class="sig-name descname"><span class="pre">to_baggage</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.to_baggage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.to_baggage" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the <code class="xref py py-class docutils literal notranslate"><span class="pre">Baggage</span></code>
+associated with this <code class="docutils literal notranslate"><span class="pre">Span</span></code>, if any. (Taken from the root of the span tree.)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<code class="xref py py-class docutils literal notranslate"><span class="pre">Baggage</span></code>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Span.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span.to_json" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a JSON-compatible representation of the span.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.tracing.</span></span><span class="sig-name descname"><span class="pre">Transaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><span class="pre">Any</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction" title="Link to this definition">¶</a></dt>
-<dd><dl class="py method">
+<dd><p>The Transaction is the root element that holds all the spans
+for Sentry performance instrumentation.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.containing_transaction">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">containing_transaction</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><span class="pre">Transaction</span></a></em><a class="headerlink" href="#sentry_sdk.tracing.Transaction.containing_transaction" title="Link to this definition">¶</a></dt>
+<dd><p>The root element of the span tree.
+In the case of a transaction it is the transaction itself.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.finish">
+<span class="sig-name descname"><span class="pre">finish</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_timestamp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction.finish"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction.finish" title="Link to this definition">¶</a></dt>
+<dd><p>Finishes the transaction and sends it to Sentry.
+All finished spans in the transaction will also be sent to Sentry.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hub</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="#sentry_sdk.Hub" title="sentry_sdk.hub.Hub"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hub</span></code></a>]) – The hub to use for this transaction.
+If not provided, the current hub will be used.</p></li>
+<li><p><strong>end_timestamp</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/datetime.html#datetime.datetime" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">datetime</span></code></a>]) – Optional timestamp that should
+be used as timestamp instead of the current time.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The event ID if the transaction was sent to Sentry,
+otherwise None.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.get_baggage">
 <span class="sig-name descname"><span class="pre">get_baggage</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction.get_baggage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction.get_baggage" title="Link to this definition">¶</a></dt>
-<dd><p>The first time a new baggage with sentry items is made,
+<dd><p>Returns the <code class="xref py py-class docutils literal notranslate"><span class="pre">Baggage</span></code>
+associated with the Transaction.</p>
+<p>The first time a new baggage with Sentry items is made,
 it will be frozen.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Baggage</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.set_context">
+<span class="sig-name descname"><span class="pre">set_context</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction.set_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction.set_context" title="Link to this definition">¶</a></dt>
+<dd><p>Sets a context. Transactions can have multiple contexts
+and they should follow the format described in the “Contexts Interface”
+documentation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>) – The name of the context.</p></li>
+<li><p><strong>value</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>) – The information about the context.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.set_http_status">
+<span class="sig-name descname"><span class="pre">set_http_status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">http_status</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction.set_http_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction.set_http_status" title="Link to this definition">¶</a></dt>
+<dd><p>Sets the status of the Transaction according to the given HTTP status.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>http_status</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>) – The HTTP status code.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.11)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sentry_sdk.tracing.Transaction.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Transaction.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Transaction.to_json" title="Link to this definition">¶</a></dt>
+<dd><p>Returns a JSON-compatible representation of the transaction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.11)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.11)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1570,10 +1722,10 @@ it will be frozen.</p>
     </div>
   </div>
 </footer></div>
-      <script src="_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="_static/documentation_options.js?v=497d83b4"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="_static/shibuya.js?v=d7f4572f"></script>
+      <script src="_static/shibuya.js?v=3e5c8598"></script>
     
 </body>
 </html>

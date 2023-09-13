@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.client - sentry-python 1.30.0 documentation</title>
+      <title>sentry_sdk.client - sentry-python 1.31.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -14,7 +14,7 @@
       document.documentElement.classList.add('dark')
     }
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9cd6187f" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=2981b36d" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=ee381b95" />
     <style>
 :root {
@@ -89,8 +89,7 @@ html.dark {
   <aside id="lside" class="sy-lside md:w-72 md:shrink-0 print:hidden">
     <div class="sy-lside-inner md:sticky">
       <div class="sy-scrollbar p-6">
-        <div class="globaltoc">
-          <ul>
+        <div class="globaltoc" data-expand-depth="0"><ul>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">Main API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../integrations.html">Integrations</a></li>
 </ul>
@@ -105,7 +104,7 @@ html.dark {
     <button class="rside-close js-menu xl:hidden" aria-label="Close Table of Contents" type="button" aria-controls="rside" aria-expanded="false">
       <i class="i-icon close"></i>
     </button>
-    <div class="sy-scrollbar px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div>
+    <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div id="ethical-ad-placement" data-ea-publisher="readthedocs"></div>
     </div>
   </aside>
   <div class="rside-overlay js-menu" role="button" aria-label="Close Table of Contents" aria-controls="rside" aria-expanded="false"></div>
@@ -400,14 +399,14 @@ html.dark {
 </span><span id="1-258">            <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sdk_name</span>
 </span><span id="1-259">            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Setting SDK name to &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">sdk_name</span><span class="p">)</span>
 </span><span id="1-260">
-</span><span id="1-261">        <span class="k">finally</span><span class="p">:</span>
-</span><span id="1-262">            <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old_debug</span><span class="p">)</span>
-</span><span id="1-263">
-</span><span id="1-264">        <span class="k">if</span> <span class="n">has_profiling_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">):</span>
-</span><span id="1-265">            <span class="k">try</span><span class="p">:</span>
-</span><span id="1-266">                <span class="n">setup_profiler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-</span><span id="1-267">            <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-</span><span id="1-268">                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+</span><span id="1-261">            <span class="k">if</span> <span class="n">has_profiling_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">):</span>
+</span><span id="1-262">                <span class="k">try</span><span class="p">:</span>
+</span><span id="1-263">                    <span class="n">setup_profiler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+</span><span id="1-264">                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+</span><span id="1-265">                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Can not set up profiler. (</span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+</span><span id="1-266">
+</span><span id="1-267">        <span class="k">finally</span><span class="p">:</span>
+</span><span id="1-268">            <span class="n">_client_init_debug</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">old_debug</span><span class="p">)</span>
 </span><span id="1-269">
 </span><span id="1-270">        <span class="bp">self</span><span class="o">.</span><span class="n">_setup_instrumentation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;functions_to_trace&quot;</span><span class="p">,</span> <span class="p">[]))</span>
 </span><span id="1-271">
@@ -843,10 +842,10 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=38a8c9ed"></script>
+      <script src="../../_static/documentation_options.js?v=497d83b4"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=d7f4572f"></script>
+      <script src="../../_static/shibuya.js?v=3e5c8598"></script>
     
 </body>
 </html>
