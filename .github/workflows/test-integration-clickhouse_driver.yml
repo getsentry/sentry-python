@@ -44,6 +44,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - uses: getsentry/action-clickhouse-in-ci@v1
+
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
