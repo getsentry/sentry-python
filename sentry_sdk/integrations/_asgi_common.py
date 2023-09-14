@@ -43,7 +43,7 @@ def _get_url(asgi_scope, default_scheme, host):
 
     if server is not None:
         host, port = server
-        default_port = {"http": 80, "https": 443, "ws": 80, "wss": 443}[scheme]
+        default_port = {"http": 80, "https": 443, "ws": 80, "wss": 443}.get(scheme)
         if port != default_port:
             return "%s://%s:%s%s" % (scheme, host, port, path)
         return "%s://%s%s" % (scheme, host, path)
