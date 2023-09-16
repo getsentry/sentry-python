@@ -359,9 +359,12 @@ def test_retry(celery, capture_events):
 
 
 # TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
-@pytest.mark.skip
+# @pytest.mark.skip
 @pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
+@pytest.mark.parametrize("execution_way", ["apply_async", "send_task"])
+def test_redis_backend_trace_propagation(
+    init_celery, capture_events_forksafe, execution_way
+):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
@@ -375,7 +378,12 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
 
     with start_transaction(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-        res = dummy_task.apply_async()
+        if execution_way == "apply_async":
+            res = dummy_task.apply_async()
+        elif execution_way == "send_task":
+            res = celery.send_task("dummy_task")
+        else:  # pragma: no cover
+            raise ValueError(execution_way)
 
     with pytest.raises(Exception):  # noqa: B017
         # Celery 4.1 raises a gibberish exception

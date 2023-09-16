@@ -108,8 +108,10 @@ class CeleryIntegration(Integration):
         trace.build_tracer = sentry_build_tracer
 
         from celery.app.task import Task  # type: ignore
+        from celery import Celery  # type: ignore
 
         Task.apply_async = _wrap_apply_async(Task.apply_async)
+        Celery.send_task = _wrap_apply_async(Celery.send_task)
 
         _patch_worker_exit()
 
