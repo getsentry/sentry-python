@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.30.0",
+    version="1.31.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -51,6 +51,7 @@ setup(
         "bottle": ["bottle>=0.12.13"],
         "celery": ["celery>=3"],
         "chalice": ["chalice>=1.16.0"],
+        "clickhouse-driver": ["clickhouse-driver>=0.2.0"],
         "django": ["django>=1.8"],
         "falcon": ["falcon>=1.4"],
         "fastapi": ["fastapi>=0.79.0"],

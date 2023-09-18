@@ -876,6 +876,11 @@ class NoOpSpan(Span):
         # type: () -> str
         return self.__class__.__name__
 
+    @property
+    def containing_transaction(self):
+        # type: () -> Optional[Transaction]
+        return None
+
     def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
@@ -889,6 +894,10 @@ class NoOpSpan(Span):
         return ""
 
     def to_baggage(self):
+        # type: () -> Optional[Baggage]
+        return None
+
+    def get_baggage(self):
         # type: () -> Optional[Baggage]
         return None
 
@@ -926,6 +935,22 @@ class NoOpSpan(Span):
 
     def finish(self, hub=None, end_timestamp=None):
         # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        pass
+
+    def set_measurement(self, name, value, unit=""):
+        # type: (str, float, MeasurementUnit) -> None
+        pass
+
+    def set_context(self, key, value):
+        # type: (str, Any) -> None
+        pass
+
+    def init_span_recorder(self, maxlen):
+        # type: (int) -> None
+        pass
+
+    def _set_initial_sampling_decision(self, sampling_context):
+        # type: (SamplingContext) -> None
         pass
 
 

@@ -1,4 +1,4 @@
-name: Test starlite
+name: Test clickhouse_driver
 
 on:
   push:
@@ -24,7 +24,7 @@ env:
 
 jobs:
   test:
-    name: starlite, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: clickhouse_driver, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
@@ -44,11 +44,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - uses: getsentry/action-clickhouse-in-ci@v1
+
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
 
-      - name: Test starlite
+      - name: Test clickhouse_driver
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 15
@@ -60,7 +62,7 @@ jobs:
             coverage erase
 
             # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
 
@@ -71,7 +73,7 @@ jobs:
 
 
   check_required_tests:
-    name: All starlite tests passed or skipped
+    name: All clickhouse_driver tests passed or skipped
     needs: test
     # Always run this, even if a dependent job failed
     if: always()
