@@ -126,7 +126,7 @@ def test_transport_works(
     out, err = capsys.readouterr()
     assert not err and not out
     assert capturing_server.captured
-    assert capturing_server.captured[0].compressed == compressionlevel > 0
+    assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
     assert any("Sending event" in record.msg for record in caplog.records) == debug
 
