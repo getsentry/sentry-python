@@ -1,5 +1,4 @@
 from importlib import import_module
-from inspect import iscoroutinefunction
 
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -17,9 +16,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from graphql import version as GRAPHQL_CORE_VERSION
-    from graphql.execution.execute import ExecutionContext
-    from graphql.language import DocumentNode, OperationDefinitionNode
-    from graphql.pyutils import is_awaitable
+    from graphql.language import DocumentNode
 except ImportError:
     raise DidNotEnable("graphql-core not installed")
 
@@ -28,25 +25,14 @@ try:
         "ariadne.graphql"
     )  # necessary because of some name shadowing shenanigans in ariadne
     # XXX verify again
-    from ariadne.asgi import GraphQL as ASGIGraphQL
-    from ariadne.asgi.handlers import GraphQLHTTPHandler
     from ariadne.asgi.handlers import http as ariadne_http
-    from ariadne.types import Extension
-    from ariadne.wsgi import GraphQL as WSGIGraphQL
 except ImportError:
     raise DidNotEnable("ariadne not installed")
 
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List
-    from ariadne.types import (
-        ContextValue,
-        GraphQLError,
-        GraphQLResult,
-        GraphQLSchema,
-        Resolver,
-    )
-    from graphql import GraphQLResolveInfo
+    from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema
     from sentry_sdk._types import EventProcessor
 
 
@@ -78,7 +64,6 @@ class AriadneIntegration(Integration):
             raise DidNotEnable("graphql-core 3.2 or newer required.")
 
         _patch_graphql()
-        _patch_execution_context()
 
 
 def _patch_graphql():
@@ -87,6 +72,7 @@ def _patch_graphql():
     old_graphql_async = ariadne_graphql.graphql
     old_handle_errors = ariadne_graphql.handle_graphql_errors
     old_handle_query_result = ariadne_graphql.handle_query_result
+
     old_execute_async = ariadne_graphql.execute
     old_execute_sync = ariadne_graphql.execute_sync
     old_parse_query = ariadne_graphql.parse_query
@@ -226,85 +212,6 @@ def _patch_graphql():
     # ariadne_graphql.execute = _sentry_patched_execute_async
     # ariadne_graphql.execute_sync = _sentry_patched_execute_sync
     # ariadne_graphql.parse_query = _sentry_patched_parse_query
-
-
-def _patch_execution_context():
-    # type: () -> None
-    old_init = ExecutionContext.__init__
-    old_execute_operation = ExecutionContext.execute_operation
-    old_build_response = ExecutionContext.build_response
-
-    def _sentry_patched_init(
-        self, schema, fragments, root_value, context_value, operation, *args, **kwargs
-    ):
-        print("ExecutionContext init")
-        # send_name = getattr(send, "__name__", str(send))
-        # send_patched = send_name == "_sentry_send"
-
-        hub = Hub.current
-        integration = hub.get_integration(AriadneIntegration)
-        if integration is None:
-            return old_init(
-                self,
-                schema,
-                fragments,
-                root_value,
-                context_value,
-                operation,
-                *args,
-                **kwargs
-            )
-
-        return old_init(
-            self,
-            schema,
-            fragments,
-            root_value,
-            context_value,
-            operation,
-            *args,
-            **kwargs
-        )
-
-    def _sentry_patched_execute_operation(self, *args, **kwargs):
-        hub = Hub.current
-        integration = hub.get_integration(AriadneIntegration)
-        if integration is None:
-            return old_execute_operation(self, *args, **kwargs)
-        (
-            operation_type,
-            operation_name,
-        ) = get_operation_type_and_name_from_operation_definition(self.operation)
-
-        scope = hub.scope  # XXX
-        if scope is not None:
-            if scope.span:
-                _sentry_span = scope.span.start_child(
-                    op=OPERATION_TYPE_TO_OP.get(operation_type)
-                )
-            else:
-                _sentry_span = hub.start_span(
-                    op=OPERATION_TYPE_TO_OP.get(operation_type)
-                )
-
-        result = old_execute_operation(self, *args, **kwargs)
-        _sentry_span.finish()
-        print("span finished")
-        return result
-
-    def _sentry_patched_build_response(*args, **kwargs):
-        hub = Hub.current
-        integration = hub.get_integration(AriadneIntegration)
-        if integration is None:
-            return old_build_response(*args, **kwargs)
-
-        result = old_build_response(*args, **kwargs)
-        # XXX self._sentry_span.finish()
-        return result
-
-    ExecutionContext.__init__ = _sentry_patched_init
-    ExecutionContext.execute_operation = _sentry_patched_execute_operation
-    # XXX ExecutionContext.build_response = _sentry_patched_build_response
 
 
 def _make_request_event_processor(data):
