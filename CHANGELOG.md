@@ -1,5 +1,154 @@
 # Changelog
 
+## 1.31.0
+
+### Various fixes & improvements
+
+- **New:** Add integration for `clickhouse-driver` (#2167) by @mimre25
+
+  For more information, see the documentation for [clickhouse-driver](https://docs.sentry.io/platforms/python/configuration/integrations/clickhouse-driver) for more information.
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
+
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            ClickhouseDriverIntegration(),
+        ],
+    )
+  ```
+
+- **New:** Add integration for `asyncpg` (#2314) by @mimre25
+
+  For more information, see the documentation for [asyncpg](https://docs.sentry.io/platforms/python/configuration/integrations/asyncpg/) for more information.
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
+
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            AsyncPGIntegration(),
+        ],
+    )
+  ```
+
+- **New:** Allow to override `propagate_traces` in `Celery` per task (#2331) by @jan-auer
+
+  For more information, see the documentation for [Celery](https://docs.sentry.io//platforms/python/guides/celery/#distributed-traces) for more information.
+
+  Usage:
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+
+    # Enable global distributed traces (this is the default, just to be explicit.)
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            CeleryIntegration(propagate_traces=True),
+        ],
+    )
+
+    ...
+
+    # This will NOT propagate the trace. (The task will start its own trace):
+    my_task_b.apply_async(
+        args=("some_parameter", ),
+        headers={"sentry-propagate-traces": False},
+    )
+  ```
+
+- Prevent Falcon integration from breaking ASGI apps (#2359) by @szokeasaurusrex
+- Backpressure: only downsample a max of 10 times (#2347) by @sl0thentr0py
+- Made NoOpSpan compatible to Transactions. (#2364) by @antonpirker
+- Cleanup ASGI integration (#2335) by @antonpirker
+- Pin anyio in tests (dep of httpx), because new major 4.0.0 breaks tests. (#2336) by @antonpirker
+- Added link to backpressure section in docs. (#2354) by @antonpirker
+- Add .vscode to .gitignore (#2317) by @shoaib-mohd
+- Documenting Spans and Transactions (#2358) by @antonpirker
+- Fix in profiler: do not call getcwd from module root (#2329) by @Zylphrex
+- Fix deprecated version attribute (#2338) by @vagi8
+- Fix transaction name in Starlette and FastAPI (#2341) by @antonpirker
+- Fix tests using Postgres (#2362) by @antonpirker
+- build(deps): Updated linting tooling (#2350) by @antonpirker
+- build(deps): bump sphinx from 7.2.4 to 7.2.5 (#2344) by @dependabot
+- build(deps): bump actions/checkout from 2 to 4 (#2352) by @dependabot
+- build(deps): bump checkouts/data-schemas from `ebc77d3` to `68def1e` (#2351) by @dependabot
+
+## 1.30.0
+
+### Various fixes & improvements
+
+- Officially support Python 3.11 (#2300) by @sentrivana
+- Context manager monitor (#2290) by @szokeasaurusrex
+- Set response status code in transaction `response` context. (#2312) by @antonpirker
+- Add missing context kwarg to `_sentry_task_factory` (#2267) by @JohnnyDeuss
+- In Postgres take the connection params from the connection  (#2308) by @antonpirker
+- Experimental: Allow using OTel for performance instrumentation (#2272) by @sentrivana
+
+    This release includes experimental support for replacing Sentry's default
+    performance monitoring solution with one powered by OpenTelemetry without having
+    to do any manual setup.
+
+    Try it out by installing `pip install sentry-sdk[opentelemetry-experimental]` and
+    then initializing the SDK with:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        _experiments={"otel_powered_performance": True},
+    )
+    ```
+
+    This enables OpenTelemetry performance monitoring support for some of the most
+    popular frameworks and libraries (Flask, Django, FastAPI, requests...).
+
+    We're looking forward to your feedback! Please let us know about your experience
+    in this discussion: https://github.com/getsentry/sentry/discussions/55023
+
+    **Important note:** Please note that this feature is experimental and in a
+    proof-of-concept stage and is not meant for production use. It may be changed or
+    removed at any point.
+
+- Enable backpressure handling by default (#2298) by @sl0thentr0py
+
+    The SDK now dynamically downsamples transactions to reduce backpressure in high
+    throughput systems. It starts a new `Monitor` thread to perform some health checks
+    which decide to downsample (halved each time) in 10 second intervals till the system
+    is healthy again.
+
+    To disable this behavior, use:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        enable_backpressure_handling=False,
+    )
+    ```
+
+    If your system serves heavy load, please let us know how this feature works for you!
+
+    Check out the [documentation](https://docs.sentry.io/platforms/python/configuration/options/#enable-backpressure-handling) for more information.
+
+- Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
+- Add test for `ThreadPoolExecutor` (#2259) by @gggritso
+- Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
+- Moved `is_sentry_url` to utils (#2304) by @szokeasaurusrex
+- Fix: arq attribute error on settings, support worker args (#2260) by @rossmacarthur
+- Fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
+- build(deps): bump mypy from 1.4.1 to 1.5.1 (#2319) by @dependabot
+- build(deps): bump sphinx from 7.1.2 to 7.2.4 (#2322) by @dependabot
+- build(deps): bump sphinx from 7.0.1 to 7.1.2 (#2296) by @dependabot
+- build(deps): bump checkouts/data-schemas from `1b85152` to `ebc77d3` (#2254) by @dependabot
+
 ## 1.29.2
 
 ### Various fixes & improvements

@@ -58,7 +58,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -66,6 +66,8 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
+          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
 
       - name: Test django
         uses: nick-fields/retry@v2
@@ -114,7 +116,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: postgres
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Test Env
         run: |

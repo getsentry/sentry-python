@@ -500,7 +500,10 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
     _, frame_ids, frames = extract_stack(
-        frame, LRUCache(max_size=1), max_stack_depth=max_stack_depth + base_stack_depth
+        frame,
+        LRUCache(max_size=1),
+        max_stack_depth=max_stack_depth + base_stack_depth,
+        cwd=os.getcwd(),
     )
     assert len(frame_ids) == base_stack_depth + actual_depth
     assert len(frames) == base_stack_depth + actual_depth
@@ -527,8 +530,9 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 def test_extract_stack_with_cache(frame, depth):
     # make sure cache has enough room or this test will fail
     cache = LRUCache(max_size=depth)
-    _, _, frames1 = extract_stack(frame, cache)
-    _, _, frames2 = extract_stack(frame, cache)
+    cwd = os.getcwd()
+    _, _, frames1 = extract_stack(frame, cache, cwd=cwd)
+    _, _, frames2 = extract_stack(frame, cache, cwd=cwd)
 
     assert len(frames1) > 0
     assert len(frames2) > 0
@@ -667,7 +671,16 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 )
 @mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
-    sample = [("1", extract_stack(get_frame(), LRUCache(max_size=1)))]
+    sample = [
+        (
+            "1",
+            extract_stack(
+                get_frame(),
+                LRUCache(max_size=1),
+                cwd=os.getcwd(),
+            ),
+        ),
+    ]
 
     with scheduler_class(frequency=1000) as scheduler:
         transaction = Transaction(sampled=True)
@@ -711,8 +724,18 @@ thread_metadata = {
 
 
 sample_stacks = [
-    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=1),
-    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=2),
+    extract_stack(
+        get_frame(),
+        LRUCache(max_size=1),
+        max_stack_depth=1,
+        cwd=os.getcwd(),
+    ),
+    extract_stack(
+        get_frame(),
+        LRUCache(max_size=1),
+        max_stack_depth=2,
+        cwd=os.getcwd(),
+    ),
 ]
 
 
@@ -805,7 +828,7 @@ sample_stacks = [
                 "stacks": [[0], [1, 0]],
                 "thread_metadata": thread_metadata,
             },
-            id="two identical stacks",
+            id="two different stacks",
         ),
     ],
 )

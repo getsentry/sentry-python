@@ -27,7 +27,7 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
@@ -224,9 +224,7 @@ class _Client(object):
 
             self.monitor = None
             if self.transport:
-                if self.options["_experiments"].get(
-                    "enable_backpressure_handling", False
-                ):
+                if self.options["enable_backpressure_handling"]:
                     self.monitor = Monitor(self.transport)
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
@@ -237,6 +235,15 @@ class _Client(object):
                     "Invalid value for max_request_body_size. Must be one of {}".format(
                         max_request_body_size
                     )
+                )
+
+            if self.options["_experiments"].get("otel_powered_performance", False):
+                logger.debug(
+                    "[OTel] Enabling experimental OTel-powered performance monitoring."
+                )
+                self.options["instrumenter"] = INSTRUMENTER.OTEL
+                _DEFAULT_INTEGRATIONS.append(
+                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
                 )
 
             self.integrations = setup_integrations(
@@ -251,14 +258,14 @@ class _Client(object):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
+            if has_profiling_enabled(self.options):
+                try:
+                    setup_profiler(self.options)
+                except Exception as e:
+                    logger.debug("Can not set up profiler. (%s)", e)
+
         finally:
             _client_init_debug.set(old_debug)
-
-        if has_profiling_enabled(self.options):
-            try:
-                setup_profiler(self.options)
-            except ValueError as e:
-                logger.debug(str(e))
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 

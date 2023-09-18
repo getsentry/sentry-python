@@ -21,41 +21,39 @@ class UnhealthyTestTransport(HealthyTestTransport):
 
 
 def test_no_monitor_if_disabled(sentry_init):
-    sentry_init(transport=HealthyTestTransport())
+    sentry_init(
+        transport=HealthyTestTransport(),
+        enable_backpressure_handling=False,
+    )
+
     assert Hub.current.client.monitor is None
 
 
 def test_monitor_if_enabled(sentry_init):
-    sentry_init(
-        transport=HealthyTestTransport(),
-        _experiments={"enable_backpressure_handling": True},
-    )
+    sentry_init(transport=HealthyTestTransport())
 
     monitor = Hub.current.client.monitor
     assert monitor is not None
     assert monitor._thread is None
 
     assert monitor.is_healthy() is True
-    assert monitor.downsample_factor == 1
+    assert monitor.downsample_factor == 0
     assert monitor._thread is not None
     assert monitor._thread.name == "sentry.monitor"
 
 
 def test_monitor_unhealthy(sentry_init):
-    sentry_init(
-        transport=UnhealthyTestTransport(),
-        _experiments={"enable_backpressure_handling": True},
-    )
+    sentry_init(transport=UnhealthyTestTransport())
 
     monitor = Hub.current.client.monitor
     monitor.interval = 0.1
 
     assert monitor.is_healthy() is True
-    monitor.run()
-    assert monitor.is_healthy() is False
-    assert monitor.downsample_factor == 2
-    monitor.run()
-    assert monitor.downsample_factor == 4
+
+    for i in range(15):
+        monitor.run()
+        assert monitor.is_healthy() is False
+        assert monitor.downsample_factor == (i + 1 if i < 10 else 10)
 
 
 def test_transaction_uses_downsampled_rate(
@@ -64,7 +62,6 @@ def test_transaction_uses_downsampled_rate(
     sentry_init(
         traces_sample_rate=1.0,
         transport=UnhealthyTestTransport(),
-        _experiments={"enable_backpressure_handling": True},
     )
 
     reports = capture_client_reports()
@@ -78,7 +75,7 @@ def test_transaction_uses_downsampled_rate(
     assert monitor.is_healthy() is True
     monitor.run()
     assert monitor.is_healthy() is False
-    assert monitor.downsample_factor == 2
+    assert monitor.downsample_factor == 1
 
     with start_transaction(name="foobar") as transaction:
         assert transaction.sampled is False

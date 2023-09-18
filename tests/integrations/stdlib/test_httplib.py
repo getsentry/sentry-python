@@ -84,7 +84,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     }
 
 
-def test_empty_realurl(sentry_init, capture_events):
+def test_empty_realurl(sentry_init):
     """
     Ensure that after using sentry_sdk.init you can putrequest a
     None url.
@@ -114,7 +114,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     conn.request("GET", "/200")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         # This raises an exception, because we didn't call `getresponse` for
         # the previous request yet.
         #
