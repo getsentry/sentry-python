@@ -7,9 +7,9 @@ from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    ariadne_graphql = import_module(
-        "ariadne.graphql"
-    )  # necessary because of some name shadowing shenanigans in ariadne
+    # importing like this is necessary due to name shadowing in ariadne
+    # (ariadne.graphql is also a function)
+    ariadne_graphql = import_module("ariadne.graphql")
     from ariadne.asgi.handlers import http as ariadne_http
 except ImportError:
     raise DidNotEnable("ariadne not installed")
