@@ -243,7 +243,7 @@ class _Client(object):
                 )
                 self.options["instrumenter"] = INSTRUMENTER.OTEL
                 _DEFAULT_INTEGRATIONS.append(
-                    "sentry_sdk.integrations.opentelemetry.OpenTelemetryIntegration",
+                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
                 )
 
             self.integrations = setup_integrations(
