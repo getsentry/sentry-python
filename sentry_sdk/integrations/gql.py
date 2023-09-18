@@ -1,7 +1,7 @@
-import gql
-from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode
-from gql.transport import Transport, AsyncTransport
-from gql.transport.exceptions import TransportQueryError
+import gql  # type: ignore[import]
+from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import]
+from gql.transport import Transport, AsyncTransport  # type: ignore[import]
+from gql.transport.exceptions import TransportQueryError  # type: ignore[import]
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
@@ -36,7 +36,7 @@ def _transport_method(transport: Union[Transport, AsyncTransport]) -> str:
     other transports use POST.
     """
     try:
-        return transport.method  # type: ignore
+        return transport.method
     except AttributeError:
         return "POST"
 
@@ -52,7 +52,7 @@ def _request_info_from_transport(
     }
 
     try:
-        request_info["url"] = transport.url  # type: ignore
+        request_info["url"] = transport.url
     except AttributeError:
         pass
 
@@ -71,7 +71,7 @@ def _patch_execute() -> None:
             hub = Hub.current
             event, hint = event_from_exception(
                 e,
-                client_options=hub.client.options,
+                client_options=hub.client.options if hub.client is not None else None,
                 mechanism={"type": "gql", "handled": False},
             )
             event["request"] = {
