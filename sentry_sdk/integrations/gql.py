@@ -1,11 +1,13 @@
 import gql
-from graphql import print_ast, get_operation_ast, DocumentNode
+from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode
 from gql.transport import Transport, AsyncTransport
 from gql.transport.exceptions import TransportQueryError
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Tuple, Union
+
+EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
 
 
 class GQLIntegration(Integration):
@@ -16,13 +18,16 @@ class GQLIntegration(Integration):
         _patch_execute()
 
 
-def _data_from_document(document: DocumentNode) -> Dict[str, str]:
+def _data_from_document(document: DocumentNode) -> EventDataType:
     operation_ast = get_operation_ast(document)
-    return {
-        "operationName": operation_ast.name.value,
-        operation_ast.operation.value: print_ast(document),
-        "variables": operation_ast.variable_definitions,
-    }
+    data: EventDataType = {"query": print_ast(document)}
+
+    if operation_ast is not None:
+        data["variables"] = operation_ast.variable_definitions
+        if operation_ast.name is not None:
+            data["operationName"] = operation_ast.name.value
+
+    return data
 
 
 def _transport_method(transport: Union[Transport, AsyncTransport]) -> str:
