@@ -10,7 +10,6 @@ try:
     ariadne_graphql = import_module(
         "ariadne.graphql"
     )  # necessary because of some name shadowing shenanigans in ariadne
-    # XXX verify again
     from ariadne.asgi.handlers import http as ariadne_http
 except ImportError:
     raise DidNotEnable("ariadne not installed")
@@ -37,13 +36,12 @@ class AriadneIntegration(Integration):
     def setup_once():
         # type: () -> None
         installed_packages = _get_installed_modules()
+        version = parse_version(installed_packages["ariadne"])
 
-        ariadne_version = parse_version(installed_packages["ariadne"])
+        if version is None:
+            raise DidNotEnable("Unparsable ariadne version: {}".format(version))
 
-        if ariadne_version is None:
-            raise DidNotEnable("Unparsable ariadne version: {}".format(ariadne_version))
-
-        if ariadne_version < (0, 20):
+        if version < (0, 20):
             raise DidNotEnable("ariadne 0.20 or newer required.")
 
         _patch_graphql()
@@ -64,7 +62,7 @@ def _patch_graphql():
             return old_graphql_sync(schema, data, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            event_processor = _make_request_event_processor(schema, data)
+            event_processor = _make_request_event_processor(data)
             scope.add_event_processor(event_processor)
 
         result = old_graphql_sync(schema, data, *args, **kwargs)
@@ -149,7 +147,7 @@ def _make_request_event_processor(data):
 
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        if _should_send_default_pii() and isinstance(data, dict) and data.get("query"):
+        if _should_send_default_pii() and isinstance(data, dict):
             request_info = event.setdefault("request", {})
             request_info["api_target"] = "graphql"
             request_info["data"] = data

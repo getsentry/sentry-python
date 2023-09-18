@@ -1,5 +1,6 @@
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.utils import parse_version
 from sentry_sdk._types import TYPE_CHECKING
 
