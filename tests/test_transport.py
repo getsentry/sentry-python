@@ -18,7 +18,7 @@ from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
-CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compression"])
+CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
 
 class CapturingServer(WSGIServer):
@@ -44,10 +44,10 @@ class CapturingServer(WSGIServer):
         event = envelope = None
         if request.headers.get("content-encoding") == "gzip":
             rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
-            compression = True
+            compressed = True
         else:
             rdr = io.BytesIO(request.data)
-            compression = False
+            compressed = False
 
         if request.mimetype == "application/json":
             event = parse_json(rdr.read())
@@ -59,7 +59,7 @@ class CapturingServer(WSGIServer):
                 path=request.path,
                 event=event,
                 envelope=envelope,
-                compression=compression,
+                compressed=compressed,
             )
         )
 
