@@ -1,13 +1,13 @@
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.modules import _get_installed_modules
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from graphql import schema as graphene_schema
 except ImportError:
-    raise DidNotEnable("graphene not installed")
+    raise DidNotEnable("graphql-core is not installed")
 
 
 if TYPE_CHECKING:
@@ -20,13 +20,12 @@ if TYPE_CHECKING:
 
 class GrapheneIntegration(Integration):
     # XXX guard against double patching
-
+    # XXX maybe an opt-in for capturing request bodies
     identifier = "graphene"
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        # XXX version guard for graphene
         installed_packages = _get_installed_modules()
         version = parse_version(installed_packages["graphene"])
 
@@ -85,7 +84,15 @@ def _patch_graphql():
 def _raise_graphql_errors(result, hub):
     # type: (ExecutionResult, Hub) -> None
     for error in result.errors or []:
-        hub.capture_exception(error)
+        event, hint = event_from_exception(
+            error,
+            client_options=hub.client.options,
+            mechanism={
+                "type": hub.get_integration(GrapheneIntegration).identifier,
+                "handled": False,
+            },
+        )
+        hub.capture_event(event, hint=hint)
 
 
 def _make_event_processor(source):

@@ -16,7 +16,7 @@ try:
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
 except ImportError:
-    raise DidNotEnable("strawberry-graphql is not installed.")
+    raise DidNotEnable("strawberry-graphql is not installed")
 
 import hashlib
 from inspect import isawaitable

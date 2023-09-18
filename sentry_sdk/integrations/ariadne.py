@@ -12,7 +12,7 @@ try:
     ariadne_graphql = import_module("ariadne.graphql")
     from ariadne.asgi.handlers import http as ariadne_http
 except ImportError:
-    raise DidNotEnable("ariadne not installed")
+    raise DidNotEnable("ariadne is not installed")
 
 
 if TYPE_CHECKING:
