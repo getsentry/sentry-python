@@ -42,7 +42,6 @@ class StrawberryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
         installed_packages = _get_installed_modules()
         version = parse_version(installed_packages["strawberry-graphql"])
 

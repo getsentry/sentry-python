@@ -2,12 +2,13 @@ import pytest
 
 from ariadne import ObjectType, QueryType, gql, make_executable_schema
 from ariadne.asgi import GraphQL
-from ariadne.graphql import graphql as graphql_async, graphql_sync
+from ariadne.graphql import graphql as graphql_sync
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask import Flask, request, jsonify
 
 from sentry_sdk.integrations.ariadne import AriadneIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import ignore_logger
 
 
@@ -71,7 +72,7 @@ def test_capture_request_and_response_if_send_pii_is_on(
 ):
     sentry_init(
         send_default_pii=True,
-        integrations=[AriadneIntegration()],
+        integrations=[AriadneIntegration(), FastApiIntegration()],
     )
     events = capture_events()
 
@@ -94,32 +95,47 @@ def test_capture_request_and_response_if_send_pii_is_on(
             ],
         }
     }
-    from pprint import pprint
-
-    pprint(event["request"])
     assert event["request"]["api_target"] == "graphql"
     assert event["request"]["data"] == query
 
 
 @pytest.mark.parametrize(
-    "graphql_run",
-    [graphql_async, graphql_sync],
+    "client",
+    [TestClient(async_app), sync_app.test_client()],
 )
-def test_nothing_captured_on_success(sentry_init, capture_events, graphql_run):
+def test_do_not_capture_request_and_response_if_send_pii_is_off(
+    sentry_init, capture_events, client
+):
     sentry_init(
-        send_default_pii=True,
-        integrations=[AriadneIntegration()],
+        integrations=[AriadneIntegration(), FastApiIntegration()],
     )
     events = capture_events()
 
-    schema = schema_factory()
+    query = {"query": "query ErrorQuery {error}"}
+    client.post("/graphql", json=query)
 
-    graphql_run(
-        schema,
-        data={
-            "query": "query GreetingQuery($name: String) { greeting(name: $name) {name}}",
-            "variables": {"name": "some name"},
-        },
+    assert len(events) == 1
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert "data" not in event["request"]
+    assert "response" not in event["contexts"]
+
+
+@pytest.mark.parametrize(
+    "client",
+    [TestClient(async_app), sync_app.test_client()],
+)
+def test_no_event_if_no_errors(sentry_init, capture_events, client):
+    sentry_init(
+        integrations=[AriadneIntegration(), FastApiIntegration()],
     )
+    events = capture_events()
+
+    query = {
+        "query": "query GreetingQuery($name: String) { greeting(name: $name) {name}}",
+        "variables": {"name": "some name"},
+    }
+    client.post("/graphql", json=query)
 
     assert len(events) == 0

@@ -3,6 +3,7 @@ from importlib import import_module
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.modules import _get_installed_modules
+from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -23,14 +24,6 @@ if TYPE_CHECKING:
 
 class AriadneIntegration(Integration):
     identifier = "ariadne"
-
-    # XXX double patching
-    # XXX if we end up patching graphql-core, we need guards to prevent re-patching
-    # XXX capture internal exceptions
-    # XXX capture request/response? to override pii?
-    # XXX max_request_body_size? see request_body_within_bounds
-    # XXX subscriptions
-    # XXX ws
 
     @staticmethod
     def setup_once():
@@ -143,14 +136,22 @@ def _patch_graphql():
 
 def _make_request_event_processor(data):
     # type: (GraphQLSchema) -> EventProcessor
-    """Add request data to events."""
+    """Add request data and api_target to events."""
 
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         if _should_send_default_pii() and isinstance(data, dict):
-            request_info = event.setdefault("request", {})
-            request_info["api_target"] = "graphql"
-            request_info["data"] = data
+            try:
+                content_length = int(
+                    (data.get("headers") or {}).get("Content-Length", 0)
+                )
+            except (TypeError, ValueError):
+                return event
+
+            if request_body_within_bounds(Hub.current.client, content_length):
+                request_info = event.setdefault("request", {})
+                request_info["api_target"] = "graphql"
+                request_info["data"] = data
 
         return event
 
