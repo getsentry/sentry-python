@@ -62,7 +62,7 @@ def _request_info_from_transport(
 def _patch_execute() -> None:
     real_execute = gql.Client.execute
 
-    def patch_execute(
+    def sentry_patched_execute(
         self: gql.Client, document: DocumentNode, *args: Any, **kwargs: Any
     ) -> Any:
         try:
@@ -87,4 +87,4 @@ def _patch_execute() -> None:
             hub.capture_event(event, hint)
             raise e
 
-    gql.Client.execute = patch_execute
+    gql.Client.execute = sentry_patched_execute
