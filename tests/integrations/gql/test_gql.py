@@ -1,3 +1,7 @@
+import pytest
+
+gql = pytest.importorskip("gql")
+
 from sentry_sdk.integrations.gql import GQLIntegration
 from unittest.mock import Mock, patch
 
