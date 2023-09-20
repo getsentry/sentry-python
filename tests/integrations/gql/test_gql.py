@@ -2,9 +2,22 @@ import pytest
 
 gql = pytest.importorskip("gql")
 
+from gql import Client
 from gql.transport.exceptions import TransportQueryError
+from graphql import DocumentNode
 from sentry_sdk.integrations.gql import GQLIntegration
 from unittest.mock import MagicMock, Mock, patch
+
+
+class _MockClientBase(MagicMock):
+    """
+    Mocked version of GQL Client class, following same spec as GQL Client.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, spec=Client)
+
+    transport = MagicMock()
 
 
 def test_gql_init(sentry_init):
@@ -24,48 +37,71 @@ def test_setup_once_patches_gql_execute(mock_gql):
     ), "the patched gql.Client.execute is not a function"
 
 
-@patch("sentry_sdk.integrations.gql.gql")
-def test_patched_gql_execute_still_calls_real_execute(mock_gql):
-    class MockClient(MagicMock):
-        def execute(self, _, x, y):
-            return 2 * x + y
+def test_patched_gql_execute_still_calls_real_execute():
+    original_method_return_value = MagicMock()
 
-    mock_gql.Client = MockClient
-    call_args = (None, 3, 4)
+    class OriginalMockClient(_MockClientBase):
+        """
+        This mock client always returns the mock original_method_return_value when a query
+        is executed. This can be used to simulate successful GraphQL queries.
+        """
 
-    client_before_patch = MockClient()
-    result_before_patch = client_before_patch.execute(*call_args)
+        execute = MagicMock(
+            spec=Client.execute, return_value=original_method_return_value
+        )
 
-    GQLIntegration.setup_once()
+    original_execute_method = OriginalMockClient.execute
 
-    client_after_patch = mock_gql.Client()
-    result_after_patch = client_after_patch.execute(*call_args)
+    with patch(
+        "sentry_sdk.integrations.gql.gql.Client", new=OriginalMockClient
+    ) as PatchedMockClient:
+        # Below line should patch the PatchedMockClient with Sentry SDK magic
+        GQLIntegration.setup_once()
 
-    assert (
-        result_after_patch == result_before_patch
-    ), "the patched execute returned a different result than the real execute"
+        # We expect GQLIntegration.setup_once to patch the execute method.
+        assert (
+            PatchedMockClient.execute is not original_execute_method
+        ), "execute method not patched"
+
+        # Now, let's instantiate a client and send it a query. Original execute still should get called.
+        mock_query = MagicMock(spec=DocumentNode)
+        client_instance = PatchedMockClient()
+        patched_method_return_value = client_instance.execute(mock_query)
+
+        original_execute_method.assert_called_once_with(client_instance, mock_query)
+
+        # Also, let's verify that the patched execute returns the expected value.
+        assert (
+            patched_method_return_value is original_method_return_value
+        ), "pathced execute method returns a different value than the original execute method"
 
 
-@patch("sentry_sdk.integrations.gql.print_ast")
-@patch("sentry_sdk.integrations.gql.event_from_exception")
-@patch("sentry_sdk.integrations.gql.Hub")
-@patch("sentry_sdk.integrations.gql.gql")
+@patch("sentry_sdk.integrations.gql.Hub.current.capture_event")
 def test_patched_gql_execute_captures_and_reraises_graphql_exception(
-    mock_gql, mock_hub, mock_event_from_exception, _
+    mock_capture_event,
 ):
-    mock_event_from_exception.return_value = (MagicMock(), MagicMock())
+    class OriginalMockClient(_MockClientBase):
+        """
+        This mock client always raises a TransportQueryError when a GraphQL query is attempted.
+        This simulates a GraphQL query which results in errors.
+        """
 
-    class MockClient(MagicMock):
-        def execute(self, _):
-            raise TransportQueryError("the query failed")
+        execute = MagicMock(
+            spec=Client.execute, side_effect=TransportQueryError("query failed")
+        )
 
-    mock_gql.Client = MockClient
+    with patch(
+        "sentry_sdk.integrations.gql.gql.Client", new=OriginalMockClient
+    ) as PatchedMockClient:
+        # Below line should patch the PatchedMockClient with Sentry SDK magic
+        GQLIntegration.setup_once()
 
-    GQLIntegration.setup_once()
+        mock_query = MagicMock(spec=DocumentNode)
+        client_instance = PatchedMockClient()
 
-    mock_client = mock_gql.Client()
+        # The error should still get raised even though we have instrumented the execute method.
+        with pytest.raises(TransportQueryError):
+            client_instance.execute(mock_query)
 
-    with pytest.raises(TransportQueryError):
-        mock_client.execute(MagicMock())
-
-    assert mock_hub.current.capture_event.called, "event was not captured"
+        # However, we should have also captured the error on the hub.
+        mock_capture_event.assert_called_once()
