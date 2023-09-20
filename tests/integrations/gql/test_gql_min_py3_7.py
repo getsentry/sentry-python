@@ -55,7 +55,7 @@ def test_setup_once_patches_execute_and_patched_function_calls_original():
 
     with patch(
         "sentry_sdk.integrations.gql.gql.Client", new=OriginalMockClient
-    ) as PatchedMockClient:
+    ) as PatchedMockClient:  # noqa: N806
         # Below line should patch the PatchedMockClient with Sentry SDK magic
         GQLIntegration.setup_once()
 
@@ -100,7 +100,7 @@ def test_patched_gql_execute_captures_and_reraises_graphql_exception(
 
     with patch(
         "sentry_sdk.integrations.gql.gql.Client", new=OriginalMockClient
-    ) as PatchedMockClient:
+    ) as PatchedMockClient:  # noqa: N806
         # Below line should patch the PatchedMockClient with Sentry SDK magic
         GQLIntegration.setup_once()
 
