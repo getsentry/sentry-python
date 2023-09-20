@@ -285,9 +285,9 @@ def test_tag_normalization(sentry_init, capture_envelopes):
     ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.distribution("dist", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
-    metrics.distribution("dist", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
-    metrics.distribution("dist", 1.0, tags={"foö-bar": "snöwmän"}, timestamp=ts)
+    metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
+    metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
+    metrics.distribution("c", 1.0, tags={"foö-bar": "snöwmän"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -312,5 +312,43 @@ def test_tag_normalization(sentry_init, capture_envelopes):
     assert m[2][4] == {
         "fo_-bar": "snöwmän",
         "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+
+def test_before_emit_metric(sentry_init, capture_envelopes):
+    def before_emit(key, tags):
+        if key == "removed-metric":
+            return False
+        tags["extra"] = "foo"
+        del tags["release"]
+        return True
+
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={
+            "enable_metrics": True,
+            "before_emit_metric": before_emit,
+        },
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.incr("removed-metric", 1.0)
+    metrics.incr("actual-metric", 1.0)
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][1] == "actual-metric@none"
+    assert m[0][3] == ["1.0"]
+    assert m[0][4] == {
+        "extra": "foo",
         "environment": "not-fun-env",
     }

@@ -455,8 +455,8 @@ class MetricsAggregator(object):
         return tuple(sorted(rv))
 
 
-def get_aggregator_and_update_tags(tags):
-    # type: (Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[MetricTags]]
+def get_aggregator_and_update_tags(key, tags):
+    # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[MetricTags]]
     """Returns the current metrics aggregator if there is one."""
     hub = Hub.current
     client = hub.client
@@ -474,6 +474,11 @@ def get_aggregator_and_update_tags(tags):
         if transaction:
             updated_tags.setdefault("transaction", transaction)
 
+    callback = client.options.get("_experiments", {}).get("before_emit_metric")
+    if callback is not None:
+        if not callback(key, updated_tags):
+            return None, updated_tags
+
     return client.metrics_aggregator, updated_tags
 
 
@@ -486,7 +491,7 @@ def incr(
 ):
     # type: (...) -> None
     """Increments a counter."""
-    aggregator, tags = get_aggregator_and_update_tags(tags)
+    aggregator, tags = get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("c", key, value, unit, tags, timestamp)
 
@@ -499,7 +504,7 @@ def timing(
 ):
     # type: (...) -> Iterator[None]
     """Emits a distribution with the time it takes to run the given code block."""
-    aggregator, tags = get_aggregator_and_update_tags(tags)
+    aggregator, tags = get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         then = now()
         try:
@@ -519,7 +524,7 @@ def distribution(
     timestamp=None,  # type: Optional[float]
 ) -> None:
     """Emits a distribution."""
-    aggregator, tags = get_aggregator_and_update_tags(tags)
+    aggregator, tags = get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("d", key, value, unit, tags, timestamp)
 
@@ -532,7 +537,7 @@ def set(
     timestamp=None,  # type: Optional[float]
 ) -> None:
     """Emits a set."""
-    aggregator, tags = get_aggregator_and_update_tags(tags)
+    aggregator, tags = get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("s", key, value, unit, tags, timestamp)
 
@@ -545,6 +550,6 @@ def gauge(
     timestamp=None,  # type: Optional[float]
 ) -> None:
     """Emits a gauge."""
-    aggregator, tags = get_aggregator_and_update_tags(tags)
+    aggregator, tags = get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("g", key, value, unit, tags, timestamp)
