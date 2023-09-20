@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         "session",
         "internal",
         "profile",
+        "statsd",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]

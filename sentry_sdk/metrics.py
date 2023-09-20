@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricUnit
     from sentry_sdk._types import MetricType
     from sentry_sdk._types import MetricTags
+    from sentry_sdk._types import MetricTagValue
     from sentry_sdk._types import MetricTagsInternal
     from sentry_sdk._types import FlushedMetricValue
     from sentry_sdk._types import BucketKey
@@ -460,7 +461,7 @@ def get_aggregator_and_update_tags(tags):
     if client is None or client.metrics_aggregator is None:
         return None, tags
 
-    updated_tags = dict(tags or ())
+    updated_tags = dict(tags or ()) # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
@@ -472,11 +473,6 @@ def get_aggregator_and_update_tags(tags):
             updated_tags.setdefault("transaction", transaction)
 
     return client.metrics_aggregator, updated_tags
-
-
-def enhance_tags(tags):
-    # type: (Optional[MetricTags]) -> MetricTags
-    return tags
 
 
 def incr(
