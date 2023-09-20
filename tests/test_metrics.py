@@ -1,5 +1,3 @@
-# coding: utf-8
-
 import time
 
 from sentry_sdk import Hub, metrics, push_scope
@@ -321,9 +319,11 @@ def test_tag_normalization(sentry_init, capture_envelopes):
     ts = time.time()
     envelopes = capture_envelopes()
 
+    # fmt: off
     metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
     metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
-    metrics.distribution("c", 1.0, tags={"foö-bar": u"snöwmän"}, timestamp=ts)
+    metrics.distribution("c", 1.0, tags={u"foö-bar": u"snöwmän"}, timestamp=ts)
+    # fmt: on
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -345,11 +345,13 @@ def test_tag_normalization(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
+    # fmt: off
     assert m[2][4] == {
         "fo_-bar": u"snöwmän",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
+    # fmt: on
 
 
 def test_before_emit_metric(sentry_init, capture_envelopes):
