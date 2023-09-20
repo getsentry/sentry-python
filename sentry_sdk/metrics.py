@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Optional
     from typing import Tuple
-    from typing import Iterator
 
     from sentry_sdk._types import MetricValue
     from sentry_sdk._types import MetricUnit
@@ -490,7 +489,7 @@ def incr(
 class _Timing(object):
     def __init__(
         self,
-        key,  #  type: str
+        key,  # type: str
         tags,  # type: Optional[MetricTags]
         timestamp,  # type: Optional[float]
     ):
