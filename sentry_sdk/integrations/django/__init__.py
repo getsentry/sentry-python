@@ -24,6 +24,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     transaction_from_function,
     walk_exception_chain,
+    exc_info_from_error,
+    iter_stacks,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -490,6 +492,93 @@ def _make_event_processor(weak_request, integration):
     return event_processor
 
 
+def _clean_vars(error):
+    exc_info = exc_info_from_error(error)
+    sensitive_variables = None
+    for _, _, tb in walk_exception_chain(exc_info):
+        for tb in iter_stacks(tb):
+            current_frame = tb.tb_frame
+            if (
+                current_frame.f_code.co_name == "sensitive_variables_wrapper"
+                and "sensitive_variables_wrapper" in current_frame.f_locals
+            ):
+                wrapper = current_frame.f_locals["sensitive_variables_wrapper"]
+                sensitive_variables = getattr(wrapper, "sensitive_variables", None)
+    return sensitive_variables
+
+
+def _sensitive_variables_from_exc(error):
+    exc_info = exc_info_from_error(error)
+    sensitive_variables = None
+    for _, _, tb in walk_exception_chain(exc_info):
+        for tb in iter_stacks(tb):
+            current_frame = tb.tb_frame
+            if (
+                current_frame.f_code.co_name == "sensitive_variables_wrapper"
+                and "sensitive_variables_wrapper" in current_frame.f_locals
+            ):
+                wrapper = current_frame.f_locals["sensitive_variables_wrapper"]
+                sensitive_variables = getattr(wrapper, "sensitive_variables", None)
+            # current_frame = current_frame.f_back
+    return sensitive_variables
+    # remove variables
+    # remove frame
+
+
+def _remove_sensitive_variables(sensitive_variables, event):
+    """
+    ----- event variable skeleton ------
+    event = dict (level, exception)
+    exception = {values = [exception]}
+    exception = {mechanism, type (error type i guess ex Lookup Error), module=None, value="", stacktrace}
+    stacktrace  = {frames = [ frame1 ] }
+    frame1 ={ 'filename', 'abs_path', 'function', 'module', 'lineno', 'pre_context', 'context_line', 'post_context', 'vars'}
+    vars = {user, pwd, a,b, request}
+    """
+    if "exception" in event:
+        for exception in event["exception"].get("values") or ():
+            if "stacktrace" in exception:
+                for frame in exception["stacktrace"].get("frames") or ():
+                    # if SV == all then clean all variables in all frames
+                    # elif sv not NONE then clean variables in last frame
+                    # hide func args in the wrapper for better safety
+                    clean_vars = {}
+                    if sensitive_variables == "__ALL__":
+                        for name in frame.get("vars", ()):
+                            clean_vars[name] = SENSITIVE_DATA_SUBSTITUTE
+                    else:
+                        # Cleanse specified variables
+                        for name, value in frame.get("vars", {}).items():
+                            if name in sensitive_variables:
+                                value = SENSITIVE_DATA_SUBSTITUTE
+                            else:
+                                # have to check if speacial variables in frames have to be removed
+                                print(
+                                    "skip checking for sensitive variable key - {}",
+                                    name,
+                                )
+                            clean_vars[name] = value
+                    frame["vars"] = clean_vars
+    print("--------event-------- ", event)
+    print("--------end +event-------- ")
+    return event
+
+
+def _remove_frame():
+    pass
+
+
+def _clean_event(exception, event):
+    # type: (...) -> Dict[str, Any]
+    sensitive_variables = _sensitive_variables_from_exc(exception)
+    if sensitive_variables:
+        event = _remove_sensitive_variables(
+            sensitive_variables, event
+        )  # remove sensitive variables
+        # event = _remove_frame(event) # clean sensitive_variable_wrapper frame
+    return event
+
+
 def _got_request_exception(request=None, **kwargs):
     # type: (WSGIRequest, **Any) -> None
     hub = Hub.current
@@ -501,13 +590,16 @@ def _got_request_exception(request=None, **kwargs):
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
-
+        exception = sys.exc_info()
         event, hint = event_from_exception(
-            sys.exc_info(),
+            exception,
             client_options=client.options,
             mechanism={"type": "django", "handled": False},
         )
-        hub.capture_event(event, hint=hint)
+        # get clean event and capture it
+        clean_event = _clean_event(exception, event)
+        # print("---------printing clean event---------", clean_event)
+        hub.capture_event(clean_event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
