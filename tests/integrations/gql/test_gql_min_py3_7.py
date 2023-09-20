@@ -115,7 +115,7 @@ def test_patched_gql_execute_captures_and_reraises_graphql_exception(
     mock_capture_event.assert_called_once()
 
     # Let's also ensure the event captured was a TransportQueryError
-    event, _ = mock_capture_event.call_args.args
+    ((event, _), *_) = mock_capture_event.call_args
     (exception,) = event["exception"]["values"]
 
     assert (
