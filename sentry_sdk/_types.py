@@ -13,11 +13,9 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import Iterable
     from typing import List
     from typing import Mapping
     from typing import Optional
-    from typing import Sequence
     from typing import Tuple
     from typing import Type
     from typing import Union
@@ -125,16 +123,13 @@ if TYPE_CHECKING:
     # Value of the metric.
     MetricValue = Union[int, float, str]
 
-    # Tag key of a metric.
-    MetricTagKey = str
-
     # Internal representation of tags as a tuple of tuples (this is done in order to allow for the same key to exist
     # multiple times).
-    MetricTagsInternal = Tuple[Tuple[MetricTagKey, str], ...]
+    MetricTagsInternal = Tuple[Tuple[str, str], ...]
 
     # External representation of tags as a dictionary.
     MetricTagValue = Union[str, List[str], Tuple[str, ...]]
-    MetricTags = Mapping[MetricTagKey, MetricTagValue]
+    MetricTags = Mapping[str, MetricTagValue]
 
     # Value inside the generator for the metric value.
     FlushedMetricValue = Union[int, float]
