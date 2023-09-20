@@ -9,6 +9,7 @@ from threading import Event, Lock, Thread
 from contextlib import contextmanager
 
 from sentry_sdk.hub import Hub
+from sentry_sdk.utils import now
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -31,32 +32,32 @@ if TYPE_CHECKING:
 
 thread_local = threading.local()
 
-_sanitize_value = partial(re.compile(r"[^a-zA-Z0-9_/.]").sub, "")
+_sanitize_value = partial(re.compile(r"[^a-zA-Z0-9_/.@-]").sub, "")
 
 
-def in_minimetrics():
+def in_metrics():
     # type: (...) -> bool
     try:
-        return thread_local.in_minimetrics
+        return thread_local.in_metrics
     except AttributeError:
         return False
 
 
-def minimetrics_noop(func):
+def metrics_noop(func):
     # type: (Any) -> Any
     @wraps(func)
     def new_func(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         try:
-            in_minimetrics = thread_local.in_minimetrics
+            in_metrics = thread_local.in_metrics
         except AttributeError:
-            in_minimetrics = False
-        thread_local.in_minimetrics = True
+            in_metrics = False
+        thread_local.in_metrics = True
         try:
-            if not in_minimetrics:
+            if not in_metrics:
                 return func(*args, **kwargs)
         finally:
-            thread_local.in_minimetrics = in_minimetrics
+            thread_local.in_metrics = in_metrics
 
     return new_func
 
@@ -296,7 +297,7 @@ class MetricsAggregator(object):
 
     def _flush_loop(self):
         # type: (...) -> None
-        thread_local.in_minimetrics = True
+        thread_local.in_metrics = True
         while self._running or self._force_flush:
             self._flush()
             if self._running:
@@ -338,7 +339,7 @@ class MetricsAggregator(object):
 
         return flushable_buckets
 
-    @minimetrics_noop
+    @metrics_noop
     def add(
         self,
         ty,  # type: MetricType
@@ -395,7 +396,7 @@ class MetricsAggregator(object):
     def flush(self):
         # type: (...) -> None
         self._force_flush = True
-        self._flush_event.set()
+        self._flush()
 
     def _consider_force_flush(self):
         # type: (...) -> None
@@ -436,11 +437,23 @@ class MetricsAggregator(object):
         return tuple(sorted(rv))
 
 
-def get_aggregator():
-    # type: () -> Optional[MetricsAggregator]
+def get_aggregator_and_update_tags(tags):
+    # type: (Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[MetricTags]]
     """Returns the current metrics aggregator if there is one."""
-    client = Hub.current.client
-    return client.metrics_aggregator if client is not None else None
+    hub = Hub.current
+    client = hub.client
+    if client is None or client.metrics_aggregator is None:
+        return None, tags
+
+    updated_tags = dict(tags or ())
+    updated_tags.setdefault("release", client.options["release"])
+    updated_tags.setdefault("environment", client.options["environment"])
+    return client.metrics_aggregator, updated_tags
+
+
+def enhance_tags(tags):
+    # type: (Optional[MetricTags]) -> MetricTags
+    return tags
 
 
 def incr(
@@ -452,7 +465,7 @@ def incr(
 ):
     # type: (...) -> None
     """Increments a counter."""
-    aggregator = get_aggregator()
+    aggregator, tags = get_aggregator_and_update_tags(tags)
     if aggregator is not None:
         aggregator.add("c", key, value, unit, tags, timestamp)
 
@@ -465,16 +478,13 @@ def timing(
 ):
     # type: (...) -> Iterator[None]
     """Emits a distribution with the time it takes to run the given code block."""
-    aggregator = get_aggregator()
+    aggregator, tags = get_aggregator_and_update_tags(tags)
     if aggregator is not None:
-        then = time.time()
+        then = now()
         try:
             yield
         finally:
-            now = time.time()
-            elapsed = then - now
-            if timestamp is None:
-                timestamp = now
+            elapsed = now() - then
             aggregator.add("d", key, elapsed, "second", tags, timestamp)
     else:
         yield
@@ -488,7 +498,7 @@ def distribution(
     timestamp=None,  # type: Optional[float]
 ) -> None:
     """Emits a distribution."""
-    aggregator = get_aggregator()
+    aggregator, tags = get_aggregator_and_update_tags(tags)
     if aggregator is not None:
         aggregator.add("d", key, value, unit, tags, timestamp)
 
@@ -501,7 +511,7 @@ def set(
     timestamp=None,  # type: Optional[float]
 ) -> None:
     """Emits a set."""
-    aggregator = get_aggregator()
+    aggregator, tags = get_aggregator_and_update_tags(tags)
     if aggregator is not None:
         aggregator.add("s", key, value, unit, tags, timestamp)
 
@@ -515,6 +525,6 @@ def gauge(
 ) -> None:
     """Emits a gauge."""
     # TODO: emit as gauge not as count
-    aggregator = get_aggregator()
+    aggregator, tags = get_aggregator_and_update_tags(tags)
     if aggregator is not None:
         aggregator.add("c", key, value, unit, tags, timestamp)
