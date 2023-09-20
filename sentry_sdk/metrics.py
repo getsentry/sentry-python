@@ -461,7 +461,7 @@ def get_aggregator_and_update_tags(tags):
     if client is None or client.metrics_aggregator is None:
         return None, tags
 
-    updated_tags = dict(tags or ()) # type: Dict[str, MetricTagValue]
+    updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
