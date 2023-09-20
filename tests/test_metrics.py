@@ -149,3 +149,34 @@ def test_set(sentry_init, capture_envelopes):
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
+
+
+def test_gauge(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    envelopes = capture_envelopes()
+
+    metrics.gauge("my-gauge", 10.0, tags={"x": "y"})
+    metrics.gauge("my-gauge", 20.0, tags={"x": "y"})
+    metrics.gauge("my-gauge", 30.0, tags={"x": "y"})
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][1] == "my-gauge@none"
+    assert m[0][2] == "g"
+    assert len(m[0][3]) == 5
+    assert list(map(float, m[0][3])) == [30.0, 10.0, 30.0, 60.0, 3.0]
+    assert m[0][4] == {
+        "x": "y",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }

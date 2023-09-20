@@ -519,12 +519,11 @@ def set(
 def gauge(
     key,  # type: str
     value,  # type: float
-    unit="second",  # type: MetricValue
+    unit="none",  # type: MetricValue
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
 ) -> None:
     """Emits a gauge."""
-    # TODO: emit as gauge not as count
     aggregator, tags = get_aggregator_and_update_tags(tags)
     if aggregator is not None:
-        aggregator.add("c", key, value, unit, tags, timestamp)
+        aggregator.add("g", key, value, unit, tags, timestamp)
