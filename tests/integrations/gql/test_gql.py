@@ -1,9 +1,12 @@
 import pytest
 
-gql = pytest.importorskip("gql")
+pytest.importorskip("gql")
 
+import responses
+from gql import gql
 from gql import Client
 from gql.transport.exceptions import TransportQueryError
+from gql.transport.requests import RequestsHTTPTransport
 from graphql import DocumentNode
 from sentry_sdk.integrations.gql import GQLIntegration
 from unittest.mock import MagicMock, patch
@@ -27,7 +30,7 @@ def test_gql_init(sentry_init):
     sentry_init(integrations=[GQLIntegration()])
 
 
-def test_integration_patches_execute_and_patched_function_calls_original():
+def test_setup_once_patches_execute_and_patched_function_calls_original():
     """
     Unit test which ensures the following:
         1. The GQLIntegration setup_once function patches the gql.Client.execute method
@@ -66,12 +69,13 @@ def test_integration_patches_execute_and_patched_function_calls_original():
         client_instance = PatchedMockClient()
         patched_method_return_value = client_instance.execute(mock_query)
 
-        original_execute_method.assert_called_once_with(client_instance, mock_query)
+    # Here, we check that the original execute was called
+    original_execute_method.assert_called_once_with(client_instance, mock_query)
 
-        # Also, let's verify that the patched execute returns the expected value.
-        assert (
-            patched_method_return_value is original_method_return_value
-        ), "pathced execute method returns a different value than the original execute method"
+    # Also, let's verify that the patched execute returns the expected value.
+    assert (
+        patched_method_return_value is original_method_return_value
+    ), "pathced execute method returns a different value than the original execute method"
 
 
 @patch("sentry_sdk.integrations.gql.Hub.current.capture_event")
@@ -107,5 +111,94 @@ def test_patched_gql_execute_captures_and_reraises_graphql_exception(
         with pytest.raises(TransportQueryError):
             client_instance.execute(mock_query)
 
-        # However, we should have also captured the error on the hub.
-        mock_capture_event.assert_called_once()
+    # However, we should have also captured the error on the hub.
+    mock_capture_event.assert_called_once()
+
+    # Let's also ensure the event captured was a TransportQueryError
+    event, _ = mock_capture_event.call_args.args
+    (exception,) = event["exception"]["values"]
+
+    assert (
+        exception["type"] == "TransportQueryError"
+    ), f"{exception['type']} was captured, but we expected a TransportQueryError"
+
+
+@responses.activate
+def test_real_gql_request_no_error(sentry_init, capture_events):
+    """
+    Integration test verifying that the GQLIntegration works as expected with successful query.
+    """
+    sentry_init(integrations=[GQLIntegration()])
+    events = capture_events()
+
+    url = "http://example.com/graphql"
+    query_string = """
+        query Example {
+            example
+        }
+    """
+    response_data = {"example": "This is the example"}
+
+    # Mock the GraphQL server response
+    responses.add(
+        method=responses.POST,
+        url=url,
+        json={"data": {"example": "This is the example"}},
+        status=200,
+    )
+
+    transport = RequestsHTTPTransport(url=url)
+    client = Client(transport=transport)
+    query = gql(query_string)
+
+    result = client.execute(query)
+
+    assert (
+        result == response_data
+    ), "client.execute returned a different value from what it received from the server"
+    assert (
+        len(events) == 0
+    ), "the sdk captured an event, even though the query was successful"
+
+
+@responses.activate
+def test_real_gql_request_with_error(sentry_init, capture_events):
+    """
+    Integration test verifying that the GQLIntegration works as expected with query resulting
+    in a GraphQL error.
+    """
+    sentry_init(integrations=[GQLIntegration()])
+    events = capture_events()
+
+    url = "http://example.com/graphql"
+    query_string = """
+        query Example {
+            example
+        }
+    """
+
+    # Mock the GraphQL server response
+    responses.add(
+        method=responses.POST,
+        url=url,
+        json={"errors": ["something bad happened"]},
+        status=200,
+    )
+
+    transport = RequestsHTTPTransport(url=url)
+    client = Client(transport=transport)
+    query = gql(query_string)
+
+    with pytest.raises(TransportQueryError):
+        client.execute(query)
+
+    assert (
+        len(events) == 1
+    ), f"the sdk captured {len(events)} events, but 1 event was expected"
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+
+    assert (
+        exception["type"] == "TransportQueryError"
+    ), f"{exception['type']} was captured, but we expected a TransportQueryError"
