@@ -607,7 +607,7 @@ def create_mock_http_server():
 
 
 def pytest_ignore_collect(path):
-    min_version_match = re.search(r"\S+__min_py(\d)(?:\.(\d+))\.py$", str(path))
+    min_version_match = re.search(r"\S+_min_py(\d)(?:\.(\d+))\.py$", str(path))
     if min_version_match is not None:
         min_version = [int(min_version_match.group(1))]
         if min_version_match.group(2) is not None:
