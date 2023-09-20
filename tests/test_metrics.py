@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import time
 
 from sentry_sdk import Hub, metrics, push_scope
