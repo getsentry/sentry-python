@@ -426,11 +426,12 @@ class MetricsAggregator(object):
         self,
         flushable_buckets,  # type: (Iterable[Tuple[int, Dict[BucketKey, Metric]]])
     ):
-        # type: (...) -> None
+        # type: (...) -> Envelope
         encoded_metrics = _encode_metrics(flushable_buckets)
         metric_item = Item(payload=encoded_metrics, type="statsd")
         envelope = Envelope(items=[metric_item])
         self._capture_func(envelope)
+        return envelope
 
     def _serialize_tags(
         self, tags  # type: Optional[MetricTags]
