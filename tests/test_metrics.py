@@ -1,6 +1,6 @@
 import time
 
-from sentry_sdk import Hub, metrics
+from sentry_sdk import Hub, metrics, push_scope
 
 
 def parse_metrics(bytes):
@@ -234,6 +234,43 @@ def test_multiple(sentry_init, capture_envelopes):
     assert list(map(float, m[2][3])) == [30.0, 10.0, 30.0, 60.0, 3.0]
     assert m[2][4] == {
         "x": "y",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+
+def test_distribution(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with push_scope() as scope:
+        scope.set_transaction_name("/user/{user_id}", source="route")
+        metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
+        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+        metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
+
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][1] == "dist@second"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 4
+    assert sorted(map(float, m[0][3])) == [1.0, 2.0, 2.0, 3.0]
+    assert m[0][4] == {
+        "a": "b",
+        "transaction": "/user/{user_id}",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }

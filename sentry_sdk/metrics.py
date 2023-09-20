@@ -11,6 +11,12 @@ from contextlib import contextmanager
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import now
 from sentry_sdk.envelope import Envelope, Item
+from sentry_sdk.tracing import (
+    TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_VIEW,
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_TASK,
+)
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -32,7 +38,16 @@ if TYPE_CHECKING:
 
 thread_local = threading.local()
 
-_sanitize_value = partial(re.compile(r"[^a-zA-Z0-9_/.@-]").sub, "")
+_sanitize_value = partial(re.compile(r"[^a-zA-Z0-9_/{}<>[].@-]").sub, "")
+
+GOOD_TRANSACTION_SOURCES = frozenset(
+    [
+        TRANSACTION_SOURCE_ROUTE,
+        TRANSACTION_SOURCE_VIEW,
+        TRANSACTION_SOURCE_COMPONENT,
+        TRANSACTION_SOURCE_TASK,
+    ]
+)
 
 
 def in_metrics():
@@ -448,6 +463,14 @@ def get_aggregator_and_update_tags(tags):
     updated_tags = dict(tags or ())
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
+
+    scope = hub.scope
+    transaction_source = scope._transaction_info.get("source")
+    if transaction_source in GOOD_TRANSACTION_SOURCES:
+        transaction = scope._transaction
+        if transaction:
+            updated_tags.setdefault("transaction", transaction)
+
     return client.metrics_aggregator, updated_tags
 
 
