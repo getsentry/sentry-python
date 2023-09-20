@@ -239,7 +239,7 @@ def test_multiple(sentry_init, capture_envelopes):
     }
 
 
-def test_distribution(sentry_init, capture_envelopes):
+def test_transaction_name(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
