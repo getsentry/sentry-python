@@ -467,11 +467,14 @@ def timing(
     """Emits a distribution with the time it takes to run the given code block."""
     aggregator = get_aggregator()
     if aggregator is not None:
-        now = time.time()
+        then = time.time()
         try:
             yield
         finally:
-            elapsed = time.time() - now
+            now = time.time()
+            elapsed = then - now
+            if timestamp is None:
+                timestamp = now
             aggregator.add("d", key, elapsed, "second", tags, timestamp)
     else:
         yield
