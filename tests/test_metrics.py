@@ -323,7 +323,7 @@ def test_tag_normalization(sentry_init, capture_envelopes):
 
     metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
     metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
-    metrics.distribution("c", 1.0, tags={"foö-bar": u"snöwmän"}, timestamp=ts)
+    metrics.distribution("c", 1.0, tags={"foö-bar": "snöwmän"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
