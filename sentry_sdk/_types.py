@@ -13,7 +13,11 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
+    from typing import Iterable
+    from typing import List
+    from typing import Mapping
     from typing import Optional
+    from typing import Sequence
     from typing import Tuple
     from typing import Type
     from typing import Union
@@ -87,3 +91,52 @@ if TYPE_CHECKING:
     MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
 
     ProfilerMode = Literal["sleep", "thread", "gevent", "unknown"]
+
+    # Unit of the metrics.
+    MetricUnit = Literal[
+        "none",
+        "nanosecond",
+        "microsecond",
+        "millisecond",
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+        "bit",
+        "byte",
+        "kilobyte",
+        "kibibyte",
+        "mebibyte",
+        "gigabyte",
+        "terabyte",
+        "tebibyte",
+        "petabyte",
+        "pebibyte",
+        "exabyte",
+        "exbibyte",
+        "ratio",
+        "percent",
+    ]
+
+    # Type of the metric.
+    MetricType = Literal["d", "s", "g", "c"]
+
+    # Value of the metric.
+    MetricValue = Union[int, float, str]
+
+    # Tag key of a metric.
+    MetricTagKey = str
+
+    # Internal representation of tags as a tuple of tuples (this is done in order to allow for the same key to exist
+    # multiple times).
+    MetricTagsInternal = Tuple[Tuple[MetricTagKey, str], ...]
+
+    # External representation of tags as a dictionary.
+    MetricTagValue = Union[str, List[str], Tuple[str, ...]]
+    MetricTags = Mapping[MetricTagKey, MetricTagValue]
+
+    # Value inside the generator for the metric value.
+    FlushedMetricValue = Union[int, float]
+
+    BucketKey = Tuple[MetricType, str, MetricUnit, MetricTagsInternal]

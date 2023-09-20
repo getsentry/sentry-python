@@ -41,6 +41,7 @@ if TYPE_CHECKING:
             "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "enable_metrics": Optional[bool],
         },
         total=False,
     )
