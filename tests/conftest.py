@@ -1,6 +1,8 @@
 import json
 import os
+import re
 import socket
+import sys
 from threading import Thread
 
 import pytest
@@ -602,3 +604,13 @@ def create_mock_http_server():
     mock_server_thread.start()
 
     return mock_server_port
+
+
+def pytest_ignore_collect(path):
+    min_version_match = re.search(r"\S+__min_py(\d)(?:\.(\d+))\.py$", str(path))
+    if min_version_match is not None:
+        min_version = [int(min_version_match.group(1))]
+        if min_version_match.group(2) is not None:
+            min_version.append(int(min_version_match.group(2)))
+
+        return sys.version_info < tuple(min_version)
