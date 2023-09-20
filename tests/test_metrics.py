@@ -89,7 +89,7 @@ def test_timing(sentry_init, capture_envelopes):
     }
 
 
-def test_timed(sentry_init, capture_envelopes):
+def test_timing_decorator(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -97,7 +97,7 @@ def test_timed(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    @metrics.timed("whatever", tags={"x": "y"})
+    @metrics.timing("whatever", tags={"x": "y"})
     def amazing():
         time.sleep(0.1)
         return 42

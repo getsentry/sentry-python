@@ -6,7 +6,6 @@ import time
 import zlib
 from functools import wraps, partial
 from threading import Event, Lock, Thread
-from contextlib import contextmanager
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import now
@@ -488,41 +487,50 @@ def incr(
         aggregator.add("c", key, value, unit, tags, timestamp)
 
 
-@contextmanager
+class _Timing(object):
+    def __init__(
+        self,
+        key,  #  type: str
+        tags,  # type: Optional[MetricTags]
+        timestamp,  # type: Optional[float]
+    ):
+        # type: (...) -> None
+        self.key = key
+        self.tags = tags
+        self.timestamp = timestamp
+        self.then = None  # type: Optional[float]
+
+    def __enter__(self):
+        # type: (...) -> _Timing
+        self.then = now()
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
+        aggregator, tags = _get_aggregator_and_update_tags(self.key, self.tags)
+        if aggregator is not None:
+            elapsed = now() - self.then  # type: ignore
+            aggregator.add("d", self.key, elapsed, "second", tags, self.timestamp)
+
+    def __call__(self, f):
+        # type: (Any) -> Any
+        @wraps(f)
+        def timed_func(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            with timing(self.key, self.tags, self.timestamp):
+                return f(*args, **kwargs)
+
+        return timed_func
+
+
 def timing(
     key,  # type: str
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
 ):
-    # type: (...) -> Iterator[None]
+    # type: (...) -> _Timing
     """Emits a distribution with the time it takes to run the given code block."""
-    aggregator, tags = _get_aggregator_and_update_tags(key, tags)
-    if aggregator is not None:
-        then = now()
-        try:
-            yield
-        finally:
-            elapsed = now() - then
-            aggregator.add("d", key, elapsed, "second", tags, timestamp)
-    else:
-        yield
-
-
-def timed(
-    key,  # type: str
-    tags=None,  # type: Optional[MetricTags]
-):
-    # type: (...) -> Callable[[Any], Any]
-    """Similar to `timing` but to be used as a decorator."""
-    def decorator(f):
-        # type: (Any) -> Any
-        @wraps(f)
-        def timed_func(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            with timing(key, tags):
-                return f(*args, **kwargs)
-        return timed_func
-    return decorator
+    return _Timing(key, tags, timestamp)
 
 
 def distribution(
