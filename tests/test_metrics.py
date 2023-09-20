@@ -34,10 +34,11 @@ def test_incr(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={"enable_metrics": True},
     )
+    ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"})
-    metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"})
+    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -64,9 +65,10 @@ def test_timing(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={"enable_metrics": True},
     )
+    ts = time.time()
     envelopes = capture_envelopes()
 
-    with metrics.timing("whatever", tags={"blub": "blah"}):
+    with metrics.timing("whatever", tags={"blub": "blah"}, timestamp=ts):
         time.sleep(0.1)
     Hub.current.flush()
 
@@ -94,12 +96,13 @@ def test_distribution(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={"enable_metrics": True},
     )
+    ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.distribution("dist", 1.0, tags={"a": "b"})
-    metrics.distribution("dist", 2.0, tags={"a": "b"})
-    metrics.distribution("dist", 2.0, tags={"a": "b"})
-    metrics.distribution("dist", 3.0, tags={"a": "b"})
+    metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -126,11 +129,12 @@ def test_set(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={"enable_metrics": True},
     )
+    ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.set("my-set", "peter", tags={"magic": "puff"})
-    metrics.set("my-set", "paul", tags={"magic": "puff"})
-    metrics.set("my-set", "mary", tags={"magic": "puff"})
+    metrics.set("my-set", "peter", tags={"magic": "puff"}, timestamp=ts)
+    metrics.set("my-set", "paul", tags={"magic": "puff"}, timestamp=ts)
+    metrics.set("my-set", "mary", tags={"magic": "puff"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -157,11 +161,12 @@ def test_gauge(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={"enable_metrics": True},
     )
+    ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.gauge("my-gauge", 10.0, tags={"x": "y"})
-    metrics.gauge("my-gauge", 20.0, tags={"x": "y"})
-    metrics.gauge("my-gauge", 30.0, tags={"x": "y"})
+    metrics.gauge("my-gauge", 10.0, tags={"x": "y"}, timestamp=ts)
+    metrics.gauge("my-gauge", 20.0, tags={"x": "y"}, timestamp=ts)
+    metrics.gauge("my-gauge", 30.0, tags={"x": "y"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -176,6 +181,59 @@ def test_gauge(sentry_init, capture_envelopes):
     assert len(m[0][3]) == 5
     assert list(map(float, m[0][3])) == [30.0, 10.0, 30.0, 60.0, 3.0]
     assert m[0][4] == {
+        "x": "y",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+
+def test_multiple(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.gauge("my-gauge", 10.0, tags={"x": "y"}, timestamp=ts)
+    metrics.gauge("my-gauge", 20.0, tags={"x": "y"}, timestamp=ts)
+    metrics.gauge("my-gauge", 30.0, tags={"x": "y"}, timestamp=ts)
+    for _ in range(10):
+        metrics.incr("counter-1", 1.0, timestamp=ts)
+    metrics.incr("counter-2", 1.0, timestamp=ts)
+
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 3
+
+    assert m[0][1] == "counter-1@none"
+    assert m[0][2] == "c"
+    assert list(map(float, m[0][3])) == [10.0]
+    assert m[0][4] == {
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[1][1] == "counter-2@none"
+    assert m[1][2] == "c"
+    assert list(map(float, m[1][3])) == [1.0]
+    assert m[1][4] == {
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[2][1] == "my-gauge@none"
+    assert m[2][2] == "g"
+    assert len(m[2][3]) == 5
+    assert list(map(float, m[2][3])) == [30.0, 10.0, 30.0, 60.0, 3.0]
+    assert m[2][4] == {
         "x": "y",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
