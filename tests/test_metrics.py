@@ -366,7 +366,6 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
             "before_emit_metric": before_emit,
         },
     )
-    ts = time.time()
     envelopes = capture_envelopes()
 
     metrics.incr("removed-metric", 1.0)
