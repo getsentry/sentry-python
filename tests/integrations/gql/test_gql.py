@@ -6,7 +6,7 @@ from gql import Client
 from gql.transport.exceptions import TransportQueryError
 from graphql import DocumentNode
 from sentry_sdk.integrations.gql import GQLIntegration
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 
 class _MockClientBase(MagicMock):
@@ -21,23 +21,21 @@ class _MockClientBase(MagicMock):
 
 
 def test_gql_init(sentry_init):
+    """
+    Integration test to ensure we can initialize the SDK with the GQL Integration
+    """
     sentry_init(integrations=[GQLIntegration()])
 
 
-@patch("sentry_sdk.integrations.gql.gql")
-def test_setup_once_patches_gql_execute(mock_gql):
-    GQLIntegration.setup_once()
-
-    assert not isinstance(
-        mock_gql.Client.execute, Mock
-    ), "setup_once did not patch gql.Client.execute"
-
-    assert callable(
-        mock_gql.Client.execute
-    ), "the patched gql.Client.execute is not a function"
-
-
-def test_patched_gql_execute_still_calls_real_execute():
+def test_integration_patches_execute_and_patched_function_calls_original():
+    """
+    Unit test which ensures the following:
+        1. The GQLIntegration setup_once function patches the gql.Client.execute method
+        2. The patched gql.Client.execute method still calls the original method, and it
+           forwards its arguments to the original method.
+        3. The patched gql.Client.execute method returns the same value that the original
+           method returns.
+    """
     original_method_return_value = MagicMock()
 
     class OriginalMockClient(_MockClientBase):
@@ -80,6 +78,12 @@ def test_patched_gql_execute_still_calls_real_execute():
 def test_patched_gql_execute_captures_and_reraises_graphql_exception(
     mock_capture_event,
 ):
+    """
+    Unit test which ensures that in the case that calling the execute method results in a
+    TransportQueryError (which gql raises when a GraphQL error occurs), the patched method
+    captures the event on the current Hub and it reraises the error.
+    """
+
     class OriginalMockClient(_MockClientBase):
         """
         This mock client always raises a TransportQueryError when a GraphQL query is attempted.
