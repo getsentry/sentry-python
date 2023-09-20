@@ -1,4 +1,3 @@
-import sentry_sdk
 import time
 
 from sentry_sdk import Hub, metrics
