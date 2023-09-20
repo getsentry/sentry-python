@@ -39,7 +39,8 @@ if TYPE_CHECKING:
 
 thread_local = threading.local()
 
-_sanitize_value = partial(re.compile(r"[^a-zA-Z0-9_/{}<>[].@-]").sub, "")
+_sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
+_sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 
 GOOD_TRANSACTION_SOURCES = frozenset(
     [
@@ -234,7 +235,7 @@ def _encode_metrics(flushable_buckets):
     for timestamp, buckets in flushable_buckets:
         for bucket_key, metric in buckets.items():
             metric_type, metric_name, metric_unit, metric_tags = bucket_key
-            metric_name = _sanitize_value(metric_name) or "invalid-metric-name"
+            metric_name = _sanitize_key(metric_name)
             _write(metric_name.encode("utf-8"))
             _write(b"@")
             _write(metric_unit.encode("utf-8"))
@@ -250,7 +251,7 @@ def _encode_metrics(flushable_buckets):
                 _write(b"|#")
                 first = True
                 for tag_key, tag_value in metric_tags:
-                    tag_key = _sanitize_value(tag_key)
+                    tag_key = _sanitize_key(tag_key)
                     if not tag_key:
                         continue
                     if first:

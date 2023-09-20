@@ -23,7 +23,7 @@ def parse_metrics(bytes):
             else:
                 raise ValueError("unknown piece %r" % (piece,))
         rv.append((ts, name, ty, values, tags))
-    rv.sort()
+    rv.sort(key=lambda x: (x[0], x[1], tuple(sorted(tags.items()))))
     return rv
 
 
@@ -271,6 +271,46 @@ def test_transaction_name(sentry_init, capture_envelopes):
     assert m[0][4] == {
         "a": "b",
         "transaction": "/user/{user_id}",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+
+def test_tag_normalization(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.distribution("dist", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
+    metrics.distribution("dist", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
+    metrics.distribution("dist", 1.0, tags={"foö-bar": "snöwmän"}, timestamp=ts)
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 3
+    assert m[0][4] == {
+        "foo-bar": "_$foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[1][4] == {
+        "foo_bar": "blah{}",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[2][4] == {
+        "fo_-bar": "snöwmän",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
