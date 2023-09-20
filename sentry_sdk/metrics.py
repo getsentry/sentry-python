@@ -538,7 +538,8 @@ def distribution(
     unit="second",  # type: MetricUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
-) -> None:
+):
+    # type: (...) -> None
     """Emits a distribution."""
     aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
@@ -551,7 +552,8 @@ def set(
     unit="none",  # type: MetricUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
-) -> None:
+):
+    # type: (...) -> None
     """Emits a set."""
     aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
@@ -564,7 +566,8 @@ def gauge(
     unit="none",  # type: MetricValue
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
-) -> None:
+):
+    # type: (...) -> None
     """Emits a gauge."""
     aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
