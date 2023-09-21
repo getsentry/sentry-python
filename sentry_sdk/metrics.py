@@ -563,7 +563,7 @@ def timing(
 ):
     # type: (...) -> _Timing
     """Emits a distribution with the time it takes to run the given code block.
-    
+
     This method supports three forms of invocation:
 
     - when a `value` is provided, it functions similar to `distribution` but with
