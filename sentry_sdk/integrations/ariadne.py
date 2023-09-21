@@ -17,8 +17,8 @@ except ImportError:
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
-    from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser
-    from graphql.language.ast import DocumentNode
+    from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
+    from graphql.language.ast import DocumentNode  # type: ignore
     from sentry_sdk._types import EventProcessor
 
 
@@ -73,16 +73,17 @@ def _patch_graphql():
             event_processor = _make_response_event_processor(result[1])
             scope.add_event_processor(event_processor)
 
-        for error in errors:
-            event, hint = event_from_exception(
-                error,
-                client_options=hub.client.options,
-                mechanism={
-                    "type": hub.get_integration(AriadneIntegration).identifier,
-                    "handled": False,
-                },
-            )
-            hub.capture_event(event, hint=hint)
+        if hub.client:
+            for error in errors:
+                event, hint = event_from_exception(
+                    error,
+                    client_options=hub.client.options,
+                    mechanism={
+                        "type": hub.get_integration(AriadneIntegration).identifier,
+                        "handled": False,
+                    },
+                )
+                hub.capture_event(event, hint=hint)
 
         return result
 
@@ -99,22 +100,23 @@ def _patch_graphql():
             event_processor = _make_response_event_processor(response[1])
             scope.add_event_processor(event_processor)
 
-        for error in result.errors or []:
-            event, hint = event_from_exception(
-                error,
-                client_options=hub.client.options,
-                mechanism={
-                    "type": hub.get_integration(AriadneIntegration).identifier,
-                    "handled": False,
-                },
-            )
-            hub.capture_event(event, hint=hint)
+        if hub.client:
+            for error in result.errors or []:
+                event, hint = event_from_exception(
+                    error,
+                    client_options=hub.client.options,
+                    mechanism={
+                        "type": hub.get_integration(AriadneIntegration).identifier,
+                        "handled": False,
+                    },
+                )
+                hub.capture_event(event, hint=hint)
 
         return response
 
-    ariadne_graphql.parse_query = _sentry_patched_parse_query
-    ariadne_graphql.handle_graphql_errors = _sentry_patched_handle_graphql_errors
-    ariadne_graphql.handle_query_result = _sentry_patched_handle_query_result
+    ariadne_graphql.parse_query = _sentry_patched_parse_query  # type: ignore
+    ariadne_graphql.handle_graphql_errors = _sentry_patched_handle_graphql_errors  # type: ignore
+    ariadne_graphql.handle_query_result = _sentry_patched_handle_query_result  # type: ignore
 
 
 def _make_request_event_processor(data):
@@ -147,7 +149,7 @@ def _make_request_event_processor(data):
 
 
 def _make_response_event_processor(response):
-    # type: (dict) -> EventProcessor
+    # type: (Dict[str, Any]) -> EventProcessor
     """Add response data to the event's response context."""
 
     def inner(event, hint):
