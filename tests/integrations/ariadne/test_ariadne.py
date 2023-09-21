@@ -43,7 +43,7 @@ def schema_factory():
 
     @greeting.field("name")
     def resolve_name(obj, *_):
-        return f"Hello, {obj['name']}!"
+        return "Hello, {}!".format(obj["name"])
 
     return make_executable_schema(type_defs, query)
 
