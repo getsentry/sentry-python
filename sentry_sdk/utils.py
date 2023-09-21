@@ -1579,7 +1579,7 @@ else:
 
     def nanosecond_time():
         # type: () -> int
-        raise int(time.time() * 1e9)
+        return int(time.time() * 1e9)
 
 
 if PY2:
