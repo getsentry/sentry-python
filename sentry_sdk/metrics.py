@@ -7,6 +7,7 @@ import zlib
 from functools import wraps, partial
 from threading import Event, Lock, Thread
 
+from sentry_sdk._compat import text_type
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import now
 from sentry_sdk.envelope import Envelope, Item
@@ -437,9 +438,9 @@ class MetricsAggregator(object):
             if isinstance(value, (list, tuple)):
                 for inner_value in value:
                     if inner_value is not None:
-                        rv.append((key, str(inner_value)))
+                        rv.append((key, text_type(inner_value)))
             elif value is not None:
-                rv.append((key, str(value)))
+                rv.append((key, text_type(value)))
 
         # It's very important to sort the tags in order to obtain the
         # same bucket key.
