@@ -223,6 +223,11 @@ def _encode_metrics(flushable_buckets):
     out = io.BytesIO()
     _write = out.write
 
+    # Note on sanetization: we intentionally sanetize in emission (serialization)
+    # and not during aggregation for performance reasons.  This means that the
+    # envelope can in fact have duplicate buckets stored.  This is acceptable for
+    # relay side emission and should not happen commonly.
+
     for timestamp, buckets in flushable_buckets:
         for bucket_key, metric in buckets.items():
             metric_type, metric_name, metric_unit, metric_tags = bucket_key
