@@ -1,10 +1,15 @@
-import gql  # type: ignore[import]
-from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import]
-from gql.transport import Transport, AsyncTransport  # type: ignore[import]
-from gql.transport.exceptions import TransportQueryError  # type: ignore[import]
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import DidNotEnable, Integration
+
+try:
+    import gql  # type: ignore[import]
+    from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import]
+    from gql.transport import Transport, AsyncTransport  # type: ignore[import]
+    from gql.transport.exceptions import TransportQueryError  # type: ignore[import]
+except ImportError:
+    raise DidNotEnable("gql is not installed")
+
 from typing import Any, Dict, Optional, Tuple, Union
 
 EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
