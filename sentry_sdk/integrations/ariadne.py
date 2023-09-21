@@ -4,7 +4,11 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
-from sentry_sdk.utils import event_from_exception, parse_version
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    parse_version,
+)
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
@@ -74,16 +78,17 @@ def _patch_graphql():
             scope.add_event_processor(event_processor)
 
         if hub.client:
-            for error in errors:
-                event, hint = event_from_exception(
-                    error,
-                    client_options=hub.client.options,
-                    mechanism={
-                        "type": hub.get_integration(AriadneIntegration).identifier,
-                        "handled": False,
-                    },
-                )
-                hub.capture_event(event, hint=hint)
+            with capture_internal_exceptions():
+                for error in errors:
+                    event, hint = event_from_exception(
+                        error,
+                        client_options=hub.client.options,
+                        mechanism={
+                            "type": hub.get_integration(AriadneIntegration).identifier,
+                            "handled": False,
+                        },
+                    )
+                    hub.capture_event(event, hint=hint)
 
         return result
 
@@ -101,16 +106,17 @@ def _patch_graphql():
             scope.add_event_processor(event_processor)
 
         if hub.client:
-            for error in result.errors or []:
-                event, hint = event_from_exception(
-                    error,
-                    client_options=hub.client.options,
-                    mechanism={
-                        "type": hub.get_integration(AriadneIntegration).identifier,
-                        "handled": False,
-                    },
-                )
-                hub.capture_event(event, hint=hint)
+            with capture_internal_exceptions():
+                for error in result.errors or []:
+                    event, hint = event_from_exception(
+                        error,
+                        client_options=hub.client.options,
+                        mechanism={
+                            "type": hub.get_integration(AriadneIntegration).identifier,
+                            "handled": False,
+                        },
+                    )
+                    hub.capture_event(event, hint=hint)
 
         return response
 
@@ -128,20 +134,23 @@ def _make_request_event_processor(data):
         if not isinstance(data, dict):
             return event
 
-        try:
-            content_length = int((data.get("headers") or {}).get("Content-Length", 0))
-        except (TypeError, ValueError):
-            return event
+        with capture_internal_exceptions():
+            try:
+                content_length = int(
+                    (data.get("headers") or {}).get("Content-Length", 0)
+                )
+            except (TypeError, ValueError):
+                return event
 
-        if _should_send_default_pii() and request_body_within_bounds(
-            Hub.current.client, content_length
-        ):
-            request_info = event.setdefault("request", {})
-            request_info["api_target"] = "graphql"
-            request_info["data"] = data
+            if _should_send_default_pii() and request_body_within_bounds(
+                Hub.current.client, content_length
+            ):
+                request_info = event.setdefault("request", {})
+                request_info["api_target"] = "graphql"
+                request_info["data"] = data
 
-        elif event.get("request", {}).get("data"):
-            del event["request"]["data"]
+            elif event.get("request", {}).get("data"):
+                del event["request"]["data"]
 
         return event
 
@@ -154,11 +163,12 @@ def _make_response_event_processor(response):
 
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        if _should_send_default_pii() and response.get("errors"):
-            request_info = event.setdefault("contexts", {})
-            request_info["response"] = {
-                "data": response,
-            }
+        with capture_internal_exceptions():
+            if _should_send_default_pii() and response.get("errors"):
+                response_context = event.setdefault("contexts", {})
+                response_context["response"] = {
+                    "data": response,
+                }
 
         return event
 
