@@ -526,7 +526,9 @@ class _Timing(object):
     def _validate_invocation(self, context):
         # type: (str) -> None
         if self.value is not None:
-            raise TypeError('cannot use timing as %s when a value is provided' % context)
+            raise TypeError(
+                "cannot use timing as %s when a value is provided" % context
+            )
 
     def __enter__(self):
         # type: (...) -> _Timing
@@ -548,7 +550,9 @@ class _Timing(object):
         @wraps(f)
         def timed_func(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            with timing(key=self.key, tags=self.tags, timestamp=self.timestamp, unit=self.unit):
+            with timing(
+                key=self.key, tags=self.tags, timestamp=self.timestamp, unit=self.unit
+            ):
                 return f(*args, **kwargs)
 
         return timed_func
