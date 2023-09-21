@@ -19,7 +19,14 @@ def parse_metrics(bytes):
             if piece[0] == "#":
                 for pair in piece[1:].split(","):
                     k, v = pair.split(":", 1)
-                    tags[k] = v
+                    old = tags.get(k)
+                    if old is not None:
+                        if isinstance(old, list):
+                            old.append(v)
+                        else:
+                            tags[k] = [old, v]
+                    else:
+                        tags[k] = v
             elif piece[0] == "T":
                 ts = int(piece[1:])
             else:
@@ -389,5 +396,59 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
     assert m[0][3] == ["1.0"]
     assert m[0][4] == {
         "extra": "foo",
+        "environment": "not-fun-env",
+    }
+
+
+def test_aggregator_flush(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={
+            "enable_metrics": True,
+        },
+    )
+    envelopes = capture_envelopes()
+
+    metrics.incr("a-metric", 1.0)
+    Hub.current.flush()
+
+    assert len(envelopes) == 1
+    assert Hub.current.client.metrics_aggregator.buckets == {}
+
+
+def test_tag_serialization(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    envelopes = capture_envelopes()
+
+    metrics.incr(
+        "counter",
+        tags={
+            "no-value": None,
+            "an-int": 42,
+            "a-float": 23.0,
+            "a-string": "blah",
+            "more-than-one": [1, "zwei", "3.0", None],
+        },
+    )
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][4] == {
+        "an-int": "42",
+        "a-float": "23.0",
+        "a-string": "blah",
+        "more-than-one": ["1", "3.0", "zwei"],
+        "release": "fun-release",
         "environment": "not-fun-env",
     }

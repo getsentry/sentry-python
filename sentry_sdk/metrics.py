@@ -436,9 +436,10 @@ class MetricsAggregator(object):
             # If the value is a collection, we want to flatten it.
             if isinstance(value, (list, tuple)):
                 for inner_value in value:
-                    rv.append((key, inner_value))
-            else:
-                rv.append((key, value))
+                    if inner_value is not None:
+                        rv.append((key, str(inner_value)))
+            elif value is not None:
+                rv.append((key, str(value)))
 
         # It's very important to sort the tags in order to obtain the
         # same bucket key.

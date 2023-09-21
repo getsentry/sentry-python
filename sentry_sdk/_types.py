@@ -129,7 +129,14 @@ if TYPE_CHECKING:
     MetricTagsInternal = Tuple[Tuple[str, str], ...]
 
     # External representation of tags as a dictionary.
-    MetricTagValue = Union[str, List[str], Tuple[str, ...]]
+    MetricTagValue = Union[
+        str,
+        int,
+        float,
+        None,
+        List[Union[int, str, float, None]],
+        Tuple[Union[int, str, float, None], ...],
+    ]
     MetricTags = Mapping[str, MetricTagValue]
 
     # Value inside the generator for the metric value.
