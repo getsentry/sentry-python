@@ -9,7 +9,7 @@ from threading import Event, Lock, Thread
 
 from sentry_sdk._compat import text_type
 from sentry_sdk.hub import Hub
-from sentry_sdk.utils import now
+from sentry_sdk.utils import now, nanosecond_time
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
@@ -27,14 +27,15 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
 
-    from sentry_sdk._types import MetricValue
-    from sentry_sdk._types import MetricUnit
-    from sentry_sdk._types import MetricType
-    from sentry_sdk._types import MetricTags
-    from sentry_sdk._types import MetricTagValue
-    from sentry_sdk._types import MetricTagsInternal
-    from sentry_sdk._types import FlushedMetricValue
     from sentry_sdk._types import BucketKey
+    from sentry_sdk._types import DurationUnit
+    from sentry_sdk._types import FlushedMetricValue
+    from sentry_sdk._types import MeasurementUnit
+    from sentry_sdk._types import MetricTagValue
+    from sentry_sdk._types import MetricTags
+    from sentry_sdk._types import MetricTagsInternal
+    from sentry_sdk._types import MetricType
+    from sentry_sdk._types import MetricValue
 
 
 _thread_local = threading.local()
@@ -272,6 +273,18 @@ METRIC_TYPES = {
     "s": SetMetric,
 }
 
+# some of these are dumb
+TIMING_FUNCTIONS = {
+    "nanosecond": nanosecond_time,
+    "microsecond": lambda: nanosecond_time() / 1000.0,
+    "millisecond": lambda: nanosecond_time() / 1000000.0,
+    "second": now,
+    "minute": lambda: now() / 60.0,
+    "hour": lambda: now() / 3600.0,
+    "day": lambda: now() / 3600.0 / 24.0,
+    "week": lambda: now() / 3600.0 / 24.0 / 7.0,
+}
+
 
 class MetricsAggregator(object):
     ROLLUP_IN_SECONDS = 10.0
@@ -358,7 +371,7 @@ class MetricsAggregator(object):
         ty,  # type: MetricType
         key,  # type: str
         value,  # type: MetricValue
-        unit,  # type: MetricUnit
+        unit,  # type: MeasurementUnit
         tags,  # type: Optional[MetricTags]
         timestamp=None,  # type: Optional[float]
     ):
@@ -482,7 +495,7 @@ def _get_aggregator_and_update_tags(key, tags):
 def incr(
     key,  # type: str
     value=1.0,  # type: float
-    unit="none",  # type: MetricUnit
+    unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
 ):
@@ -499,31 +512,43 @@ class _Timing(object):
         key,  # type: str
         tags,  # type: Optional[MetricTags]
         timestamp,  # type: Optional[float]
+        value,  # type: Optional[float]
+        unit,  # type: DurationUnit
     ):
         # type: (...) -> None
         self.key = key
         self.tags = tags
         self.timestamp = timestamp
-        self.then = None  # type: Optional[float]
+        self.value = value
+        self.unit = unit
+        self.entered = None  # type: Optional[float]
+
+    def _validate_invocation(self, context):
+        # type: (str) -> None
+        if self.value is not None:
+            raise TypeError('cannot use timing as %s when a value is provided' % context)
 
     def __enter__(self):
         # type: (...) -> _Timing
-        self.then = now()
+        self.entered = TIMING_FUNCTIONS[self.unit]()
+        self._validate_invocation("context-manager")
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
         aggregator, tags = _get_aggregator_and_update_tags(self.key, self.tags)
         if aggregator is not None:
-            elapsed = now() - self.then  # type: ignore
-            aggregator.add("d", self.key, elapsed, "second", tags, self.timestamp)
+            elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
+            aggregator.add("d", self.key, elapsed, self.unit, tags, self.timestamp)
 
     def __call__(self, f):
         # type: (Any) -> Any
+        self._validate_invocation("decorator")
+
         @wraps(f)
         def timed_func(*args, **kwargs):
             # type: (*Any, **Any) -> Any
-            with timing(self.key, self.tags, self.timestamp):
+            with timing(key=self.key, tags=self.tags, timestamp=self.timestamp, unit=self.unit):
                 return f(*args, **kwargs)
 
         return timed_func
@@ -531,18 +556,31 @@ class _Timing(object):
 
 def timing(
     key,  # type: str
+    value=None,  # type: Optional[float]
+    unit="second",  # type: DurationUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
 ):
     # type: (...) -> _Timing
-    """Emits a distribution with the time it takes to run the given code block."""
-    return _Timing(key, tags, timestamp)
+    """Emits a distribution with the time it takes to run the given code block.
+    
+    This method supports three forms of invocation:
+
+    - when a `value` is provided, it functions similar to `distribution` but with
+    - it can be used as a context manager
+    - it can be used as a decorator
+    """
+    if value is not None:
+        aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+        if aggregator is not None:
+            aggregator.add("d", key, value, unit, tags, timestamp)
+    return _Timing(key, tags, timestamp, value, unit)
 
 
 def distribution(
     key,  # type: str
     value,  # type: float
-    unit="second",  # type: MetricUnit
+    unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
 ):
@@ -556,7 +594,7 @@ def distribution(
 def set(
     key,  # type: str
     value,  # type: MetricValue
-    unit="none",  # type: MetricUnit
+    unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[float]
 ):

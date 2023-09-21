@@ -91,33 +91,6 @@ if TYPE_CHECKING:
 
     ProfilerMode = Literal["sleep", "thread", "gevent", "unknown"]
 
-    # Unit of the metrics.
-    MetricUnit = Literal[
-        "none",
-        "nanosecond",
-        "microsecond",
-        "millisecond",
-        "second",
-        "minute",
-        "hour",
-        "day",
-        "week",
-        "bit",
-        "byte",
-        "kilobyte",
-        "kibibyte",
-        "mebibyte",
-        "gigabyte",
-        "terabyte",
-        "tebibyte",
-        "petabyte",
-        "pebibyte",
-        "exabyte",
-        "exbibyte",
-        "ratio",
-        "percent",
-    ]
-
     # Type of the metric.
     MetricType = Literal["d", "s", "g", "c"]
 
@@ -142,4 +115,4 @@ if TYPE_CHECKING:
     # Value inside the generator for the metric value.
     FlushedMetricValue = Union[int, float]
 
-    BucketKey = Tuple[MetricType, str, MetricUnit, MetricTagsInternal]
+    BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]

@@ -106,12 +106,61 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     )
     envelopes = capture_envelopes()
 
-    @metrics.timing("whatever", tags={"x": "y"})
+    @metrics.timing("whatever-1", tags={"x": "y"})
     def amazing():
         time.sleep(0.1)
         return 42
 
+    @metrics.timing("whatever-2", tags={"x": "y"}, unit="nanosecond")
+    def amazing_nano():
+        time.sleep(0.01)
+        return 23
+
     assert amazing() == 42
+    assert amazing_nano() == 23
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 2
+    assert m[0][1] == "whatever-1@second"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 1
+    assert float(m[0][3][0]) >= 0.1
+    assert m[0][4] == {
+        "x": "y",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[1][1] == "whatever-2@nanosecond"
+    assert m[1][2] == "d"
+    assert len(m[1][3]) == 1
+    assert float(m[1][3][0]) >= 10000000.0
+    assert m[1][4] == {
+        "x": "y",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+
+def test_timing_basic(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.timing("timing", 1.0, tags={"a": "b"}, timestamp=ts)
+    metrics.timing("timing", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.timing("timing", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.timing("timing", 3.0, tags={"a": "b"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -121,12 +170,12 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     m = parse_metrics(envelope.items[0].payload.get_bytes())
 
     assert len(m) == 1
-    assert m[0][1] == "whatever@second"
+    assert m[0][1] == "timing@second"
     assert m[0][2] == "d"
-    assert len(m[0][3]) == 1
-    assert float(m[0][3][0]) >= 0.1
+    assert len(m[0][3]) == 4
+    assert sorted(map(float, m[0][3])) == [1.0, 2.0, 2.0, 3.0]
     assert m[0][4] == {
-        "x": "y",
+        "a": "b",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
@@ -154,7 +203,7 @@ def test_distribution(sentry_init, capture_envelopes):
     m = parse_metrics(envelope.items[0].payload.get_bytes())
 
     assert len(m) == 1
-    assert m[0][1] == "dist@second"
+    assert m[0][1] == "dist@none"
     assert m[0][2] == "d"
     assert len(m[0][3]) == 4
     assert sorted(map(float, m[0][3])) == [1.0, 2.0, 2.0, 3.0]
@@ -307,7 +356,7 @@ def test_transaction_name(sentry_init, capture_envelopes):
     m = parse_metrics(envelope.items[0].payload.get_bytes())
 
     assert len(m) == 1
-    assert m[0][1] == "dist@second"
+    assert m[0][1] == "dist@none"
     assert m[0][2] == "d"
     assert len(m[0][3]) == 4
     assert sorted(map(float, m[0][3])) == [1.0, 2.0, 2.0, 3.0]
