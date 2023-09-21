@@ -38,7 +38,8 @@ def schema_factory():
     greeting = ObjectType("Greeting")
 
     @query.field("greeting")
-    def resolve_greeting(*_, name=None):
+    def resolve_greeting(*_, **kwargs):
+        name = kwargs.pop("name")
         return {"name": name}
 
     @query.field("error")
