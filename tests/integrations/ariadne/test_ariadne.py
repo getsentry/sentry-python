@@ -14,6 +14,7 @@ from sentry_sdk.integrations.ariadne import AriadneIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
 # to prevent the logging integration from capturing the exception first
@@ -53,35 +54,26 @@ def schema_factory():
     return make_executable_schema(type_defs, query)
 
 
-schema = schema_factory()
-
-async_app = FastAPI()
-async_app.mount("/graphql/", GraphQL(schema))
-
-sync_app = Flask(__name__)
-
-
-@sync_app.route("/graphql", methods=["POST"])
-def graphql_server():
-    data = request.get_json()
-    success, result = graphql_sync(schema, data)
-    return jsonify(result), 200
-
-
-@pytest.mark.parametrize(
-    "client",
-    [TestClient(async_app), sync_app.test_client()],
-)
-def test_capture_request_and_response_if_send_pii_is_on(
-    sentry_init, capture_events, client
+def test_capture_request_and_response_if_send_pii_is_on_async(
+    sentry_init, capture_events
 ):
     sentry_init(
         send_default_pii=True,
-        integrations=[AriadneIntegration(), FastApiIntegration(), FlaskIntegration()],
+        integrations=[
+            AriadneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
     )
     events = capture_events()
 
+    schema = schema_factory()
+
+    async_app = FastAPI()
+    async_app.mount("/graphql/", GraphQL(schema))
+
     query = {"query": "query ErrorQuery {error}"}
+    client = TestClient(async_app)
     client.post("/graphql", json=query)
 
     assert len(events) == 1
@@ -104,19 +96,68 @@ def test_capture_request_and_response_if_send_pii_is_on(
     assert event["request"]["data"] == query
 
 
-@pytest.mark.parametrize(
-    "client",
-    [TestClient(async_app), sync_app.test_client()],
-)
-def test_do_not_capture_request_and_response_if_send_pii_is_off(
-    sentry_init, capture_events, client
+def test_capture_request_and_response_if_send_pii_is_on_sync(
+    sentry_init, capture_events
 ):
     sentry_init(
-        integrations=[AriadneIntegration(), FastApiIntegration(), FlaskIntegration()],
+        send_default_pii=True,
+        integrations=[AriadneIntegration(), FlaskIntegration()],
     )
     events = capture_events()
 
+    schema = schema_factory()
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server():
+        data = request.get_json()
+        success, result = graphql_sync(schema, data)
+        return jsonify(result), 200
+
     query = {"query": "query ErrorQuery {error}"}
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert event["contexts"]["response"] == {
+        "data": {
+            "data": {"error": None},
+            "errors": [
+                {
+                    "locations": [{"column": 19, "line": 1}],
+                    "message": "resolver failed",
+                    "path": ["error"],
+                }
+            ],
+        }
+    }
+    assert event["request"]["api_target"] == "graphql"
+    assert event["request"]["data"] == query
+
+
+def test_do_not_capture_request_and_response_if_send_pii_is_off_async(
+    sentry_init, capture_events
+):
+    sentry_init(
+        integrations=[
+            AriadneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = schema_factory()
+
+    async_app = FastAPI()
+    async_app.mount("/graphql/", GraphQL(schema))
+
+    query = {"query": "query ErrorQuery {error}"}
+    client = TestClient(async_app)
     client.post("/graphql", json=query)
 
     assert len(events) == 1
@@ -127,20 +168,82 @@ def test_do_not_capture_request_and_response_if_send_pii_is_off(
     assert "response" not in event["contexts"]
 
 
-@pytest.mark.parametrize(
-    "client",
-    [TestClient(async_app), sync_app.test_client()],
-)
-def test_no_event_if_no_errors(sentry_init, capture_events, client):
+def test_do_not_capture_request_and_response_if_send_pii_is_off_sync(
+    sentry_init, capture_events
+):
     sentry_init(
-        integrations=[AriadneIntegration(), FastApiIntegration(), FlaskIntegration()],
+        integrations=[AriadneIntegration(), FlaskIntegration()],
     )
     events = capture_events()
+
+    schema = schema_factory()
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server():
+        data = request.get_json()
+        success, result = graphql_sync(schema, data)
+        return jsonify(result), 200
+
+    query = {"query": "query ErrorQuery {error}"}
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert "data" not in event["request"]
+    assert "response" not in event["contexts"]
+
+
+def test_no_event_if_no_errors_async(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            AriadneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = schema_factory()
+
+    async_app = FastAPI()
+    async_app.mount("/graphql/", GraphQL(schema))
 
     query = {
         "query": "query GreetingQuery($name: String) { greeting(name: $name) {name} }",
         "variables": {"name": "some name"},
     }
+    client = TestClient(async_app)
+    client.post("/graphql", json=query)
+
+    assert len(events) == 0
+
+
+def test_no_event_if_no_errors_sync(sentry_init, capture_events):
+    sentry_init(
+        integrations=[AriadneIntegration(), FlaskIntegration()],
+    )
+    events = capture_events()
+
+    schema = schema_factory()
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server():
+        data = request.get_json()
+        success, result = graphql_sync(schema, data)
+        return jsonify(result), 200
+
+    query = {
+        "query": "query GreetingQuery($name: String) { greeting(name: $name) {name} }",
+        "variables": {"name": "some name"},
+    }
+    client = sync_app.test_client()
     client.post("/graphql", json=query)
 
     assert len(events) == 0
