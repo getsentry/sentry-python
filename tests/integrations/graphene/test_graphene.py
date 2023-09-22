@@ -19,10 +19,10 @@ class Query(ObjectType):
     hello = String(first_name=String(default_value="stranger"))
     goodbye = String()
 
-    def resolve_hello(root, info, first_name):
+    def resolve_hello(root, info, first_name):  # noqa: N805
         return "Hello {}!".format(first_name)
 
-    def resolve_goodbye(root, info):
+    def resolve_goodbye(root, info):  # noqa: N805
         raise RuntimeError("oh no!")
 
 

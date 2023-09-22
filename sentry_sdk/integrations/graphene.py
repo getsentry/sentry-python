@@ -10,14 +10,14 @@ from sentry_sdk._types import TYPE_CHECKING
 
 
 try:
-    from graphene.types import schema as graphene_schema
+    from graphene.types import schema as graphene_schema  # type: ignore
 except ImportError:
     raise DidNotEnable("graphene is not installed")
 
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Union
-    from graphene.language.source import Source
+    from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult
     from graphql.type import GraphQLSchema
 
@@ -53,8 +53,7 @@ def _patch_graphql():
             return old_graphql_sync(schema, source, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            event_processor = _make_event_processor()
-            scope.add_event_processor(event_processor)
+            scope.add_event_processor(_event_processor)
 
         result = old_graphql_sync(schema, source, *args, **kwargs)
 
@@ -62,7 +61,7 @@ def _patch_graphql():
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=hub.client.options,
+                    client_options=hub.client.options if hub.client else None,
                     mechanism={
                         "type": hub.get_integration(GrapheneIntegration).identifier,
                         "handled": False,
@@ -80,8 +79,7 @@ def _patch_graphql():
             return await old_graphql_async(schema, source, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            event_processor = _make_event_processor()
-            scope.add_event_processor(event_processor)
+            scope.add_event_processor(_event_processor)
 
         result = await old_graphql_async(schema, source, *args, **kwargs)
 
@@ -89,7 +87,7 @@ def _patch_graphql():
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=hub.client.options,
+                    client_options=hub.client.options if hub.client else None,
                     mechanism={
                         "type": hub.get_integration(GrapheneIntegration).identifier,
                         "handled": False,
@@ -103,16 +101,13 @@ def _patch_graphql():
     graphene_schema.graphql = _sentry_patched_graphql_async
 
 
-def _make_event_processor():
-    def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-        if _should_send_default_pii():
-            request_info = event.setdefault("request", {})
-            request_info["api_target"] = "graphql"
+def _event_processor(event, hint):
+    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+    if _should_send_default_pii():
+        request_info = event.setdefault("request", {})
+        request_info["api_target"] = "graphql"
 
-        elif event.get("request", {}).get("data"):
-            del event["request"]["data"]
+    elif event.get("request", {}).get("data"):
+        del event["request"]["data"]
 
-        return event
-
-    return inner
+    return event
