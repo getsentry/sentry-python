@@ -18,8 +18,8 @@ except ImportError:
 if TYPE_CHECKING:
     from typing import Any, Dict, Union
     from graphene.language.source import Source  # type: ignore
-    from graphql.execution import ExecutionResult
-    from graphql.type import GraphQLSchema
+    from graphql.execution import ExecutionResult  # type: ignore
+    from graphql.type import GraphQLSchema  # type: ignore
 
 
 class GrapheneIntegration(Integration):
