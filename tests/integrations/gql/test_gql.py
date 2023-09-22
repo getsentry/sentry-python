@@ -31,7 +31,8 @@ def test_gql_init(sentry_init):
     sentry_init(integrations=[GQLIntegration()])
 
 
-def test_setup_once_patches_execute_and_patched_function_calls_original():
+@patch("sentry_sdk.integrations.gql.Hub")
+def test_setup_once_patches_execute_and_patched_function_calls_original(_):
     """
     Unit test which ensures the following:
         1. The GQLIntegration setup_once function patches the gql.Client.execute method
@@ -79,15 +80,17 @@ def test_setup_once_patches_execute_and_patched_function_calls_original():
     ), "pathced execute method returns a different value than the original execute method"
 
 
-@patch("sentry_sdk.integrations.gql.Hub.current.capture_event")
+@patch("sentry_sdk.integrations.gql.event_from_exception")
+@patch("sentry_sdk.integrations.gql.Hub")
 def test_patched_gql_execute_captures_and_reraises_graphql_exception(
-    mock_capture_event,
+    mock_hub, mock_event_from_exception
 ):
     """
     Unit test which ensures that in the case that calling the execute method results in a
     TransportQueryError (which gql raises when a GraphQL error occurs), the patched method
     captures the event on the current Hub and it reraises the error.
     """
+    mock_event_from_exception.return_value = (dict(), MagicMock())
 
     class OriginalMockClient(_MockClientBase):
         """
@@ -113,15 +116,18 @@ def test_patched_gql_execute_captures_and_reraises_graphql_exception(
             client_instance.execute(mock_query)
 
     # However, we should have also captured the error on the hub.
+    mock_capture_event = mock_hub.current.capture_event
     mock_capture_event.assert_called_once()
 
     # Let's also ensure the event captured was a TransportQueryError
     ((event, _), _) = mock_capture_event.call_args
-    (exception,) = event["exception"]["values"]
 
-    assert exception["type"] == "TransportQueryError", (
-        "%s was captured, but we expected a TransportQueryError" % exception[type]
-    )
+    try:
+        assert "data" in event["request"]
+        assert event["request"]["api_target"] == "graphql"
+        assert "errors" in event["contexts"]["response"]["data"]
+    except KeyError:
+        pytest.fail("The captured event does not have the expected structure.")
 
 
 @responses.activate

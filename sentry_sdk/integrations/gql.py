@@ -81,10 +81,14 @@ def _patch_execute():
 
     def sentry_patched_execute(self, document, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
+        hub = Hub.current
+        if hub.get_integration(GQLIntegration) is None:
+            breakpoint()
+            return real_execute(self, document, *args, **kwargs)
+
         try:
             return real_execute(self, document, *args, **kwargs)
         except TransportQueryError as e:
-            hub = Hub.current
             event, hint = event_from_exception(
                 e,
                 client_options=hub.client.options if hub.client is not None else None,
