@@ -10,9 +10,12 @@ try:
 except ImportError:
     raise DidNotEnable("gql is not installed")
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
-EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
+if TYPE_CHECKING:
+    from typing import Any, Dict, Optional, Tuple, Union
+
+    EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
 
 
 class GQLIntegration(Integration):
@@ -23,9 +26,10 @@ class GQLIntegration(Integration):
         _patch_execute()
 
 
-def _data_from_document(document: DocumentNode) -> EventDataType:
+def _data_from_document(document):
+    # type: (DocumentNode) -> EventDataType
     operation_ast = get_operation_ast(document)
-    data: EventDataType = {"query": print_ast(document)}
+    data = {"query": print_ast(document)}  # type: EventDataType
 
     if operation_ast is not None:
         data["variables"] = operation_ast.variable_definitions
@@ -35,7 +39,8 @@ def _data_from_document(document: DocumentNode) -> EventDataType:
     return data
 
 
-def _transport_method(transport: Union[Transport, AsyncTransport]) -> str:
+def _transport_method(transport):
+    # type: (Union[Transport, AsyncTransport]) -> str
     """
     The RequestsHTTPTransport allows defining the HTTP method; all
     other transports use POST.
@@ -46,9 +51,8 @@ def _transport_method(transport: Union[Transport, AsyncTransport]) -> str:
         return "POST"
 
 
-def _request_info_from_transport(
-    transport: Optional[Union[Transport, AsyncTransport]]
-) -> Dict[str, str]:
+def _request_info_from_transport(transport):
+    # type: (Optional[Union[Transport, AsyncTransport]]) -> Dict[str, str]
     if transport is None:
         return {}
 
@@ -64,12 +68,12 @@ def _request_info_from_transport(
     return request_info
 
 
-def _patch_execute() -> None:
+def _patch_execute():
+    # type: () -> None
     real_execute = gql.Client.execute
 
-    def sentry_patched_execute(
-        self: gql.Client, document: DocumentNode, *args: Any, **kwargs: Any
-    ) -> Any:
+    def sentry_patched_execute(self, document, *args, **kwargs):
+        # type: (gql.Client, DocumentNode, Any, Any) -> Any
         try:
             return real_execute(self, document, *args, **kwargs)
         except TransportQueryError as e:
