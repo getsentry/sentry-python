@@ -229,6 +229,14 @@ class _Client(object):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
+            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+            if self.options.get("_experiments", {}).get("enable_metrics"):
+                from sentry_sdk.metrics import MetricsAggregator
+
+                self.metrics_aggregator = MetricsAggregator(
+                    capture_func=_capture_envelope
+                )
+
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
@@ -610,6 +618,8 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            if self.metrics_aggregator is not None:
+                self.metrics_aggregator.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -632,6 +642,8 @@ class _Client(object):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
+            if self.metrics_aggregator is not None:
+                self.metrics_aggregator.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
