@@ -18,7 +18,8 @@ class _MockClientBase(MagicMock):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs, spec=Client)
+        kwargs["spec"] = Client
+        super().__init__(*args, **kwargs)
 
     transport = MagicMock()
 
@@ -115,12 +116,12 @@ def test_patched_gql_execute_captures_and_reraises_graphql_exception(
     mock_capture_event.assert_called_once()
 
     # Let's also ensure the event captured was a TransportQueryError
-    ((event, _), *_) = mock_capture_event.call_args
+    ((event, _), _) = mock_capture_event.call_args
     (exception,) = event["exception"]["values"]
 
-    assert (
-        exception["type"] == "TransportQueryError"
-    ), f"{exception['type']} was captured, but we expected a TransportQueryError"
+    assert exception["type"] == "TransportQueryError", (
+        "%s was captured, but we expected a TransportQueryError" % exception[type]
+    )
 
 
 @responses.activate
@@ -194,11 +195,11 @@ def test_real_gql_request_with_error(sentry_init, capture_events):
 
     assert (
         len(events) == 1
-    ), f"the sdk captured {len(events)} events, but 1 event was expected"
+    ), "the sdk captured %d events, but 1 event was expected" % len(events)
 
     (event,) = events
     (exception,) = event["exception"]["values"]
 
     assert (
         exception["type"] == "TransportQueryError"
-    ), f"{exception['type']} was captured, but we expected a TransportQueryError"
+    ), "%s was captured, but we expected a TransportQueryError" % exception(type)

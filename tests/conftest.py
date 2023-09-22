@@ -1,8 +1,6 @@
 import json
 import os
-import re
 import socket
-import sys
 from threading import Thread
 
 import pytest
@@ -604,29 +602,3 @@ def create_mock_http_server():
     mock_server_thread.start()
 
     return mock_server_port
-
-
-def pytest_ignore_collect(path):
-    """
-    This function allows us to add a minimum version suffix to any test files we only wish
-    to run in certain Python versions.
-
-    This function causes pytest to ignore any files ending in "_min_py<x>_<y>.py" when the
-    current Python version is below <x>.<y>. If the test suite is being run in a Python version
-    lower than <x>.<y>, the file will not be loaded at all.
-
-    For example, if you would like a certain test file to only be run in Python versions 3.7
-    and above, you could name the file "test_something_min_py3.7.py". Then, the file will only
-    be loaded in Python versions 3.7 and higher.
-
-    Since the file will never be loaded in Python versions below the minimum version, using a
-    minimum version suffix of this format allows us to safely use syntax in the files which
-    may be invalid in older Python versions.
-    """
-    min_version_match = re.search(r"\S+_min_py(\d)(?:_(\d+))\.py$", str(path))
-    if min_version_match is not None:
-        min_version = [int(min_version_match.group(1))]
-        if min_version_match.group(2) is not None:
-            min_version.append(int(min_version_match.group(2)))
-
-        return sys.version_info < tuple(min_version)
