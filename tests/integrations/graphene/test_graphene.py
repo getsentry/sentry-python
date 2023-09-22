@@ -4,7 +4,7 @@ pytest.importorskip("graphene")
 pytest.importorskip("fastapi")
 pytest.importorskip("flask")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from flask import Flask, request, jsonify
 from graphene import ObjectType, String, Schema
@@ -12,6 +12,7 @@ from graphene import ObjectType, String, Schema
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.graphene import GrapheneIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
 class Query(ObjectType):
@@ -25,40 +26,31 @@ class Query(ObjectType):
         raise RuntimeError("oh no!")
 
 
-schema = Schema(query=Query)
-
-async_app = FastAPI()
-
-
-@async_app.post("/graphql")
-async def graphql_server_async(request):
-    data = await request.json()
-    result = schema.execute(data["query"])
-    return result.data
-
-
-sync_app = Flask(__name__)
-
-
-@sync_app.route("/graphql", methods=["POST"])
-def graphql_server_sync():
-    data = request.get_json()
-    result = schema.execute(data["query"])
-    return jsonify(result.data), 200
-
-
-@pytest.mark.parametrize(
-    "client",
-    [TestClient(async_app), sync_app.test_client()],
-)
-def test_capture_request_if_send_pii_is_on(sentry_init, capture_events, client):
+def test_capture_request_if_available_and_send_pii_is_on_async(
+    sentry_init, capture_events
+):
     sentry_init(
         send_default_pii=True,
-        integrations=[GrapheneIntegration(), FastApiIntegration(), FlaskIntegration()],
+        integrations=[
+            GrapheneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
     )
     events = capture_events()
 
+    schema = Schema(query=Query)
+
+    async_app = FastAPI()
+
+    @async_app.post("/graphql")
+    async def graphql_server_async(request: Request):
+        data = await request.json()
+        result = schema.execute(data["query"])
+        return result.data
+
     query = {"query": "query ErrorQuery {goodbye}"}
+    client = TestClient(async_app)
     client.post("/graphql", json=query)
 
     assert len(events) == 1
@@ -69,17 +61,59 @@ def test_capture_request_if_send_pii_is_on(sentry_init, capture_events, client):
     assert event["request"]["data"] == query
 
 
-@pytest.mark.parametrize(
-    "client",
-    [TestClient(async_app), sync_app.test_client()],
-)
-def test_do_not_capture_request_if_send_pii_is_off(sentry_init, capture_events, client):
+def test_capture_request_if_available_and_send_pii_is_on_sync(
+    sentry_init, capture_events
+):
     sentry_init(
-        integrations=[GrapheneIntegration(), FastApiIntegration(), FlaskIntegration()],
+        send_default_pii=True,
+        integrations=[GrapheneIntegration(), FlaskIntegration()],
     )
     events = capture_events()
 
+    schema = Schema(query=Query)
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server_sync():
+        data = request.get_json()
+        result = schema.execute(data["query"])
+        return jsonify(result.data), 200
+
     query = {"query": "query ErrorQuery {goodbye}"}
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "graphene"
+    assert event["request"]["api_target"] == "graphql"
+    assert event["request"]["data"] == query
+
+
+def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            GrapheneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = Schema(query=Query)
+
+    async_app = FastAPI()
+
+    @async_app.post("/graphql")
+    async def graphql_server_async(request: Request):
+        data = await request.json()
+        result = schema.execute(data["query"])
+        return result.data
+
+    query = {"query": "query ErrorQuery {goodbye}"}
+    client = TestClient(async_app)
     client.post("/graphql", json=query)
 
     assert len(events) == 1
@@ -90,19 +124,86 @@ def test_do_not_capture_request_if_send_pii_is_off(sentry_init, capture_events, 
     assert "response" not in event["contexts"]
 
 
-@pytest.mark.parametrize(
-    "client",
-    [TestClient(async_app), sync_app.test_client()],
-)
-def test_no_event_if_no_errors(sentry_init, capture_events, client):
+def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_events):
     sentry_init(
-        integrations=[GrapheneIntegration(), FastApiIntegration(), FlaskIntegration()],
+        integrations=[GrapheneIntegration(), FlaskIntegration()],
     )
     events = capture_events()
+
+    schema = Schema(query=Query)
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server_sync():
+        data = request.get_json()
+        result = schema.execute(data["query"])
+        return jsonify(result.data), 200
+
+    query = {"query": "query ErrorQuery {goodbye}"}
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "graphene"
+    assert "data" not in event["request"]
+    assert "response" not in event["contexts"]
+
+
+def test_no_event_if_no_errors_async(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            GrapheneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = Schema(query=Query)
+
+    async_app = FastAPI()
+
+    @async_app.post("/graphql")
+    async def graphql_server_async(request: Request):
+        data = await request.json()
+        result = schema.execute(data["query"])
+        return result.data
 
     query = {
         "query": "query GreetingQuery { hello }",
     }
+    client = TestClient(async_app)
+    client.post("/graphql", json=query)
+
+    assert len(events) == 0
+
+
+def test_no_event_if_no_errors_sync(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            GrapheneIntegration(),
+            FlaskIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = Schema(query=Query)
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server_sync():
+        data = request.get_json()
+        result = schema.execute(data["query"])
+        return jsonify(result.data), 200
+
+    query = {
+        "query": "query GreetingQuery { hello }",
+    }
+    client = sync_app.test_client()
     client.post("/graphql", json=query)
 
     assert len(events) == 0

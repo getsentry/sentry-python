@@ -53,7 +53,8 @@ def _patch_graphql():
             return old_graphql_sync(schema, source, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            scope.add_event_processor(_event_processor)
+            event_processor = _make_event_processor()
+            scope.add_event_processor(event_processor)
 
         result = old_graphql_sync(schema, source, *args, **kwargs)
 
@@ -79,7 +80,8 @@ def _patch_graphql():
             return await old_graphql_async(schema, source, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            scope.add_event_processor(_event_processor)
+            event_processor = _make_event_processor()
+            scope.add_event_processor(event_processor)
 
         result = await old_graphql_async(schema, source, *args, **kwargs)
 
@@ -101,13 +103,16 @@ def _patch_graphql():
     graphene_schema.graphql = _sentry_patched_graphql_async
 
 
-def _event_processor(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-    if _should_send_default_pii():
-        request_info = event.setdefault("request", {})
-        request_info["api_target"] = "graphql"
+def _make_event_processor():
+    def inner(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        if _should_send_default_pii():
+            request_info = event.setdefault("request", {})
+            request_info["api_target"] = "graphql"
 
-    elif event.get("request", {}).get("data"):
-        del event["request"]["data"]
+        elif event.get("request", {}).get("data"):
+            del event["request"]["data"]
 
-    return event
+        return event
+
+    return inner
