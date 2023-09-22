@@ -10,7 +10,7 @@ from sentry_sdk.integrations import Integration
 from .client import ClientInterceptor
 from .server import ServerInterceptor
 from .aio.server import ServerInterceptor as AsyncServerInterceptor
-from .aio.client import AsyncClientInterceptor
+from .aio.client import ClientInterceptor as AsyncClientInterceptor
 
 P = ParamSpec("P")
 

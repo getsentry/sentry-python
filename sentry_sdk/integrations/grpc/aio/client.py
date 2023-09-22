@@ -1,15 +1,13 @@
 from typing import Callable, Union
 
-from grpc.aio import UnaryUnaryClientInterceptor
-from grpc.aio._call import UnaryUnaryCall
-from grpc.aio._interceptor import ClientCallDetails
+from grpc.aio import UnaryUnaryClientInterceptor, ClientCallDetails, UnaryUnaryCall
 from google.protobuf.message import Message
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 
 
-class AsyncClientInterceptor(UnaryUnaryClientInterceptor):
+class ClientInterceptor(UnaryUnaryClientInterceptor):
     async def intercept_unary_unary(
         self,
         continuation: Callable[[ClientCallDetails, Message], UnaryUnaryCall],
