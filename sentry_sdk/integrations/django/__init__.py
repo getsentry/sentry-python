@@ -37,6 +37,7 @@ try:
     from django.conf import settings as django_settings
     from django.core import signals
     from django.conf import settings
+    from django.utils.datastructures import MultiValueDict
 
     try:
         from django.urls import resolve
@@ -76,7 +77,6 @@ if TYPE_CHECKING:
     from django.core.handlers.wsgi import WSGIRequest
     from django.http.response import HttpResponse
     from django.http.request import QueryDict
-    from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.tracing import Span
     from sentry_sdk.scope import Scope
@@ -492,7 +492,40 @@ def _make_event_processor(weak_request, integration):
     return event_processor
 
 
-def _clean_vars2(error, event):
+def get_cleansed_multivaluedict(request, multivaluedict):
+    """
+    Copy of django.views.debug.SafeExceptionReporterFilter.get_cleansed_multivaluedict
+
+    Replace the keys in a MultiValueDict marked as sensitive with stars.
+    This mitigates leaking sensitive POST parameters if something like
+    request.POST['nonexistent_key'] throws an exception.
+    """
+    sensitive_post_parameters = getattr(request, "sensitive_post_parameters", [])
+    if sensitive_post_parameters:
+        multivaluedict = multivaluedict.copy()
+        for param in sensitive_post_parameters:
+            if param in multivaluedict:
+                multivaluedict[param] = SENSITIVE_DATA_SUBSTITUTE
+    return multivaluedict
+
+
+def cleanse_special_types(request, value):
+    try:
+        # Copy of django.views.debug.SafeExceptionReporterFilter.cleanse_special_types
+        # If value is lazy or a complex object of another kind, this check
+        # might raise an exception. isinstance checks that lazy
+        # MultiValueDicts will have a return value.
+        is_multivalue_dict = isinstance(value, MultiValueDict)
+    except Exception as e:
+        return "{!r} while evaluating {!r}".format(e, value)
+
+    if is_multivalue_dict:
+        # Cleanse MultiValueDicts
+        value = get_cleansed_multivaluedict(request, value)
+    return value
+
+
+def _clean_vars2(error, request, event):
     exc_info = exc_info_from_error(error)
     exception_idx = 0
     for _, _, tbs in walk_exception_chain(exc_info):
@@ -502,7 +535,7 @@ def _clean_vars2(error, event):
             frame = tb.tb_frame
             if sensitive_variables:
                 _cleanse_sensitive_vars(
-                    event, sensitive_variables, exception_idx, frame_idx
+                    request, event, sensitive_variables, exception_idx, frame_idx
                 )
             if (
                 frame.f_code.co_name == "sensitive_variables_wrapper"
@@ -516,7 +549,7 @@ def _clean_vars2(error, event):
 
 
 def _cleanse_sensitive_vars(
-    event, sensitive_variables, reverse_exception_idx, frame_idx
+    request, event, sensitive_variables, reverse_exception_idx, frame_idx
 ):
     if "exception" in event:
         exceptions = event["exception"].get("values", ())
@@ -537,11 +570,8 @@ def _cleanse_sensitive_vars(
                             if name in sensitive_variables:
                                 value = SENSITIVE_DATA_SUBSTITUTE
                             else:
-                                # have to check if speacial variables in frames have to be removed
-                                print(
-                                    "skip checking for sensitive variable key - {}",
-                                    name,
-                                )
+                                # clean multivaluedicts in frames with sensitive post parameters
+                                value = cleanse_special_types(request, value)
                             clean_vars[name] = value
                     frame["vars"] = clean_vars
 
@@ -591,7 +621,6 @@ def _got_request_exception(request=None, **kwargs):
         if request is not None and integration.transaction_style == "url":
             with hub.configure_scope() as scope:
                 _attempt_resolve_again(request, scope, integration.transaction_style)
-
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
         exception = sys.exc_info()
@@ -601,7 +630,9 @@ def _got_request_exception(request=None, **kwargs):
             mechanism={"type": "django", "handled": False},
         )
         # get clean event and capture it
-        clean_event = _clean_vars2(exception, event)
+        clean_event = _clean_vars2(exception, request, event)
+        print("clean_event", clean_event)
+        print("hint", hint)
         hub.capture_event(clean_event, hint=hint)
 
 
@@ -632,6 +663,21 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def form(self):
         # type: () -> QueryDict
+        sensitive_post_parameters = getattr(
+            self.request, "sensitive_post_parameters", []
+        )
+        if sensitive_post_parameters:
+            cleansed_request = self.request.POST.copy()
+            if sensitive_post_parameters == "__ALL__":
+                # Cleanse all parameters.
+                for k in cleansed_request:
+                    cleansed_request[k] = SENSITIVE_DATA_SUBSTITUTE
+            else:
+                # Cleanse only the specified parameters.
+                for param in sensitive_post_parameters:
+                    if param in cleansed_request:
+                        cleansed_request[param] = SENSITIVE_DATA_SUBSTITUTE
+            return cleansed_request
         return self.request.POST
 
     def files(self):
