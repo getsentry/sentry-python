@@ -492,37 +492,58 @@ def _make_event_processor(weak_request, integration):
     return event_processor
 
 
-def _clean_vars(error):
+def _clean_vars2(error, event):
     exc_info = exc_info_from_error(error)
-    sensitive_variables = None
-    for _, _, tb in walk_exception_chain(exc_info):
-        for tb in iter_stacks(tb):
-            current_frame = tb.tb_frame
+    exception_idx = 0
+    for _, _, tbs in walk_exception_chain(exc_info):
+        sensitive_variables = None
+        frame_idx = 0
+        for tb in iter_stacks(tbs):
+            frame = tb.tb_frame
+            if sensitive_variables:
+                _cleanse_sensitive_vars(
+                    event, sensitive_variables, exception_idx, frame_idx
+                )
             if (
-                current_frame.f_code.co_name == "sensitive_variables_wrapper"
-                and "sensitive_variables_wrapper" in current_frame.f_locals
+                frame.f_code.co_name == "sensitive_variables_wrapper"
+                and "sensitive_variables_wrapper" in frame.f_locals
             ):
-                wrapper = current_frame.f_locals["sensitive_variables_wrapper"]
+                wrapper = frame.f_locals["sensitive_variables_wrapper"]
                 sensitive_variables = getattr(wrapper, "sensitive_variables", None)
-    return sensitive_variables
+            frame_idx += 1
+        exception_idx += 1
+    return event
 
 
-def _sensitive_variables_from_exc(error):
-    exc_info = exc_info_from_error(error)
-    sensitive_variables = None
-    for _, _, tb in walk_exception_chain(exc_info):
-        for tb in iter_stacks(tb):
-            current_frame = tb.tb_frame
-            if (
-                current_frame.f_code.co_name == "sensitive_variables_wrapper"
-                and "sensitive_variables_wrapper" in current_frame.f_locals
-            ):
-                wrapper = current_frame.f_locals["sensitive_variables_wrapper"]
-                sensitive_variables = getattr(wrapper, "sensitive_variables", None)
-            # current_frame = current_frame.f_back
-    return sensitive_variables
-    # remove variables
-    # remove frame
+def _cleanse_sensitive_vars(
+    event, sensitive_variables, reverse_exception_idx, frame_idx
+):
+    if "exception" in event:
+        exceptions = event["exception"].get("values", ())
+        if len(exceptions) > 0:
+            exception_idx = len(exceptions) - reverse_exception_idx - 1
+            exception = exceptions[exception_idx]
+            if "stacktrace" in exception:
+                frames = exception["stacktrace"].get("frames", ())
+                if len(frames) > frame_idx:
+                    frame = frames[frame_idx]
+                    clean_vars = {}
+                    if sensitive_variables == "__ALL__":
+                        for name in frame.get("vars", ()):
+                            clean_vars[name] = SENSITIVE_DATA_SUBSTITUTE
+                    else:
+                        # Cleanse specified variables
+                        for name, value in frame.get("vars", {}).items():
+                            if name in sensitive_variables:
+                                value = SENSITIVE_DATA_SUBSTITUTE
+                            else:
+                                # have to check if speacial variables in frames have to be removed
+                                print(
+                                    "skip checking for sensitive variable key - {}",
+                                    name,
+                                )
+                            clean_vars[name] = value
+                    frame["vars"] = clean_vars
 
 
 def _remove_sensitive_variables(sensitive_variables, event):
@@ -559,23 +580,6 @@ def _remove_sensitive_variables(sensitive_variables, event):
                                 )
                             clean_vars[name] = value
                     frame["vars"] = clean_vars
-    print("--------event-------- ", event)
-    print("--------end +event-------- ")
-    return event
-
-
-def _remove_frame():
-    pass
-
-
-def _clean_event(exception, event):
-    # type: (...) -> Dict[str, Any]
-    sensitive_variables = _sensitive_variables_from_exc(exception)
-    if sensitive_variables:
-        event = _remove_sensitive_variables(
-            sensitive_variables, event
-        )  # remove sensitive variables
-        # event = _remove_frame(event) # clean sensitive_variable_wrapper frame
     return event
 
 
@@ -597,8 +601,7 @@ def _got_request_exception(request=None, **kwargs):
             mechanism={"type": "django", "handled": False},
         )
         # get clean event and capture it
-        clean_event = _clean_event(exception, event)
-        # print("---------printing clean event---------", clean_event)
+        clean_event = _clean_vars2(exception, event)
         hub.capture_event(clean_event, hint=hint)
 
 
