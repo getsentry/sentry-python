@@ -46,7 +46,7 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
     @async_app.post("/graphql")
     async def graphql_server_async(request: Request):
         data = await request.json()
-        result = schema.execute(data["query"])
+        result = await schema.execute_async(data["query"])
         return result.data
 
     query = {"query": "query ErrorQuery {goodbye}"}
@@ -109,7 +109,7 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
     @async_app.post("/graphql")
     async def graphql_server_async(request: Request):
         data = await request.json()
-        result = schema.execute(data["query"])
+        result = await schema.execute_async(data["query"])
         return result.data
 
     query = {"query": "query ErrorQuery {goodbye}"}
@@ -169,7 +169,7 @@ def test_no_event_if_no_errors_async(sentry_init, capture_events):
     @async_app.post("/graphql")
     async def graphql_server_async(request: Request):
         data = await request.json()
-        result = schema.execute(data["query"])
+        result = await schema.execute_async(data["query"])
         return result.data
 
     query = {
