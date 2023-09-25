@@ -27,7 +27,7 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.integrations import setup_integrations
+from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
@@ -229,12 +229,29 @@ class _Client(object):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
+            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+            if self.options.get("_experiments", {}).get("enable_metrics"):
+                from sentry_sdk.metrics import MetricsAggregator
+
+                self.metrics_aggregator = MetricsAggregator(
+                    capture_func=_capture_envelope
+                )
+
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
                 raise ValueError(
                     "Invalid value for max_request_body_size. Must be one of {}".format(
                         max_request_body_size
                     )
+                )
+
+            if self.options["_experiments"].get("otel_powered_performance", False):
+                logger.debug(
+                    "[OTel] Enabling experimental OTel-powered performance monitoring."
+                )
+                self.options["instrumenter"] = INSTRUMENTER.OTEL
+                _DEFAULT_INTEGRATIONS.append(
+                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
                 )
 
             self.integrations = setup_integrations(
@@ -249,14 +266,14 @@ class _Client(object):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
+            if has_profiling_enabled(self.options):
+                try:
+                    setup_profiler(self.options)
+                except Exception as e:
+                    logger.debug("Can not set up profiler. (%s)", e)
+
         finally:
             _client_init_debug.set(old_debug)
-
-        if has_profiling_enabled(self.options):
-            try:
-                setup_profiler(self.options)
-            except ValueError as e:
-                logger.debug(str(e))
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
@@ -601,6 +618,8 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            if self.metrics_aggregator is not None:
+                self.metrics_aggregator.kill()
             if self.monitor:
                 self.monitor.kill()
             self.transport.kill()
@@ -623,6 +642,8 @@ class _Client(object):
             if timeout is None:
                 timeout = self.options["shutdown_timeout"]
             self.session_flusher.flush()
+            if self.metrics_aggregator is not None:
+                self.metrics_aggregator.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
     def __enter__(self):
