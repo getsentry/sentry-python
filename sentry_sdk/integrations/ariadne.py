@@ -84,7 +84,7 @@ def _patch_graphql():
                         error,
                         client_options=hub.client.options,
                         mechanism={
-                            "type": hub.get_integration(AriadneIntegration).identifier,
+                            "type": integration.identifier,
                             "handled": False,
                         },
                     )
@@ -99,10 +99,10 @@ def _patch_graphql():
         if integration is None:
             return old_handle_query_result(result, *args, **kwargs)
 
-        response = old_handle_query_result(result, *args, **kwargs)
+        result = old_handle_query_result(result, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            event_processor = _make_response_event_processor(response[1])
+            event_processor = _make_response_event_processor(result[1])
             scope.add_event_processor(event_processor)
 
         if hub.client:
@@ -112,13 +112,13 @@ def _patch_graphql():
                         error,
                         client_options=hub.client.options,
                         mechanism={
-                            "type": hub.get_integration(AriadneIntegration).identifier,
+                            "type": integration.identifier,
                             "handled": False,
                         },
                     )
                     hub.capture_event(event, hint=hint)
 
-        return response
+        return result
 
     ariadne_graphql.parse_query = _sentry_patched_parse_query  # type: ignore
     ariadne_graphql.handle_graphql_errors = _sentry_patched_handle_graphql_errors  # type: ignore
@@ -147,7 +147,8 @@ def _make_request_event_processor(data):
             ):
                 request_info = event.setdefault("request", {})
                 request_info["api_target"] = "graphql"
-                request_info["data"] = data
+                if not request_info.get("data"):
+                    request_info["data"] = data
 
             elif event.get("request", {}).get("data"):
                 del event["request"]["data"]
