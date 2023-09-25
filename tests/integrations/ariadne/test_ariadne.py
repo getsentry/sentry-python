@@ -198,6 +198,44 @@ def test_do_not_capture_request_and_response_if_send_pii_is_off_sync(
     assert "response" not in event["contexts"]
 
 
+def test_capture_validation_error(sentry_init, capture_events):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[
+            AriadneIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = schema_factory()
+
+    async_app = FastAPI()
+    async_app.mount("/graphql/", GraphQL(schema))
+
+    query = {"query": "query ErrorQuery {doesnt_exist}"}
+    client = TestClient(async_app)
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "ariadne"
+    assert event["contexts"]["response"] == {
+        "data": {
+            "errors": [
+                {
+                    "locations": [{"column": 19, "line": 1}],
+                    "message": "Cannot query field 'doesnt_exist' on type 'Query'.",
+                }
+            ]
+        }
+    }
+    assert event["request"]["api_target"] == "graphql"
+    assert event["request"]["data"] == query
+
+
 def test_no_event_if_no_errors_async(sentry_init, capture_events):
     sentry_init(
         integrations=[

@@ -99,10 +99,10 @@ def _patch_graphql():
         if integration is None:
             return old_handle_query_result(result, *args, **kwargs)
 
-        result = old_handle_query_result(result, *args, **kwargs)
+        query_result = old_handle_query_result(result, *args, **kwargs)
 
         with hub.configure_scope() as scope:
-            event_processor = _make_response_event_processor(result[1])
+            event_processor = _make_response_event_processor(query_result[1])
             scope.add_event_processor(event_processor)
 
         if hub.client:
@@ -118,7 +118,7 @@ def _patch_graphql():
                     )
                     hub.capture_event(event, hint=hint)
 
-        return result
+        return query_result
 
     ariadne_graphql.parse_query = _sentry_patched_parse_query  # type: ignore
     ariadne_graphql.handle_graphql_errors = _sentry_patched_handle_graphql_errors  # type: ignore
