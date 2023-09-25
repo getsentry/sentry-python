@@ -166,8 +166,8 @@ def _make_response_event_processor(response):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         with capture_internal_exceptions():
             if _should_send_default_pii() and response.get("errors"):
-                response_context = event.setdefault("contexts", {})
-                response_context["response"] = {
+                contexts = event.setdefault("contexts", {})
+                contexts["response"] = {
                     "data": response,
                 }
 
