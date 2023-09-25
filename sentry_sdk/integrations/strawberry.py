@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
+    import strawberry.http as strawberry_http
     import strawberry.schema.schema as strawberry_schema
     from strawberry import Schema
     from strawberry.extensions import SchemaExtension
@@ -25,12 +26,13 @@ except ImportError:
 import hashlib
 from functools import cached_property
 from inspect import isawaitable
-from typing import Any, Callable, Generator, Optional
 
 
 if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Generator, Optional
     from graphql import GraphQLResolveInfo
     from strawberry.types.execution import ExecutionContext
+    from sentry_sdk._types import EventProcessor
 
 
 class StrawberryIntegration(Integration):
@@ -61,6 +63,7 @@ class StrawberryIntegration(Integration):
 
         # _patch_schema_init()
         _patch_execute()
+        _patch_process_result()
 
 
 def _patch_schema_init():
@@ -243,8 +246,10 @@ class SentrySyncExtension(SentryAsyncExtension):
 
 
 def _patch_execute():
+    # type: () -> None
     old_execute_async = strawberry_schema.execute
     old_execute_sync = strawberry_schema.execute_sync
+    # XXX capture response, see create_response or run
 
     async def _sentry_patched_execute_async(*args, **kwargs):
         hub = Hub.current
@@ -256,8 +261,8 @@ def _patch_execute():
 
         if "execution_context" in kwargs and result.errors:
             with hub.configure_scope() as scope:
-                event_processor = _make_event_processor(
-                    kwargs["execution_context"].query
+                event_processor = _make_request_event_processor(
+                    kwargs["execution_context"]
                 )
                 scope.add_event_processor(event_processor)
 
@@ -285,8 +290,8 @@ def _patch_execute():
 
         if "execution_context" in kwargs and result.errors:
             with hub.configure_scope() as scope:
-                event_processor = _make_event_processor(
-                    kwargs["execution_context"].query
+                event_processor = _make_request_event_processor(
+                    kwargs["execution_context"]
                 )
                 scope.add_event_processor(event_processor)
 
@@ -308,10 +313,40 @@ def _patch_execute():
     strawberry_schema.execute_sync = _sentry_patched_execute_sync
 
 
-def _make_event_processor(query):
+def _patch_process_result():
+    # type: () -> None
+    old_process_result = strawberry_http.process_result
+
+    async def _sentry_patched_process_result(*args, **kwargs):
+        hub = Hub.current
+        integration = hub.get_integration(StrawberryIntegration)
+        if integration is None:
+            return old_process_result(*args, **kwargs)
+
+        result = old_process_result(*args, **kwargs)
+
+        with hub.configure_scope() as scope:
+            event_processor = _make_response_event_processor(result)
+            scope.add_event_processor(event_processor)
+
+        return result
+
+    strawberry_http.process_result = _sentry_patched_process_result
+
+
+# XXX check size before attaching req/resp
+
+
+def _make_request_event_processor(execution_context):
+    # type: (ExecutionContext) -> EventProcessor
+    # XXX query type
     def inner(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         with capture_internal_exceptions():
             # XXX
+            query = execution_context.query
+            variables = execution_context.variables
+
             if _should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
@@ -320,6 +355,21 @@ def _make_event_processor(query):
 
             elif event.get("request", {}).get("data"):
                 del event["request"]["data"]
+
+        return event
+
+    return inner
+
+
+def _make_response_event_processor(data):
+    # type: (Dict[str, Any]) -> EventProcessor
+
+    def inner(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        with capture_internal_exceptions():
+            if _should_send_default_pii():
+                contexts = event.setdefault("contexts", {})
+                contexts["response"] = {"data": data}
 
         return event
 
