@@ -83,7 +83,6 @@ def _patch_execute():
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
         hub = Hub.current
         if hub.get_integration(GQLIntegration) is None:
-            breakpoint()
             return real_execute(self, document, *args, **kwargs)
 
         try:
