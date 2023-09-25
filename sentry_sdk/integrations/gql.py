@@ -65,7 +65,7 @@ def _transport_method(transport):
 
 
 def _request_info_from_transport(transport):
-    # type: (object) -> Dict[str, str]
+    # type: (Union[Transport, AsyncTransport, None]) -> Dict[str, str]
     if transport is None:
         return {}
 
