@@ -249,7 +249,6 @@ def _patch_execute():
     # type: () -> None
     old_execute_async = strawberry_schema.execute
     old_execute_sync = strawberry_schema.execute_sync
-    # XXX capture response, see create_response or run
 
     async def _sentry_patched_execute_async(*args, **kwargs):
         hub = Hub.current
@@ -317,41 +316,43 @@ def _patch_process_result():
     # type: () -> None
     old_process_result = strawberry_http.process_result
 
-    async def _sentry_patched_process_result(*args, **kwargs):
+    async def _sentry_patched_process_result(result, *args, **kwargs):
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
-            return old_process_result(*args, **kwargs)
+            return old_process_result(result, *args, **kwargs)
 
-        result = old_process_result(*args, **kwargs)
+        processed_result = old_process_result(result, *args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            event_processor = _make_response_event_processor(result)
-            scope.add_event_processor(event_processor)
+        if result.errors:
+            with hub.configure_scope() as scope:
+                event_processor = _make_response_event_processor(processed_result)
+                scope.add_event_processor(event_processor)
 
-        return result
+        return processed_result
 
     strawberry_http.process_result = _sentry_patched_process_result
 
 
-# XXX check size before attaching req/resp
-
-
 def _make_request_event_processor(execution_context):
     # type: (ExecutionContext) -> EventProcessor
-    # XXX query type
+
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         with capture_internal_exceptions():
-            # XXX
-            query = execution_context.query
-            variables = execution_context.variables
-
             if _should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
+
                 if not request_data.get("data"):
-                    request_data["data"] = {"query": query}  # XXX
+                    request_data["data"] = {"query": execution_context.query}
+
+                    if execution_context.variables:
+                        request_data["data"]["variables"] = execution_context.variables
+                    if execution_context.operation_name:
+                        request_data["data"][
+                            "operationName"
+                        ] = execution_context.operation_name
 
             elif event.get("request", {}).get("data"):
                 del event["request"]["data"]
