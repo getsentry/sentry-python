@@ -96,7 +96,7 @@ def _patch_schema_init():
                 )
 
             logger.info(
-                "Assuming strawberry is running in %s context. If not, initialize the integration with async_execution=%s.",
+                "Assuming strawberry is running in %s context. If not, initialize it as StrawberryIntegration(async_execution=%s).",
                 "async" if should_use_async_extension else "sync",
                 "False" if should_use_async_extension else "True",
             )
