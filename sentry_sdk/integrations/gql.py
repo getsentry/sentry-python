@@ -1,6 +1,4 @@
-from contextlib import contextmanager
-from collections.abc import Mapping, MutableMapping
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 
@@ -15,7 +13,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Generator, Tuple, Union
+    from typing import Any, Dict, Tuple, Union
     from sentry_sdk._types import EventProcessor
 
     EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
@@ -29,7 +27,8 @@ class GQLIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if tuple(int(num) for num in gql.__version__.split(".")) < MIN_GQL_VERSION:
+        gql_version = parse_version(gql.__version__)
+        if gql_version is None or gql_version < MIN_GQL_VERSION:
             raise DidNotEnable(
                 "GQLIntegration is only supported for GQL versions %s and above."
                 % ".".join(str(num) for num in MIN_GQL_VERSION)
@@ -92,20 +91,20 @@ def _patch_execute():
         if hub.get_integration(GQLIntegration) is None:
             return real_execute(self, document, *args, **kwargs)
 
-        with _graphql_event_processing(self, document):
-            try:
-                return real_execute(self, document, *args, **kwargs)
-            except TransportQueryError as e:
-                event, hint = event_from_exception(
-                    e,
-                    client_options=hub.client.options
-                    if hub.client is not None
-                    else None,
-                    mechanism={"type": "gql", "handled": False},
-                )
+        with Hub.current.configure_scope() as scope:
+            scope.add_event_processor(_make_gql_event_processor(self, document))
 
-                hub.capture_event(event, hint)
-                raise e
+        try:
+            return real_execute(self, document, *args, **kwargs)
+        except TransportQueryError as e:
+            event, hint = event_from_exception(
+                e,
+                client_options=hub.client.options if hub.client is not None else None,
+                mechanism={"type": "gql", "handled": False},
+            )
+
+            hub.capture_event(event, hint)
+            raise e
 
     gql.Client.execute = sentry_patched_execute
 
@@ -118,54 +117,26 @@ def _make_gql_event_processor(client, document):
             errors = hint["exc_info"][1].errors
         except (AttributeError, KeyError):
             errors = None
-        _deep_update(
-            event,
+
+        request = event.setdefault("request", {})
+        request.update(
             {
-                "request": {
-                    "api_target": "graphql",
-                    **_request_info_from_transport(client.transport),
-                },
-            },
+                "api_target": "graphql",
+                **_request_info_from_transport(client.transport),
+            }
         )
 
         if _should_send_default_pii():
-            _deep_update(
-                event,
+            request["data"] = _data_from_document(document)
+            contexts = event.setdefault("contexts", {})
+            response = contexts.setdefault("response", {})
+            response.update(
                 {
-                    "request": {
-                        "data": _data_from_document(document),
-                    },
-                    "contexts": {
-                        "response": {
-                            "data": {
-                                "errors": errors,
-                            },
-                            "type": "response",
-                        },
-                    },
-                },
+                    "data": {"errors": errors},
+                    "type": response,
+                }
             )
 
         return event
 
     return processor
-
-
-@contextmanager
-def _graphql_event_processing(client, document):
-    # type: (gql.Client, DocumentNode) -> Generator[None, None, None]
-
-    with Hub.current.configure_scope() as scope:
-        scope.add_event_processor(_make_gql_event_processor(client, document))
-        yield
-
-
-def _deep_update(dictionary, update):
-    # type: (MutableMapping[Any, Any], Mapping[Any, Any]) -> None
-    for key, value in update.items():
-        if isinstance(value, Mapping):
-            if key not in dictionary or not isinstance(dictionary[key], MutableMapping):
-                dictionary[key] = dict()
-            _deep_update(dictionary[key], value)
-        else:
-            dictionary[key] = value
