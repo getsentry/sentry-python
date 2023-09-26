@@ -7,16 +7,26 @@ pytest.importorskip("flask")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask import Flask
+from strawberry.extensions.tracing import (  # XXX conditional on strawberry version
+    SentryTracingExtension,
+    SentryTracingExtensionSync,
+)
 from strawberry.fastapi import GraphQLRouter
 from strawberry.flask.views import GraphQLView
 
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.strawberry import StrawberryIntegration
+from sentry_sdk.integrations.strawberry import (
+    StrawberryIntegration,
+    SentryAsyncExtension,
+    SentrySyncExtension,
+)
 
-ignore_logger("strawberry*")
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 
 @strawberry.type
@@ -28,6 +38,96 @@ class Query:
     @strawberry.field
     def error(self) -> str:
         raise RuntimeError("oh no!")
+
+
+def test_async_execution_uses_async_extension(sentry_init):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=True),
+        ],
+    )
+
+    with mock.patch(
+        "sentry_sdk.integrations.strawberry._get_installed_modules",
+        return_value={"flask": "2.3.3"},
+    ):
+        # actual installed modules should not matter, the explicit option takes
+        # precedence
+        schema = strawberry.Schema(Query)
+        assert SentryAsyncExtension in schema.extensions
+
+
+def test_sync_execution_uses_sync_extension(sentry_init):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=False),
+        ],
+    )
+
+    with mock.patch(
+        "sentry_sdk.integrations.strawberry._get_installed_modules",
+        return_value={"fastapi": "0.103.1", "starlette": "0.27.0"},
+    ):
+        # actual installed modules should not matter, the explicit option takes
+        # precedence
+        schema = strawberry.Schema(Query)
+        assert SentrySyncExtension in schema.extensions
+
+
+def test_infer_execution_type_from_installed_packages_async(sentry_init):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(),
+        ],
+    )
+
+    with mock.patch(
+        "sentry_sdk.integrations.strawberry._get_installed_modules",
+        return_value={"fastapi": "0.103.1", "starlette": "0.27.0"},
+    ):
+        schema = strawberry.Schema(Query)
+        assert SentryAsyncExtension in schema.extensions
+
+
+def test_infer_execution_type_from_installed_packages_sync(sentry_init):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(),
+        ],
+    )
+
+    with mock.patch(
+        "sentry_sdk.integrations.strawberry._get_installed_modules",
+        return_value={"flask": "2.3.3"},
+    ):
+        schema = strawberry.Schema(Query)
+        assert SentrySyncExtension in schema.extensions
+
+
+def test_replace_existing_sentry_async_extension(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[
+            StrawberryIntegration(),
+        ],
+    )
+
+    schema = strawberry.Schema(Query, extensions=[SentryTracingExtension])
+    assert SentryTracingExtension not in schema.extensions
+    assert SentryAsyncExtension in schema.extensions
+
+
+def test_replace_existing_sentry_sync_extension(sentry_init):
+    sentry_init(
+        send_default_pii=True,
+        integrations=[
+            StrawberryIntegration(),
+        ],
+    )
+
+    schema = strawberry.Schema(Query, extensions=[SentryTracingExtensionSync])
+    assert SentryTracingExtensionSync not in schema.extensions
+    assert SentrySyncExtension in schema.extensions
 
 
 def test_capture_request_if_available_and_send_pii_is_on_async(

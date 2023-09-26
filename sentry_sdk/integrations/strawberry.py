@@ -61,19 +61,19 @@ class StrawberryIntegration(Integration):
         if version < (0, 208):
             raise DidNotEnable("strawberry-graphql 0.208 or newer required.")
 
-        # _patch_schema_init()
+        _patch_schema_init()
         _patch_execute()
         _patch_process_result()
 
 
 def _patch_schema_init():
     # type: () -> None
-    old_schema = Schema.__init__
+    old_schema_init = Schema.__init__
 
     def _sentry_patched_schema_init(self, *args, **kwargs):
         integration = Hub.current.get_integration(StrawberryIntegration)
         if integration is None:
-            return old_schema(self, *args, **kwargs)
+            return old_schema_init(self, *args, **kwargs)
 
         extensions = kwargs.get("extensions") or []
 
@@ -81,10 +81,15 @@ def _patch_schema_init():
             should_use_async_extension = integration.async_execution
         else:
             # try to figure it out ourselves
-            should_use_async_extension = bool(
-                {"starlette", "starlite", "litestar", "fastapi"}
-                & set(_get_installed_modules())
-            )
+            if StrawberrySentryAsyncExtension in extensions:
+                should_use_async_extension = True
+            elif StrawberrySentrySyncExtension in extensions:
+                should_use_async_extension = False
+            else:
+                should_use_async_extension = bool(
+                    {"starlette", "starlite", "litestar", "fastapi"}
+                    & set(_get_installed_modules())
+                )
 
             logger.info(
                 "Assuming strawberry is running in %s context. If not, initialize the integration with async_execution=%s.",
@@ -108,12 +113,9 @@ def _patch_schema_init():
 
         kwargs["extensions"] = extensions
 
-        return old_schema(self, *args, **kwargs)
+        return old_schema_init(self, *args, **kwargs)
 
-    # XXX
-    not_yet_patched = old_schema.__name__ != "_sentry_patched_schema_init"
-    if not_yet_patched:
-        Schema.__init__ = _sentry_patched_schema_init
+    Schema.__init__ = _sentry_patched_schema_init
 
 
 class SentryAsyncExtension(SchemaExtension):
