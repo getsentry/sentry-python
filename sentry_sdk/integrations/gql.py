@@ -27,7 +27,8 @@ class GQLIntegration(Integration):
     identifier = "gql"
 
     @staticmethod
-    def setup_once() -> None:
+    def setup_once():
+        # type: () -> None
         if tuple(int(num) for num in gql.__version__.split(".")) < MIN_GQL_VERSION:
             raise DidNotEnable(
                 "GQLIntegration is only supported for GQL versions %s and above."
