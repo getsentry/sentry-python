@@ -2,6 +2,7 @@ import hashlib
 from functools import cached_property
 from inspect import isawaitable
 from sentry_sdk import configure_scope, start_span
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.modules import _get_installed_modules
@@ -85,18 +86,10 @@ def _patch_schema_init():
             should_use_async_extension = integration.async_execution
         else:
             # try to figure it out ourselves
-            if StrawberrySentryAsyncExtension in extensions:
-                should_use_async_extension = True
-            elif StrawberrySentrySyncExtension in extensions:
-                should_use_async_extension = False
-            else:
-                should_use_async_extension = bool(
-                    {"starlette", "starlite", "litestar", "fastapi"}
-                    & set(_get_installed_modules())
-                )
+            should_use_async_extension = _guess_if_using_async(extensions)
 
             logger.info(
-                "Assuming strawberry is running in %s context. If not, initialize it as StrawberryIntegration(async_execution=%s).",
+                "Assuming strawberry is running %s. If not, initialize it as StrawberryIntegration(async_execution=%s).",
                 "async" if should_use_async_extension else "sync",
                 "False" if should_use_async_extension else "True",
             )
@@ -134,6 +127,7 @@ class SentryAsyncExtension(SchemaExtension):
 
     @cached_property
     def _resource_name(self):
+        # type: () -> Any
         assert self.execution_context.query
 
         query_hash = self.hash_query(self.execution_context.query)
@@ -150,40 +144,46 @@ class SentryAsyncExtension(SchemaExtension):
     def on_operation(self):
         # type: () -> Generator[None, None, None]
         self._operation_name = self.execution_context.operation_name
-        name = f"{self._operation_name}" if self._operation_name else "Anonymous Query"
-
-        with configure_scope() as scope:
-            if scope.span:
-                self.gql_span = scope.span.start_child(
-                    op="gql",
-                    description=name,
-                )
-            else:
-                self.gql_span = start_span(
-                    op="gql",
-                )
+        name = self._operation_name if self._operation_name else "<anonymous query>"
 
         operation_type = "query"
+        op = OP.GRAPHQL_QUERY
 
         assert self.execution_context.query
 
         if self.execution_context.query.strip().startswith("mutation"):
             operation_type = "mutation"
+            op = OP.GRAPHQL_MUTATION
         if self.execution_context.query.strip().startswith("subscription"):
             operation_type = "subscription"
+            op = OP.GRAPHQL_SUBSCRIPTION
 
-        self.gql_span.set_tag("graphql.operation_type", operation_type)
-        self.gql_span.set_tag("graphql.resource_name", self._resource_name)
-        self.gql_span.set_data("graphql.query", self.execution_context.query)
+        with configure_scope() as scope:
+            if scope.span:
+                self.graphql_span = scope.span.start_child(
+                    op=op,
+                    description="{} {}".format(operation_type, name),
+                )
+            else:
+                # XXX start transaction?
+                self.graphql_span = start_span(
+                    op=op,
+                    description="{} {}".format(operation_type, name),
+                )
+
+        self.graphql_span.set_data("graphql.operation.type", operation_type)
+        self.graphql_span.set_data("graphql.operation.name", self._operation_name)
+        self.graphql_span.set_data("graphql.resource_name", self._resource_name)  # XXX
+        self.graphql_span.set_data("graphql.document", self.execution_context.query)
 
         yield
 
-        self.gql_span.finish()
+        self.graphql_span.finish()
 
     def on_validate(self):
         # type: () -> Generator[None, None, None]
-        self.validation_span = self.gql_span.start_child(
-            op="validation", description="Validation"
+        self.validation_span = self.graphql_span.start_child(
+            op=OP.GRAPHQL_VALIDATE, description="validation"
         )
 
         yield
@@ -192,8 +192,8 @@ class SentryAsyncExtension(SchemaExtension):
 
     def on_parse(self):
         # type: () -> Generator[None, None, None]
-        self.parsing_span = self.gql_span.start_child(
-            op="parsing", description="Parsing"
+        self.parsing_span = self.graphql_span.start_child(
+            op=OP.GRAPHQL_PARSE, description="parsing"
         )
 
         yield
@@ -216,13 +216,13 @@ class SentryAsyncExtension(SchemaExtension):
 
         field_path = f"{info.parent_type}.{info.field_name}"
 
-        with self.gql_span.start_child(
-            op="resolve", description=f"Resolving: {field_path}"
+        with self.graphql_span.start_child(
+            op=OP.GRAPHQL_RESOLVE, description=f"resolving: {field_path}"
         ) as span:
-            span.set_tag("graphql.field_name", info.field_name)
-            span.set_tag("graphql.parent_type", info.parent_type.name)
-            span.set_tag("graphql.field_path", field_path)
-            span.set_tag("graphql.path", ".".join(map(str, info.path.as_list())))
+            span.set_data("graphql.field_name", info.field_name)
+            span.set_data("graphql.parent_type", info.parent_type.name)
+            span.set_data("graphql.field_path", field_path)
+            span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
 
             result = _next(root, info, *args, **kwargs)
 
@@ -241,12 +241,12 @@ class SentrySyncExtension(SentryAsyncExtension):
         field_path = f"{info.parent_type}.{info.field_name}"
 
         with self.gql_span.start_child(
-            op="resolve", description=f"Resolving: {field_path}"
+            op=OP.GRAPHQL_RESOLVE, description=f"resolving: {field_path}"
         ) as span:
-            span.set_tag("graphql.field_name", info.field_name)
-            span.set_tag("graphql.parent_type", info.parent_type.name)
-            span.set_tag("graphql.field_path", field_path)
-            span.set_tag("graphql.path", ".".join(map(str, info.path.as_list())))
+            span.set_data("graphql.field_name", info.field_name)
+            span.set_data("graphql.parent_type", info.parent_type.name)
+            span.set_data("graphql.field_path", field_path)
+            span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
 
             return _next(root, info, *args, **kwargs)
 
@@ -372,3 +372,15 @@ def _make_response_event_processor(data):
         return event
 
     return inner
+
+
+def _guess_if_using_async(extensions):
+    # (List[SchemaExtension]) -> bool
+    if StrawberrySentryAsyncExtension in extensions:
+        return True
+    elif StrawberrySentrySyncExtension in extensions:
+        return False
+
+    return bool(
+        {"starlette", "starlite", "litestar", "fastapi"} & set(_get_installed_modules())
+    )
