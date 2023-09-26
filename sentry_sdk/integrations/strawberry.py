@@ -1,5 +1,9 @@
+import hashlib
+from functools import cached_property
+from inspect import isawaitable
 from sentry_sdk import configure_scope, start_span
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
@@ -20,19 +24,19 @@ try:
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
+    from strawberry.fastapi import router as fastapi_router
+    from strawberry.http import async_base_view, sync_base_view
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
-
-import hashlib
-from functools import cached_property
-from inspect import isawaitable
-
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Generator, Optional
     from graphql import GraphQLResolveInfo
     from strawberry.types.execution import ExecutionContext
     from sentry_sdk._types import EventProcessor
+
+
+ignore_logger("strawberry.execution")
 
 
 class StrawberryIntegration(Integration):
@@ -267,18 +271,6 @@ def _patch_execute():
                 )
                 scope.add_event_processor(event_processor)
 
-        with capture_internal_exceptions():
-            for error in result.errors or []:
-                event, hint = event_from_exception(
-                    error,
-                    client_options=hub.client.options if hub.client else None,
-                    mechanism={
-                        "type": integration.identifier,
-                        "handled": False,
-                    },
-                )
-                hub.capture_event(event, hint=hint)
-
         return result
 
     def _sentry_patched_execute_sync(*args, **kwargs):
@@ -296,18 +288,6 @@ def _patch_execute():
                 )
                 scope.add_event_processor(event_processor)
 
-        with capture_internal_exceptions():
-            for error in result.errors or []:
-                event, hint = event_from_exception(
-                    error,
-                    client_options=hub.client.options if hub.client else None,
-                    mechanism={
-                        "type": integration.identifier,
-                        "handled": False,
-                    },
-                )
-                hub.capture_event(event, hint=hint)
-
         return result
 
     strawberry_schema.execute = _sentry_patched_execute_async
@@ -318,7 +298,7 @@ def _patch_process_result():
     # type: () -> None
     old_process_result = strawberry_http.process_result
 
-    async def _sentry_patched_process_result(result, *args, **kwargs):
+    def _sentry_patched_process_result(result, *args, **kwargs):
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
@@ -331,9 +311,24 @@ def _patch_process_result():
                 event_processor = _make_response_event_processor(processed_result)
                 scope.add_event_processor(event_processor)
 
+        with capture_internal_exceptions():
+            for error in result.errors or []:
+                event, hint = event_from_exception(
+                    error,
+                    client_options=hub.client.options if hub.client else None,
+                    mechanism={
+                        "type": integration.identifier,
+                        "handled": False,
+                    },
+                )
+                hub.capture_event(event, hint=hint)
+
         return processed_result
 
     strawberry_http.process_result = _sentry_patched_process_result
+    async_base_view.process_result = _sentry_patched_process_result
+    sync_base_view.process_result = _sentry_patched_process_result
+    fastapi_router.process_result = _sentry_patched_process_result
 
 
 def _make_request_event_processor(execution_context):

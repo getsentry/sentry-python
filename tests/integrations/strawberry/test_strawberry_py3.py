@@ -37,15 +37,11 @@ class Query:
 
     @strawberry.field
     def error(self) -> str:
-        raise RuntimeError("oh no!")
+        return 1 / 0
 
 
 def test_async_execution_uses_async_extension(sentry_init):
-    sentry_init(
-        integrations=[
-            StrawberryIntegration(async_execution=True),
-        ],
-    )
+    sentry_init(integrations=[StrawberryIntegration(async_execution=True)])
 
     with mock.patch(
         "sentry_sdk.integrations.strawberry._get_installed_modules",
@@ -58,11 +54,7 @@ def test_async_execution_uses_async_extension(sentry_init):
 
 
 def test_sync_execution_uses_sync_extension(sentry_init):
-    sentry_init(
-        integrations=[
-            StrawberryIntegration(async_execution=False),
-        ],
-    )
+    sentry_init(integrations=[StrawberryIntegration(async_execution=False)])
 
     with mock.patch(
         "sentry_sdk.integrations.strawberry._get_installed_modules",
@@ -75,11 +67,7 @@ def test_sync_execution_uses_sync_extension(sentry_init):
 
 
 def test_infer_execution_type_from_installed_packages_async(sentry_init):
-    sentry_init(
-        integrations=[
-            StrawberryIntegration(),
-        ],
-    )
+    sentry_init(integrations=[StrawberryIntegration()])
 
     with mock.patch(
         "sentry_sdk.integrations.strawberry._get_installed_modules",
@@ -90,11 +78,7 @@ def test_infer_execution_type_from_installed_packages_async(sentry_init):
 
 
 def test_infer_execution_type_from_installed_packages_sync(sentry_init):
-    sentry_init(
-        integrations=[
-            StrawberryIntegration(),
-        ],
-    )
+    sentry_init(integrations=[StrawberryIntegration()])
 
     with mock.patch(
         "sentry_sdk.integrations.strawberry._get_installed_modules",
@@ -105,12 +89,7 @@ def test_infer_execution_type_from_installed_packages_sync(sentry_init):
 
 
 def test_replace_existing_sentry_async_extension(sentry_init):
-    sentry_init(
-        send_default_pii=True,
-        integrations=[
-            StrawberryIntegration(),
-        ],
-    )
+    sentry_init(integrations=[StrawberryIntegration()])
 
     schema = strawberry.Schema(Query, extensions=[SentryTracingExtension])
     assert SentryTracingExtension not in schema.extensions
@@ -118,12 +97,7 @@ def test_replace_existing_sentry_async_extension(sentry_init):
 
 
 def test_replace_existing_sentry_sync_extension(sentry_init):
-    sentry_init(
-        send_default_pii=True,
-        integrations=[
-            StrawberryIntegration(),
-        ],
-    )
+    sentry_init(integrations=[StrawberryIntegration()])
 
     schema = strawberry.Schema(Query, extensions=[SentryTracingExtensionSync])
     assert SentryTracingExtensionSync not in schema.extensions
@@ -140,6 +114,7 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
             FastApiIntegration(),
             StarletteIntegration(),
         ],
+        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -152,12 +127,24 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
     client = TestClient(async_app)
     client.post("/graphql", json=query)
 
-    assert len(events) == 1
+    assert len(events) == 2
 
-    (error_event,) = events
+    (error_event, transaction_event) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
     assert error_event["request"]["data"] == query
+    assert error_event["contexts"]["response"] == {
+        "data": {
+            "data": None,
+            "errors": [
+                {
+                    "message": "division by zero",
+                    "locations": [{"line": 1, "column": 20}],
+                    "path": ["error"],
+                }
+            ],
+        }
+    }
 
 
 def test_capture_request_if_available_and_send_pii_is_on_sync(
@@ -165,7 +152,8 @@ def test_capture_request_if_available_and_send_pii_is_on_sync(
 ):
     sentry_init(
         send_default_pii=True,
-        integrations=[StrawberryIntegration(), FlaskIntegration()],
+        integrations=[StrawberryIntegration(async_execution=False), FlaskIntegration()],
+        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -181,12 +169,24 @@ def test_capture_request_if_available_and_send_pii_is_on_sync(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    assert len(events) == 1
+    assert len(events) == 2
 
-    (error_event,) = events
+    (error_event, transaction_event) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
     assert error_event["request"]["data"] == query
+    assert error_event["contexts"]["response"] == {
+        "data": {
+            "data": None,
+            "errors": [
+                {
+                    "message": "division by zero",
+                    "locations": [{"line": 1, "column": 20}],
+                    "path": ["error"],
+                }
+            ],
+        }
+    }
 
 
 def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_events):
@@ -196,6 +196,7 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
             FastApiIntegration(),
             StarletteIntegration(),
         ],
+        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -208,9 +209,9 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
     client = TestClient(async_app)
     client.post("/graphql", json=query)
 
-    assert len(events) == 1
+    assert len(events) == 2
 
-    (error_event,) = events
+    (error_event, transaction_event) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
@@ -218,7 +219,8 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
 
 def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_events):
     sentry_init(
-        integrations=[StrawberryIntegration(), FlaskIntegration()],
+        integrations=[StrawberryIntegration(async_execution=False), FlaskIntegration()],
+        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -234,21 +236,22 @@ def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_eve
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    assert len(events) == 1
+    assert len(events) == 2
 
-    (error_event,) = events
+    (error_event, transaction_event) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
 
 
-def test_no_event_if_no_errors_async(sentry_init, capture_events):
+def test_no_errors_async(sentry_init, capture_events):
     sentry_init(
         integrations=[
             StrawberryIntegration(),
             FastApiIntegration(),
             StarletteIntegration(),
         ],
+        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -261,15 +264,17 @@ def test_no_event_if_no_errors_async(sentry_init, capture_events):
     client = TestClient(async_app)
     client.post("/graphql", json=query)
 
-    assert len(events) == 0
+    assert len(events) == 1
+    assert False
 
 
-def test_no_event_if_no_errors_sync(sentry_init, capture_events):
+def test_no_errors_sync(sentry_init, capture_events):
     sentry_init(
         integrations=[
-            StrawberryIntegration(),
+            StrawberryIntegration(async_execution=False),
             FlaskIntegration(),
         ],
+        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -287,4 +292,5 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    assert len(events) == 0
+    assert len(events) == 1
+    assert False
