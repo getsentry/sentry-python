@@ -493,13 +493,7 @@ def _make_event_processor(weak_request, integration):
 
 
 def get_cleansed_multivaluedict(request, multivaluedict):
-    """
-    Copy of django.views.debug.SafeExceptionReporterFilter.get_cleansed_multivaluedict
-
-    Replace the keys in a MultiValueDict marked as sensitive with stars.
-    This mitigates leaking sensitive POST parameters if something like
-    request.POST['nonexistent_key'] throws an exception.
-    """
+    # Copy of django.views.debug.SafeExceptionReporterFilter.get_cleansed_multivaluedict
     sensitive_post_parameters = getattr(request, "sensitive_post_parameters", [])
     if sensitive_post_parameters:
         multivaluedict = multivaluedict.copy()
@@ -510,19 +504,45 @@ def get_cleansed_multivaluedict(request, multivaluedict):
 
 
 def cleanse_special_types(request, value):
+    # Copy of django.views.debug.SafeExceptionReporterFilter.cleanse_special_types
     try:
-        # Copy of django.views.debug.SafeExceptionReporterFilter.cleanse_special_types
-        # If value is lazy or a complex object of another kind, this check
-        # might raise an exception. isinstance checks that lazy
-        # MultiValueDicts will have a return value.
         is_multivalue_dict = isinstance(value, MultiValueDict)
     except Exception as e:
         return "{!r} while evaluating {!r}".format(e, value)
 
     if is_multivalue_dict:
-        # Cleanse MultiValueDicts
         value = get_cleansed_multivaluedict(request, value)
     return value
+
+
+def _clean_vars(error, request):
+    exc_info = exc_info_from_error(error)
+    for _, _, tbs in walk_exception_chain(exc_info):
+        sensitive_variables = None
+        for tb in iter_stacks(tbs):
+            # clean_vars = {}
+            frame = tb.tb_frame
+            if sensitive_variables == "__ALL__":
+                if sensitive_variables == "__ALL__":
+                    for name in frame.f_locals:
+                        frame.f_locals[name] = SENSITIVE_DATA_SUBSTITUTE
+                # frame.f_locals = clean_vars
+            elif sensitive_variables is not None:
+                for name, value in frame.f_locals.items():
+                    if name in sensitive_variables:
+                        value = SENSITIVE_DATA_SUBSTITUTE
+                    else:
+                        # clean multivaluedicts in frames with sensitive post parameters
+                        value = cleanse_special_types(request, value)
+                    frame.f_locals[name] = value
+                # frame.f_locals = clean_vars
+            if (
+                frame.f_code.co_name == "sensitive_variables_wrapper"
+                and "sensitive_variables_wrapper" in frame.f_locals
+            ):
+                wrapper = frame.f_locals["sensitive_variables_wrapper"]
+                sensitive_variables = getattr(wrapper, "sensitive_variables", None)
+    return error
 
 
 def _clean_vars2(error, request, event):
@@ -551,6 +571,7 @@ def _clean_vars2(error, request, event):
 def _cleanse_sensitive_vars(
     request, event, sensitive_variables, reverse_exception_idx, frame_idx
 ):
+    # catch exception if index out of range.
     if "exception" in event:
         exceptions = event["exception"].get("values", ())
         if len(exceptions) > 0:
@@ -624,16 +645,15 @@ def _got_request_exception(request=None, **kwargs):
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
         exception = sys.exc_info()
+        exception = _clean_vars(exception, request)
         event, hint = event_from_exception(
             exception,
             client_options=client.options,
             mechanism={"type": "django", "handled": False},
         )
         # get clean event and capture it
-        clean_event = _clean_vars2(exception, request, event)
-        print("clean_event", clean_event)
-        print("hint", hint)
-        hub.capture_event(clean_event, hint=hint)
+        # clean_event = _clean_vars2(exception, request, event)
+        hub.capture_event(event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
