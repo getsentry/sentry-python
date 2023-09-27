@@ -18,22 +18,22 @@ from sentry_sdk._types import TYPE_CHECKING
 try:
     import strawberry.http as strawberry_http  # type: ignore
     import strawberry.schema.schema as strawberry_schema  # type: ignore
-    from strawberry import Schema  # type: ignore
-    from strawberry.extensions import SchemaExtension  # type: ignore
+    from strawberry import Schema
+    from strawberry.extensions import SchemaExtension
     from strawberry.extensions.tracing.utils import should_skip_tracing  # type: ignore
     from strawberry.extensions.tracing import (  # type: ignore
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
     from strawberry.fastapi import router as fastapi_router  # type: ignore
-    from strawberry.http import async_base_view, sync_base_view  # type: ignore
+    from strawberry.http import async_base_view, sync_base_view
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, Optional
+    from typing import Any, Callable, Dict, Generator, List, Optional
     from graphql import GraphQLResolveInfo  # type: ignore
-    from strawberry.http import GraphQLHTTPResponse  # type: ignore
+    from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
     from sentry_sdk._types import EventProcessor
 
@@ -368,7 +368,7 @@ def _make_request_event_processor(execution_context):
 
 
 def _make_response_event_processor(data):
-    # type: (Dict[str, Any]) -> EventProcessor
+    # type: (GraphQLHTTPResponse) -> EventProcessor
 
     def inner(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
@@ -383,7 +383,7 @@ def _make_response_event_processor(data):
 
 
 def _guess_if_using_async(extensions):
-    # (List[SchemaExtension]) -> bool
+    # type: (List[SchemaExtension]) -> bool
     if StrawberrySentryAsyncExtension in extensions:
         return True
     elif StrawberrySentrySyncExtension in extensions:
