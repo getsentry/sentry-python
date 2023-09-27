@@ -19,7 +19,7 @@ try:
     import strawberry.http as strawberry_http  # type: ignore
     import strawberry.schema.schema as strawberry_schema  # type: ignore
     from strawberry import Schema
-    from strawberry.extensions import SchemaExtension
+    from strawberry.extensions import SchemaExtension  # type: ignore
     from strawberry.extensions.tracing.utils import should_skip_tracing  # type: ignore
     from strawberry.extensions.tracing import (  # type: ignore
         SentryTracingExtension as StrawberrySentryAsyncExtension,
@@ -117,7 +117,7 @@ def _patch_schema_init():
     Schema.__init__ = _sentry_patched_schema_init
 
 
-class SentryAsyncExtension(SchemaExtension):
+class SentryAsyncExtension(SchemaExtension):  # type: ignore
     def __init__(
         self,
         *,
@@ -206,11 +206,11 @@ class SentryAsyncExtension(SchemaExtension):
         self.parsing_span.finish()
 
     def should_skip_tracing(self, _next, info):
-        # type: (Callable, GraphQLResolveInfo) -> bool
+        # type: (Callable[[Any, GraphQLResolveInfo, Any], Any], GraphQLResolveInfo) -> bool
         return should_skip_tracing(_next, info)
 
     async def resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable, Any, GraphQLResolveInfo, str, Any) -> Any
+        # type: (Callable[[Any, GraphQLResolveInfo, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
         if self.should_skip_tracing(_next, info):
             result = _next(root, info, *args, **kwargs)
 
@@ -239,7 +239,7 @@ class SentryAsyncExtension(SchemaExtension):
 
 class SentrySyncExtension(SentryAsyncExtension):
     def resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable, Any, GraphQLResolveInfo, str, Any) -> Any
+        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
         if self.should_skip_tracing(_next, info):
             return _next(root, info, *args, **kwargs)
 
