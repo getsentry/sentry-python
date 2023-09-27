@@ -235,7 +235,7 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.gql_span.start_child(
+        with self.graphql_span.start_child(
             op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
