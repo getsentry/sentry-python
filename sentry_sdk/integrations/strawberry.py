@@ -47,8 +47,9 @@ class StrawberryIntegration(Integration):
         # type: (Optional[bool]) -> None
         if async_execution not in (None, False, True):
             raise ValueError(
-                "Invalid value for async_execution: %s (must be bool)"
-                % (async_execution)
+                'Invalid value for async_execution: "{}" (must be bool)'.format(
+                    async_execution
+                )
             )
         self.async_execution = async_execution
 
@@ -94,8 +95,7 @@ def _patch_schema_init():
                 "False" if should_use_async_extension else "True",
             )
 
-        # remove the strawberry sentry extension, if present, to avoid double
-        # tracing
+        # remove the built in strawberry sentry extension, if present
         extensions = [
             extension
             for extension in extensions
@@ -127,13 +127,11 @@ class SentryAsyncExtension(SchemaExtension):
 
     @cached_property
     def _resource_name(self):
-        # type: () -> Any
-        assert self.execution_context.query
-
+        # type: () -> str
         query_hash = self.hash_query(self.execution_context.query)
 
         if self.execution_context.operation_name:
-            return f"{self.execution_context.operation_name}:{query_hash}"
+            return "{}:{}".format(self.execution_context.operation_name, query_hash)
 
         return query_hash
 
@@ -144,12 +142,9 @@ class SentryAsyncExtension(SchemaExtension):
     def on_operation(self):
         # type: () -> Generator[None, None, None]
         self._operation_name = self.execution_context.operation_name
-        name = self._operation_name if self._operation_name else "<anonymous query>"
 
         operation_type = "query"
         op = OP.GRAPHQL_QUERY
-
-        assert self.execution_context.query
 
         if self.execution_context.query.strip().startswith("mutation"):
             operation_type = "mutation"
@@ -158,23 +153,23 @@ class SentryAsyncExtension(SchemaExtension):
             operation_type = "subscription"
             op = OP.GRAPHQL_SUBSCRIPTION
 
+        if self._operation_name:
+            description = "{} {}".format(operation_type, self._operation_name)
+        else:
+            description = operation_type
+
         with configure_scope() as scope:
             if scope.span:
                 self.graphql_span = scope.span.start_child(
-                    op=op,
-                    description="{} {}".format(operation_type, name),
+                    op=op, description=description
                 )
             else:
-                # XXX start transaction?
-                self.graphql_span = start_span(
-                    op=op,
-                    description="{} {}".format(operation_type, name),
-                )
+                self.graphql_span = start_span(op=op, description=description)
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
-        self.graphql_span.set_data("graphql.resource_name", self._resource_name)  # XXX
         self.graphql_span.set_data("graphql.document", self.execution_context.query)
+        self.graphql_span.set_data("graphql.resource_name", self._resource_name)
 
         yield
 
@@ -209,15 +204,15 @@ class SentryAsyncExtension(SchemaExtension):
         if self.should_skip_tracing(_next, info):
             result = _next(root, info, *args, **kwargs)
 
-            if isawaitable(result):  # pragma: no cover
+            if isawaitable(result):
                 result = await result
 
             return result
 
-        field_path = f"{info.parent_type}.{info.field_name}"
+        field_path = "{}.{}".format(info.parent_type, info.field_name)
 
         with self.graphql_span.start_child(
-            op=OP.GRAPHQL_RESOLVE, description=f"resolving: {field_path}"
+            op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
             span.set_data("graphql.parent_type", info.parent_type.name)
@@ -238,10 +233,10 @@ class SentrySyncExtension(SentryAsyncExtension):
         if self.should_skip_tracing(_next, info):
             return _next(root, info, *args, **kwargs)
 
-        field_path = f"{info.parent_type}.{info.field_name}"
+        field_path = "{}.{}".format(info.parent_type, info.field_name)
 
         with self.gql_span.start_child(
-            op=OP.GRAPHQL_RESOLVE, description=f"resolving: {field_path}"
+            op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
             span.set_data("graphql.parent_type", info.parent_type.name)
