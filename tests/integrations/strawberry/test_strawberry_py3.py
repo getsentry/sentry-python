@@ -123,9 +123,9 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
     async_app = FastAPI()
     async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
 
-    query = {"query": "query ErrorQuery { error }"}
+    query = "query ErrorQuery { error }"
     client = TestClient(async_app)
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 1
 
@@ -133,7 +133,10 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
 
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
-    assert error_event["request"]["data"] == query
+    assert error_event["request"]["data"] == {
+        "query": query,
+        "operationName": "ErrorQuery",
+    }
     assert error_event["contexts"]["response"] == {
         "data": {
             "data": None,
@@ -145,6 +148,12 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
                 }
             ],
         }
+    }
+    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
+    assert error_event["breadcrumbs"]["values"][0]["data"] == {
+        "operation_name": "ErrorQuery",
+        "operation_type": "query",
     }
 
 
@@ -165,16 +174,19 @@ def test_capture_request_if_available_and_send_pii_is_on_sync(
         view_func=GraphQLView.as_view("graphql_view", schema=schema),
     )
 
-    query = {"query": "query ErrorQuery { error }"}
+    query = "query ErrorQuery { error }"
     client = sync_app.test_client()
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 1
 
     (error_event,) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
-    assert error_event["request"]["data"] == query
+    assert error_event["request"]["data"] == {
+        "query": query,
+        "operationName": "ErrorQuery",
+    }
     assert error_event["contexts"]["response"] == {
         "data": {
             "data": None,
@@ -186,6 +198,12 @@ def test_capture_request_if_available_and_send_pii_is_on_sync(
                 }
             ],
         }
+    }
+    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
+    assert error_event["breadcrumbs"]["values"][0]["data"] == {
+        "operation_name": "ErrorQuery",
+        "operation_type": "query",
     }
 
 
@@ -204,9 +222,9 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
     async_app = FastAPI()
     async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
 
-    query = {"query": "query ErrorQuery { error }"}
+    query = "query ErrorQuery { error }"
     client = TestClient(async_app)
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 1
 
@@ -214,6 +232,13 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
+
+    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
+    assert error_event["breadcrumbs"]["values"][0]["data"] == {
+        "operation_name": "ErrorQuery",
+        "operation_type": "query",
+    }
 
 
 def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_events):
@@ -230,9 +255,9 @@ def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_eve
         view_func=GraphQLView.as_view("graphql_view", schema=schema),
     )
 
-    query = {"query": "query ErrorQuery { error }"}
+    query = "query ErrorQuery { error }"
     client = sync_app.test_client()
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 1
 
@@ -240,6 +265,13 @@ def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_eve
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
+
+    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
+    assert error_event["breadcrumbs"]["values"][0]["data"] == {
+        "operation_name": "ErrorQuery",
+        "operation_type": "query",
+    }
 
 
 def test_capture_transaction_on_error_async(sentry_init, capture_events):
