@@ -7,7 +7,7 @@ pytest.importorskip("flask")
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask import Flask
-from strawberry.extensions.tracing import (  # XXX conditional on strawberry version
+from strawberry.extensions.tracing import (
     SentryTracingExtension,
     SentryTracingExtensionSync,
 )
