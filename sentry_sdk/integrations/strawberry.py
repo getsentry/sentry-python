@@ -16,24 +16,25 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    import strawberry.http as strawberry_http
-    import strawberry.schema.schema as strawberry_schema
-    from strawberry import Schema
-    from strawberry.extensions import SchemaExtension
-    from strawberry.extensions.tracing.utils import should_skip_tracing
-    from strawberry.extensions.tracing import (
+    import strawberry.http as strawberry_http  # type: ignore
+    import strawberry.schema.schema as strawberry_schema  # type: ignore
+    from strawberry import Schema  # type: ignore
+    from strawberry.extensions import SchemaExtension  # type: ignore
+    from strawberry.extensions.tracing.utils import should_skip_tracing  # type: ignore
+    from strawberry.extensions.tracing import (  # type: ignore
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
-    from strawberry.fastapi import router as fastapi_router
-    from strawberry.http import async_base_view, sync_base_view
+    from strawberry.fastapi import router as fastapi_router  # type: ignore
+    from strawberry.http import async_base_view, sync_base_view  # type: ignore
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Generator, Optional
-    from graphql import GraphQLResolveInfo
-    from strawberry.types.execution import ExecutionContext
+    from graphql import GraphQLResolveInfo  # type: ignore
+    from strawberry.http import GraphQLHTTPResponse  # type: ignore
+    from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
     from sentry_sdk._types import EventProcessor
 
 
@@ -77,6 +78,7 @@ def _patch_schema_init():
     old_schema_init = Schema.__init__
 
     def _sentry_patched_schema_init(self, *args, **kwargs):
+        # type: (Any, Any, Any) -> None
         integration = Hub.current.get_integration(StrawberryIntegration)
         if integration is None:
             return old_schema_init(self, *args, **kwargs)
@@ -260,6 +262,7 @@ def _patch_execute():
     old_execute_sync = strawberry_schema.execute_sync
 
     async def _sentry_patched_execute_async(*args, **kwargs):
+        # type: (Any, Any) -> ExecutionResult
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
@@ -277,6 +280,7 @@ def _patch_execute():
         return result
 
     def _sentry_patched_execute_sync(*args, **kwargs):
+        # type: (Any, Any) -> ExecutionResult
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
@@ -302,6 +306,7 @@ def _patch_process_result():
     old_process_result = strawberry_http.process_result
 
     def _sentry_patched_process_result(result, *args, **kwargs):
+        # type: (ExecutionResult, Any, Any) -> GraphQLHTTPResponse
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
