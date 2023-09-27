@@ -219,7 +219,6 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
 def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_events):
     sentry_init(
         integrations=[StrawberryIntegration(async_execution=False), FlaskIntegration()],
-        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -260,9 +259,9 @@ def test_capture_transaction_on_error_async(sentry_init, capture_events):
     async_app = FastAPI()
     async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
 
-    query = {"query": "query ErrorQuery { error }"}
+    query = "query ErrorQuery { error }"
     client = TestClient(async_app)
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 2
     (_, transaction_event) = events
@@ -278,7 +277,7 @@ def test_capture_transaction_on_error_async(sentry_init, capture_events):
     assert query_span["description"] == "query ErrorQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] == "ErrorQuery"
-    assert query_span["data"]["graphql.document"] == query["query"]
+    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
@@ -328,9 +327,9 @@ def test_capture_transaction_on_error_sync(sentry_init, capture_events):
         view_func=GraphQLView.as_view("graphql_view", schema=schema),
     )
 
-    query = {"query": "query ErrorQuery { error }"}
+    query = "query ErrorQuery { error }"
     client = sync_app.test_client()
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "ErrorQuery"})
 
     assert len(events) == 2
 
@@ -347,7 +346,7 @@ def test_capture_transaction_on_error_sync(sentry_init, capture_events):
     assert query_span["description"] == "query ErrorQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] == "ErrorQuery"
-    assert query_span["data"]["graphql.document"] == query["query"]
+    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
@@ -397,9 +396,9 @@ def test_capture_transaction_on_success_async(sentry_init, capture_events):
     async_app = FastAPI()
     async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
 
-    query = {"query": "query GreetingQuery { hello }"}
+    query = "query GreetingQuery { hello }"
     client = TestClient(async_app)
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
     assert len(events) == 1
     (transaction_event,) = events
@@ -415,7 +414,7 @@ def test_capture_transaction_on_success_async(sentry_init, capture_events):
     assert query_span["description"] == "query GreetingQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
-    assert query_span["data"]["graphql.document"] == query["query"]
+    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [
@@ -467,11 +466,9 @@ def test_capture_transaction_on_success_sync(sentry_init, capture_events):
         view_func=GraphQLView.as_view("graphql_view", schema=schema),
     )
 
-    query = {
-        "query": "query GreetingQuery { hello }",
-    }
+    query = "query GreetingQuery { hello }"
     client = sync_app.test_client()
-    client.post("/graphql", json=query)
+    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
 
     assert len(events) == 1
     (transaction_event,) = events
@@ -487,7 +484,7 @@ def test_capture_transaction_on_success_sync(sentry_init, capture_events):
     assert query_span["description"] == "query GreetingQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
     assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
-    assert query_span["data"]["graphql.document"] == query["query"]
+    assert query_span["data"]["graphql.document"] == query
     assert query_span["data"]["graphql.resource_name"]
 
     parse_spans = [

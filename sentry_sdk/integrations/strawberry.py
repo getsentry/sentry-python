@@ -159,7 +159,7 @@ class SentryAsyncExtension(SchemaExtension):
             description = operation_type
 
         Hub.current.add_breadcrumb(
-            category="graphql",
+            category="graphql.operation",
             data={
                 "operation_name": self._operation_name,
                 "operation_type": operation_type,
