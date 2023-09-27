@@ -206,7 +206,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         self.parsing_span.finish()
 
     def should_skip_tracing(self, _next, info):
-        # type: (Callable[[Any, GraphQLResolveInfo, Any], Any], GraphQLResolveInfo) -> bool
+        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], GraphQLResolveInfo) -> bool
         return should_skip_tracing(_next, info)
 
     async def resolve(self, _next, root, info, *args, **kwargs):
