@@ -158,6 +158,14 @@ class SentryAsyncExtension(SchemaExtension):
         else:
             description = operation_type
 
+        Hub.current.add_breadcrumb(
+            category="graphql",
+            data={
+                "operation_name": self._operation_name,
+                "operation_type": operation_type,
+            },
+        )
+
         with configure_scope() as scope:
             if scope.span:
                 self.graphql_span = scope.span.start_child(

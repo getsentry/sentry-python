@@ -37,7 +37,7 @@ class Query:
         return "Hello World"
 
     @strawberry.field
-    def error(self) -> str:
+    def error(self) -> int:
         return 1 / 0
 
 
@@ -115,7 +115,6 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -128,9 +127,9 @@ def test_capture_request_if_available_and_send_pii_is_on_async(
     client = TestClient(async_app)
     client.post("/graphql", json=query)
 
-    assert len(events) == 2
+    assert len(events) == 1
 
-    (error_event, _) = events
+    (error_event,) = events
 
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
@@ -155,7 +154,6 @@ def test_capture_request_if_available_and_send_pii_is_on_sync(
     sentry_init(
         send_default_pii=True,
         integrations=[StrawberryIntegration(async_execution=False), FlaskIntegration()],
-        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -171,9 +169,9 @@ def test_capture_request_if_available_and_send_pii_is_on_sync(
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    assert len(events) == 2
+    assert len(events) == 1
 
-    (error_event, _) = events
+    (error_event,) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert error_event["request"]["api_target"] == "graphql"
     assert error_event["request"]["data"] == query
@@ -198,7 +196,6 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        traces_sample_rate=1,
     )
     events = capture_events()
 
@@ -211,9 +208,9 @@ def test_do_not_capture_request_if_send_pii_is_off_async(sentry_init, capture_ev
     client = TestClient(async_app)
     client.post("/graphql", json=query)
 
-    assert len(events) == 2
+    assert len(events) == 1
 
-    (error_event, _) = events
+    (error_event,) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
@@ -238,9 +235,9 @@ def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_eve
     client = sync_app.test_client()
     client.post("/graphql", json=query)
 
-    assert len(events) == 2
+    assert len(events) == 1
 
-    (error_event, _) = events
+    (error_event,) = events
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
     assert "data" not in error_event["request"]
     assert "response" not in error_event["contexts"]
@@ -278,9 +275,9 @@ def test_capture_transaction_on_error_async(sentry_init, capture_events):
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
-    assert query_span["description"] == "query"
+    assert query_span["description"] == "query ErrorQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.operation.name"] == "ErrorQuery"
     assert query_span["data"]["graphql.document"] == query["query"]
     assert query_span["data"]["graphql.resource_name"]
 
@@ -347,9 +344,9 @@ def test_capture_transaction_on_error_sync(sentry_init, capture_events):
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
-    assert query_span["description"] == "query"
+    assert query_span["description"] == "query ErrorQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.operation.name"] == "ErrorQuery"
     assert query_span["data"]["graphql.document"] == query["query"]
     assert query_span["data"]["graphql.resource_name"]
 
@@ -415,9 +412,9 @@ def test_capture_transaction_on_success_async(sentry_init, capture_events):
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
-    assert query_span["description"] == "query"
+    assert query_span["description"] == "query GreetingQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
     assert query_span["data"]["graphql.document"] == query["query"]
     assert query_span["data"]["graphql.resource_name"]
 
@@ -487,9 +484,9 @@ def test_capture_transaction_on_success_sync(sentry_init, capture_events):
     ]
     assert len(query_spans) == 1, "exactly one query span expected"
     query_span = query_spans[0]
-    assert query_span["description"] == "query"
+    assert query_span["description"] == "query GreetingQuery"
     assert query_span["data"]["graphql.operation.type"] == "query"
-    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
     assert query_span["data"]["graphql.document"] == query["query"]
     assert query_span["data"]["graphql.resource_name"]
 
