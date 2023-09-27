@@ -210,7 +210,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         return should_skip_tracing(_next, info)
 
     async def resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable[[Any, GraphQLResolveInfo, str, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
+        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
         if self.should_skip_tracing(_next, info):
             result = _next(root, info, *args, **kwargs)
 
@@ -239,7 +239,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
 class SentrySyncExtension(SentryAsyncExtension):
     def resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable[[Any, Any, str, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
+        # type: (Callable[[Any, Any, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
         if self.should_skip_tracing(_next, info):
             return _next(root, info, *args, **kwargs)
 
