@@ -41,6 +41,13 @@ class Query:
         return 1 / 0
 
 
+@strawberry.type
+class Mutation:
+    @strawberry.mutation
+    def change(self, attribute: str) -> str:
+        return attribute
+
+
 def test_async_execution_uses_async_extension(sentry_init):
     sentry_init(integrations=[StrawberryIntegration(async_execution=True)])
 
@@ -270,6 +277,67 @@ def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_eve
     assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
     assert error_event["breadcrumbs"]["values"][0]["data"] == {
         "operation_name": "ErrorQuery",
+        "operation_type": "query",
+    }
+
+
+def test_breadcrumb_no_operation_name_async(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    async_app = FastAPI()
+    async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
+
+    query = "{ error }"
+    client = TestClient(async_app)
+    client.post("/graphql", json={"query": query})
+
+    assert len(events) == 1
+
+    (error_event,) = events
+
+    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
+    assert error_event["breadcrumbs"]["values"][0]["data"] == {
+        "operation_name": None,
+        "operation_type": "query",
+    }
+
+
+def test_breadcrumb_no_operation_name_sync(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StrawberryIntegration(async_execution=False), FlaskIntegration()],
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    sync_app = Flask(__name__)
+    sync_app.add_url_rule(
+        "/graphql",
+        view_func=GraphQLView.as_view("graphql_view", schema=schema),
+    )
+
+    query = "{ error }"
+    client = sync_app.test_client()
+    client.post("/graphql", json={"query": query})
+
+    assert len(events) == 1
+
+    (error_event,) = events
+
+    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
+    assert error_event["breadcrumbs"]["values"][0]["data"] == {
+        "operation_name": None,
         "operation_type": "query",
     }
 
@@ -547,4 +615,280 @@ def test_capture_transaction_on_success_sync(sentry_init, capture_events):
         "graphql.parent_type": "Query",
         "graphql.field_path": "Query.hello",
         "graphql.path": "hello",
+    }
+
+
+def test_transaction_no_operation_name_async(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    async_app = FastAPI()
+    async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
+
+    query = "{ hello }"
+    client = TestClient(async_app)
+    client.post("/graphql", json={"query": query})
+
+    assert len(events) == 1
+    (transaction_event,) = events
+
+    assert transaction_event["transaction"] == "/graphql"
+    assert transaction_event["spans"]
+
+    query_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
+    ]
+    assert len(query_spans) == 1, "exactly one query span expected"
+    query_span = query_spans[0]
+    assert query_span["description"] == "query"
+    assert query_span["data"]["graphql.operation.type"] == "query"
+    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.document"] == query
+    assert query_span["data"]["graphql.resource_name"]
+
+    parse_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+    ]
+    assert len(parse_spans) == 1, "exactly one parse span expected"
+    parse_span = parse_spans[0]
+    assert parse_span["parent_span_id"] == query_span["span_id"]
+    assert parse_span["description"] == "parsing"
+
+    validate_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+    ]
+    assert len(validate_spans) == 1, "exactly one validate span expected"
+    validate_span = validate_spans[0]
+    assert validate_span["parent_span_id"] == query_span["span_id"]
+    assert validate_span["description"] == "validation"
+
+    resolve_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+    ]
+    assert len(resolve_spans) == 1, "exactly one resolve span expected"
+    resolve_span = resolve_spans[0]
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
+    assert resolve_span["description"] == "resolving Query.hello"
+    assert resolve_span["data"] == {
+        "graphql.field_name": "hello",
+        "graphql.parent_type": "Query",
+        "graphql.field_path": "Query.hello",
+        "graphql.path": "hello",
+    }
+
+
+def test_transaction_no_operation_name_sync(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=False),
+            FlaskIntegration(),
+        ],
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    sync_app = Flask(__name__)
+    sync_app.add_url_rule(
+        "/graphql",
+        view_func=GraphQLView.as_view("graphql_view", schema=schema),
+    )
+
+    query = "{ hello }"
+    client = sync_app.test_client()
+    client.post("/graphql", json={"query": query})
+
+    assert len(events) == 1
+    (transaction_event,) = events
+
+    assert transaction_event["transaction"] == "graphql_view"
+    assert transaction_event["spans"]
+
+    query_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_QUERY
+    ]
+    assert len(query_spans) == 1, "exactly one query span expected"
+    query_span = query_spans[0]
+    assert query_span["description"] == "query"
+    assert query_span["data"]["graphql.operation.type"] == "query"
+    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.document"] == query
+    assert query_span["data"]["graphql.resource_name"]
+
+    parse_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+    ]
+    assert len(parse_spans) == 1, "exactly one parse span expected"
+    parse_span = parse_spans[0]
+    assert parse_span["parent_span_id"] == query_span["span_id"]
+    assert parse_span["description"] == "parsing"
+
+    validate_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+    ]
+    assert len(validate_spans) == 1, "exactly one validate span expected"
+    validate_span = validate_spans[0]
+    assert validate_span["parent_span_id"] == query_span["span_id"]
+    assert validate_span["description"] == "validation"
+
+    resolve_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+    ]
+    assert len(resolve_spans) == 1, "exactly one resolve span expected"
+    resolve_span = resolve_spans[0]
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
+    assert resolve_span["description"] == "resolving Query.hello"
+    assert resolve_span["data"] == {
+        "graphql.field_name": "hello",
+        "graphql.parent_type": "Query",
+        "graphql.field_path": "Query.hello",
+        "graphql.path": "hello",
+    }
+
+
+def test_transaction_mutation_async(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(),
+            FastApiIntegration(),
+            StarletteIntegration(),
+        ],
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query, mutation=Mutation)
+
+    async_app = FastAPI()
+    async_app.include_router(GraphQLRouter(schema), prefix="/graphql")
+
+    query = 'mutation Change { change(attribute: "something") }'
+    client = TestClient(async_app)
+    client.post("/graphql", json={"query": query})
+
+    assert len(events) == 1
+    (transaction_event,) = events
+
+    assert transaction_event["transaction"] == "/graphql"
+    assert transaction_event["spans"]
+
+    query_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_MUTATION
+    ]
+    assert len(query_spans) == 1, "exactly one mutation span expected"
+    query_span = query_spans[0]
+    assert query_span["description"] == "mutation"
+    assert query_span["data"]["graphql.operation.type"] == "mutation"
+    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.document"] == query
+    assert query_span["data"]["graphql.resource_name"]
+
+    parse_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+    ]
+    assert len(parse_spans) == 1, "exactly one parse span expected"
+    parse_span = parse_spans[0]
+    assert parse_span["parent_span_id"] == query_span["span_id"]
+    assert parse_span["description"] == "parsing"
+
+    validate_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+    ]
+    assert len(validate_spans) == 1, "exactly one validate span expected"
+    validate_span = validate_spans[0]
+    assert validate_span["parent_span_id"] == query_span["span_id"]
+    assert validate_span["description"] == "validation"
+
+    resolve_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+    ]
+    assert len(resolve_spans) == 1, "exactly one resolve span expected"
+    resolve_span = resolve_spans[0]
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
+    assert resolve_span["description"] == "resolving Mutation.change"
+    assert resolve_span["data"] == {
+        "graphql.field_name": "change",
+        "graphql.parent_type": "Mutation",
+        "graphql.field_path": "Mutation.change",
+        "graphql.path": "change",
+    }
+
+
+def test_transaction_mutation_sync(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=False),
+            FlaskIntegration(),
+        ],
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query, mutation=Mutation)
+
+    sync_app = Flask(__name__)
+    sync_app.add_url_rule(
+        "/graphql",
+        view_func=GraphQLView.as_view("graphql_view", schema=schema),
+    )
+
+    query = 'mutation Change { change(attribute: "something") }'
+    client = sync_app.test_client()
+    client.post("/graphql", json={"query": query})
+
+    assert len(events) == 1
+    (transaction_event,) = events
+
+    assert transaction_event["transaction"] == "graphql_view"
+    assert transaction_event["spans"]
+
+    query_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_MUTATION
+    ]
+    assert len(query_spans) == 1, "exactly one mutation span expected"
+    query_span = query_spans[0]
+    assert query_span["description"] == "mutation"
+    assert query_span["data"]["graphql.operation.type"] == "mutation"
+    assert query_span["data"]["graphql.operation.name"] is None
+    assert query_span["data"]["graphql.document"] == query
+    assert query_span["data"]["graphql.resource_name"]
+
+    parse_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_PARSE
+    ]
+    assert len(parse_spans) == 1, "exactly one parse span expected"
+    parse_span = parse_spans[0]
+    assert parse_span["parent_span_id"] == query_span["span_id"]
+    assert parse_span["description"] == "parsing"
+
+    validate_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_VALIDATE
+    ]
+    assert len(validate_spans) == 1, "exactly one validate span expected"
+    validate_span = validate_spans[0]
+    assert validate_span["parent_span_id"] == query_span["span_id"]
+    assert validate_span["description"] == "validation"
+
+    resolve_spans = [
+        span for span in transaction_event["spans"] if span["op"] == OP.GRAPHQL_RESOLVE
+    ]
+    assert len(resolve_spans) == 1, "exactly one resolve span expected"
+    resolve_span = resolve_spans[0]
+    assert resolve_span["parent_span_id"] == query_span["span_id"]
+    assert resolve_span["description"] == "resolving Mutation.change"
+    assert resolve_span["data"] == {
+        "graphql.field_name": "change",
+        "graphql.parent_type": "Mutation",
+        "graphql.field_path": "Mutation.change",
+        "graphql.path": "change",
     }
