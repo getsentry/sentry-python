@@ -2,6 +2,7 @@ import os
 import io
 import re
 import threading
+import random
 import time
 import zlib
 from functools import wraps, partial
@@ -303,6 +304,14 @@ class MetricsAggregator(object):
         self._flush_event = Event()
         self._force_flush = False
 
+        # The aggregator shifts it's flushing by up to an entire rollup window to
+        # avoid multiple clients trampling on end of a 10 second window as all the
+        # buckets are anchored to multiples of ROLLUP seconds.  We randomize this
+        # number once per aggregator boot to achieve some level of offsetting
+        # across a fleet of deployed SDKs.  Relay itself will also apply independent
+        # jittering.
+        self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
+
         self._flusher = None  # type: Optional[Thread]
         self._flusher_pid = None  # type: Optional[int]
         self._ensure_thread()
@@ -339,7 +348,7 @@ class MetricsAggregator(object):
         # type: (...) -> (Iterable[Tuple[int, Dict[BucketKey, Metric]]])
         with self._lock:
             force_flush = self._force_flush
-            cutoff = time.time() - self.ROLLUP_IN_SECONDS
+            cutoff = time.time() - self.ROLLUP_IN_SECONDS - self._flush_shift
             flushable_buckets = ()  # type: Iterable[Tuple[int, Dict[BucketKey, Metric]]]
             weight_to_remove = 0
 
