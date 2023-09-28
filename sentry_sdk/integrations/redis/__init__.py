@@ -126,39 +126,6 @@ def _set_db_data(span, connection_params):
     span.set_data(SPANDATA.SERVER_PORT, connection_params.get("port"))
 
 
-def patch_redis_client(cls, is_cluster):
-    # type: (Any, bool) -> None
-    """
-    This function can be used to instrument custom redis client classes or
-    subclasses.
-    """
-    old_execute_command = cls.execute_command
-
-    def sentry_patched_execute_command(self, name, *args, **kwargs):
-        # type: (Any, str, *Any, **Any) -> Any
-        hub = Hub.current
-        integration = hub.get_integration(RedisIntegration)
-
-        if integration is None:
-            return old_execute_command(self, name, *args, **kwargs)
-
-        description = _get_span_description(name, *args)
-
-        data_should_be_truncated = (
-            integration.max_data_size and len(description) > integration.max_data_size
-        )
-        if data_should_be_truncated:
-            description = description[: integration.max_data_size - len("...")] + "..."
-
-        with hub.start_span(op=OP.DB_REDIS, description=description) as span:
-            _set_db_data(span, self.connection_pool.connection_kwargs)
-            _set_client_data(span, is_cluster, name, *args)
-
-            return old_execute_command(self, name, *args, **kwargs)
-
-    cls.execute_command = sentry_patched_execute_command
-
-
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
     # type: (Any, bool, Any) -> None
     old_execute = pipeline_cls.execute
@@ -191,6 +158,39 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
             return old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = sentry_patched_execute
+
+
+def patch_redis_client(cls, is_cluster):
+    # type: (Any, bool) -> None
+    """
+    This function can be used to instrument custom redis client classes or
+    subclasses.
+    """
+    old_execute_command = cls.execute_command
+
+    def sentry_patched_execute_command(self, name, *args, **kwargs):
+        # type: (Any, str, *Any, **Any) -> Any
+        hub = Hub.current
+        integration = hub.get_integration(RedisIntegration)
+
+        if integration is None:
+            return old_execute_command(self, name, *args, **kwargs)
+
+        description = _get_span_description(name, *args)
+
+        data_should_be_truncated = (
+            integration.max_data_size and len(description) > integration.max_data_size
+        )
+        if data_should_be_truncated:
+            description = description[: integration.max_data_size - len("...")] + "..."
+
+        with hub.start_span(op=OP.DB_REDIS, description=description) as span:
+            _set_db_data(span, self.connection_pool.connection_kwargs)
+            _set_client_data(span, is_cluster, name, *args)
+
+            return old_execute_command(self, name, *args, **kwargs)
+
+    cls.execute_command = sentry_patched_execute_command
 
 
 def _patch_redis(StrictRedis, client):  # noqa: N803
