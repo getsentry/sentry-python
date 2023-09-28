@@ -134,7 +134,14 @@ def _set_db_data(span, conn):
     if db_system is not None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)
 
-    span.set_data(SPANDATA.DB_NAME, conn.engine.url.database)
+    db_name = conn.engine.url.database
+    if db_name is not None:
+        span.set_data(SPANDATA.DB_NAME, db_name)
 
-    span.set_data(SPANDATA.SERVER_ADDRESS, conn.engine.url.host)
-    span.set_data(SPANDATA.SERVER_PORT, conn.engine.url.port)
+    server_address = conn.engine.url.host
+    if server_address is not None:
+        span.set_data(SPANDATA.SERVER_ADDRESS, server_address)
+
+    server_port = conn.engine.url.port
+    if server_port is not None:
+        span.set_data(SPANDATA.SERVER_PORT, server_port)

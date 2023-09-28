@@ -81,7 +81,7 @@ def patch_app_init() -> None:
             ]
         )
 
-        SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3
+        SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3  # type: ignore
         middleware = kwargs.pop("middleware", None) or []
         kwargs["middleware"] = [SentryStarliteASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)
