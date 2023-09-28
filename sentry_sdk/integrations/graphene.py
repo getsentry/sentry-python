@@ -63,7 +63,7 @@ def _patch_graphql():
                     error,
                     client_options=hub.client.options if hub.client else None,
                     mechanism={
-                        "type": hub.get_integration(GrapheneIntegration).identifier,
+                        "type": integration.identifier,
                         "handled": False,
                     },
                 )
@@ -89,7 +89,7 @@ def _patch_graphql():
                     error,
                     client_options=hub.client.options if hub.client else None,
                     mechanism={
-                        "type": hub.get_integration(GrapheneIntegration).identifier,
+                        "type": integration.identifier,
                         "handled": False,
                     },
                 )
