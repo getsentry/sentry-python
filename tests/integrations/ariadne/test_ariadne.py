@@ -13,12 +13,7 @@ from flask import Flask, request, jsonify
 from sentry_sdk.integrations.ariadne import AriadneIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
-from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.starlette import StarletteIntegration
-
-
-# to prevent the logging integration from capturing the exception first
-ignore_logger("ariadne")
 
 
 def schema_factory():
