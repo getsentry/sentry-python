@@ -150,8 +150,7 @@ def _make_request_event_processor(data):
             ):
                 request_info = event.setdefault("request", {})
                 request_info["api_target"] = "graphql"
-                if not request_info.get("data"):
-                    request_info["data"] = data
+                request_info["data"] = data
 
             elif event.get("request", {}).get("data"):
                 del event["request"]["data"]
