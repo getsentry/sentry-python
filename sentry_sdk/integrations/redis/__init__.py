@@ -17,9 +17,11 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 _SINGLE_KEY_COMMANDS = frozenset(
-    ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"]
+    ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"],
 )
-_MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
+_MULTI_KEY_COMMANDS = frozenset(
+    ["del", "touch", "unlink"],
+)
 _COMMANDS_INCLUDING_SENSITIVE_DATA = [
     "auth",
 ]
