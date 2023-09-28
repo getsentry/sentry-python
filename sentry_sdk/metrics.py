@@ -310,7 +310,7 @@ class MetricsAggregator(object):
         # number once per aggregator boot to achieve some level of offsetting
         # across a fleet of deployed SDKs.  Relay itself will also apply independent
         # jittering.
-        self._flush_shift = random.random() * self.ROLLUP
+        self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
         self._flusher = None  # type: Optional[Thread]
         self._flusher_pid = None  # type: Optional[int]
