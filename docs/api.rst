@@ -5,12 +5,14 @@ Top Level API
 This is the user facing API of the SDK. It's exposed as ``sentry_sdk``.
 With this API you can implement a custom performance monitoring or error reporting solution.
 
+
 Capturing Data
 ==============
 
 .. autofunction:: sentry_sdk.api.capture_event
 .. autofunction:: sentry_sdk.api.capture_exception
 .. autofunction:: sentry_sdk.api.capture_message
+
 
 Enriching Events
 ================
@@ -37,7 +39,6 @@ Distributed Tracing
 
 .. autofunction:: sentry_sdk.api.get_baggage
 .. autofunction:: sentry_sdk.api.get_traceparent
-
 
 
 Managing Scope (advanced)

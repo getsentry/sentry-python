@@ -2,8 +2,6 @@
 API Docs
 ========
 
-.. inherited-members necessary because of hack for Client and init methods
-
 .. autoclass:: sentry_sdk.Hub
     :members:
 
