@@ -24,6 +24,8 @@ from sentry_sdk.utils import (
     event_from_exception,
     transaction_from_function,
     walk_exception_chain,
+    exc_info_from_error,
+    iter_stacks,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -35,6 +37,7 @@ try:
     from django.conf import settings as django_settings
     from django.core import signals
     from django.conf import settings
+    from django.utils.datastructures import MultiValueDict
 
     try:
         from django.urls import resolve
@@ -74,12 +77,17 @@ if TYPE_CHECKING:
     from django.core.handlers.wsgi import WSGIRequest
     from django.http.response import HttpResponse
     from django.http.request import QueryDict
-    from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.tracing import Span
     from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        EventProcessor,
+        NotImplementedType,
+        ExcInfo,
+    )
 
 
 if DJANGO_VERSION < (1, 10):
@@ -490,6 +498,106 @@ def _make_event_processor(weak_request, integration):
     return event_processor
 
 
+def _get_cleansed_multivaluedict(request, multivaluedict):
+    # type: (WSGIRequest, MultiValueDict) -> MultiValueDict
+    """
+    Replace the keys in a MultiValueDict marked as sensitive with stars.
+    This mitigates leaking sensitive POST parameters if something like
+    request.POST['nonexistent_key'] throws an exception
+    """
+    sensitive_post_parameters = getattr(request, "sensitive_post_parameters", [])
+    if sensitive_post_parameters:
+        multivaluedict = multivaluedict.copy()
+        for param in sensitive_post_parameters:
+            if param in multivaluedict:
+                multivaluedict[param] = SENSITIVE_DATA_SUBSTITUTE
+    return multivaluedict
+
+
+def _cleanse_special_types(request, value):
+    # type: (WSGIRequest, Any) -> Any
+    try:
+        # If value is lazy or a complex object of another kind, this check
+        # might raise an exception. isinstance checks that lazy
+        # MultiValueDicts will have a return value.
+        is_multivalue_dict = isinstance(value, MultiValueDict)
+    except Exception as e:
+        return "{!r} while evaluating {!r}".format(e, value)
+
+    if is_multivalue_dict:
+        # Cleanse MultiValueDicts (request.POST is the one we usually care about)
+        value = _get_cleansed_multivaluedict(request, value)
+    return value
+
+
+def _clean_event(
+    error,  # type: Union[BaseException, ExcInfo]
+    request,  # type: WSGIRequest
+    event,  # type: Event
+):
+    # type: (...) -> Event
+    """
+    Clean the already created event with sensitive variables defined by the user in the django app
+    These sensitive variables are defined using the decorator @sensitive_variables
+    see https://docs.djangoproject.com/en/3.2/_modules/django/views/decorators/debug/
+    """
+    exc_info = exc_info_from_error(error)
+    exception_idx = 0
+    for _, _, tbs in walk_exception_chain(exc_info):
+        sensitive_variables = None
+        frame_idx = 0
+        for tb in iter_stacks(tbs):
+            frame = tb.tb_frame
+            if sensitive_variables:
+                _cleanse_sensitive_vars(
+                    request, event, sensitive_variables, exception_idx, frame_idx
+                )
+            # get sensitve variables from the frame
+            if (
+                frame.f_code.co_name == "sensitive_variables_wrapper"
+                and "sensitive_variables_wrapper" in frame.f_locals
+            ):
+                wrapper = frame.f_locals["sensitive_variables_wrapper"]
+                sensitive_variables = getattr(wrapper, "sensitive_variables", None)
+            frame_idx += 1
+        exception_idx += 1
+    return event
+
+
+def _cleanse_sensitive_vars(
+    request,  # type: WSGIRequest
+    event,  # type: Event
+    sensitive_variables,  # type: dict[str, Any]
+    reverse_exception_idx,  # type: int
+    frame_idx,  # type: int
+):
+    # type: (...) -> None
+    if "exception" in event:
+        exceptions = event["exception"].get("values", ())
+        if len(exceptions) > 0:
+            exception_idx = len(exceptions) - reverse_exception_idx - 1
+            if 0 <= exception_idx and exception_idx < len(exceptions):
+                exception = exceptions[exception_idx]
+                if "stacktrace" in exception:
+                    frames = exception["stacktrace"].get("frames", ())
+                    if frame_idx < len(frames):
+                        frame = frames[frame_idx]
+                        clean_vars = {}
+                        if sensitive_variables == "__ALL__":
+                            for name in frame.get("vars", ()):
+                                clean_vars[name] = SENSITIVE_DATA_SUBSTITUTE
+                        else:
+                            # Clean specified variables
+                            for name, value in frame.get("vars", {}).items():
+                                if name in sensitive_variables:
+                                    value = SENSITIVE_DATA_SUBSTITUTE
+                                else:
+                                    # clean multivaluedicts in frames with sensitive post parameters
+                                    value = _cleanse_special_types(request, value)
+                                clean_vars[name] = value
+                        frame["vars"] = clean_vars
+
+
 def _got_request_exception(request=None, **kwargs):
     # type: (WSGIRequest, **Any) -> None
     hub = Hub.current
@@ -501,13 +609,15 @@ def _got_request_exception(request=None, **kwargs):
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
-
+        exception = sys.exc_info()
         event, hint = event_from_exception(
-            sys.exc_info(),
+            exception,
             client_options=client.options,
             mechanism={"type": "django", "handled": False},
         )
-        hub.capture_event(event, hint=hint)
+        # Clean the event for sensitve variables defined in the django app.
+        cleansed_event = _clean_event(exception, request, event)
+        hub.capture_event(cleansed_event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -537,6 +647,25 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def form(self):
         # type: () -> QueryDict
+        """
+        Clean form data of any sensitive post parameters defined in the django app
+        see https://docs.djangoproject.com/en/3.2/_modules/django/views/decorators/debug/
+        """
+        sensitive_post_parameters = getattr(
+            self.request, "sensitive_post_parameters", []
+        )
+        if sensitive_post_parameters:
+            cleansed_request = self.request.POST.copy()
+            if sensitive_post_parameters == "__ALL__":
+                # Cleanse all parameters.
+                for k in cleansed_request:
+                    cleansed_request[k] = SENSITIVE_DATA_SUBSTITUTE
+            else:
+                # Cleanse only the specified parameters.
+                for param in sensitive_post_parameters:
+                    if param in cleansed_request:
+                        cleansed_request[param] = SENSITIVE_DATA_SUBSTITUTE
+            return cleansed_request
         return self.request.POST
 
     def files(self):
