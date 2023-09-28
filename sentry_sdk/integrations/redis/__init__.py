@@ -121,9 +121,18 @@ def _set_client_data(span, is_cluster, name, *args):
 def _set_db_data(span, connection_params):
     # type: (Span, Dict[str, Any]) -> None
     span.set_data(SPANDATA.DB_SYSTEM, "redis")
-    span.set_data(SPANDATA.DB_NAME, text_type(connection_params.get("db")))
-    span.set_data(SPANDATA.SERVER_ADDRESS, connection_params.get("host"))
-    span.set_data(SPANDATA.SERVER_PORT, connection_params.get("port"))
+
+    db = connection_params.get("db")
+    if db is not None:
+        span.set_data(SPANDATA.DB_NAME, text_type(db))
+
+    host = connection_params.get("host")
+    if host is not None:
+        span.set_data(SPANDATA.SERVER_ADDRESS, host)
+
+    port = connection_params.get("port")
+    if port is not None:
+        span.set_data(SPANDATA.SERVER_PORT, port)
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
@@ -140,20 +149,15 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
         with hub.start_span(
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
-            # with capture_internal_exceptions():
-            # import ipdb; ipdb.set_trace()
-            print("#####################################")
-            print(dir(self.connection_pool))
-            print("#####################################")
-            print(self.connection_pool)
-            _set_db_data(span, self.connection_pool.connection_kwargs)
-            _set_pipeline_data(
-                span,
-                is_cluster,
-                get_command_args_fn,
-                self.transaction,
-                self.command_stack,
-            )
+            with capture_internal_exceptions():
+                _set_db_data(span, self.connection_pool.connection_kwargs)
+                _set_pipeline_data(
+                    span,
+                    is_cluster,
+                    get_command_args_fn,
+                    self.transaction,
+                    self.command_stack,
+                )
 
             return old_execute(self, *args, **kwargs)
 
