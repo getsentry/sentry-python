@@ -68,6 +68,25 @@ urlpatterns = [
         name="csrf_hello_not_exempt",
     ),
     path("sync/thread_ids", views.thread_ids_sync, name="thread_ids_sync"),
+    path(
+        "hide-sensitive-variables",
+        views.hide_sensitive_variables,
+        name="hide_sensitive_variables",
+    ),
+    path(
+        "hide-all-sensitive-variables",
+        views.hide_all_sensitive_variables,
+        name="hide_all_sensitive_variables",
+    ),
+    path("hide-post-params", views.hide_post_params, name="hide_post_params"),
+    path(
+        "hide-all-post-params", views.hide_all_post_params, name="hide_all_post_params"
+    ),
+    path(
+        "hide-nested-sensitive-data",
+        views.hide_nested_sensitive_data,
+        name="hide_nested_sensitive_data",
+    ),
 ]
 
 # async views
