@@ -614,18 +614,17 @@ def install_sql_hook():
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
             _set_db_data(span, self)
-            if (
-                hub.client.options["_experiments"].get("attach_explain_plans")
-                is not None
-            ):
-                attach_explain_plan_to_span(
-                    span,
-                    self.cursor.connection,
-                    sql,
-                    params,
-                    self.mogrify,
-                    hub.client.options["_experiments"].get("attach_explain_plans"),
-                )
+            if hub.client:
+                options = hub.client.options["_experiments"].get("attach_explain_plans")
+                if options is not None:
+                    attach_explain_plan_to_span(
+                        span,
+                        self.cursor.connection,
+                        sql,
+                        params,
+                        self.mogrify,
+                        options,
+                    )
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):

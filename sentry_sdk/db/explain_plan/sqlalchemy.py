@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from sentry_sdk.consts import TYPE_CHECKING
 from sentry_sdk.db.explain_plan import cache_statement, should_run_explain_plan
 from sentry_sdk.integrations import DidNotEnable
 
@@ -8,8 +9,14 @@ try:
 except ImportError:
     raise DidNotEnable("SQLAlchemy not installed.")
 
+if TYPE_CHECKING:
+    from typing import Any
+
+    from sentry_sdk.tracing import Span
+
 
 def attach_explain_plan_to_span(span, connection, statement, parameters, options):
+    # type: (Span, Any, str, Any, dict[str, Any]) -> None
     """
     Run EXPLAIN or EXPLAIN ANALYZE on the given statement and attach the explain plan to the span data.
 

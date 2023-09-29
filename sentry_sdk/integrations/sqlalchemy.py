@@ -69,14 +69,16 @@ def _before_cursor_execute(
 
     if span is not None:
         _set_db_data(span, conn)
-        if hub.client.options["_experiments"].get("attach_explain_plans") is not None:
-            attach_explain_plan_to_span(
-                span,
-                conn,
-                statement,
-                parameters,
-                hub.client.options["_experiments"].get("attach_explain_plans"),
-            )
+        if hub.client:
+            options = hub.client.options["_experiments"].get("attach_explain_plans")
+            if options is not None:
+                attach_explain_plan_to_span(
+                    span,
+                    conn,
+                    statement,
+                    parameters,
+                    options,
+                )
         context._sentry_sql_span = span
 
 

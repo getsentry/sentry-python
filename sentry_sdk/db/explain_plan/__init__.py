@@ -1,5 +1,9 @@
 import datetime
 
+from sentry_sdk.consts import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
 
 EXPLAIN_CACHE = {}
 
@@ -9,11 +13,13 @@ EXPLAIN_CACHE_TIMEOUT_SECONDS = 60 * 60 * 24
 
 
 def cache_statement(statement):
+    # type: (str) -> None
     global EXPLAIN_CACHE
     EXPLAIN_CACHE[hash(statement)] = datetime.datetime.utcnow()
 
 
 def should_run_explain_plan(statement, options):
+    # type: (str, dict[str, Any]) -> bool
     """
     Check cache if the explain plan for the given statement should be run.
     """
