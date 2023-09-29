@@ -606,11 +606,11 @@ def _got_request_exception(request=None, **kwargs):
         if request is not None and integration.transaction_style == "url":
             with hub.configure_scope() as scope:
                 _attempt_resolve_again(request, scope, integration.transaction_style)
-
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any
         exception = sys.exc_info()
         event, hint = event_from_exception(
+            exception,
             exception,
             client_options=client.options,
             mechanism={"type": "django", "handled": False},
