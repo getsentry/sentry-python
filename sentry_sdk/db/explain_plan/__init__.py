@@ -5,10 +5,9 @@ from sentry_sdk.consts import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any
 
+
 EXPLAIN_CACHE = {}
-
 EXPLAIN_CACHE_SIZE = 50
-
 EXPLAIN_CACHE_TIMEOUT_SECONDS = 60 * 60 * 24
 
 
