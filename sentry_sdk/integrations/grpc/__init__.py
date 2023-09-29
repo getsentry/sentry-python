@@ -10,7 +10,12 @@ from sentry_sdk.integrations import Integration
 from .client import ClientInterceptor
 from .server import ServerInterceptor
 from .aio.server import ServerInterceptor as AsyncServerInterceptor
-from .aio.client import ClientInterceptor as AsyncClientInterceptor
+from .aio.client import (
+    SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
+)
+from .aio.client import (
+    SentryUnaryStreamClientInterceptor as AsyncUnaryStreamClientIntercetor,
+)
 
 P = ParamSpec("P")
 
@@ -35,8 +40,11 @@ def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncCha
         interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
         **kwargs: P.kwargs,
     ) -> Channel:
-        interceptor = AsyncClientInterceptor()
-        interceptors = [interceptor, *(interceptors or [])]
+        sentry_interceptors = [
+            AsyncUnaryUnaryClientInterceptor(),
+            AsyncUnaryStreamClientIntercetor(),
+        ]
+        interceptors = [*sentry_interceptors, *(interceptors or [])]
         return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
     return patched_channel  # type: ignore
