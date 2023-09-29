@@ -611,7 +611,6 @@ def _got_request_exception(request=None, **kwargs):
         exception = sys.exc_info()
         event, hint = event_from_exception(
             exception,
-            exception,
             client_options=client.options,
             mechanism={"type": "django", "handled": False},
         )

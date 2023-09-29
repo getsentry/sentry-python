@@ -218,7 +218,7 @@ def thread_ids_sync(*args, **kwargs):
 def hide_sensitive_variables(request):
     foo = request.POST["foo"]
     zoo = request.POST["zoo"]
-    sentry_sdk.capture_message("{},{}".format(foo, zoo), level="info")
+    print("{},{}".format(foo, zoo))
     1 / 0
 
 
@@ -227,7 +227,7 @@ def hide_sensitive_variables(request):
 def hide_all_sensitive_variables(request):
     foo = request.POST["foo"]
     zoo = request.POST["zoo"]
-    sentry_sdk.capture_message("{},{}".format(foo, zoo), level="info")
+    print("{},{}".format(foo, zoo))
     1 / 0
 
 
@@ -247,7 +247,7 @@ def decorator_with_sensitive_data(func):
     def wrapper(*args, **kwargs):
         request = args[0]
         to_be_hidden = request.POST["to_be_hidden"]
-        sentry_sdk.capture_message("{}".format(to_be_hidden), level="info")
+        print("{}".format(to_be_hidden))
         return func(*args, **kwargs)
 
     return wrapper
@@ -261,7 +261,7 @@ def hide_nested_sensitive_data(request):
     @sensitive_variables("after_after_req_var")
     def after_after_req(to_be_hidden):
         after_after_req_var = "foo"
-        sentry_sdk.capture_message("{}".format(after_after_req_var), level="info")
+        print("{}".format(after_after_req_var))
         1 / 0
 
     def after_req(to_be_hidden):
@@ -269,7 +269,7 @@ def hide_nested_sensitive_data(request):
 
     to_be_hidden = request.POST["to_be_hidden"]
     to_not_be_hidden = request.POST["to_not_be_hidden"]
-    sentry_sdk.capture_message("{}".format(to_not_be_hidden), level="info")
+    print("{}".format(to_not_be_hidden))
     return after_req(to_be_hidden)
 
 
