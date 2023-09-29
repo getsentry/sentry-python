@@ -7,7 +7,7 @@ from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 
 
-class ClientInterceptor(UnaryUnaryClientInterceptor):
+class ClientInterceptor(UnaryUnaryClientInterceptor):  # type: ignore
     async def intercept_unary_unary(
         self,
         continuation: Callable[[ClientCallDetails, Message], UnaryUnaryCall],
@@ -36,7 +36,7 @@ class ClientInterceptor(UnaryUnaryClientInterceptor):
     @staticmethod
     def _update_client_call_details_metadata_from_hub(
         client_call_details: ClientCallDetails, hub: Hub
-    ):
+    ) -> ClientCallDetails:
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )

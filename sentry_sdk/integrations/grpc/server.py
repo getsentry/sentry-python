@@ -6,7 +6,7 @@ from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
 
 if MYPY:
     from typing import Callable, Optional
-    from google.protobuf.message import Message  # type: ignore
+    from google.protobuf.message import Message
 
 try:
     import grpc
@@ -16,7 +16,7 @@ except ImportError:
 
 
 class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    def __init__(self, find_name=None):
+    def __init__(self, find_name=None) -> None:
         # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
         self._find_method_name = find_name or ServerInterceptor._find_name
 

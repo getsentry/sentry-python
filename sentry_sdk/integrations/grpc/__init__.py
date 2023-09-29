@@ -1,4 +1,4 @@
-from typing import List, Optional, Sequence, Callable, ParamSpec
+from typing import List, Optional, Sequence, Callable, ParamSpec, Any
 from functools import wraps
 
 import grpc
@@ -19,7 +19,7 @@ def _wrap_channel_sync(func: Callable[P, Channel]) -> Callable[P, Channel]:
     "Wrapper for synchronous secure and insecure channel."
 
     @wraps(func)
-    def patched_channel(*args, **kwargs) -> Channel:
+    def patched_channel(*args: Any, **kwargs: Any) -> Channel:
         channel = func(*args, **kwargs)
         return intercept_channel(channel, ClientInterceptor())
 
@@ -31,15 +31,15 @@ def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncCha
 
     @wraps(func)
     def patched_channel(
-        *args,
+        *args: P.args,
         interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
-        **kwargs
+        **kwargs: P.kwargs,
     ) -> Channel:
         interceptor = AsyncClientInterceptor()
         interceptors = [interceptor, *(interceptors or [])]
-        return func(*args, interceptors=interceptors, **kwargs)
+        return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
-    return patched_channel
+    return patched_channel  # type: ignore
 
 
 def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
@@ -47,13 +47,15 @@ def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
 
     @wraps(func)
     def patched_server(
-        *args, interceptors: Optional[List[grpc.ServerInterceptor]] = None, **kwargs
+        *args: P.args,
+        interceptors: Optional[List[grpc.ServerInterceptor]] = None,
+        **kwargs: P.kwargs,
     ) -> Server:
         server_interceptor = ServerInterceptor()
         interceptors = [server_interceptor, *(interceptors or [])]
-        return func(*args, interceptors=interceptors, **kwargs)
+        return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
-    return patched_server
+    return patched_server  # type: ignore
 
 
 def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServer]:
@@ -61,15 +63,17 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
 
     @wraps(func)
     def patched_aio_server(
-        *args, interceptors: Optional[List[grpc.ServerInterceptor]] = None, **kwargs
+        *args: P.args,
+        interceptors: Optional[List[grpc.ServerInterceptor]] = None,
+        **kwargs: P.kwargs,
     ) -> Server:
         server_interceptor = AsyncServerInterceptor(
             find_name=lambda request: request.__class__
         )
         interceptors = [server_interceptor, *(interceptors or [])]
-        return func(*args, interceptors=interceptors, **kwargs)
+        return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
-    return patched_aio_server
+    return patched_aio_server  # type: ignore
 
 
 class GRPCIntegration(Integration):
