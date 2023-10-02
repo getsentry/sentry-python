@@ -13,8 +13,7 @@ from .server import ServerInterceptor
 from .aio.server import ServerInterceptor as AsyncServerInterceptor
 from .aio.client import ClientInterceptor as AsyncClientInterceptor
 
-if TYPE_CHECKING:
-    from typing import Optional, Sequence
+from typing import Optional, Sequence
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
