@@ -9,6 +9,7 @@ from importlib import import_module
 from sentry_sdk._compat import string_types, text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -613,6 +614,17 @@ def install_sql_hook():
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
             _set_db_data(span, self)
+            if hub.client:
+                options = hub.client.options["_experiments"].get("attach_explain_plans")
+                if options is not None:
+                    attach_explain_plan_to_span(
+                        span,
+                        self.cursor.connection,
+                        sql,
+                        params,
+                        self.mogrify,
+                        options,
+                    )
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):

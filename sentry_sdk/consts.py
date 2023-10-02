@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
+            "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             # TODO: Remove these 2 profiling related experiments
