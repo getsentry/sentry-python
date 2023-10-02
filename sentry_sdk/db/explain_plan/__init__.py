@@ -17,35 +17,44 @@ def cache_statement(statement):
     EXPLAIN_CACHE[hash(statement)] = datetime.datetime.utcnow()
 
 
-def should_run_explain_plan(statement, options):
-    # type: (str, dict[str, Any]) -> bool
+def remove_exired_cache_items(options):
+    # type: (dict[str, Any]) -> None
     """
-    Check cache if the explain plan for the given statement should be run.
+    Remove expired cache items from the cache.
     """
-    explain_cache_size = options.get("explain_cache_size", EXPLAIN_CACHE_SIZE)
+    global EXPLAIN_CACHE
+
     explain_cache_timeout_seconds = options.get(
         "explain_cache_timeout_seconds", EXPLAIN_CACHE_TIMEOUT_SECONDS
     )
 
     now = datetime.datetime.utcnow()
-    key = hash(statement)
 
-    global EXPLAIN_CACHE
-
-    if key in EXPLAIN_CACHE:
-        statement_timestamp = EXPLAIN_CACHE[key]
-
-        # Cached item expired, remove from cache
-        if (
-            statement_timestamp
-            + datetime.timedelta(seconds=explain_cache_timeout_seconds)
-            < now
-        ):
+    for key, statement_timestamp in EXPLAIN_CACHE.items():
+        expiration_time = statement_timestamp + datetime.timedelta(
+            seconds=explain_cache_timeout_seconds
+        )
+        expiration_in_the_past = expiration_time < now
+        if expiration_in_the_past:
             del EXPLAIN_CACHE[key]
 
+
+def should_run_explain_plan(statement, options):
+    # type: (str, dict[str, Any]) -> bool
+    """
+    Check cache if the explain plan for the given statement should be run.
+    """
+    global EXPLAIN_CACHE
+
+    remove_exired_cache_items(options)
+
+    key = hash(statement)
+    if key in EXPLAIN_CACHE:
         return False
 
-    if len(EXPLAIN_CACHE.keys()) >= explain_cache_size:
+    explain_cache_size = options.get("explain_cache_size", EXPLAIN_CACHE_SIZE)
+    cache_is_full = len(EXPLAIN_CACHE.keys()) >= explain_cache_size
+    if cache_is_full:
         return False
 
     return True
