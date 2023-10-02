@@ -46,4 +46,4 @@ def attach_explain_plan_to_span(span, connection, statement, parameters, options
     explain_plan = [row for row in result]
 
     span.set_data("db.explain_plan", explain_plan)
-    cache_statement(statement)
+    cache_statement(statement, options)
