@@ -122,7 +122,7 @@ async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
     assert event["exception"]["values"][0]["type"] == "TestService.TestException"
     assert event["exception"]["values"][0]["value"] == "test"
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "gRPC"
+    assert event["exception"]["values"][0]["mechanism"]["type"] == "grpc"
 
 
 @pytest.mark.asyncio
