@@ -17,7 +17,7 @@ def cache_statement(statement):
     EXPLAIN_CACHE[hash(statement)] = datetime.datetime.utcnow()
 
 
-def remove_exired_cache_items(options):
+def remove_expired_cache_items(options):
     # type: (dict[str, Any]) -> None
     """
     Remove expired cache items from the cache.
