@@ -46,7 +46,7 @@ def should_run_explain_plan(statement, options):
     """
     global EXPLAIN_CACHE
 
-    remove_exired_cache_items(options)
+    remove_expired_cache_items(options)
 
     key = hash(statement)
     if key in EXPLAIN_CACHE:
