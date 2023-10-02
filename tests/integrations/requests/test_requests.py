@@ -5,7 +5,7 @@ requests = pytest.importorskip("requests")
 
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk.integrations.requests import RequestsIntegration
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -14,7 +14,7 @@ except ImportError:
 
 
 def test_crumb_capture(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[RequestsIntegration()])
 
     url = "http://example.com/"
     responses.add(responses.GET, url, status=200)
@@ -40,7 +40,7 @@ def test_crumb_capture(sentry_init, capture_events):
 
 @pytest.mark.tests_internal_exceptions
 def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[RequestsIntegration()])
 
     url = "https://example.com"
     responses.add(responses.GET, url, status=200)
@@ -48,7 +48,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     events = capture_events()
 
     with mock.patch(
-        "sentry_sdk.integrations.stdlib.parse_url",
+        "sentry_sdk.integrations.requests.parse_url",
         side_effect=ValueError,
     ):
         response = requests.get(url)

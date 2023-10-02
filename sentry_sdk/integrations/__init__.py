@@ -75,6 +75,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.redis.RedisIntegration",
+    "sentry_sdk.integrations.requests.RequestsIntegration",
     "sentry_sdk.integrations.rq.RqIntegration",
     "sentry_sdk.integrations.sanic.SanicIntegration",
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
