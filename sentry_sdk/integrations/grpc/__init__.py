@@ -1,4 +1,3 @@
-from typing import List, Optional, Sequence, Callable, ParamSpec
 from functools import wraps
 
 import grpc
@@ -7,10 +6,35 @@ from grpc.aio import Channel as AsyncChannel
 from grpc.aio import Server as AsyncServer
 
 from sentry_sdk.integrations import Integration
+from sentry_sdk._types import TYPE_CHECKING
+
 from .client import ClientInterceptor
 from .server import ServerInterceptor
 from .aio.server import ServerInterceptor as AsyncServerInterceptor
 from .aio.client import ClientInterceptor as AsyncClientInterceptor
+
+if TYPE_CHECKING:
+    from typing import Optional, Sequence
+
+# Hack to get new Python features working in older versions
+# without introducing a hard dependency on `typing_extensions`
+# from: https://stackoverflow.com/a/71944042/300572
+if TYPE_CHECKING:
+    from typing import ParamSpec, Callable
+else:
+    # Fake ParamSpec
+    class ParamSpec:
+        def __init__(self, _):
+            self.args = None
+            self.kwargs = None
+
+    # Callable[anything] will return None
+    class _Callable:
+        def __getitem__(self, _):
+            return None
+
+    # Make instances
+    Callable = _Callable()
 
 P = ParamSpec("P")
 
@@ -47,7 +71,7 @@ def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
 
     @wraps(func)
     def patched_server(
-        *args, interceptors: Optional[List[grpc.ServerInterceptor]] = None, **kwargs
+        *args, interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None, **kwargs
     ) -> Server:
         server_interceptor = ServerInterceptor()
         interceptors = [server_interceptor, *(interceptors or [])]
@@ -61,7 +85,7 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
 
     @wraps(func)
     def patched_aio_server(
-        *args, interceptors: Optional[List[grpc.ServerInterceptor]] = None, **kwargs
+        *args, interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None, **kwargs
     ) -> Server:
         server_interceptor = AsyncServerInterceptor(
             find_name=lambda request: request.__class__
