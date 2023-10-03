@@ -13,7 +13,7 @@ from .server import ServerInterceptor
 from .aio.server import ServerInterceptor as AsyncServerInterceptor
 from .aio.client import ClientInterceptor as AsyncClientInterceptor
 
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -42,7 +42,7 @@ def _wrap_channel_sync(func: Callable[P, Channel]) -> Callable[P, Channel]:
     "Wrapper for synchronous secure and insecure channel."
 
     @wraps(func)
-    def patched_channel(*args, **kwargs) -> Channel:
+    def patched_channel(*args: Any, **kwargs: Any) -> Channel:
         channel = func(*args, **kwargs)
         return intercept_channel(channel, ClientInterceptor())
 
@@ -56,7 +56,7 @@ def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncCha
     def patched_channel(
         *args,
         interceptors: Optional[Sequence[grpc.aio.ClientInterceptor]] = None,
-        **kwargs
+        **kwargs,
     ) -> Channel:
         interceptor = AsyncClientInterceptor()
         interceptors = [interceptor, *(interceptors or [])]

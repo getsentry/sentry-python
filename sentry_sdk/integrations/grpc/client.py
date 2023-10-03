@@ -11,7 +11,7 @@ try:
     from grpc import ClientCallDetails, Call
     from grpc._interceptor import _UnaryOutcome
     from grpc.aio._interceptor import UnaryStreamCall
-    from google.protobuf.message import Message  # type: ignore
+    from google.protobuf.message import Message
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 

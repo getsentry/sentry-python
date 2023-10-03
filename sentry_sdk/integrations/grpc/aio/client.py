@@ -36,7 +36,7 @@ class ClientInterceptor(UnaryUnaryClientInterceptor):
     @staticmethod
     def _update_client_call_details_metadata_from_hub(
         client_call_details: ClientCallDetails, hub: Hub
-    ):
+    ) -> ClientCallDetails:
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )
