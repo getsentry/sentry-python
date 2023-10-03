@@ -19,3 +19,5 @@ exclude =
   # gRCP generated files
   grpc_test_service_pb2.py
   grpc_test_service_pb2_grpc.py
+  grpc_aio_test_service_pb2.py
+  grpc_aio_test_service_pb2_grpc.py

@@ -4,7 +4,7 @@ from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class gRPCTestMessage(_message.Message):
+class gRPCaioTestMessage(_message.Message):
     __slots__ = ["text"]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     text: str

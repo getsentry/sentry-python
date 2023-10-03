@@ -57,7 +57,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                 except Exception as exc:
                     event, hint = event_from_exception(
                         exc,
-                        mechanism={"type": "gRPC", "handled": False},
+                        mechanism={"type": "grpc", "handled": False},
                     )
                     hub.capture_event(event, hint=hint)
                     raise
