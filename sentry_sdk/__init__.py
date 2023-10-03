@@ -39,6 +39,7 @@ __all__ = [  # noqa
     "get_traceparent",
     "get_baggage",
     "continue_trace",
+    "trace",
 ]
 
 # Initialize the debug support after everything is loaded
