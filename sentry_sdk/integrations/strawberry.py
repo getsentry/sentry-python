@@ -63,8 +63,8 @@ class StrawberryIntegration(Integration):
                 "Unparsable strawberry-graphql version: {}".format(version)
             )
 
-        if version < (0, 209, 3):
-            raise DidNotEnable("strawberry-graphql 0.209.3 or newer required.")
+        if version < (0, 209, 5):
+            raise DidNotEnable("strawberry-graphql 0.209.5 or newer required.")
 
         _patch_schema_init()
         _patch_execute()
