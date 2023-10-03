@@ -301,6 +301,19 @@ def _patch_execute():
 
 def _patch_views():
     # type: () -> None
+    old_handle_errors_async = async_base_view.AsyncBaseHTTPView._handle_errors
+    old_handle_errors_sync = sync_base_view.SyncBaseHTTPView._handle_errors
+
+    def _sentry_patched_handle_errors_async(self, errors, response_data):
+        # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
+        old_handle_errors_async(self, errors, response_data)
+        _sentry_patched_handle_errors(self, errors, response_data)
+
+    def _sentry_patched_handle_errors_sync(self, errors, response_data):
+        # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
+        old_handle_errors_sync(self, errors, response_data)
+        _sentry_patched_handle_errors(self, errors, response_data)
+
     def _sentry_patched_handle_errors(self, errors, response_data):
         # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
         hub = Hub.current
@@ -327,8 +340,10 @@ def _patch_views():
                 )
                 hub.capture_event(event, hint=hint)
 
-    async_base_view.AsyncBaseHTTPView._handle_errors = _sentry_patched_handle_errors
-    sync_base_view.SyncBaseHTTPView._handle_errors = _sentry_patched_handle_errors
+    async_base_view.AsyncBaseHTTPView._handle_errors = (
+        _sentry_patched_handle_errors_async
+    )
+    sync_base_view.SyncBaseHTTPView._handle_errors = _sentry_patched_handle_errors_sync
 
 
 def _make_request_event_processor(execution_context):
