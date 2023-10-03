@@ -24,7 +24,7 @@ try:
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
-    from strawberry.http import async_base_view, sync_base_view
+    from strawberry.http import async_base_view, sync_base_view  # type: ignore
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
@@ -300,6 +300,7 @@ def _patch_execute():
 
 
 def _patch_views():
+    # type: () -> None
     def _sentry_patched_handle_errors(self, errors, response_data):
         # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
         hub = Hub.current
