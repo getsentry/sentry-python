@@ -16,7 +16,6 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    import strawberry.http as strawberry_http  # type: ignore
     import strawberry.schema.schema as strawberry_schema  # type: ignore
     from strawberry import Schema
     from strawberry.extensions import SchemaExtension  # type: ignore
@@ -25,14 +24,13 @@ try:
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
-    from strawberry.fastapi import router as fastapi_router  # type: ignore
     from strawberry.http import async_base_view, sync_base_view
 except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Generator, List, Optional
-    from graphql import GraphQLResolveInfo  # type: ignore
+    from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
     from sentry_sdk._types import EventProcessor
@@ -65,12 +63,12 @@ class StrawberryIntegration(Integration):
                 "Unparsable strawberry-graphql version: {}".format(version)
             )
 
-        if version < (0, 208):
-            raise DidNotEnable("strawberry-graphql 0.208 or newer required.")
+        if version < (0, 209, 3):
+            raise DidNotEnable("strawberry-graphql 0.209.3 or newer required.")
 
         _patch_schema_init()
         _patch_execute()
-        _patch_process_result()
+        _patch_views()
 
 
 def _patch_schema_init():
@@ -301,26 +299,23 @@ def _patch_execute():
     strawberry_schema.execute_sync = _sentry_patched_execute_sync
 
 
-def _patch_process_result():
-    # type: () -> None
-    old_process_result = strawberry_http.process_result
-
-    def _sentry_patched_process_result(result, *args, **kwargs):
-        # type: (ExecutionResult, Any, Any) -> GraphQLHTTPResponse
+def _patch_views():
+    def _sentry_patched_handle_errors(self, errors, response_data):
+        # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
-            return old_process_result(result, *args, **kwargs)
+            return
 
-        processed_result = old_process_result(result, *args, **kwargs)
+        if not errors:
+            return
 
-        if result.errors:
-            with hub.configure_scope() as scope:
-                event_processor = _make_response_event_processor(processed_result)
-                scope.add_event_processor(event_processor)
+        with hub.configure_scope() as scope:
+            event_processor = _make_response_event_processor(response_data)
+            scope.add_event_processor(event_processor)
 
         with capture_internal_exceptions():
-            for error in result.errors or []:
+            for error in errors:
                 event, hint = event_from_exception(
                     error,
                     client_options=hub.client.options if hub.client else None,
@@ -331,12 +326,8 @@ def _patch_process_result():
                 )
                 hub.capture_event(event, hint=hint)
 
-        return processed_result
-
-    strawberry_http.process_result = _sentry_patched_process_result
-    async_base_view.process_result = _sentry_patched_process_result
-    sync_base_view.process_result = _sentry_patched_process_result
-    fastapi_router.process_result = _sentry_patched_process_result
+    async_base_view.AsyncBaseHTTPView._handle_errors = _sentry_patched_handle_errors
+    sync_base_view.SyncBaseHTTPView._handle_errors = _sentry_patched_handle_errors
 
 
 def _make_request_event_processor(execution_context):
@@ -367,7 +358,7 @@ def _make_request_event_processor(execution_context):
     return inner
 
 
-def _make_response_event_processor(data):
+def _make_response_event_processor(response_data):
     # type: (GraphQLHTTPResponse) -> EventProcessor
 
     def inner(event, hint):
@@ -375,7 +366,7 @@ def _make_response_event_processor(data):
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 contexts = event.setdefault("contexts", {})
-                contexts["response"] = {"data": data}
+                contexts["response"] = {"data": response_data}
 
         return event
 
