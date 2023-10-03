@@ -57,7 +57,8 @@ class ClientInterceptor(
             response = continuation(
                 client_call_details, request
             )  # type: UnaryStreamCall
-            span.set_data("code", response.code().name)
+            # Setting code on unary-stream leads to execution getting stuck
+            # span.set_data("code", response.code().name)
 
             return response
 

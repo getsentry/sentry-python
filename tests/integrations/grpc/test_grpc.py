@@ -158,6 +158,38 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
     }
 
 
+@pytest.mark.forked
+def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksafe):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server = _set_up()
+
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+
+        with start_transaction():
+            [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
+
+    _tear_down(server=server)
+
+    events.write_file.close()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
+    )
+    assert span["data"] == {
+        "type": "unary stream",
+        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+        "code": "OK",
+    }
+
+
 # using unittest.mock.Mock not possible because grpc verifies
 # that the interceptor is of the correct type
 class MockClientInterceptor(grpc.UnaryUnaryClientInterceptor):
@@ -263,3 +295,8 @@ class TestService(gRPCTestServiceServicer):
             pass
 
         return gRPCTestMessage(text=request.text)
+
+    @staticmethod
+    def TestUnaryStream(request, context):  # noqa: N802
+        for _ in range(3):
+            yield gRPCTestMessage(text=request.text)
