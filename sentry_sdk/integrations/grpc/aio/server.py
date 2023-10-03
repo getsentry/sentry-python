@@ -1,5 +1,3 @@
-from functools import wraps
-
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
@@ -16,7 +14,6 @@ try:
     import grpc
     from grpc import HandlerCallDetails, RpcMethodHandler
     from grpc.aio import ServicerContext
-    from grpc.experimental import wrap_server_method_handler
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
@@ -31,11 +28,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
     async def intercept_service(self, continuation, handler_call_details):
         # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Awaitable[RpcMethodHandler]
         handler = await continuation(handler_call_details)
-        return wrap_server_method_handler(self.wrapper, handler)
 
-    def wrapper(self, handler):
-        # type: (ServerInterceptor, Callable[[Any, ServicerContext], Awaitable[Any]]) -> Callable[[Any, ServicerContext], Awaitable[Any]]
-        @wraps(handler)
         async def wrapped(request, context):
             # type: (Any, ServicerContext) -> Any
             name = self._find_method_name(context)
@@ -53,7 +46,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
 
             with hub.start_transaction(transaction=transaction):
                 try:
-                    return await handler(request, context)
+                    return await handler.unary_unary(request, context)
                 except Exception as exc:
                     event, hint = event_from_exception(
                         exc,
@@ -62,7 +55,11 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     hub.capture_event(event, hint=hint)
                     raise
 
-        return wrapped
+        return grpc.unary_unary_rpc_method_handler(
+            wrapped,
+            request_deserializer=handler.request_deserializer,
+            response_serializer=handler.response_serializer,
+        )
 
     @staticmethod
     def _find_name(context):
