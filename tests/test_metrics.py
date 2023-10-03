@@ -2,7 +2,7 @@
 
 import time
 
-from sentry_sdk import Hub, metrics, push_scope
+from sentry_sdk import Hub, metrics, push_scope, start_span
 
 
 def parse_metrics(bytes):
@@ -176,6 +176,40 @@ def test_timing_basic(sentry_init, capture_envelopes):
     assert sorted(map(float, m[0][3])) == [1.0, 2.0, 2.0, 3.0]
     assert m[0][4] == {
         "a": "b",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+
+def test_timing_via_span(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_span(
+        op="whatever", start_timestamp=ts, emit_metric=True
+    ) as span:
+        span.set_tag("blub", "blah")
+        time.sleep(0.1)
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][1] == "span.whatever@second"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 1
+    assert float(m[0][3][0]) >= 0.1
+    assert m[0][4] == {
+        "blub": "blah",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }

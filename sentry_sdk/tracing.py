@@ -101,6 +101,8 @@ class Span(object):
         "hub",
         "_context_manager_state",
         "_containing_transaction",
+        "emit_metric",
+        "metric_name",
     )
 
     def __new__(cls, **kwargs):
@@ -130,7 +132,9 @@ class Span(object):
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
-        start_timestamp=None,  # type: Optional[datetime]
+        start_timestamp=None,  # type: Optional[Union[datetime, float]]
+        emit_metric=False,  # type: bool
+        metric_name=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -145,7 +149,11 @@ class Span(object):
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
-        self.start_timestamp = start_timestamp or datetime.utcnow()
+        if start_timestamp is None:
+            start_timestamp = datetime.utcnow()
+        elif isinstance(start_timestamp, float):
+            start_timestamp = datetime.utcfromtimestamp(start_timestamp)
+        self.start_timestamp = start_timestamp
         try:
             # profiling depends on this value and requires that
             # it is measured in nanoseconds
@@ -155,6 +163,9 @@ class Span(object):
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
+
+        self.emit_metric = emit_metric
+        self.metric_name = metric_name
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
@@ -470,6 +481,17 @@ class Span(object):
                 )
         except AttributeError:
             self.timestamp = datetime.utcnow()
+
+        # If we were asked to emit a metric, do so now.  We always record
+        # that timing in seconds.
+        if self.emit_metric:
+            metrics.timing(
+                self.metric_name or ("span." + (self.op or "generic")),
+                timestamp=self.start_timestamp,
+                value=(self.timestamp - self.start_timestamp).total_seconds(),
+                unit="second",
+                tags=self._tags,
+            )
 
         maybe_create_breadcrumbs_from_span(hub, self)
         return None
@@ -995,3 +1017,4 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
+from sentry_sdk import metrics
