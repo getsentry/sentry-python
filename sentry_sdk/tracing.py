@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import Tuple
+    from typing import Union
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
