@@ -1,9 +1,3 @@
-import pytest
-
-pytest.importorskip("graphene")
-pytest.importorskip("fastapi")
-pytest.importorskip("flask")
-
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from flask import Flask, request, jsonify

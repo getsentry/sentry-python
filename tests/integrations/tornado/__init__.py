@@ -1,3 +1,3 @@
 import pytest
 
-tornado = pytest.importorskip("tornado")
+pytest.importorskip("tornado")

@@ -1,3 +1,3 @@
 import pytest
 
-django = pytest.importorskip("django")
+pytest.importorskip("django")
