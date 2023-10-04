@@ -28,17 +28,9 @@ On macOS, we recommend using `brew` to install Python. For Windows, we recommend
 
 ### Fork the Repo
 
-Go to the [home page of the repo](https://github.com/getsentry/sentry-python), click the "Fork" button, and go through the process of creating your fork of `sentry-python`.
+Before you can contribute, you will need to [fork the `sentry-python` repository](https://github.com/getsentry/sentry-python/fork).
 
-### Clone the Forked Repo
-
-You should now have a new `sentry-python` repo in your GitHub projects. Clone it to work on it locally:
-
-```bash
-git clone git@github.com:<YOUR-USERNAME>/sentry-python.git
-```
-
-Replace `<YOUR-USERNAME>` with your actual GitHub username. Alternatively, you can go to your GitHub profile, find the forked `sentry-python` repo, and copy the clone URL from there.
+Then, clone the forked repository to your local development environment.
 
 ### Create a Virtual Environment
 
@@ -49,7 +41,12 @@ used by your operation system, create a virtual environment:
 cd sentry-python
 
 python -m venv .venv
+```
 
+From now on, every time you want to work on your changes for `sentry-python`,
+you will need to make sure your virtual environment is active:
+
+```bash
 source .venv/bin/activate
 ```
 
@@ -115,7 +112,7 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
    - Avoid modifying the hub, registering a new client or the like. The user drives the client, and the client owns integrations.
 
-   - Allow the user to disable the integration by changing the client. Check `Hub.current.get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
+   - Allow the user to turn off the integration by changing the client. Check `Hub.current.get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
 
 2. Write tests.
 
@@ -131,7 +128,7 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
 4. Write the [docs](https://github.com/getsentry/sentry-docs). Follow the structure of [existing integration docs](https://docs.sentry.io/platforms/python/integrations/). And, please **make sure to add your integration to the table in `python/integrations/index.md`** (people often forget this step 🙂).
 
-5. Merge docs after new version has been released (auto-deploys on merge).
+5. Merge docs after new version has been released. The docs are built and deployed after each merge, so your changes should go live in a few minutes.
 
 6. (optional, if possible) Update data in [`sdk_updates.py`](https://github.com/getsentry/sentry/blob/master/src/sentry/sdk_updates.py) to give users in-app suggestions to use your integration. This step will only apply to some integrations.
 
