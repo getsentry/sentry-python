@@ -75,6 +75,7 @@ def test_redis_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
+    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
     assert span["data"]["redis.commands"] == {
         "count": 3,
         "first_ten": expected_first_ten,
