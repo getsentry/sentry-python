@@ -22,11 +22,13 @@ import datetime
 
 import asyncpg
 import pytest
+
+import pytest_asyncio
+
 from asyncpg import connect, Connection
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
-from tests.integrations.asgi import pytest_asyncio
 
 
 PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
