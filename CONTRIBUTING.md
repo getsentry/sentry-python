@@ -56,7 +56,7 @@ source .venv/bin/activate
 
 ### Install `sentry-python` in Editable Mode
 
-Install `sentry-python` in [editable mode](https://pip.pypa.io/en/latest/topics/local-project-installs/#editable-installs). This will make any changes you make to the SDK code locally immediately effective.
+Install `sentry-python` in [editable mode](https://pip.pypa.io/en/latest/topics/local-project-installs/#editable-installs). This will make any changes you make to the SDK code locally immediately effective without you having to reinstall or copy anything.
 
 ```bash
 pip install -e .
