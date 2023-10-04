@@ -13,6 +13,9 @@ _sym_db = _symbol_database.Default()
 
 
 
+
+
+
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x17grpc_test_service.proto\x12\x10grpc_test_server\"\x1f\n\x0fgRPCTestMessage\x12\x0c\n\x04text\x18\x01 \x01(\t2d\n\x0fgRPCTestService\x12Q\n\tTestServe\x12!.grpc_test_server.gRPCTestMessage\x1a!.grpc_test_server.gRPCTestMessageb\x06proto3')
 
 _globals = globals()
