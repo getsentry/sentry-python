@@ -26,11 +26,9 @@ Make sure that you have Python 3 installed. Version 3.7 or higher is required to
 
 On macOS, we recommend using `brew` to install Python. For Windows, we recommend an official [python.org](https://www.python.org/downloads/) release.
 
-### Fork the Repo
+### Fork and Clone the Repo
 
-Before you can contribute, you will need to [fork the `sentry-python` repository](https://github.com/getsentry/sentry-python/fork).
-
-Then, clone the forked repository to your local development environment.
+Before you can contribute, you will need to [fork the `sentry-python` repository](https://github.com/getsentry/sentry-python/fork). Then, clone the forked repository to your local development environment.
 
 ### Create a Virtual Environment
 
