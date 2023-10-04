@@ -1,6 +1,6 @@
 # Contributing to Sentry SDK for Python
 
-Thank you for your interest in contributing to `sentry-python`!
+We welcome contributions to `sentry-python` by the community.
 
 This file outlines the process to contribute to the SDK itself. For contributing to the documentation, please see the [Contributing to Docs](https://docs.sentry.io/contributing/) page.
 
