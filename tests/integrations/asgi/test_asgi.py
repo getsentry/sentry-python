@@ -8,7 +8,6 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
-async_asgi_testclient = pytest.importorskip("async_asgi_testclient")
 from async_asgi_testclient import TestClient
 
 
