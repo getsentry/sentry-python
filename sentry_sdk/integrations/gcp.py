@@ -1,6 +1,6 @@
 import sys
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from os import environ
 
 from sentry_sdk.api import continue_trace
@@ -57,7 +57,7 @@ def _wrap_func(func):
 
         configured_time = int(configured_time)
 
-        initial_time = datetime.utcnow()
+        initial_time = datetime.now(timezone.utc)
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -154,7 +154,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
 
-        final_time = datetime.utcnow()
+        final_time = datetime.now(timezone.utc)
         time_diff = final_time - initial_time
 
         execution_duration_in_millis = time_diff.microseconds / MILLIS_TO_SECONDS

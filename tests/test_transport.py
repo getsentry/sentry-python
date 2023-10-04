@@ -4,7 +4,7 @@ import pickle
 import gzip
 import io
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import pytest
 from collections import namedtuple
@@ -118,7 +118,7 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.utcnow())
+    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.now(timezone.utc))
     capture_message("löl")
 
     getattr(client, client_flush_method)()

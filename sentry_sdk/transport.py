@@ -6,7 +6,7 @@ import certifi
 import gzip
 import time
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
@@ -122,7 +122,7 @@ class Transport(object):
 def _parse_rate_limits(header, now=None):
     # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
     if now is None:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
     for limit in header.split(","):
         try:
@@ -209,7 +209,7 @@ class HttpTransport(Transport):
         # sentries if a proxy in front wants to globally slow things down.
         elif response.status == 429:
             logger.warning("Rate-limited via 429")
-            self._disabled_until[None] = datetime.utcnow() + timedelta(
+            self._disabled_until[None] = datetime.now(timezone.utc) + timedelta(
                 seconds=self._retry.get_retry_after(response) or 60
             )
 
@@ -316,13 +316,13 @@ class HttpTransport(Transport):
         def _disabled(bucket):
             # type: (Any) -> bool
             ts = self._disabled_until.get(bucket)
-            return ts is not None and ts > datetime.utcnow()
+            return ts is not None and ts > datetime.now(timezone.utc)
 
         return _disabled(category) or _disabled(None)
 
     def _is_rate_limited(self):
         # type: () -> bool
-        return any(ts > datetime.utcnow() for ts in self._disabled_until.values())
+        return any(ts > datetime.now(timezone.utc) for ts in self._disabled_until.values())
 
     def _is_worker_full(self):
         # type: () -> bool

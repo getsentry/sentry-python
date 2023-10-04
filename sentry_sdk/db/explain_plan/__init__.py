@@ -15,7 +15,7 @@ def cache_statement(statement, options):
     # type: (str, dict[str, Any]) -> None
     global EXPLAIN_CACHE
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
     explain_cache_timeout_seconds = options.get(
         "explain_cache_timeout_seconds", EXPLAIN_CACHE_TIMEOUT_SECONDS
     )
@@ -31,7 +31,7 @@ def remove_expired_cache_items():
     """
     global EXPLAIN_CACHE
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc)
 
     for key, expiration_time in EXPLAIN_CACHE.items():
         expiration_in_the_past = expiration_time < now

@@ -1,7 +1,7 @@
 import uuid
 import random
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
@@ -145,7 +145,7 @@ class Span(object):
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
-        self.start_timestamp = start_timestamp or datetime.utcnow()
+        self.start_timestamp = start_timestamp or datetime.now(timezone.utc)
         try:
             # profiling depends on this value and requires that
             # it is measured in nanoseconds
@@ -469,7 +469,7 @@ class Span(object):
                     microseconds=elapsed / 1000
                 )
         except AttributeError:
-            self.timestamp = datetime.utcnow()
+            self.timestamp = datetime.now(timezone.utc)
 
         maybe_create_breadcrumbs_from_span(hub, self)
         return None

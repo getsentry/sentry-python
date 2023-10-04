@@ -2,7 +2,7 @@ from importlib import import_module
 import os
 import uuid
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 import socket
 
 from sentry_sdk._compat import string_types, text_type, iteritems
@@ -292,7 +292,7 @@ class _Client(object):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime.utcnow()
+            event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
@@ -568,7 +568,7 @@ class _Client(object):
         if should_use_envelope_endpoint:
             headers = {
                 "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime.utcnow()),
+                "sent_at": format_timestamp(datetime.now(timezone.utc)),
             }
 
             if dynamic_sampling_context:
