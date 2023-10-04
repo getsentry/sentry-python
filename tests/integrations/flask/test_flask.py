@@ -5,8 +5,6 @@ import logging
 
 from io import BytesIO
 
-flask = pytest.importorskip("flask")
-
 from flask import (
     Flask,
     Response,

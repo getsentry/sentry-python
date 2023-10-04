@@ -1,9 +1,3 @@
-import pytest
-
-pytest.importorskip("ariadne")
-pytest.importorskip("fastapi")
-pytest.importorskip("flask")
-
 from ariadne import gql, graphql_sync, ObjectType, QueryType, make_executable_schema
 from ariadne.asgi import GraphQL
 from fastapi import FastAPI

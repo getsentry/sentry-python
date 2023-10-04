@@ -2,9 +2,6 @@ import json
 import pytest
 import logging
 
-
-pytest.importorskip("bottle")
-
 from io import BytesIO
 from bottle import Bottle, debug as set_debug, abort, redirect
 from sentry_sdk import capture_message
