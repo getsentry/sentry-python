@@ -132,12 +132,6 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
 6. (optional, if possible) Update data in [`sdk_updates.py`](https://github.com/getsentry/sentry/blob/master/src/sentry/sdk_updates.py) to give users in-app suggestions to use your integration. This step will only apply to some integrations.
 
-## Commit Message Format Guidelines
-
-See the documentation on commit messages here:
-
-https://develop.sentry.dev/commit-messages/#commit-message-format
-
 ## Releasing a New Version
 
 _(only relevant for Sentry employees)_
