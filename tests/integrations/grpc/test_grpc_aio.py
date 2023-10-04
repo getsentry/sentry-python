@@ -11,11 +11,11 @@ import sentry_sdk
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
-from tests.integrations.grpc.grpc_aio_test_service_pb2 import gRPCaioTestMessage
-from tests.integrations.grpc.grpc_aio_test_service_pb2_grpc import (
-    gRPCaioTestServiceServicer,
-    add_gRPCaioTestServiceServicer_to_server,
-    gRPCaioTestServiceStub,
+from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
+from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
+    gRPCTestServiceServicer,
+    add_gRPCTestServiceServicer_to_server,
+    gRPCTestServiceStub,
 )
 
 AIO_PORT = 50052
@@ -35,7 +35,7 @@ async def grpc_server(sentry_init, event_loop):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     server = grpc.aio.server()
     server.add_insecure_port(f"[::]:{AIO_PORT}")
-    add_gRPCaioTestServiceServicer_to_server(TestService, server)
+    add_gRPCTestServiceServicer_to_server(TestService, server)
 
     await event_loop.create_task(server.start())
 
@@ -50,8 +50,8 @@ async def test_grpc_server_starts_transaction(capture_events, grpc_server):
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
-        stub = gRPCaioTestServiceStub(channel)
-        await stub.TestServe(gRPCaioTestMessage(text="test"))
+        stub = gRPCTestServiceStub(channel)
+        await stub.TestServe(gRPCTestMessage(text="test"))
 
     (event,) = events
     span = event["spans"][0]
@@ -69,7 +69,7 @@ async def test_grpc_server_continues_transaction(capture_events, grpc_server):
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
-        stub = gRPCaioTestServiceStub(channel)
+        stub = gRPCTestServiceStub(channel)
 
         with sentry_sdk.start_transaction() as transaction:
             metadata = (
@@ -90,7 +90,7 @@ async def test_grpc_server_continues_transaction(capture_events, grpc_server):
                 ),
             )
 
-            await stub.TestServe(gRPCaioTestMessage(text="test"), metadata=metadata)
+            await stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
 
     (event, _) = events
     span = event["spans"][0]
@@ -110,9 +110,9 @@ async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
-        stub = gRPCaioTestServiceStub(channel)
+        stub = gRPCTestServiceStub(channel)
         try:
-            await stub.TestServe(gRPCaioTestMessage(text="exception"))
+            await stub.TestServe(gRPCTestMessage(text="exception"))
             raise AssertionError()
         except Exception:
             pass
@@ -130,9 +130,9 @@ async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
     events = capture_events_forksafe()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
-        stub = gRPCaioTestServiceStub(channel)
+        stub = gRPCTestServiceStub(channel)
         with start_transaction():
-            await stub.TestServe(gRPCaioTestMessage(text="test"))
+            await stub.TestServe(gRPCTestMessage(text="test"))
 
     events.write_file.close()
     events.read_event()
@@ -143,16 +143,16 @@ async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
     assert span["op"] == OP.GRPC_CLIENT
     assert (
         span["description"]
-        == "unary unary call to /grpc_aio_test_server.gRPCaioTestService/TestServe"
+        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
     assert span["data"] == {
         "type": "unary unary",
-        "method": "/grpc_aio_test_server.gRPCaioTestService/TestServe",
+        "method": "/grpc_test_server.gRPCTestService/TestServe",
         "code": "OK",
     }
 
 
-class TestService(gRPCaioTestServiceServicer):
+class TestService(gRPCTestServiceServicer):
     class TestException(Exception):
         def __init__(self):
             super().__init__("test")
@@ -166,4 +166,4 @@ class TestService(gRPCaioTestServiceServicer):
         if request.text == "exception":
             raise cls.TestException()
 
-        return gRPCaioTestMessage(text=request.text)
+        return gRPCTestMessage(text=request.text)
