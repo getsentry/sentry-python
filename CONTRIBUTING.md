@@ -6,16 +6,15 @@ This file outlines the process to contribute to the SDK itself. For contributing
 
 ## How to Report a Problem
 
-Please search the [issue tracker](https://github.com/getsentry/sentry-python/issues) before creating a new issue (a problem or an improvement request). Please also ask in our [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr) before submitting a new issue. There is a ton of great people in our Discord community ready to help you!
+Please search the [issue tracker](https://github.com/getsentry/sentry-python/issues) before creating a new issue (a problem or an improvement request). Please also ask in our [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr) before submitting a new issue. There are a ton of great people in our Discord community ready to help you!
 
-If you feel that you can fix or implement it yourself, please read a few paragraphs below to learn how to submit your changes.
 
 ## Submitting Changes
 
 - Fork the `sentry-python` repo and prepare your changes.
 - Add tests for your changes to `tests/`.
 - Run tests and make sure all of them pass.
-- Submit a pull request, referencing any issues it addresses.
+- Submit a pull request, referencing any issues your changes address. Please follow our [commit message format](https://develop.sentry.dev/commit-messages/#commit-message-format) when naming your pull request.
 
 We will review your pull request as soon as possible. Thank you for contributing!
 
@@ -120,7 +119,7 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
 2. Write tests.
 
-   - Think about the minimum versions supported, and test each version in a separate env in `tox.ini`.
+   - Consider the minimum versions supported, and test each version in a separate env in `tox.ini`.
 
    - Create a new folder in `tests/integrations/`, with an `__init__` file that skips the entire suite if the package is not installed.
 
@@ -128,13 +127,13 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
    - We use `extras_require` in `setup.py` to communicate minimum version requirements for integrations. People can use this in combination with tools like Poetry or Pipenv to detect conflicts between our supported versions and their used versions programmatically.
 
-     Do not set upper-bounds on version requirements as people are often faster in adopting new versions of a web framework than we are in adding them to the test matrix or our package metadata.
+     Do not set upper bounds on version requirements as people are often faster in adopting new versions of a web framework than we are in adding them to the test matrix or our package metadata.
 
-4. Write the [docs](https://github.com/getsentry/sentry-docs). Follow the structure of [existing integration docs](https://docs.sentry.io/platforms/python/integrations/). Make sure to add your integration to the table in `python/integrations/index.md` (people forget to do that all the time).
+4. Write the [docs](https://github.com/getsentry/sentry-docs). Follow the structure of [existing integration docs](https://docs.sentry.io/platforms/python/integrations/). And, please **make sure to add your integration to the table in `python/integrations/index.md`** (people often forget this step 🙂).
 
 5. Merge docs after new version has been released (auto-deploys on merge).
 
-6. (optional) Update data in [`sdk_updates.py`](https://github.com/getsentry/sentry/blob/master/src/sentry/sdk_updates.py) to give users in-app suggestions to use your integration. May not be applicable or doable for all kinds of integrations.
+6. (optional, if possible) Update data in [`sdk_updates.py`](https://github.com/getsentry/sentry/blob/master/src/sentry/sdk_updates.py) to give users in-app suggestions to use your integration. This step will only apply to some integrations.
 
 ## Commit Message Format Guidelines
 
@@ -155,7 +154,7 @@ _(only relevant for Sentry employees)_
 ### Manual Process
 
 - On GitHub in the `sentry-python` repository, go to "Actions" and select the "Release" workflow.
-- Click on "Run workflow" on the right side, make sure the `master` branch is selected.
+- Click on "Run workflow" on the right side, and make sure the `master` branch is selected.
 - Set the "Version to release" input field. Here you decide if it is a major, minor or patch release. (See "Versioning Policy" below)
 - Click "Run Workflow".
 
