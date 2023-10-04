@@ -43,8 +43,7 @@ cd sentry-python
 python -m venv .venv
 ```
 
-From now on, every time you want to work on your changes for `sentry-python`,
-you will need to make sure your virtual environment is active:
+Then, activate your virtual environment with the following command. You will need to repeat this step every time you wish to work on your changes for `sentry-python`.
 
 ```bash
 source .venv/bin/activate
