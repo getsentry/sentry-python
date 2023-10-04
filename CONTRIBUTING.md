@@ -112,6 +112,8 @@ pytest -rs tests/integrations/flask/  # Replace "flask" with the specific integr
 
      - You don't need to feel bad about it.
 
+   - Make sure your changes don't break end user contracts. The SDK should never alter the expected behavior of the underlying library or framework from the user's perspective and it shouldn't have any side effects.
+
    - Avoid modifying the hub, registering a new client or the like. The user drives the client, and the client owns integrations.
 
    - Allow the user to disable the integration by changing the client. Check `Hub.current.get_integration(MyIntegration)` from within your signal handlers to see if your integration is still active before you do anything impactful (such as sending an event).
