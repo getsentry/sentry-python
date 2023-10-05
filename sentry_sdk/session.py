@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, timezone
 
+from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import format_timestamp
 
@@ -48,7 +48,7 @@ class Session(object):
         if sid is None:
             sid = uuid.uuid4()
         if started is None:
-            started = datetime.now(timezone.utc)
+            started = datetime_utcnow()
         if status is None:
             status = "ok"
         self.status = status
@@ -108,7 +108,7 @@ class Session(object):
         if did is not None:
             self.did = str(did)
         if timestamp is None:
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime_utcnow()
         self.timestamp = timestamp
         if started is not None:
             self.started = started
