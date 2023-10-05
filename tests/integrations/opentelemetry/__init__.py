@@ -1,3 +1,3 @@
 import pytest
 
-django = pytest.importorskip("opentelemetry")
+pytest.importorskip("opentelemetry")
