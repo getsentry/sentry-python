@@ -106,7 +106,6 @@ async def test_grpc_server_continues_transaction(capture_events, grpc_server):
 
 @pytest.mark.asyncio
 async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
-    sentry_init(traces_sample_rate=1.0)
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
@@ -126,7 +125,9 @@ async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
-async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
+async def test_grpc_client_starts_span(
+    grpc_server, sentry_init, capture_events_forksafe
+):
     events = capture_events_forksafe()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
@@ -152,6 +153,34 @@ async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
     }
 
 
+@pytest.mark.asyncio
+async def test_grpc_client_unary_stream_starts_span(
+    grpc_server, capture_events_forksafe
+):
+    events = capture_events_forksafe()
+
+    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        with start_transaction():
+            response = stub.TestUnaryStream(gRPCTestMessage(text="test"))
+            [_ async for _ in response]
+
+    events.write_file.close()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
+    )
+    assert span["data"] == {
+        "type": "unary stream",
+        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+    }
+
+
 class TestService(gRPCTestServiceServicer):
     class TestException(Exception):
         def __init__(self):
@@ -167,3 +196,8 @@ class TestService(gRPCTestServiceServicer):
             raise cls.TestException()
 
         return gRPCTestMessage(text=request.text)
+
+    @classmethod
+    async def TestUnaryStream(cls, request, context):  # noqa: N802
+        for _ in range(3):
+            yield gRPCTestMessage(text=request.text)
