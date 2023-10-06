@@ -4,6 +4,7 @@ package grpc_test_server;
 
 service gRPCTestService{
   rpc TestServe(gRPCTestMessage) returns (gRPCTestMessage);
+  rpc TestUnaryStream(gRPCTestMessage) returns (stream gRPCTestMessage);
 }
 
 message gRPCTestMessage {
