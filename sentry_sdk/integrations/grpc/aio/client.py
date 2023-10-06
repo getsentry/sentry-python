@@ -75,17 +75,17 @@ class SentryUnaryStreamClientInterceptor(
         method = client_call_details.method
 
         with hub.start_span(
-            op=OP.GRPC_CLIENT, description="unary stream call %s" % method
+            op=OP.GRPC_CLIENT, description="unary stream call to %s" % method.decode()
         ) as span:
             span.set_data("type", "unary stream")
-            span.set_data("methdo", method)
+            span.set_data("method", method)
 
             client_call_details = self._update_client_call_details_metadata_from_hub(
                 client_call_details, hub
             )
 
             response = await continuation(client_call_details, request)
-            status_code = await response.code()
-            span.set_data("code", status_code)
+            # status_code = await response.code()
+            # span.set_data("code", status_code)
 
             return response
