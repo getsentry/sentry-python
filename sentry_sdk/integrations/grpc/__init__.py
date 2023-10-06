@@ -49,9 +49,33 @@ def _wrap_channel_sync(func: Callable[P, Channel]) -> Callable[P, Channel]:
     @wraps(func)
     def patched_channel(*args: Any, **kwargs: Any) -> Channel:
         channel = func(*args, **kwargs)
-        return intercept_channel(channel, ClientInterceptor())
+        if not ClientInterceptor._is_intercepted:
+            ClientInterceptor._is_intercepted = True
+            return intercept_channel(channel, ClientInterceptor())
+        else:
+            return channel
 
     return patched_channel
+
+
+def _wrap_intercept_channel(func: Callable[P, Channel]) -> Callable[P, Channel]:
+    @wraps(func)
+    def patched_intercept_channel(
+        channel: Channel, *interceptors: grpc.ServerInterceptor
+    ) -> Channel:
+        if ClientInterceptor._is_intercepted:
+            interceptors = tuple(
+                [
+                    interceptor
+                    for interceptor in interceptors
+                    if not isinstance(interceptor, ClientInterceptor)
+                ]
+            )
+        else:
+            interceptors = interceptors
+        return intercept_channel(channel, *interceptors)
+
+    return patched_intercept_channel  # type: ignore
 
 
 def _wrap_channel_async(func: Callable[P, AsyncChannel]) -> Callable[P, AsyncChannel]:
@@ -82,6 +106,11 @@ def _wrap_sync_server(func: Callable[P, Server]) -> Callable[P, Server]:
         interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
         **kwargs: P.kwargs,
     ) -> Server:
+        interceptors = [
+            interceptor
+            for interceptor in interceptors or []
+            if not isinstance(interceptor, ServerInterceptor)
+        ]
         server_interceptor = ServerInterceptor()
         interceptors = [server_interceptor, *(interceptors or [])]
         return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
@@ -116,6 +145,7 @@ class GRPCIntegration(Integration):
 
         grpc.insecure_channel = _wrap_channel_sync(grpc.insecure_channel)
         grpc.secure_channel = _wrap_channel_sync(grpc.secure_channel)
+        grpc.intercept_channel = _wrap_intercept_channel(grpc.intercept_channel)
 
         grpc.aio.insecure_channel = _wrap_channel_async(grpc.aio.insecure_channel)
         grpc.aio.secure_channel = _wrap_channel_async(grpc.aio.secure_channel)

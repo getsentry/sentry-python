@@ -16,7 +16,7 @@ except ImportError:
 
 
 class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    def __init__(self, find_name=None) -> None:
+    def __init__(self, find_name=None):
         # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
         self._find_method_name = find_name or ServerInterceptor._find_name
 

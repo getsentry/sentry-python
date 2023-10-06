@@ -19,6 +19,8 @@ except ImportError:
 class ClientInterceptor(
     grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor  # type: ignore
 ):
+    _is_intercepted = False
+
     def intercept_unary_unary(self, continuation, client_call_details, request):
         # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], _UnaryOutcome], ClientCallDetails, Message) -> _UnaryOutcome
         hub = Hub.current

@@ -186,7 +186,6 @@ def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksa
     assert span["data"] == {
         "type": "unary stream",
         "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-        "code": "OK",
     }
 
 
