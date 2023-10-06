@@ -2,6 +2,7 @@ import sys
 import weakref
 from inspect import isawaitable
 
+from sentry_sdk import continue_trace
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from typing import Dict
 
     from sanic.request import Request, RequestParameters
+    from sanic.response import BaseHTTPResponse
 
     from sentry_sdk._types import Event, EventProcessor, Hint
     from sanic.router import Route
@@ -133,6 +135,7 @@ def _setup_sanic():
     # type: () -> None
     Sanic._startup = _startup
     ErrorHandler.lookup = _sentry_error_handler_lookup
+    # _patch_sanic_asgi()
 
 
 def _setup_legacy_sanic():
@@ -140,6 +143,40 @@ def _setup_legacy_sanic():
     Sanic.handle_request = _legacy_handle_request
     Router.get = _legacy_router_get
     ErrorHandler.lookup = _sentry_error_handler_lookup
+
+
+# def _patch_sanic_asgi():
+#     # type: () -> None
+#     old_app = Sanic.__call__
+
+#     print("Patching")
+#     breakpoint()
+
+#     @integration_patched_async(old_app, SanicIntegration)
+#     async def _sentry_patched_sanic(self, *args, **kwargs):
+#         # type: (Sanic, *object, **object) -> object
+#         print("Patched")
+#         # middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, *kw))
+
+#         middleware = SentryAsgiMiddleware(old_app)
+#         middleware.__call__ = middleware._run_asgi2
+
+#         breakpoint()
+
+#         return await middleware(self, *args, **kwargs)
+
+# Sanic.__call__ = _sentry_patched_sanic
+
+
+# def _patch_sanic_asgi():
+#     old_init = Sanic.__init__
+
+#     @wraps(Sanic.__init__)
+#     def _sentry_patched_init(self, *args, **kwargs):
+#         old_init(self, *args, **kwargs)
+#         self.register_middleware(SentryAsgiMiddleware(self), "request")
+
+#     Sanic.__init__ = _sentry_patched_init
 
 
 async def _startup(self):
@@ -164,6 +201,7 @@ async def _startup(self):
 
 async def _hub_enter(request):
     # type: (Request) -> None
+    # breakpoint()
     hub = Hub.current
     request.ctx._sentry_do_integration = (
         hub.get_integration(SanicIntegration) is not None
@@ -180,9 +218,20 @@ async def _hub_enter(request):
         scope.clear_breadcrumbs()
         scope.add_event_processor(_make_request_processor(weak_request))
 
+    transaction = continue_trace(
+        dict(request.headers), op="http.server", name=request.server_path
+    )
+    request.ctx._sentry_transaction = request.ctx._sentry_hub.start_transaction(
+        transaction
+    )
 
-async def _hub_exit(request, **_):
-    # type: (Request, **Any) -> None
+
+async def _hub_exit(request, response):
+    # type: (Request, BaseHTTPResponse) -> None
+    # TODO: Should these lines go in a try block in case the context got modified?
+    breakpoint()
+    request.ctx._sentry_transaction.set_http_status(response.status)
+    request.ctx._sentry_transaction.finish()
     request.ctx._sentry_hub.__exit__(None, None, None)
 
 
@@ -192,6 +241,7 @@ async def _set_transaction(request, route, **kwargs):
     if hub.get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
+                breakpoint()
                 route_name = route.name.replace(request.app.name, "").strip(".")
                 scope.set_transaction_name(
                     route_name, source=TRANSACTION_SOURCE_COMPONENT
@@ -285,6 +335,7 @@ def _legacy_router_get(self, *args):
 
 def _capture_exception(exception):
     # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
+    breakpoint()
     hub = Hub.current
     integration = hub.get_integration(SanicIntegration)
     if integration is None:
