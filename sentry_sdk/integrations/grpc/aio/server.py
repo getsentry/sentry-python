@@ -29,33 +29,45 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Awaitable[RpcMethodHandler]
         handler = await continuation(handler_call_details)
 
-        async def wrapped(request, context):
-            # type: (Any, ServicerContext) -> Any
-            name = self._find_method_name(context)
-            if not name:
-                return await handler(request, context)
+        if not handler.request_streaming and not handler.response_streaming:
+            handler_factory = grpc.unary_unary_rpc_method_handler
 
-            hub = Hub(Hub.current)
+            async def wrapped(request, context):
+                # type: (Any, ServicerContext) -> Any
+                name = self._find_method_name(context)
+                if not name:
+                    return await handler(request, context)
 
-            transaction = Transaction.continue_from_headers(
-                dict(context.invocation_metadata()),
-                op=OP.GRPC_SERVER,
-                name=name,
-                source=TRANSACTION_SOURCE_CUSTOM,
-            )
+                hub = Hub.current
 
-            with hub.start_transaction(transaction=transaction):
-                try:
-                    return await handler.unary_unary(request, context)
-                except Exception as exc:
-                    event, hint = event_from_exception(
-                        exc,
-                        mechanism={"type": "grpc", "handled": False},
-                    )
-                    hub.capture_event(event, hint=hint)
-                    raise
+                # What if the headers are empty?
+                transaction = Transaction.continue_from_headers(
+                    dict(context.invocation_metadata()),
+                    op=OP.GRPC_SERVER,
+                    name=name,
+                    source=TRANSACTION_SOURCE_CUSTOM,
+                )
 
-        return grpc.unary_unary_rpc_method_handler(
+                with hub.start_transaction(transaction=transaction):
+                    try:
+                        return await handler.unary_unary(request, context)
+                    except Exception as exc:
+                        event, hint = event_from_exception(
+                            exc,
+                            mechanism={"type": "grpc", "handled": False},
+                        )
+                        hub.capture_event(event, hint=hint)
+                        raise
+
+        elif not handler.request_streaming and handler.response_streaming:
+            handler_factory = grpc.unary_stream_rpc_method_handler
+
+            async def wrapped(request, context):  # type: ignore
+                # type: (Any, ServicerContext) -> Any
+                async for r in handler.unary_stream(request, context):
+                    yield r
+
+        return handler_factory(
             wrapped,
             request_deserializer=handler.request_deserializer,
             response_serializer=handler.response_serializer,
