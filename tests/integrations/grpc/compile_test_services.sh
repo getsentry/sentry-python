@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
-# Create python file
-python -m grpc_tools.protoc --proto_path=./protos --python_out=. --pyi_out=. --grpc_python_out=. ./protos/grpc_test_service.proto
+# Run this script from the project root to generate the python code
 
-# Fix imports in generated file
-sed -i '' 's/import grpc_/import tests\.integrations\.grpc\.grpc_/g' ./grpc_test_service_pb2_grpc.py
+TARGET_PATH=./tests/integrations/grpc
+
+# Create python file
+python -m grpc_tools.protoc \
+    --proto_path=$TARGET_PATH/protos/ \
+    --python_out=$TARGET_PATH/ \
+    --pyi_out=$TARGET_PATH/ \
+    --grpc_python_out=$TARGET_PATH/ \
+    $TARGET_PATH/protos/grpc_test_service.proto
+
+echo Code generation successfull
