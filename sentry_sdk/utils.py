@@ -68,7 +68,12 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import (
+        EndpointType,
+        Event,
+        ExcInfo,
+        Hint,
+    )
 
 
 epoch = datetime(1970, 1, 1)
@@ -1053,7 +1058,7 @@ def event_from_exception(
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    # type: (...) -> Tuple[Event, Hint]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (

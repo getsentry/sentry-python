@@ -47,12 +47,12 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 return ChaliceEventSourceHandler.__call__(self, event, context)
             except Exception:
                 exc_info = sys.exc_info()
-                event, hint = event_from_exception(
+                sentry_event, hint = event_from_exception(
                     exc_info,
                     client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
-                hub.capture_event(event, hint=hint)
+                hub.capture_event(sentry_event, hint=hint)
                 hub.flush()
                 reraise(*exc_info)
 
