@@ -96,9 +96,11 @@ else:
     binary_sequence_types = (bytes, bytearray, memoryview)
 
     def datetime_utcnow():
+        # type: () -> datetime
         return datetime.now(timezone.utc)
 
     def utc_from_timestamp(timestamp):
+        # type: (float) -> datetime
         return datetime.fromtimestamp(timestamp, timezone.utc)
 
     def implements_str(x):
