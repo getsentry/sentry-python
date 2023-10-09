@@ -1,3 +1,3 @@
 import pytest
 
-pyramid = pytest.importorskip("pyramid")
+pytest.importorskip("pyramid")

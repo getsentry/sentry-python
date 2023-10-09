@@ -24,7 +24,7 @@ from sentry_sdk.integrations.starlette import (
     StarletteRequestExtractor,
 )
 
-starlette = pytest.importorskip("starlette")
+import starlette
 from starlette.authentication import (
     AuthCredentials,
     AuthenticationBackend,

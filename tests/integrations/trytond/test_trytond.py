@@ -1,9 +1,7 @@
-import pytest
-
-pytest.importorskip("trytond")
-
 import json
 import unittest.mock
+
+import pytest
 
 import trytond
 from trytond.exceptions import TrytonException as TrytondBaseException
