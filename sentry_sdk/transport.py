@@ -17,6 +17,7 @@ from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from typing import Any
     from typing import Callable
     from typing import Dict

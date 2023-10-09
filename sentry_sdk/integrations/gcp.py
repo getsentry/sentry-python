@@ -25,6 +25,7 @@ TIMEOUT_WARNING_BUFFER = 1.5  # Buffer time required to send timeout warning to 
 MILLIS_TO_SECONDS = 1000.0
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from typing import Any
     from typing import TypeVar
     from typing import Callable

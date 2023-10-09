@@ -14,6 +14,7 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
+    from datetime import datetime
     from typing import Any
     from typing import Dict
     from typing import Iterator
