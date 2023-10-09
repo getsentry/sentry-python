@@ -6,12 +6,12 @@ removed at any time without prior notice.
 import sys
 from importlib import import_module
 
-from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
-from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.modules import _get_installed_modules
-from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations.modules import _get_installed_modules
+from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
+from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.utils import logger
 
 try:
     from opentelemetry import trace  # type: ignore

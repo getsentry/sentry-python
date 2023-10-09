@@ -2,38 +2,53 @@ from __future__ import absolute_import
 
 import sys
 
+from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK, Transaction
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
-    SENSITIVE_DATA_SUBSTITUTE,
     parse_version,
 )
 
 try:
     import arq.worker
-    from arq.version import VERSION as ARQ_VERSION
     from arq.connections import ArqRedis
-    from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
+    from arq.version import VERSION as ARQ_VERSION
+    from arq.worker import (
+        JobExecutionFailed,
+        Retry,
+        RetryJob,
+        Worker,
+    )
 except ImportError:
     raise DidNotEnable("Arq is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
-
-    from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+        Union,
+    )
 
     from arq.cron import CronJob
     from arq.jobs import Job
     from arq.typing import WorkerCoroutine
     from arq.worker import Function
+
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        ExcInfo,
+        Hint,
+    )
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 

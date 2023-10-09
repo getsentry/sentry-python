@@ -3,23 +3,24 @@ from __future__ import absolute_import
 import logging
 from fnmatch import fnmatch
 
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import (
-    to_string,
-    event_from_exception,
-    current_stacktrace,
-    capture_internal_exceptions,
-)
-from sentry_sdk.integrations import Integration
 from sentry_sdk._compat import iteritems, utc_from_timestamp
-
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import Integration
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    current_stacktrace,
+    event_from_exception,
+    to_string,
+)
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+    )
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR

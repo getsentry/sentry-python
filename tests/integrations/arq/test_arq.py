@@ -1,16 +1,15 @@
 import asyncio
-import pytest
-
-from sentry_sdk import start_transaction
-from sentry_sdk.integrations.arq import ArqIntegration
 
 import arq.worker
+import pytest
 from arq import cron
 from arq.connections import ArqRedis
 from arq.jobs import Job
 from arq.utils import timestamp_ms
-
 from fakeredis.aioredis import FakeRedis
+
+from sentry_sdk import start_transaction
+from sentry_sdk.integrations.arq import ArqIntegration
 
 
 def async_partial(async_fn, *args, **kwargs):

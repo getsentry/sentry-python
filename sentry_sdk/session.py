@@ -6,10 +6,12 @@ from sentry_sdk.utils import format_timestamp
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Optional
-    from typing import Union
-    from typing import Any
-    from typing import Dict
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+        Union,
+    )
 
     from sentry_sdk._types import SessionStatus
 

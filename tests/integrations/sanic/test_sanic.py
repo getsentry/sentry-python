@@ -1,17 +1,18 @@
-import os
-import sys
-import random
 import asyncio
+import os
+import random
+import sys
 from unittest.mock import Mock
 
 import pytest
+from sanic import Sanic
+from sanic import __version__ as SANIC_VERSION_RAW
+from sanic import request, response
+from sanic.exceptions import SanicException
+from sanic.response import HTTPResponse
 
 from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.sanic import SanicIntegration
-
-from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
-from sanic.response import HTTPResponse
-from sanic.exceptions import SanicException
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
 

@@ -6,17 +6,17 @@ except ImportError:
     from mock import MagicMock
 
 from opentelemetry.context import get_current
-from opentelemetry.trace.propagation import get_current_span
 from opentelemetry.trace import (
-    set_span_in_context,
-    TraceFlags,
     SpanContext,
+    TraceFlags,
+    set_span_in_context,
 )
+from opentelemetry.trace.propagation import get_current_span
+
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
-
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.tracing_utils import Baggage

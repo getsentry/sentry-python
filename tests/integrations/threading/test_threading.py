@@ -10,7 +10,7 @@ except ImportError:
 import pytest
 
 import sentry_sdk
-from sentry_sdk import configure_scope, capture_message
+from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
 original_start = Thread.start

@@ -5,22 +5,23 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing_utils import record_sql_queries
-
 from sentry_sdk.utils import parse_version
 
 try:
+    from sqlalchemy import __version__ as SQLALCHEMY_VERSION  # type: ignore
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
-    from sqlalchemy import __version__ as SQLALCHEMY_VERSION  # type: ignore
 except ImportError:
     raise DidNotEnable("SQLAlchemy not installed.")
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import ContextManager
-    from typing import Optional
+    from typing import (
+        Any,
+        ContextManager,
+        Optional,
+    )
 
     from sentry_sdk.tracing import Span
 

@@ -3,18 +3,18 @@ from datetime import datetime
 from opentelemetry.context import get_value  # type: ignore
 from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
 from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import (  # type: ignore
+from opentelemetry.trace import Span as OTelSpan  # type: ignore
+from opentelemetry.trace import (
+    SpanContext,
+    SpanKind,
     format_span_id,
     format_trace_id,
     get_current_span,
-    SpanContext,
-    Span as OTelSpan,
-    SpanKind,
 )
-from opentelemetry.trace.span import (  # type: ignore
-    INVALID_SPAN_ID,
-    INVALID_TRACE_ID,
-)
+from opentelemetry.trace.span import INVALID_SPAN_ID, INVALID_TRACE_ID  # type: ignore
+from urllib3.util import parse_url as urlparse
+
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations.opentelemetry.consts import (
@@ -22,14 +22,17 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import Transaction, Span as SentrySpan
+from sentry_sdk.tracing import Span as SentrySpan
+from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import Dsn
-from sentry_sdk._types import TYPE_CHECKING
-
-from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+        Union,
+    )
 
     from sentry_sdk._types import Event, Hint
 

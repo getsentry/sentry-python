@@ -13,7 +13,6 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
-
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_request_data,
@@ -23,26 +22,28 @@ from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_COMPONENT,
     TRANSACTION_SOURCE_ROUTE,
     TRANSACTION_SOURCE_URL,
-    TRANSACTION_SOURCE_COMPONENT,
+    Transaction,
 )
 from sentry_sdk.utils import (
+    CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
     ContextVar,
     event_from_exception,
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
     logger,
     transaction_from_function,
 )
-from sentry_sdk.tracing import Transaction
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import Tuple
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Optional,
+        Tuple,
+    )
 
     from sentry_sdk._types import Event, Hint
 

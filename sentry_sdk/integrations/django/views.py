@@ -1,7 +1,7 @@
+from sentry_sdk import _functools
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk import _functools
 
 if TYPE_CHECKING:
     from typing import Any
@@ -24,6 +24,7 @@ def patch_views():
 
     from django.core.handlers.base import BaseHandler
     from django.template.response import SimpleTemplateResponse
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
     old_make_view_atomic = BaseHandler.make_view_atomic

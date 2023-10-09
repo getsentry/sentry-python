@@ -5,7 +5,11 @@ from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
+from django.http import (
+    HttpResponse,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+)
 from django.shortcuts import render
 from django.template import Context, Template
 from django.template.response import TemplateResponse

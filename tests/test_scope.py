@@ -1,6 +1,8 @@
 import copy
 import os
+
 import pytest
+
 from sentry_sdk import capture_exception
 from sentry_sdk.scope import Scope
 

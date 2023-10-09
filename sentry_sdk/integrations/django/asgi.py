@@ -11,13 +11,14 @@ import asyncio
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Union
-    from typing import Callable
+    from typing import (
+        Any,
+        Callable,
+        Union,
+    )
 
     from django.http.response import HttpResponse
 
@@ -58,6 +59,7 @@ def patch_channels_asgi_handler_impl(cls):
     # type: (Any) -> None
 
     import channels  # type: ignore
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
     if channels.__version__ < "3.0.0":

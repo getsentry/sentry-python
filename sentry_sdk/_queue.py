@@ -72,7 +72,6 @@ Agreement.
 """
 
 import threading
-
 from collections import deque
 from time import time
 

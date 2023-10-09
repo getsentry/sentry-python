@@ -1,15 +1,13 @@
 import sys
-
 from collections import Counter
 
 import pytest
-import sentry_sdk
-from sentry_sdk import capture_message
-from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
-
 from async_asgi_testclient import TestClient
 
+import sentry_sdk
+from sentry_sdk import capture_message
+from sentry_sdk.integrations._asgi_common import _get_headers, _get_ip
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 
 minimum_python_36 = pytest.mark.skipif(
     sys.version_info < (3, 6), reason="ASGI is only supported in Python >= 3.6"

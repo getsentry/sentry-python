@@ -7,7 +7,6 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import logger, qualname_from_function
 
-
 if TYPE_CHECKING:
     from typing import Any
 

@@ -1,5 +1,6 @@
-import pytest
 import os
+
+import pytest
 
 pytest.importorskip("boto3")
 xml_fixture_path = os.path.dirname(os.path.abspath(__file__))

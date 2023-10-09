@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel  # type: ignore
+
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -9,15 +10,31 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import event_from_exception, transaction_from_function
 
 try:
-    from starlite import Request, Starlite, State  # type: ignore
+    from starlite import (  # type: ignore
+        Request,
+        Starlite,
+        State,
+    )
     from starlite.handlers.base import BaseRouteHandler  # type: ignore
     from starlite.middleware import DefineMiddleware  # type: ignore
     from starlite.plugins.base import get_plugin_for_value  # type: ignore
     from starlite.routes.http import HTTPRoute  # type: ignore
-    from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
+    from starlite.utils import (  # type: ignore
+        ConnectionDataExtractor,
+        Ref,
+        is_async_callable,
+    )
 
     if TYPE_CHECKING:
-        from typing import Any, Dict, List, Optional, Union
+        from typing import (
+            Any,
+            Dict,
+            List,
+            Optional,
+            Union,
+        )
+
+        from starlite import MiddlewareProtocol
         from starlite.types import (  # type: ignore
             ASGIApp,
             HTTPReceiveMessage,
@@ -29,7 +46,7 @@ try:
             Send,
             WebSocketReceiveMessage,
         )
-        from starlite import MiddlewareProtocol
+
         from sentry_sdk._types import Event
 except ImportError:
     raise DidNotEnable("Starlite is not installed")

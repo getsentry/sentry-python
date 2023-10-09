@@ -1,7 +1,7 @@
 import asyncio
 
-import pytest
 import httpx
+import pytest
 import responses
 
 from sentry_sdk import capture_message, start_transaction

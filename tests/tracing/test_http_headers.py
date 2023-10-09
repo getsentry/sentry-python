@@ -3,7 +3,6 @@ import pytest
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
-
 try:
     from unittest import mock  # python 3.3 and above
 except ImportError:

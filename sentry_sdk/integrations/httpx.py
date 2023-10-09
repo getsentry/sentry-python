@@ -1,6 +1,7 @@
 from sentry_sdk import Hub
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
@@ -10,14 +11,17 @@ from sentry_sdk.utils import (
     parse_url,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any
 
 
 try:
-    from httpx import AsyncClient, Client, Request, Response  # type: ignore
+    from httpx import (  # type: ignore
+        AsyncClient,
+        Client,
+        Request,
+        Response,
+    )
 except ImportError:
     raise DidNotEnable("httpx is not installed")
 

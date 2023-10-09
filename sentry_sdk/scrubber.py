@@ -1,17 +1,20 @@
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    AnnotatedValue,
-    iter_event_frames,
-)
 from sentry_sdk._compat import string_types
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.utils import (
+    AnnotatedValue,
+    capture_internal_exceptions,
+    iter_event_frames,
+)
 
 if TYPE_CHECKING:
+    from typing import (
+        Any,
+        Dict,
+        List,
+        Optional,
+    )
+
     from sentry_sdk._types import Event
-    from typing import Any
-    from typing import Dict
-    from typing import List
-    from typing import Optional
 
 
 DEFAULT_DENYLIST = [

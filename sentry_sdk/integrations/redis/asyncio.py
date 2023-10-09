@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 
 from sentry_sdk import Hub
+from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
-from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk.integrations.redis import (
     RedisIntegration,
     _get_redis_command_args,
@@ -10,9 +10,7 @@ from sentry_sdk.integrations.redis import (
     _set_client_data,
     _set_pipeline_data,
 )
-
-
-from sentry_sdk._types import MYPY
+from sentry_sdk.utils import capture_internal_exceptions
 
 if MYPY:
     from typing import Any

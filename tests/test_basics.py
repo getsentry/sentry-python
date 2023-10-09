@@ -7,15 +7,15 @@ import pytest
 
 from sentry_sdk import (
     Client,
-    push_scope,
-    configure_scope,
+    Hub,
+    add_breadcrumb,
     capture_event,
     capture_exception,
     capture_message,
-    start_transaction,
-    add_breadcrumb,
+    configure_scope,
     last_event_id,
-    Hub,
+    push_scope,
+    start_transaction,
 )
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
@@ -24,8 +24,8 @@ from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
-from sentry_sdk.utils import get_sdk_name
 from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.utils import get_sdk_name
 
 
 def test_processors(sentry_init, capture_events):

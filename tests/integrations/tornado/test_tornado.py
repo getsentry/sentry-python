@@ -1,12 +1,19 @@
 import json
 
 import pytest
-
-from sentry_sdk import configure_scope, start_transaction, capture_message
-from sentry_sdk.integrations.tornado import TornadoIntegration
-
-from tornado.web import RequestHandler, Application, HTTPError
 from tornado.testing import AsyncHTTPTestCase
+from tornado.web import (
+    Application,
+    HTTPError,
+    RequestHandler,
+)
+
+from sentry_sdk import (
+    capture_message,
+    configure_scope,
+    start_transaction,
+)
+from sentry_sdk.integrations.tornado import TornadoIntegration
 
 
 @pytest.fixture

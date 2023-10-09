@@ -1,24 +1,16 @@
-from importlib import import_module
 import os
-import uuid
 import random
 import socket
+import uuid
+from importlib import import_module
 
-from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    current_stacktrace,
-    disable_capture_event,
-    format_timestamp,
-    get_sdk_name,
-    get_type_name,
-    get_default_release,
-    handle_in_app,
-    logger,
+from sentry_sdk._compat import (
+    datetime_utcnow,
+    iteritems,
+    string_types,
+    text_type,
 )
-from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace, has_tracing_enabled
-from sentry_sdk.transport import make_transport
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
@@ -26,25 +18,39 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
-from sentry_sdk.utils import ContextVar
-from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
+from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
-from sentry_sdk.monitor import Monitor
-
-from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.serializer import serialize
+from sentry_sdk.sessions import SessionFlusher
+from sentry_sdk.tracing import has_tracing_enabled, trace
+from sentry_sdk.transport import make_transport
+from sentry_sdk.utils import (
+    ContextVar,
+    capture_internal_exceptions,
+    current_stacktrace,
+    disable_capture_event,
+    format_timestamp,
+    get_default_release,
+    get_sdk_name,
+    get_type_name,
+    handle_in_app,
+    logger,
+)
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import Sequence
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Optional,
+        Sequence,
+    )
 
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
 
 

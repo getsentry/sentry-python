@@ -3,14 +3,14 @@
 
 """
 import json
-from textwrap import dedent
-import tempfile
-import sys
+import os
+import os.path
 import subprocess
+import sys
+import tempfile
+from textwrap import dedent
 
 import pytest
-import os.path
-import os
 
 pytestmark = pytest.mark.skipif(
     not hasattr(tempfile, "TemporaryDirectory"), reason="need Python 3.2+"

@@ -1,42 +1,50 @@
-import os
 import io
+import os
+import random
 import re
 import threading
-import random
 import time
 import zlib
-from functools import wraps, partial
-from threading import Event, Lock, Thread
+from functools import partial, wraps
+from threading import (
+    Event,
+    Lock,
+    Thread,
+)
 
 from sentry_sdk._compat import text_type
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import now, nanosecond_time
-from sentry_sdk.envelope import Envelope, Item
-from sentry_sdk.tracing import (
-    TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_VIEW,
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_TASK,
-)
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.envelope import Envelope, Item
+from sentry_sdk.hub import Hub
+from sentry_sdk.tracing import (
+    TRANSACTION_SOURCE_COMPONENT,
+    TRANSACTION_SOURCE_ROUTE,
+    TRANSACTION_SOURCE_TASK,
+    TRANSACTION_SOURCE_VIEW,
+)
+from sentry_sdk.utils import nanosecond_time, now
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Iterable
-    from typing import Callable
-    from typing import Optional
-    from typing import Tuple
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Iterable,
+        Optional,
+        Tuple,
+    )
 
-    from sentry_sdk._types import BucketKey
-    from sentry_sdk._types import DurationUnit
-    from sentry_sdk._types import FlushedMetricValue
-    from sentry_sdk._types import MeasurementUnit
-    from sentry_sdk._types import MetricTagValue
-    from sentry_sdk._types import MetricTags
-    from sentry_sdk._types import MetricTagsInternal
-    from sentry_sdk._types import MetricType
-    from sentry_sdk._types import MetricValue
+    from sentry_sdk._types import (
+        BucketKey,
+        DurationUnit,
+        FlushedMetricValue,
+        MeasurementUnit,
+        MetricTags,
+        MetricTagsInternal,
+        MetricTagValue,
+        MetricType,
+        MetricValue,
+    )
 
 
 _thread_local = threading.local()

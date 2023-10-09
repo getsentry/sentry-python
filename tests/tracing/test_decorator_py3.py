@@ -1,6 +1,7 @@
-from unittest import mock
-import pytest
 import sys
+from unittest import mock
+
+import pytest
 
 from sentry_sdk.tracing_utils_py3 import (
     start_child_span_decorator as start_child_span_decorator_py3,

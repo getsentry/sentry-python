@@ -1,10 +1,14 @@
-import sys
 import logging
+import sys
 
-from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk import (
+    capture_event,
+    capture_exception,
+    start_span,
+    start_transaction,
+)
 from sentry_sdk.scrubber import EventScrubber
-
+from sentry_sdk.utils import event_from_exception
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

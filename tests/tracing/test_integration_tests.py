@@ -1,19 +1,20 @@
 # coding: utf-8
-import weakref
 import gc
-import re
-import pytest
 import random
+import re
+import weakref
+
+import pytest
 
 from sentry_sdk import (
+    Hub,
     capture_message,
     configure_scope,
-    Hub,
     start_span,
     start_transaction,
 )
-from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
+from sentry_sdk.transport import Transport
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])

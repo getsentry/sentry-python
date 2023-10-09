@@ -1,10 +1,9 @@
 import pytest
+from fakeredis import FakeStrictRedis
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-
-from fakeredis import FakeStrictRedis
 
 try:
     from unittest import mock  # python 3.3 and above

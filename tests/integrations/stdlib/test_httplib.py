@@ -21,12 +21,10 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
-
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
-from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-
+from sentry_sdk.tracing import Transaction
 from tests.conftest import create_mock_http_server
 
 PORT = create_mock_http_server()

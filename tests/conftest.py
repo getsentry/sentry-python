@@ -3,8 +3,8 @@ import os
 import socket
 from threading import Thread
 
-import pytest
 import jsonschema
+import pytest
 
 try:
     import gevent
@@ -26,17 +26,18 @@ except Exception:
     # Python 3
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
-
 import sentry_sdk
-from sentry_sdk._compat import iteritems, reraise, string_types
+from sentry_sdk._compat import (
+    iteritems,
+    reraise,
+    string_types,
+)
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _installed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import capture_internal_exceptions
-
 from tests import _warning_recorder, _warning_recorder_mgr
-
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
 

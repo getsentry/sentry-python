@@ -3,9 +3,12 @@ import uuid
 from sentry_sdk import Hub
 from sentry_sdk._types import TYPE_CHECKING
 
-
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+    )
 
 
 def _create_check_in_event(

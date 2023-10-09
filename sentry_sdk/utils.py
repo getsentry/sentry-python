@@ -16,17 +16,20 @@ from numbers import Real
 
 try:
     # Python 3
-    from urllib.parse import parse_qs
-    from urllib.parse import unquote
-    from urllib.parse import urlencode
-    from urllib.parse import urlsplit
-    from urllib.parse import urlunsplit
+    from urllib.parse import (
+        parse_qs,
+        unquote,
+        urlencode,
+        urlsplit,
+        urlunsplit,
+    )
 
 except ImportError:
     # Python 2
     from cgi import parse_qs  # type: ignore
     from urllib import unquote  # type: ignore
     from urllib import urlencode  # type: ignore
+
     from urlparse import urlsplit  # type: ignore
     from urlparse import urlunsplit  # type: ignore
 
@@ -48,7 +51,14 @@ except ImportError:
     _PARTIALMETHOD_AVAILABLE = False
 
 import sentry_sdk
-from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
+from sentry_sdk._compat import (
+    PY2,
+    PY33,
+    PY37,
+    implements_str,
+    text_type,
+    urlparse,
+)
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 

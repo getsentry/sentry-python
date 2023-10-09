@@ -1,5 +1,4 @@
 import pytest
-
 from werkzeug.test import Client
 
 from sentry_sdk.integrations.django import DjangoIntegration

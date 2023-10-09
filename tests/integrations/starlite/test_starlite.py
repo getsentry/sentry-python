@@ -1,18 +1,26 @@
 import functools
-
-import pytest
-
-from sentry_sdk import capture_exception, capture_message, last_event_id
-from sentry_sdk.integrations.starlite import StarliteIntegration
-
 from typing import Any, Dict
 
+import pytest
 import starlite
-from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
+from starlite import (
+    AbstractMiddleware,
+    Controller,
+    LoggingConfig,
+    Starlite,
+    get,
+)
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig
 from starlite.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 from starlite.testing import TestClient
+
+from sentry_sdk import (
+    capture_exception,
+    capture_message,
+    last_event_id,
+)
+from sentry_sdk.integrations.starlite import StarliteIntegration
 
 
 class SampleMiddleware(AbstractMiddleware):

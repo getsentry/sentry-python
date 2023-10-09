@@ -1,5 +1,6 @@
-import pytest
 import uuid
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin

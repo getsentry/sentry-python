@@ -1,7 +1,6 @@
+import pytest
 import requests
 import responses
-
-import pytest
 
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA

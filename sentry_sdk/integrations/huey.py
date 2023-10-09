@@ -3,30 +3,49 @@ from __future__ import absolute_import
 import sys
 from datetime import datetime
 
+from sentry_sdk import Hub
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK, Transaction
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
-    SENSITIVE_DATA_SUBSTITUTE,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Union, TypeVar
+    from typing import (
+        Any,
+        Callable,
+        Optional,
+        TypeVar,
+        Union,
+    )
 
-    from sentry_sdk._types import EventProcessor, Event, Hint
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        Hint,
+    )
     from sentry_sdk.utils import ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from huey.api import Huey, Result, ResultGroup, Task
-    from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
+    from huey.api import (
+        Huey,
+        Result,
+        ResultGroup,
+        Task,
+    )
+    from huey.exceptions import (
+        CancelExecution,
+        RetryTask,
+        TaskLockedException,
+    )
 except ImportError:
     raise DidNotEnable("Huey is not installed")
 

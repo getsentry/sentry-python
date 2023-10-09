@@ -1,15 +1,15 @@
 from __future__ import absolute_import
 
-import pytest
 import django
+import pytest
 
 if django.VERSION >= (2, 0):
     # TODO: once we stop supporting django < 2, use the real name of this
     # function (re_path)
-    from django.urls import re_path as url
     from django.conf.urls import include
+    from django.urls import re_path as url
 else:
-    from django.conf.urls import url, include
+    from django.conf.urls import include, url
 
 if django.VERSION < (1, 9):
     included_url_conf = (url(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "", ""
@@ -17,7 +17,6 @@ else:
     included_url_conf = ((url(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "")
 
 from sentry_sdk.integrations.django.transactions import RavenResolver
-
 
 example_url_conf = (
     url(r"^api/(?P<project_id>[\w_-]+)/store/$", lambda x: ""),

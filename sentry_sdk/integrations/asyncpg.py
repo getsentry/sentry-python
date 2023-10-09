@@ -1,15 +1,22 @@
 from __future__ import annotations
+
 import contextlib
-from typing import Any, TypeVar, Callable, Awaitable, Iterator
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Iterator,
+    TypeVar,
+)
 
 from asyncpg.cursor import BaseCursor  # type: ignore
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk.utils import parse_version, capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 try:
     import asyncpg  # type: ignore[import]

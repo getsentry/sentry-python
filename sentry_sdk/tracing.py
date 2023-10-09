@@ -1,29 +1,35 @@
-import uuid
 import random
-
+import uuid
 from datetime import timedelta
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk._compat import datetime_utcnow, PY2
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk._compat import PY2, datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
-
+from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.utils import (
+    is_valid_sample_rate,
+    logger,
+    nanosecond_time,
+)
 
 if TYPE_CHECKING:
     import typing
-
     from datetime import datetime
-    from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import Tuple
+    from typing import (
+        Any,
+        Dict,
+        Iterator,
+        List,
+        Optional,
+        Tuple,
+    )
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+    from sentry_sdk._types import (
+        Event,
+        MeasurementUnit,
+        SamplingContext,
+    )
 
 
 BAGGAGE_HEADER_NAME = "baggage"

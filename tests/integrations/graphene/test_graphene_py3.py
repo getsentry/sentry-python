@@ -1,7 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from flask import Flask, request, jsonify
-from graphene import ObjectType, String, Schema
+from flask import (
+    Flask,
+    jsonify,
+    request,
+)
+from graphene import (
+    ObjectType,
+    Schema,
+    String,
+)
 
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration

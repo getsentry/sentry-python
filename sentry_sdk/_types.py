@@ -10,15 +10,18 @@ MYPY = TYPE_CHECKING
 
 if TYPE_CHECKING:
     from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import List
-    from typing import Mapping
-    from typing import Optional
-    from typing import Tuple
-    from typing import Type
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Mapping,
+        Optional,
+        Tuple,
+        Type,
+        Union,
+    )
+
     from typing_extensions import Literal
 
     ExcInfo = Tuple[

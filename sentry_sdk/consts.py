@@ -4,29 +4,30 @@ from sentry_sdk._types import TYPE_CHECKING
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
 if TYPE_CHECKING:
-    import sentry_sdk
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Optional,
+        Sequence,
+        Type,
+        Union,
+    )
 
-    from typing import Optional
-    from typing import Callable
-    from typing import Union
-    from typing import List
-    from typing import Type
-    from typing import Dict
-    from typing import Any
-    from typing import Sequence
     from typing_extensions import TypedDict
 
-    from sentry_sdk.integrations import Integration
-
+    import sentry_sdk
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        MetricTags,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
-        MetricTags,
     )
+    from sentry_sdk.integrations import Integration
 
     # Experiments are feature flags to enable and disable certain unstable SDK
     # functionality. Changing them from the defaults (`None`) in production

@@ -3,23 +3,25 @@ from __future__ import absolute_import
 import sys
 
 from sentry_sdk import configure_scope
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    event_hint_with_exc_info,
     exc_info_from_error,
     single_exception_from_error_tuple,
     walk_exception_chain,
-    event_hint_with_exc_info,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
+    from typing import Any, Optional
 
-    from sentry_sdk._types import ExcInfo, Event, Hint
+    from sentry_sdk._types import (
+        Event,
+        ExcInfo,
+        Hint,
+    )
 
 
 class SparkWorkerIntegration(Integration):

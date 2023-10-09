@@ -1,19 +1,27 @@
-import pytest
 import inspect
 
 import dill
+import pytest
+from apache_beam.runners.common import (
+    DoFnContext,
+    DoFnInvoker,
+    OutputProcessor,
+)
+from apache_beam.transforms.core import (
+    CallableWrapperDoFn,
+    DoFn,
+    ParDo,
+    _DoFnParam,
+)
+from apache_beam.typehints.decorators import getcallargs_forhints
+from apache_beam.typehints.trivial_inference import instance_to_type
+from apache_beam.utils.windowed_value import WindowedValue
 
 from sentry_sdk.integrations.beam import (
     BeamIntegration,
-    _wrap_task_call,
     _wrap_inspect_call,
+    _wrap_task_call,
 )
-
-from apache_beam.typehints.trivial_inference import instance_to_type
-from apache_beam.typehints.decorators import getcallargs_forhints
-from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
-from apache_beam.runners.common import DoFnInvoker, OutputProcessor, DoFnContext
-from apache_beam.utils.windowed_value import WindowedValue
 
 
 def foo():

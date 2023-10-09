@@ -2,7 +2,12 @@ import random
 
 import pytest
 
-from sentry_sdk import Hub, start_span, start_transaction, capture_exception
+from sentry_sdk import (
+    Hub,
+    capture_exception,
+    start_span,
+    start_transaction,
+)
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
 

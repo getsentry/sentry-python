@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import socket
+
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
@@ -8,7 +9,12 @@ from sentry_sdk.integrations import Integration
 
 if MYPY:
     from socket import AddressFamily, SocketKind
-    from typing import Tuple, Optional, Union, List
+    from typing import (
+        List,
+        Optional,
+        Tuple,
+        Union,
+    )
 
 __all__ = ["SocketIntegration"]
 

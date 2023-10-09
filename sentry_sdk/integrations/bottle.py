@@ -1,6 +1,10 @@
 from __future__ import absolute_import
 
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -8,30 +12,32 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
-
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Any
-    from typing import Dict
-    from typing import Callable
-    from typing import Optional
-    from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Optional,
+    )
 
-    from sentry_sdk._types import EventProcessor, Event
+    from bottle import (  # type: ignore
+        FileUpload,
+        FormsDict,
+        LocalRequest,
+    )
+
+    from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
 
 try:
     from bottle import (
         Bottle,
-        Route,
-        request as bottle_request,
         HTTPResponse,
-        __version__ as BOTTLE_VERSION,
+        Route,
     )
+    from bottle import __version__ as BOTTLE_VERSION
+    from bottle import request as bottle_request
 except ImportError:
     raise DidNotEnable("Bottle not installed")
 
