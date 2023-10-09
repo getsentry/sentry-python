@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
+        MetricTags,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -34,12 +35,16 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
+            "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
+            "transport_zlib_compression_level": Optional[int],
+            "enable_metrics": Optional[bool],
+            "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
         },
         total=False,
     )
@@ -72,6 +77,13 @@ class SPANDATA:
     """
     The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
     Example: myDatabase
+    """
+
+    DB_USER = "db.user"
+    """
+    The name of the database user used for connecting to the database.
+    See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
+    Example: my_user
     """
 
     DB_OPERATION = "db.operation"
@@ -264,4 +276,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.30.0"
+VERSION = "1.31.0"

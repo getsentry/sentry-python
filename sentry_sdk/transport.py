@@ -163,6 +163,11 @@ class HttpTransport(Transport):
             proxy_headers=options["proxy_headers"],
         )
 
+        compresslevel = options.get("_experiments", {}).get(
+            "transport_zlib_compression_level"
+        )
+        self._compresslevel = 9 if compresslevel is None else int(compresslevel)
+
         from sentry_sdk import Hub
 
         self.hub_cls = Hub
@@ -338,8 +343,13 @@ class HttpTransport(Transport):
             return None
 
         body = io.BytesIO()
-        with gzip.GzipFile(fileobj=body, mode="w") as f:
-            f.write(json_dumps(event))
+        if self._compresslevel == 0:
+            body.write(json_dumps(event))
+        else:
+            with gzip.GzipFile(
+                fileobj=body, mode="w", compresslevel=self._compresslevel
+            ) as f:
+                f.write(json_dumps(event))
 
         assert self.parsed_dsn is not None
         logger.debug(
@@ -352,10 +362,14 @@ class HttpTransport(Transport):
                 self.parsed_dsn.host,
             )
         )
-        self._send_request(
-            body.getvalue(),
-            headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
-        )
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if self._compresslevel > 0:
+            headers["Content-Encoding"] = "gzip"
+
+        self._send_request(body.getvalue(), headers=headers)
         return None
 
     def _send_envelope(
@@ -390,8 +404,13 @@ class HttpTransport(Transport):
             envelope.items.append(client_report_item)
 
         body = io.BytesIO()
-        with gzip.GzipFile(fileobj=body, mode="w") as f:
-            envelope.serialize_into(f)
+        if self._compresslevel == 0:
+            envelope.serialize_into(body)
+        else:
+            with gzip.GzipFile(
+                fileobj=body, mode="w", compresslevel=self._compresslevel
+            ) as f:
+                envelope.serialize_into(f)
 
         assert self.parsed_dsn is not None
         logger.debug(
@@ -401,12 +420,15 @@ class HttpTransport(Transport):
             self.parsed_dsn.host,
         )
 
+        headers = {
+            "Content-Type": "application/x-sentry-envelope",
+        }
+        if self._compresslevel > 0:
+            headers["Content-Encoding"] = "gzip"
+
         self._send_request(
             body.getvalue(),
-            headers={
-                "Content-Type": "application/x-sentry-envelope",
-                "Content-Encoding": "gzip",
-            },
+            headers=headers,
             endpoint_type="envelope",
             envelope=envelope,
         )

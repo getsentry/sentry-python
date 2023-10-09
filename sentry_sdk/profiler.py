@@ -248,13 +248,10 @@ def teardown_profiler():
 MAX_STACK_DEPTH = 128
 
 
-CWD = os.getcwd()
-
-
 def extract_stack(
     raw_frame,  # type: Optional[FrameType]
     cache,  # type: LRUCache
-    cwd=CWD,  # type: str
+    cwd,  # type: str
     max_stack_depth=MAX_STACK_DEPTH,  # type: int
 ):
     # type: (...) -> ExtractedStack

@@ -1,5 +1,88 @@
 # Changelog
 
+## 1.31.0
+
+### Various fixes & improvements
+
+- **New:** Add integration for `clickhouse-driver` (#2167) by @mimre25
+
+  For more information, see the documentation for [clickhouse-driver](https://docs.sentry.io/platforms/python/configuration/integrations/clickhouse-driver) for more information.
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
+
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            ClickhouseDriverIntegration(),
+        ],
+    )
+  ```
+
+- **New:** Add integration for `asyncpg` (#2314) by @mimre25
+
+  For more information, see the documentation for [asyncpg](https://docs.sentry.io/platforms/python/configuration/integrations/asyncpg/) for more information.
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
+
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            AsyncPGIntegration(),
+        ],
+    )
+  ```
+
+- **New:** Allow to override `propagate_traces` in `Celery` per task (#2331) by @jan-auer
+
+  For more information, see the documentation for [Celery](https://docs.sentry.io//platforms/python/guides/celery/#distributed-traces) for more information.
+
+  Usage:
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+
+    # Enable global distributed traces (this is the default, just to be explicit.)
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            CeleryIntegration(propagate_traces=True),
+        ],
+    )
+
+    ...
+
+    # This will NOT propagate the trace. (The task will start its own trace):
+    my_task_b.apply_async(
+        args=("some_parameter", ),
+        headers={"sentry-propagate-traces": False},
+    )
+  ```
+
+- Prevent Falcon integration from breaking ASGI apps (#2359) by @szokeasaurusrex
+- Backpressure: only downsample a max of 10 times (#2347) by @sl0thentr0py
+- Made NoOpSpan compatible to Transactions. (#2364) by @antonpirker
+- Cleanup ASGI integration (#2335) by @antonpirker
+- Pin anyio in tests (dep of httpx), because new major 4.0.0 breaks tests. (#2336) by @antonpirker
+- Added link to backpressure section in docs. (#2354) by @antonpirker
+- Add .vscode to .gitignore (#2317) by @shoaib-mohd
+- Documenting Spans and Transactions (#2358) by @antonpirker
+- Fix in profiler: do not call getcwd from module root (#2329) by @Zylphrex
+- Fix deprecated version attribute (#2338) by @vagi8
+- Fix transaction name in Starlette and FastAPI (#2341) by @antonpirker
+- Fix tests using Postgres (#2362) by @antonpirker
+- build(deps): Updated linting tooling (#2350) by @antonpirker
+- build(deps): bump sphinx from 7.2.4 to 7.2.5 (#2344) by @dependabot
+- build(deps): bump actions/checkout from 2 to 4 (#2352) by @dependabot
+- build(deps): bump checkouts/data-schemas from `ebc77d3` to `68def1e` (#2351) by @dependabot
+
 ## 1.30.0
 
 ### Various fixes & improvements
@@ -52,6 +135,8 @@
     ```
 
     If your system serves heavy load, please let us know how this feature works for you!
+
+    Check out the [documentation](https://docs.sentry.io/platforms/python/configuration/options/#enable-backpressure-handling) for more information.
 
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso

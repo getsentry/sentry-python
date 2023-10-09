@@ -107,6 +107,7 @@ def record_sql_queries(
     params_list,  # type:  Any
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
+    record_cursor_repr=False,  # type: bool
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -132,6 +133,8 @@ def record_sql_queries(
         data["db.paramstyle"] = paramstyle
     if executemany:
         data["db.executemany"] = True
+    if record_cursor_repr and cursor is not None:
+        data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
         hub.add_breadcrumb(message=query, category="query", data=data)
@@ -212,6 +215,10 @@ def _format_sql(cursor, sql):
 
 
 class Baggage(object):
+    """
+    The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
+    """
+
     __slots__ = ("sentry_items", "third_party_items", "mutable")
 
     SENTRY_PREFIX = "sentry-"
