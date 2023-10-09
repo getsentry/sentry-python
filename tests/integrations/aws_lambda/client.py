@@ -1,11 +1,12 @@
-import sys
+import base64
 import os
 import shutil
-import tempfile
 import subprocess
-import boto3
+import sys
+import tempfile
 import uuid
-import base64
+
+import boto3
 
 
 def get_boto_client():

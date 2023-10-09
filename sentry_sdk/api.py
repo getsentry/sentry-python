@@ -6,21 +6,23 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import overload
-    from typing import Callable
-    from typing import TypeVar
-    from typing import ContextManager
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Optional,
+        TypeVar,
+        Union,
+        overload,
+    )
 
     from sentry_sdk._types import (
-        Event,
-        Hint,
         Breadcrumb,
         BreadcrumbHint,
+        Event,
         ExcInfo,
+        Hint,
         MeasurementUnit,
     )
     from sentry_sdk.tracing import Span

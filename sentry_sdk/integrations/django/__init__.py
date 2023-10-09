@@ -11,31 +11,31 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
-    AnnotatedValue,
-    HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
-    logger,
+    AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    logger,
     transaction_from_function,
     walk_exception_chain,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
 
 try:
     from django import VERSION as DJANGO_VERSION
+    from django.conf import settings
     from django.conf import settings as django_settings
     from django.core import signals
-    from django.conf import settings
 
     try:
         from django.urls import resolve
@@ -49,13 +49,13 @@ try:
 except ImportError:
     raise DidNotEnable("Django not installed")
 
-from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
+from sentry_sdk.integrations.django.middleware import patch_django_middlewares
+from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.templates import (
     get_template_frame_from_exception,
     patch_templates,
 )
-from sentry_sdk.integrations.django.middleware import patch_django_middlewares
-from sentry_sdk.integrations.django.signals_handlers import patch_signals
+from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.views import patch_views
 
 if DJANGO_VERSION[:2] > (1, 8):
@@ -65,22 +65,29 @@ else:
 
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import Union
-    from typing import List
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Optional,
+        Union,
+    )
 
     from django.core.handlers.wsgi import WSGIRequest
-    from django.http.response import HttpResponse
     from django.http.request import QueryDict
+    from django.http.response import HttpResponse
     from django.utils.datastructures import MultiValueDict
 
-    from sentry_sdk.tracing import Span
-    from sentry_sdk.scope import Scope
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        Hint,
+        NotImplementedType,
+    )
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
+    from sentry_sdk.scope import Scope
+    from sentry_sdk.tracing import Span
 
 
 if DJANGO_VERSION < (1, 10):

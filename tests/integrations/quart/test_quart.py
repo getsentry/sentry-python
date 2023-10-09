@@ -3,21 +3,24 @@ import threading
 
 import pytest
 import pytest_asyncio
+from quart import (
+    Quart,
+    Response,
+    abort,
+    stream_with_context,
+)
+from quart.views import View
+from quart_auth import AuthUser, login_user
 
+import sentry_sdk.integrations.quart as quart_sentry
 from sentry_sdk import (
-    set_tag,
-    configure_scope,
-    capture_message,
     capture_exception,
+    capture_message,
+    configure_scope,
     last_event_id,
+    set_tag,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-import sentry_sdk.integrations.quart as quart_sentry
-
-from quart import Quart, Response, abort, stream_with_context
-from quart.views import View
-
-from quart_auth import AuthUser, login_user
 
 try:
     from quart_auth import QuartAuth

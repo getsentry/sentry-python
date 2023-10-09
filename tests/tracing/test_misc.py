@@ -1,10 +1,16 @@
-import pytest
 import gc
-import uuid
 import os
+import uuid
+
+import pytest
 
 import sentry_sdk
-from sentry_sdk import Hub, start_span, start_transaction, set_measurement
+from sentry_sdk import (
+    Hub,
+    set_measurement,
+    start_span,
+    start_transaction,
+)
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace

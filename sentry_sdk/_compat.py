@@ -1,17 +1,19 @@
-import sys
 import contextlib
+import sys
 from datetime import datetime
 from functools import wraps
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
-    from typing import Tuple
-    from typing import Any
-    from typing import Type
-    from typing import TypeVar
-    from typing import Callable
+    from typing import (
+        Any,
+        Callable,
+        Optional,
+        Tuple,
+        Type,
+        TypeVar,
+    )
 
     T = TypeVar("T")
 
@@ -85,8 +87,8 @@ if PY2:
         return DecoratorContextManager
 
 else:
-    from datetime import timezone
     import urllib.parse as urlparse  # noqa
+    from datetime import timezone
 
     text_type = str
     string_types = (text_type,)  # type: Tuple[type]

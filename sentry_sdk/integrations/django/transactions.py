@@ -10,14 +10,16 @@ import re
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from django.urls.resolvers import URLResolver
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from django.urls.resolvers import URLPattern
-    from typing import Tuple
-    from typing import Union
     from re import Pattern
+    from typing import (
+        Dict,
+        List,
+        Optional,
+        Tuple,
+        Union,
+    )
+
+    from django.urls.resolvers import URLPattern, URLResolver
 
 try:
     from django.urls import get_resolver

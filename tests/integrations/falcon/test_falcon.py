@@ -2,14 +2,13 @@ from __future__ import absolute_import
 
 import logging
 
-import pytest
-
 import falcon
 import falcon.testing
+import pytest
+
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-
 
 try:
     import falcon.asgi

@@ -9,7 +9,7 @@ import threading
 
 import pytest
 
-from sentry_sdk import last_event_id, capture_exception
+from sentry_sdk import capture_exception, last_event_id
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.utils import parse_version
 
@@ -17,12 +17,6 @@ try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
-
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlette import (
-    StarletteIntegration,
-    StarletteRequestExtractor,
-)
 
 import starlette
 from starlette.authentication import (
@@ -36,6 +30,11 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.testclient import TestClient
 
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.starlette import (
+    StarletteIntegration,
+    StarletteRequestExtractor,
+)
 
 STARLETTE_VERSION = parse_version(starlette.__version__)
 
@@ -97,8 +96,9 @@ async def _mock_receive(msg):
     return msg
 
 
-from sentry_sdk import Hub
 from starlette.templating import Jinja2Templates
+
+from sentry_sdk import Hub
 
 
 def starlette_app_factory(middleware=None, debug=True):

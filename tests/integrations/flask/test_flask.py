@@ -1,34 +1,31 @@
 import json
-import re
-import pytest
 import logging
-
+import re
 from io import BytesIO
 
+import pytest
 from flask import (
     Flask,
     Response,
-    request,
     abort,
-    stream_with_context,
     render_template_string,
+    request,
+    stream_with_context,
 )
 from flask.views import View
-
 from flask_login import LoginManager, login_user
 
+import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
-    set_tag,
-    configure_scope,
-    capture_message,
-    capture_exception,
-    last_event_id,
     Hub,
+    capture_exception,
+    capture_message,
+    configure_scope,
+    last_event_id,
+    set_tag,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-
 
 login_manager = LoginManager()
 

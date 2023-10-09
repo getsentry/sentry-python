@@ -1,10 +1,10 @@
+import pytest
+from mockupdb import MockupDB, OpQuery
+from pymongo import MongoClient
+
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
-
-from mockupdb import MockupDB, OpQuery
-from pymongo import MongoClient
-import pytest
 
 
 @pytest.fixture(scope="session")

@@ -1,18 +1,16 @@
 from __future__ import absolute_import
 
+import atexit
 import os
 import sys
-import atexit
-
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import logger
-from sentry_sdk.integrations import Integration
 
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import Integration
+from sentry_sdk.utils import logger
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
+    from typing import Any, Optional
 
 
 def default_callback(pending, timeout):

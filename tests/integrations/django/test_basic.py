@@ -4,27 +4,34 @@ import json
 import os
 import random
 import re
-import pytest
 from functools import partial
 
-from werkzeug.test import Client
-
+import pytest
 from django import VERSION as DJANGO_VERSION
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
-from django.db.utils import OperationalError, ProgrammingError, DataError
+from django.db.utils import (
+    DataError,
+    OperationalError,
+    ProgrammingError,
+)
+from werkzeug.test import Client
 
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
 
+from sentry_sdk import (
+    capture_exception,
+    capture_message,
+    configure_scope,
+)
 from sentry_sdk._compat import PY2, PY310
-from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
+from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator

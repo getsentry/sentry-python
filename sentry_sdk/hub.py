@@ -1,58 +1,54 @@
 import copy
 import sys
-
 from contextlib import contextmanager
 
 from sentry_sdk._compat import datetime_utcnow, with_metaclass
-from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.client import Client
+from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.profiler import Profile
+from sentry_sdk.scope import Scope
+from sentry_sdk.session import Session
 from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
     Span,
     Transaction,
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
 )
-from sentry_sdk.session import Session
-from sentry_sdk.tracing_utils import (
-    has_tracing_enabled,
-    normalize_incoming_data,
-)
-
+from sentry_sdk.tracing_utils import has_tracing_enabled, normalize_incoming_data
 from sentry_sdk.utils import (
-    exc_info_from_error,
-    event_from_exception,
-    logger,
     ContextVar,
+    event_from_exception,
+    exc_info_from_error,
+    logger,
 )
-
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union
-    from typing import Any
-    from typing import Optional
-    from typing import Tuple
-    from typing import Dict
-    from typing import List
-    from typing import Callable
-    from typing import Generator
-    from typing import Type
-    from typing import TypeVar
-    from typing import overload
-    from typing import ContextManager
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Generator,
+        List,
+        Optional,
+        Tuple,
+        Type,
+        TypeVar,
+        Union,
+        overload,
+    )
 
-    from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
-        Event,
-        Hint,
         Breadcrumb,
         BreadcrumbHint,
+        Event,
         ExcInfo,
+        Hint,
     )
     from sentry_sdk.consts import ClientConstructor
+    from sentry_sdk.integrations import Integration
 
     T = TypeVar("T")
 

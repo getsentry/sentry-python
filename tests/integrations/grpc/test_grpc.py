@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import os
-
 from concurrent import futures
 
 import grpc
@@ -13,8 +12,8 @@ from sentry_sdk.integrations.grpc.client import ClientInterceptor
 from sentry_sdk.integrations.grpc.server import ServerInterceptor
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
-    gRPCTestServiceServicer,
     add_gRPCTestServiceServicer_to_server,
+    gRPCTestServiceServicer,
     gRPCTestServiceStub,
 )
 

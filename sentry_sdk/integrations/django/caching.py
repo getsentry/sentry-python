@@ -5,13 +5,11 @@ from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
 
 from sentry_sdk import Hub
-from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk._compat import text_type
-
+from sentry_sdk.consts import OP, SPANDATA
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    from typing import Any, Callable
 
 
 METHODS_TO_INSTRUMENT = [

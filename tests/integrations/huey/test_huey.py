@@ -1,11 +1,11 @@
-import pytest
 from decimal import DivisionByZero
+
+import pytest
+from huey.api import MemoryHuey, Result
+from huey.exceptions import RetryTask
 
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.huey import HueyIntegration
-
-from huey.api import MemoryHuey, Result
-from huey.exceptions import RetryTask
 
 
 @pytest.fixture

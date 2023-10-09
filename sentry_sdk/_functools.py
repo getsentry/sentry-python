@@ -63,8 +63,7 @@ from functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    from typing import Any, Callable
 
 
 WRAPPER_ASSIGNMENTS = (

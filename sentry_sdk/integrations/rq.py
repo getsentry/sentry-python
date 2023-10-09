@@ -1,9 +1,9 @@
 from __future__ import absolute_import
 
 import weakref
-from sentry_sdk.consts import OP
 
 from sentry_sdk.api import continue_trace
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
@@ -16,23 +16,27 @@ from sentry_sdk.utils import (
 )
 
 try:
+    from rq.job import JobStatus
     from rq.queue import Queue
     from rq.timeouts import JobTimeoutException
     from rq.version import VERSION as RQ_VERSION
     from rq.worker import Worker
-    from rq.job import JobStatus
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+    )
+
+    from rq.job import Job
 
     from sentry_sdk._types import EventProcessor
     from sentry_sdk.utils import ExcInfo
-
-    from rq.job import Job
 
 
 class RqIntegration(Integration):

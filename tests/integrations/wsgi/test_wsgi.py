@@ -1,13 +1,12 @@
 import sys
-
-from werkzeug.test import Client
+from collections import Counter
 
 import pytest
+from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from collections import Counter
 
 try:
     from unittest import mock  # python 3.3 and above

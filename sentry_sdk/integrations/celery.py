@@ -3,16 +3,16 @@ from __future__ import absolute_import
 import sys
 import time
 
-from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
 from sentry_sdk._functools import wraps
-from sentry_sdk.crons import capture_checkin, MonitorStatus
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.api import continue_trace
+from sentry_sdk.consts import OP
+from sentry_sdk.crons import MonitorStatus, capture_checkin
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -21,23 +21,30 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Tuple
-    from typing import TypeVar
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        List,
+        Optional,
+        Tuple,
+        TypeVar,
+        Union,
+    )
 
-    from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        ExcInfo,
+        Hint,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 
 try:
     from celery import VERSION as CELERY_VERSION  # type: ignore
-    from celery import Task, Celery
+    from celery import Celery, Task
     from celery.app.trace import task_has_custom
     from celery.beat import Scheduler  # type: ignore
     from celery.exceptions import (  # type: ignore
@@ -49,8 +56,8 @@ try:
     from celery.schedules import crontab, schedule  # type: ignore
     from celery.signals import (  # type: ignore
         task_failure,
-        task_success,
         task_retry,
+        task_success,
     )
 except ImportError:
     raise DidNotEnable("Celery not installed")

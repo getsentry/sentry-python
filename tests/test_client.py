@@ -1,30 +1,34 @@
 # coding: utf-8
-import os
 import json
-import pytest
+import os
 import subprocess
 import sys
 import time
-
 from textwrap import dedent
+
+import pytest
+
 from sentry_sdk import (
-    Hub,
     Client,
+    Hub,
     add_breadcrumb,
-    configure_scope,
-    capture_message,
-    capture_exception,
     capture_event,
-    start_transaction,
+    capture_exception,
+    capture_message,
+    configure_scope,
     set_tag,
+    start_transaction,
 )
-from sentry_sdk.integrations.executing import ExecutingIntegration
-from sentry_sdk.transport import Transport
-from sentry_sdk._compat import reraise, text_type, PY2
-from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
-from sentry_sdk.utils import logger
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk._compat import (
+    PY2,
+    reraise,
+    text_type,
+)
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk.transport import Transport
+from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS, logger
 
 try:
     from unittest import mock  # python 3.3 and above

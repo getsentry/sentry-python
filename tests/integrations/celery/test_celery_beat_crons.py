@@ -1,16 +1,16 @@
 import pytest
+from celery.schedules import crontab, schedule
 
+from sentry_sdk.crons import MonitorStatus
 from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_humanized_interval,
     _get_monitor_config,
     _patch_beat_apply_entry,
-    crons_task_success,
     crons_task_failure,
     crons_task_retry,
+    crons_task_success,
 )
-from sentry_sdk.crons import MonitorStatus
-from celery.schedules import crontab, schedule
 
 try:
     from unittest import mock  # python 3.3 and above

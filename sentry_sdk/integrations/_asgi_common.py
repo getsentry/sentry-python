@@ -1,13 +1,16 @@
 import urllib
 
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+    )
+
     from typing_extensions import Literal
 
 

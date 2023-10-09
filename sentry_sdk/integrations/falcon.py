@@ -1,7 +1,8 @@
 from __future__ import absolute_import
 
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
@@ -11,12 +12,12 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from sentry_sdk._types import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+    )
 
     from sentry_sdk._types import EventProcessor
 
@@ -25,7 +26,6 @@ if TYPE_CHECKING:
 
 try:
     import falcon  # type: ignore
-
     from falcon import __version__ as FALCON_VERSION
 except ImportError:
     raise DidNotEnable("Falcon not installed")

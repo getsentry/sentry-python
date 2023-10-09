@@ -1,5 +1,4 @@
 from sentry_sdk import start_span
-
 from sentry_sdk.tracing import Span
 
 

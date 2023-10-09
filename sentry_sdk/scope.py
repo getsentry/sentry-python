@@ -1,52 +1,51 @@
-from copy import copy
-from collections import deque
-from itertools import chain
 import os
 import uuid
+from collections import deque
+from copy import copy
+from itertools import chain
 
-from sentry_sdk.attachments import Attachment
 from sentry_sdk._functools import wraps
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.attachments import Attachment
+from sentry_sdk.consts import FALSE_VALUES
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+    Transaction,
+)
 from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
     has_tracing_enabled,
     normalize_incoming_data,
 )
-from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
-    Transaction,
-)
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import logger, capture_internal_exceptions
-
-from sentry_sdk.consts import FALSE_VALUES
-
+from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import Optional
-    from typing import Deque
-    from typing import List
-    from typing import Callable
-    from typing import Tuple
-    from typing import TypeVar
+    from typing import (
+        Any,
+        Callable,
+        Deque,
+        Dict,
+        Iterator,
+        List,
+        Optional,
+        Tuple,
+        TypeVar,
+    )
 
     from sentry_sdk._types import (
         Breadcrumb,
+        ErrorProcessor,
         Event,
         EventProcessor,
-        ErrorProcessor,
         ExcInfo,
         Hint,
         Type,
     )
-
     from sentry_sdk.profiler import Profile
-    from sentry_sdk.tracing import Span
     from sentry_sdk.session import Session
+    from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")

@@ -1,23 +1,26 @@
 # coding: utf-8
-import logging
-import pickle
 import gzip
 import io
-
+import logging
+import pickle
+from collections import namedtuple
 from datetime import datetime, timedelta
 
 import pytest
-from collections import namedtuple
+from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
-from pytest_localserver.http import WSGIServer
-
-from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
+from sentry_sdk import (
+    Client,
+    Hub,
+    Scope,
+    add_breadcrumb,
+    capture_message,
+)
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
-
+from sentry_sdk.transport import _parse_rate_limits
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 

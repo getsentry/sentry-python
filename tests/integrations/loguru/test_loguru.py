@@ -2,7 +2,7 @@ import pytest
 from loguru import logger
 
 import sentry_sdk
-from sentry_sdk.integrations.loguru import LoguruIntegration, LoggingLevels
+from sentry_sdk.integrations.loguru import LoggingLevels, LoguruIntegration
 
 logger.remove(0)  # don't print to console
 

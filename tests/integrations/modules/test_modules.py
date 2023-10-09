@@ -1,11 +1,9 @@
-import pytest
 import re
-import sentry_sdk
 
-from sentry_sdk.integrations.modules import (
-    ModulesIntegration,
-    _get_installed_modules,
-)
+import pytest
+
+import sentry_sdk
+from sentry_sdk.integrations.modules import ModulesIntegration, _get_installed_modules
 
 
 def _normalize_distribution_name(name):

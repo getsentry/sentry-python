@@ -3,11 +3,13 @@ import os
 import sys
 import threading
 import time
+from collections import defaultdict
 
 import pytest
 
-from collections import defaultdict
 from sentry_sdk import start_transaction
+from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk._queue import Queue
 from sentry_sdk.profiler import (
     GeventScheduler,
     Profile,
@@ -21,8 +23,6 @@ from sentry_sdk.profiler import (
     setup_profiler,
 )
 from sentry_sdk.tracing import Transaction
-from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk._queue import Queue
 
 try:
     from unittest import mock  # python 3.3 and above

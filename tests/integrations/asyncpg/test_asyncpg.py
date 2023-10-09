@@ -10,7 +10,6 @@ The tests use the following credentials to establish a database connection.
 """
 import os
 
-
 PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "foo")
 PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "bar")
@@ -22,14 +21,11 @@ import datetime
 
 import asyncpg
 import pytest
-
 import pytest_asyncio
-
-from asyncpg import connect, Connection
+from asyncpg import Connection, connect
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
-
 
 PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
 CRUMBS_CONNECT = {

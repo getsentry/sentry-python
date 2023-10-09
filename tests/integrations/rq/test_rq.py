@@ -1,9 +1,9 @@
 import pytest
+import rq
 from fakeredis import FakeStrictRedis
+
 from sentry_sdk import configure_scope, start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
-
-import rq
 
 try:
     from unittest import mock  # python 3.3 and above

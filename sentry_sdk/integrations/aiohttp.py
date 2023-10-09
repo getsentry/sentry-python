@@ -1,17 +1,17 @@
 import sys
 import weakref
 
-from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
+from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.sessions import auto_session_tracking
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
+from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SOURCE_FOR_STYLE,
@@ -19,43 +19,50 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
+    CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
+    SENSITIVE_DATA_SUBSTITUTE,
+    AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
     logger,
     parse_url,
     parse_version,
     transaction_from_function,
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
-    SENSITIVE_DATA_SUBSTITUTE,
-    AnnotatedValue,
 )
 
 try:
     import asyncio
 
-    from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp import ClientSession, TraceConfig
-    from aiohttp.web import Application, HTTPException, UrlDispatcher
+    from aiohttp import __version__ as AIOHTTP_VERSION
+    from aiohttp.web import (
+        Application,
+        HTTPException,
+        UrlDispatcher,
+    )
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from aiohttp.web_request import Request
-    from aiohttp.abc import AbstractMatchInfo
-    from aiohttp import TraceRequestStartParams, TraceRequestEndParams
     from types import SimpleNamespace
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Tuple
-    from typing import Callable
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Optional,
+        Tuple,
+        Union,
+    )
 
-    from sentry_sdk.utils import ExcInfo
+    from aiohttp import TraceRequestEndParams, TraceRequestStartParams
+    from aiohttp.abc import AbstractMatchInfo
+    from aiohttp.web_request import Request
+
     from sentry_sdk._types import EventProcessor
+    from sentry_sdk.utils import ExcInfo
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")

@@ -1,8 +1,14 @@
 import sys
 
+import chalice  # type: ignore
+from chalice import Chalice, ChaliceViewError
+from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
+
 from sentry_sdk._compat import reraise
+from sentry_sdk._functools import wraps
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
@@ -10,18 +16,14 @@ from sentry_sdk.utils import (
     event_from_exception,
     parse_version,
 )
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk._functools import wraps
-
-import chalice  # type: ignore
-from chalice import Chalice, ChaliceViewError
-from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import TypeVar
-    from typing import Callable
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        TypeVar,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 

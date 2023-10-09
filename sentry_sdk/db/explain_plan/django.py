@@ -2,8 +2,7 @@ from sentry_sdk.consts import TYPE_CHECKING
 from sentry_sdk.db.explain_plan import cache_statement, should_run_explain_plan
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
+    from typing import Any, Callable
 
     from sentry_sdk.tracing import Span
 

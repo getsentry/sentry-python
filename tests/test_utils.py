@@ -1,11 +1,14 @@
-import pytest
 import re
 import sys
 
+import pytest
+
+import sentry_sdk
 from sentry_sdk.utils import (
     Components,
     Dsn,
     get_error_message,
+    is_sentry_url,
     is_valid_sample_rate,
     logger,
     match_regex_list,
@@ -14,10 +17,7 @@ from sentry_sdk.utils import (
     safe_str,
     sanitize_url,
     serialize_frame,
-    is_sentry_url,
 )
-
-import sentry_sdk
 
 try:
     from unittest import mock  # python 3.3 and above

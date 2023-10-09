@@ -1,8 +1,18 @@
-from ariadne import gql, graphql_sync, ObjectType, QueryType, make_executable_schema
+from ariadne import (
+    ObjectType,
+    QueryType,
+    gql,
+    graphql_sync,
+    make_executable_schema,
+)
 from ariadne.asgi import GraphQL
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from flask import Flask, request, jsonify
+from flask import (
+    Flask,
+    jsonify,
+    request,
+)
 
 from sentry_sdk.integrations.ariadne import AriadneIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration

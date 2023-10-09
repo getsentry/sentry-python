@@ -4,18 +4,14 @@ import os
 import sys
 import weakref
 
+from sentry_sdk._compat import iteritems, reraise
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.scope import Scope
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    event_from_exception,
-)
-from sentry_sdk._compat import reraise, iteritems
-
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.scope import Scope
+from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 try:
     from pyramid.httpexceptions import HTTPException
@@ -26,17 +22,20 @@ except ImportError:
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from pyramid.response import Response
-    from typing import Any
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from webob.cookies import RequestCookies  # type: ignore
-    from webob.compat import cgi_FieldStorage  # type: ignore
+    from typing import (
+        Any,
+        Callable,
+        Dict,
+        Optional,
+    )
 
-    from sentry_sdk.utils import ExcInfo
+    from pyramid.response import Response
+    from webob.compat import cgi_FieldStorage  # type: ignore
+    from webob.cookies import RequestCookies  # type: ignore
+
     from sentry_sdk._types import EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from sentry_sdk.utils import ExcInfo
 
 
 if getattr(Request, "authenticated_userid", None):

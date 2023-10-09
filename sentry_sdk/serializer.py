@@ -1,8 +1,16 @@
-import sys
 import math
-
+import sys
 from datetime import datetime
 
+from sentry_sdk._compat import (
+    PY2,
+    binary_sequence_types,
+    iteritems,
+    number_types,
+    string_types,
+    text_type,
+)
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exception,
@@ -11,29 +19,21 @@ from sentry_sdk.utils import (
     safe_repr,
     strip_string,
 )
-from sentry_sdk._compat import (
-    text_type,
-    PY2,
-    string_types,
-    number_types,
-    iteritems,
-    binary_sequence_types,
-)
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from types import TracebackType
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        List,
+        Optional,
+        Type,
+        Union,
+    )
 
-    from typing import Any
-    from typing import Callable
-    from typing import ContextManager
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Type
-    from typing import Union
-
-    from sentry_sdk._types import NotImplementedType, Event
+    from sentry_sdk._types import Event, NotImplementedType
 
     Span = Dict[str, Any]
 
@@ -44,14 +44,22 @@ if TYPE_CHECKING:
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
     # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
-    from collections import Mapping, Sequence, Set
+    from collections import (
+        Mapping,
+        Sequence,
+        Set,
+    )
 
     serializable_str_types = string_types + binary_sequence_types
 
 else:
     # New in 3.3
     # https://docs.python.org/3/library/collections.abc.html
-    from collections.abc import Mapping, Sequence, Set
+    from collections.abc import (
+        Mapping,
+        Sequence,
+        Set,
+    )
 
     # Bytes are technically not strings in Python 3, but we can serialize them
     serializable_str_types = string_types + binary_sequence_types

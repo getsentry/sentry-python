@@ -1,37 +1,46 @@
 from __future__ import print_function
 
-import io
-import urllib3
-import certifi
 import gzip
+import io
 import time
-
-from datetime import timedelta
 from collections import defaultdict
+from datetime import timedelta
 
-from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
-from sentry_sdk.worker import BackgroundWorker
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+import certifi
+import urllib3
 
 from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.envelope import (
+    Envelope,
+    Item,
+    PayloadRef,
+)
+from sentry_sdk.utils import (
+    Dsn,
+    capture_internal_exceptions,
+    json_dumps,
+    logger,
+)
+from sentry_sdk.worker import BackgroundWorker
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Iterable
-    from typing import Optional
-    from typing import Tuple
-    from typing import Type
-    from typing import Union
-    from typing import DefaultDict
+    from typing import (
+        Any,
+        Callable,
+        DefaultDict,
+        Dict,
+        Iterable,
+        Optional,
+        Tuple,
+        Type,
+        Union,
+    )
 
-    from urllib3.poolmanager import PoolManager
-    from urllib3.poolmanager import ProxyManager
+    from urllib3.poolmanager import PoolManager, ProxyManager
 
-    from sentry_sdk._types import Event, EndpointType
+    from sentry_sdk._types import EndpointType, Event
 
     DataCategory = Optional[str]
 

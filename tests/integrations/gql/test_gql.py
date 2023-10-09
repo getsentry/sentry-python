@@ -1,13 +1,13 @@
-import pytest
+from unittest.mock import MagicMock, patch
 
+import pytest
 import responses
-from gql import gql
-from gql import Client
+from gql import Client, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
 from graphql import DocumentNode
+
 from sentry_sdk.integrations.gql import GQLIntegration
-from unittest.mock import MagicMock, patch
 
 
 class _MockClientBase(MagicMock):

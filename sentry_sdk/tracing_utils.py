@@ -1,17 +1,17 @@
-import re
 import contextlib
+import re
 
 import sentry_sdk
-from sentry_sdk.consts import OP
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    Dsn,
-    match_regex_list,
-    to_string,
-    is_sentry_url,
-)
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import OP
+from sentry_sdk.utils import (
+    Dsn,
+    capture_internal_exceptions,
+    is_sentry_url,
+    match_regex_list,
+    to_string,
+)
 
 if PY2:
     from collections import Mapping
@@ -22,12 +22,13 @@ else:
 
 if TYPE_CHECKING:
     import typing
-
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import Union
+    from typing import (
+        Any,
+        Dict,
+        Generator,
+        Optional,
+        Union,
+    )
 
 
 SENTRY_TRACE_REGEX = re.compile(

@@ -1,19 +1,16 @@
 import json
 import logging
-import pytest
 from io import BytesIO
 
 import pyramid.testing
-
+import pytest
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
-
-from sentry_sdk import capture_message, add_breadcrumb
-from sentry_sdk.integrations.pyramid import PyramidIntegration
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-
 from werkzeug.test import Client
 
+from sentry_sdk import add_breadcrumb, capture_message
+from sentry_sdk.integrations.pyramid import PyramidIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 try:
     from importlib.metadata import version

@@ -2,15 +2,20 @@ from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
+from sentry_sdk.tracing import TRANSACTION_SOURCE_CUSTOM, Transaction
 
 if MYPY:
     from typing import Callable, Optional
+
     from google.protobuf.message import Message  # type: ignore
 
 try:
     import grpc
-    from grpc import ServicerContext, HandlerCallDetails, RpcMethodHandler
+    from grpc import (
+        HandlerCallDetails,
+        RpcMethodHandler,
+        ServicerContext,
+    )
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 

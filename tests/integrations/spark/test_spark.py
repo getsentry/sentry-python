@@ -1,16 +1,15 @@
-import pytest
 import sys
-from sentry_sdk.integrations.spark.spark_driver import (
-    _set_app_properties,
-    _start_sentry_listener,
-    SentryListener,
-)
 
-from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
-
+import pytest
+from py4j.protocol import Py4JJavaError
 from pyspark import SparkContext
 
-from py4j.protocol import Py4JJavaError
+from sentry_sdk.integrations.spark.spark_driver import (
+    SentryListener,
+    _set_app_properties,
+    _start_sentry_listener,
+)
+from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
 
 ################
 # DRIVER TESTS #
@@ -198,9 +197,8 @@ def test_sentry_listener_on_stage_completed_failure(
 
 
 def test_spark_worker(monkeypatch, sentry_init, capture_events, capture_exceptions):
-    import pyspark.worker as original_worker
     import pyspark.daemon as original_daemon
-
+    import pyspark.worker as original_worker
     from pyspark.taskcontext import TaskContext
 
     task_context = TaskContext._getOrCreate()

@@ -3,6 +3,7 @@ import json
 import django
 import pytest
 from channels.testing import HttpCommunicator
+
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application

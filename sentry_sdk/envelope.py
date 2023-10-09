@@ -2,18 +2,20 @@ import io
 import json
 import mimetypes
 
-from sentry_sdk._compat import text_type, PY2
+from sentry_sdk._compat import PY2, text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.session import Session
-from sentry_sdk.utils import json_dumps, capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, json_dumps
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Union
-    from typing import Dict
-    from typing import List
-    from typing import Iterator
+    from typing import (
+        Any,
+        Dict,
+        Iterator,
+        List,
+        Optional,
+        Union,
+    )
 
     from sentry_sdk._types import Event, EventDataCategory
 

@@ -1,18 +1,20 @@
 from __future__ import absolute_import
+
 from threading import Lock
 
 from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger
 
-
 if TYPE_CHECKING:
-    from typing import Callable
-    from typing import Dict
-    from typing import Iterator
-    from typing import List
-    from typing import Set
-    from typing import Type
+    from typing import (
+        Callable,
+        Dict,
+        Iterator,
+        List,
+        Set,
+        Type,
+    )
 
 
 _installer_lock = Lock()

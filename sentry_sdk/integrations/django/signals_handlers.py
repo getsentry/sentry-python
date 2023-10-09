@@ -8,11 +8,12 @@ from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import List
+    from typing import (
+        Any,
+        Callable,
+        List,
+    )
 
 
 def _get_receiver_name(receiver):

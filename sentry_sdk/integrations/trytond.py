@@ -1,11 +1,11 @@
-import sentry_sdk.hub
-import sentry_sdk.utils
-import sentry_sdk.integrations
-import sentry_sdk.integrations.wsgi
-from sentry_sdk._types import TYPE_CHECKING
-
 from trytond.exceptions import TrytonException  # type: ignore
 from trytond.wsgi import app  # type: ignore
+
+import sentry_sdk.hub
+import sentry_sdk.integrations
+import sentry_sdk.integrations.wsgi
+import sentry_sdk.utils
+from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

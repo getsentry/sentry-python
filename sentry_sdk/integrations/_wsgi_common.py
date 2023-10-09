@@ -1,19 +1,20 @@
 import json
 from copy import deepcopy
 
+from sentry_sdk._compat import iteritems, text_type
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
-from sentry_sdk._compat import text_type, iteritems
-
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import sentry_sdk
+    from typing import (
+        Any,
+        Dict,
+        Optional,
+        Union,
+    )
 
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Union
+    import sentry_sdk
 
 
 SENSITIVE_ENV_KEYS = (

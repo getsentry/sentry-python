@@ -29,7 +29,14 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
+    from typing import (
+        Any,
+        Awaitable,
+        Callable,
+        Dict,
+        Optional,
+        Tuple,
+    )
 
     from sentry_sdk.scope import Scope as SentryScope
 
@@ -44,7 +51,9 @@ try:
     )
     from starlette.requests import Request  # type: ignore
     from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
+    from starlette.types import ASGIApp, Receive
+    from starlette.types import Scope as StarletteScope  # type: ignore
+    from starlette.types import Send
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 

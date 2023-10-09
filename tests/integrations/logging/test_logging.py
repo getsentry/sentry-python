@@ -1,9 +1,9 @@
 # coding: utf-8
+import logging
 import sys
+import warnings
 
 import pytest
-import logging
-import warnings
 
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 

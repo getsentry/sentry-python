@@ -6,8 +6,8 @@ Then the Handler function sstring should be replaced with
 'sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler'
 """
 import os
-import sys
 import re
+import sys
 
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING

@@ -1,29 +1,27 @@
 # coding: utf-8
-import sys
 import os
+import sys
 
 import pytest
 
-
+from sentry_sdk._compat import string_types, text_type
 from sentry_sdk.utils import (
+    AnnotatedValue,
     BadDsn,
     Dsn,
-    safe_repr,
     exceptions_from_error_tuple,
     filename_for_module,
-    iter_event_stacktraces,
-    to_base64,
     from_base64,
+    iter_event_stacktraces,
+    safe_repr,
     set_in_app_in_frames,
     strip_string,
-    AnnotatedValue,
+    to_base64,
 )
-from sentry_sdk._compat import text_type, string_types
-
 
 try:
-    from hypothesis import given
     import hypothesis.strategies as st
+    from hypothesis import given
 except ImportError:
     pass
 else:

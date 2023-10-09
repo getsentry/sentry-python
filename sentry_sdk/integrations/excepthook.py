@@ -1,18 +1,18 @@
 import sys
 
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
-from sentry_sdk.integrations import Integration
-
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import Integration
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Callable
-    from typing import Any
-    from typing import Type
-    from typing import Optional
-
     from types import TracebackType
+    from typing import (
+        Any,
+        Callable,
+        Optional,
+        Type,
+    )
 
     Excepthook = Callable[
         [Type[BaseException], BaseException, Optional[TracebackType]],

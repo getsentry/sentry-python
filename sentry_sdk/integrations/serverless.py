@@ -1,21 +1,20 @@
 import sys
 
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import event_from_exception
 from sentry_sdk._compat import reraise
 from sentry_sdk._functools import wraps
-
-
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.hub import Hub
+from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import TypeVar
-    from typing import Union
-    from typing import Optional
-
-    from typing import overload
+    from typing import (
+        Any,
+        Callable,
+        Optional,
+        TypeVar,
+        Union,
+        overload,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 

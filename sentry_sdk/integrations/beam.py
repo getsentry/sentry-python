@@ -2,24 +2,26 @@ from __future__ import absolute_import
 
 import sys
 import types
-from sentry_sdk._functools import wraps
 
-from sentry_sdk.hub import Hub
 from sentry_sdk._compat import reraise
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk._functools import wraps
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Iterator
-    from typing import TypeVar
-    from typing import Optional
-    from typing import Callable
+    from typing import (
+        Any,
+        Callable,
+        Iterator,
+        Optional,
+        TypeVar,
+    )
 
-    from sentry_sdk.client import Client
     from sentry_sdk._types import ExcInfo
+    from sentry_sdk.client import Client
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])

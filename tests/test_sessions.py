@@ -1,5 +1,4 @@
 import sentry_sdk
-
 from sentry_sdk import Hub
 from sentry_sdk.sessions import auto_session_tracking
 

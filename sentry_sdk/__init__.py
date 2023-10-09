@@ -1,14 +1,11 @@
+from sentry_sdk.api import *  # noqa
+from sentry_sdk.client import Client
+from sentry_sdk.consts import VERSION  # noqa
+from sentry_sdk.crons import monitor  # noqa
 from sentry_sdk.hub import Hub, init
 from sentry_sdk.scope import Scope
-from sentry_sdk.transport import Transport, HttpTransport
-from sentry_sdk.client import Client
-
-from sentry_sdk.api import *  # noqa
-
-from sentry_sdk.consts import VERSION  # noqa
-
-from sentry_sdk.crons import monitor  # noqa
 from sentry_sdk.tracing import trace  # noqa
+from sentry_sdk.transport import HttpTransport, Transport
 
 __all__ = [  # noqa
     "Hub",

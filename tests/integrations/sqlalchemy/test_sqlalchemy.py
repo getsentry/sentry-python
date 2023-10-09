@@ -1,13 +1,23 @@
 import sys
-import pytest
 
-from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
+import pytest
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    create_engine,
+    text,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy import text
 
-from sentry_sdk import capture_message, start_transaction, configure_scope
+from sentry_sdk import (
+    capture_message,
+    configure_scope,
+    start_transaction,
+)
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES

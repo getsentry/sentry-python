@@ -1,7 +1,7 @@
+import sentry_sdk.client
+from sentry_sdk import capture_event
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.session import Session
-from sentry_sdk import capture_event
-import sentry_sdk.client
 
 
 def generate_transaction_item():
