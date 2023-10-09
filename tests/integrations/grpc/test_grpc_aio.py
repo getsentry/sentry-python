@@ -105,7 +105,7 @@ async def test_grpc_server_continues_transaction(capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_exception(sentry_init, capture_events, grpc_server):
+async def test_grpc_server_exception(capture_events, grpc_server):
     events = capture_events()
 
     async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
@@ -181,6 +181,29 @@ async def test_grpc_client_unary_stream_starts_span(
     }
 
 
+@pytest.mark.asyncio
+async def test_stream_stream(grpc_server):
+    """Test to verify stream-stream works.
+    Tracing not supported for it yet.
+    """
+    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        response = stub.TestStreamStream((gRPCTestMessage(text="test"),))
+        async for r in response:
+            assert r.text == "test"
+
+
+@pytest.mark.asyncio
+async def test_stream_unary(grpc_server):
+    """Test to verify stream-stream works.
+    Tracing not supported for it yet.
+    """
+    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        response = await stub.TestStreamUnary((gRPCTestMessage(text="test"),))
+        assert response.text == "test"
+
+
 class TestService(gRPCTestServiceServicer):
     class TestException(Exception):
         def __init__(self):
@@ -201,3 +224,13 @@ class TestService(gRPCTestServiceServicer):
     async def TestUnaryStream(cls, request, context):  # noqa: N802
         for _ in range(3):
             yield gRPCTestMessage(text=request.text)
+
+    @classmethod
+    async def TestStreamStream(cls, request, context):
+        async for r in request:
+            yield r
+
+    @classmethod
+    async def TestStreamUnary(cls, request, context):
+        requests = [r async for r in request]
+        return requests.pop()

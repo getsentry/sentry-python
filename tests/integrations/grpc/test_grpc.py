@@ -263,13 +263,36 @@ def test_grpc_client_and_servers_interceptors_integration(
     )
 
 
+@pytest.mark.forked
+def test_stream_stream(sentry_init):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    _set_up()
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        response_iterator = stub.TestStreamStream(iter((gRPCTestMessage(text="test"),)))
+        for response in response_iterator:
+            assert response.text == "test"
+
+
+def test_stream_unary(sentry_init):
+    """Test to verify stream-stream works.
+    Tracing not supported for it yet.
+    """
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    _set_up()
+    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+        stub = gRPCTestServiceStub(channel)
+        response = stub.TestStreamUnary(iter((gRPCTestMessage(text="test"),)))
+        assert response.text == "test"
+
+
 def _set_up(interceptors: Optional[List[grpc.ServerInterceptor]] = None):
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=2),
         interceptors=interceptors,
     )
 
-    add_gRPCTestServiceServicer_to_server(TestService, server)
+    add_gRPCTestServiceServicer_to_server(TestService(), server)
     server.add_insecure_port(f"[::]:{PORT}")
     server.start()
 
@@ -299,3 +322,13 @@ class TestService(gRPCTestServiceServicer):
     def TestUnaryStream(request, context):  # noqa: N802
         for _ in range(3):
             yield gRPCTestMessage(text=request.text)
+
+    @staticmethod
+    def TestStreamStream(request, context):
+        for r in request:
+            yield r
+
+    @staticmethod
+    def TestStreamUnary(request, context):
+        requests = [r for r in request]
+        return requests.pop()
