@@ -304,6 +304,7 @@ TIMING_FUNCTIONS = {
 class MetricsAggregator(object):
     ROLLUP_IN_SECONDS = 10.0
     MAX_WEIGHT = 100000
+    FLUSHER_SLEEP_TIME = 5.0
 
     def __init__(
         self,
@@ -350,7 +351,7 @@ class MetricsAggregator(object):
         while self._running or self._force_flush:
             self._flush()
             if self._running:
-                self._flush_event.wait(5.0)
+                self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
 
     def _flush(self):
         # type: (...) -> None
@@ -442,6 +443,7 @@ class MetricsAggregator(object):
         self._flusher.join()
         self._flusher = None
 
+    @metrics_noop
     def flush(self):
         # type: (...) -> None
         self._force_flush = True
@@ -463,16 +465,7 @@ class MetricsAggregator(object):
         encoded_metrics = _encode_metrics(flushable_buckets)
         metric_item = Item(payload=encoded_metrics, type="statsd")
         envelope = Envelope(items=[metric_item])
-
-        # A malfunctioning transport might create a forever loop of metric
-        # emission when it emits a metric in capture_envelope.  We still
-        # allow the capture to take place, but interior metric incr calls
-        # or similar will be disabled.  In the background thread this can
-        # never happen, but in the force flush case which happens in the
-        # foreground we might make it here unprotected.
-        with recursion_protection():
-            self._capture_func(envelope)
-
+        self._capture_func(envelope)
         return envelope
 
     def _serialize_tags(
