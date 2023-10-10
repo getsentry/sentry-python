@@ -532,3 +532,35 @@ def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch)
     m = parse_metrics(envelope.items[0].payload.get_bytes())
     assert len(m) == 1
     assert m[0][1] == "counter@none"
+
+
+def test_flush_recursion_protection_background_flush(
+    sentry_init, capture_envelopes, monkeypatch
+):
+    monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.1)
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    envelopes = capture_envelopes()
+    test_client = Hub.current.client
+
+    real_capture_envelope = test_client.transport.capture_envelope
+
+    def bad_capture_envelope(*args, **kwargs):
+        metrics.incr("bad-metric")
+        return real_capture_envelope(*args, **kwargs)
+
+    monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
+
+    metrics.incr("counter")
+
+    # flush via sleep and flag
+    Hub.current.client.metrics_aggregator._force_flush = True
+    time.sleep(0.5)
+
+    (envelope,) = envelopes
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert len(m) == 1
+    assert m[0][1] == "counter@none"
