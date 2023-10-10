@@ -515,6 +515,7 @@ def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch)
     test_client = Hub.current.client
 
     real_capture_envelope = test_client.transport.capture_envelope
+
     def bad_capture_envelope(*args, **kwargs):
         metrics.incr("bad-metric")
         return real_capture_envelope(*args, **kwargs)
