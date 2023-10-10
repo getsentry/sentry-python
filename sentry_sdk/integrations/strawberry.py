@@ -366,7 +366,7 @@ def _make_request_event_processor(execution_context):
                             "operationName"
                         ] = execution_context.operation_name
 
-            elif event.get("request", {}).get("data"):
+            elif (event.get("request") or {}).get("data"):
                 del event["request"]["data"]
 
         return event
