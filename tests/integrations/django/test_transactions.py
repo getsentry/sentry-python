@@ -73,3 +73,13 @@ def test_legacy_resolver_newstyle_django20_urlconf():
     resolver = RavenResolver()
     result = resolver.resolve("/api/v2/1234/store/", url_conf)
     assert result == "/api/v2/{project_id}/store/"
+
+
+@pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
+def test_legacy_resolver_newstyle_django20_urlconf_multiple_groups():
+    from django.urls import path
+
+    url_conf = (path("api/v2/<int:project_id>/product/<int:pid>", lambda x: ""),)
+    resolver = RavenResolver()
+    result = resolver.resolve("/api/v2/1234/product/5689", url_conf)
+    assert result == "/api/v2/{project_id}/store/{pid}"
