@@ -8,10 +8,6 @@ from sentry_sdk.integrations.spark.spark_driver import (
 
 from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
 
-
-pytest.importorskip("pyspark")
-pytest.importorskip("py4j")
-
 from pyspark import SparkContext
 
 from py4j.protocol import Py4JJavaError
