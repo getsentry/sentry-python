@@ -366,8 +366,11 @@ def _make_request_event_processor(execution_context):
                             "operationName"
                         ] = execution_context.operation_name
 
-            elif (event.get("request") or {}).get("data"):
-                del event["request"]["data"]
+            else:
+                try:
+                    del event["request"]["data"]
+                except (KeyError, TypeError):
+                    pass
 
         return event
 
