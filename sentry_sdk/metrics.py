@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from typing import Iterable
     from typing import Callable
     from typing import Optional
+    from typing import Generator
     from typing import Tuple
 
     from sentry_sdk._types import BucketKey
@@ -56,8 +57,8 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 
 @contextmanager
 def recursion_protection():
+    # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
-    # type: () -> Iterable[bool]
     try:
         in_metrics = _thread_local.in_metrics
     except AttributeError:
@@ -70,10 +71,10 @@ def recursion_protection():
 
 
 def metrics_noop(func):
+    # type: (Any) -> Any
     """Convenient decorator that uses `recursion_protection` to
     make a function a noop.
     """
-    # type: (Any) -> Any
     @wraps(func)
     def new_func(*args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -465,7 +466,9 @@ class MetricsAggregator(object):
         # A malfunctioning transport might create a forever loop of metric
         # emission when it emits a metric in capture_envelope.  We still
         # allow the capture to take place, but interior metric incr calls
-        # or similar will be disabled.
+        # or similar will be disabled.  In the background thread this can
+        # never happen, but in the force flush case which happens in the
+        # foreground we might make it here unprotected.
         with recursion_protection():
             self._capture_func(envelope)
 
