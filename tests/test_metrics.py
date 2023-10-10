@@ -534,7 +534,9 @@ def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch)
     assert m[0][1] == "counter@none"
 
 
-def test_flush_recursion_protection_background_flush(sentry_init, capture_envelopes, monkeypatch):
+def test_flush_recursion_protection_background_flush(
+    sentry_init, capture_envelopes, monkeypatch
+):
     monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.1)
     sentry_init(
         release="fun-release",
