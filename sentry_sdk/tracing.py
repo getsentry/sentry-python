@@ -1,12 +1,12 @@
 import uuid
 import random
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk._compat import PY2
+from sentry_sdk._compat import datetime_utcnow, PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -14,6 +14,7 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
+    from datetime import datetime
     from typing import Any
     from typing import Dict
     from typing import Iterator
@@ -481,7 +482,7 @@ class Span(object):
                     microseconds=elapsed / 1000
                 )
         except AttributeError:
-            self.timestamp = datetime.utcnow()
+            self.timestamp = datetime_utcnow()
 
         # If we were asked to emit a metric, do so now.  We always record
         # that timing in seconds.

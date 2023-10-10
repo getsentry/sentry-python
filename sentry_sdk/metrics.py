@@ -8,6 +8,7 @@ import zlib
 from datetime import datetime
 from functools import wraps, partial
 from threading import Event, Lock, Thread
+from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import text_type
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from typing import Iterable
     from typing import Callable
     from typing import Optional
+    from typing import Generator
     from typing import Tuple
     from typing import Union
 
@@ -55,21 +57,33 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 )
 
 
+@contextmanager
+def recursion_protection():
+    # type: () -> Generator[bool, None, None]
+    """Enters recursion protection and returns the old flag."""
+    try:
+        in_metrics = _thread_local.in_metrics
+    except AttributeError:
+        in_metrics = False
+    _thread_local.in_metrics = True
+    try:
+        yield in_metrics
+    finally:
+        _thread_local.in_metrics = in_metrics
+
+
 def metrics_noop(func):
     # type: (Any) -> Any
+    """Convenient decorator that uses `recursion_protection` to
+    make a function a noop.
+    """
+
     @wraps(func)
     def new_func(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        try:
-            in_metrics = _thread_local.in_metrics
-        except AttributeError:
-            in_metrics = False
-        _thread_local.in_metrics = True
-        try:
+        with recursion_protection() as in_metrics:
             if not in_metrics:
                 return func(*args, **kwargs)
-        finally:
-            _thread_local.in_metrics = in_metrics
 
     return new_func
 
@@ -292,6 +306,7 @@ TIMING_FUNCTIONS = {
 class MetricsAggregator(object):
     ROLLUP_IN_SECONDS = 10.0
     MAX_WEIGHT = 100000
+    FLUSHER_SLEEP_TIME = 5.0
 
     def __init__(
         self,
@@ -338,7 +353,7 @@ class MetricsAggregator(object):
         while self._running or self._force_flush:
             self._flush()
             if self._running:
-                self._flush_event.wait(5.0)
+                self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
 
     def _flush(self):
         # type: (...) -> None
@@ -432,6 +447,7 @@ class MetricsAggregator(object):
         self._flusher.join()
         self._flusher = None
 
+    @metrics_noop
     def flush(self):
         # type: (...) -> None
         self._force_flush = True
@@ -499,8 +515,10 @@ def _get_aggregator_and_update_tags(key, tags):
 
     callback = client.options.get("_experiments", {}).get("before_emit_metric")
     if callback is not None:
-        if not callback(key, updated_tags):
-            return None, updated_tags
+        with recursion_protection() as in_metrics:
+            if not in_metrics:
+                if not callback(key, updated_tags):
+                    return None, updated_tags
 
     return client.metrics_aggregator, updated_tags
 

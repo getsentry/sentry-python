@@ -2,8 +2,6 @@ import threading
 
 import pytest
 
-pytest.importorskip("celery")
-
 from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
 
