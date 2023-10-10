@@ -27,6 +27,19 @@ from sentry_sdk.integrations.strawberry import (
 )
 
 
+parameterize_strawberry_test = pytest.mark.parametrize(
+    "client_factory,async_execution,framework_integrations",
+    (
+        (
+            "async_app_client_factory",
+            True,
+            [FastApiIntegration(), StarletteIntegration()],
+        ),
+        ("sync_app_client_factory", False, [FlaskIntegration()]),
+    ),
+)
+
+
 @strawberry.type
 class Query:
     @strawberry.field
@@ -134,17 +147,7 @@ def test_replace_existing_sentry_sync_extension(sentry_init):
     assert SentrySyncExtension in schema.extensions
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_capture_request_if_available_and_send_pii_is_on(
     request,
     sentry_init,
@@ -200,17 +203,7 @@ def test_capture_request_if_available_and_send_pii_is_on(
     }
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_do_not_capture_request_if_send_pii_is_off(
     request,
     sentry_init,
@@ -250,17 +243,7 @@ def test_do_not_capture_request_if_send_pii_is_off(
     }
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_breadcrumb_no_operation_name(
     request,
     sentry_init,
@@ -297,17 +280,7 @@ def test_breadcrumb_no_operation_name(
     }
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_capture_transaction_on_error(
     request,
     sentry_init,
@@ -386,17 +359,7 @@ def test_capture_transaction_on_error(
     }
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_capture_transaction_on_success(
     request,
     sentry_init,
@@ -474,17 +437,7 @@ def test_capture_transaction_on_success(
     }
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_transaction_no_operation_name(
     request,
     sentry_init,
@@ -562,17 +515,7 @@ def test_transaction_no_operation_name(
     }
 
 
-@pytest.mark.parametrize(
-    "client_factory,async_execution,framework_integrations",
-    (
-        (
-            "async_app_client_factory",
-            True,
-            [FastApiIntegration(), StarletteIntegration()],
-        ),
-        ("sync_app_client_factory", False, [FlaskIntegration()]),
-    ),
-)
+@parameterize_strawberry_test
 def test_transaction_mutation(
     request,
     sentry_init,
