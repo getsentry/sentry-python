@@ -190,9 +190,7 @@ def test_timing_via_span(sentry_init, capture_envelopes):
     ts = time.time()
     envelopes = capture_envelopes()
 
-    with start_span(
-        op="whatever", start_timestamp=ts, metric="my.span"
-    ) as span:
+    with start_span(op="whatever", start_timestamp=ts, metric="my.span") as span:
         span.set_tag("blub", "blah")
         time.sleep(0.1)
     Hub.current.flush()
