@@ -4,8 +4,9 @@ from inspect import isawaitable
 
 from sentry_sdk import continue_trace
 from sentry_sdk._compat import urlparse, reraise
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
-from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -185,9 +186,7 @@ async def _hub_enter(request):
 
     transaction = continue_trace(
         dict(request.headers),
-        op="http.server",
-        name=request.server_path,
-        source=TRANSACTION_SOURCE_COMPONENT,
+        op=OP.HTTP_SERVER,
     )
     request.ctx._sentry_transaction = request.ctx._sentry_hub.start_transaction(
         transaction
@@ -196,10 +195,14 @@ async def _hub_enter(request):
 
 async def _hub_exit(request, response):
     # type: (Request, BaseHTTPResponse) -> None
-    # TODO: Should these lines go in a try block in case the context got modified?
-    request.ctx._sentry_transaction.set_http_status(response.status)
-    request.ctx._sentry_transaction.__exit__(None, None, None)
-    request.ctx._sentry_hub.__exit__(None, None, None)
+    with capture_internal_exceptions():
+        request.ctx._sentry_transaction.set_http_status(response.status)
+        request.ctx._sentry_transaction.__exit__(None, None, None)
+
+    # These capture_internal_exceptions blocks are intentionally separate, so that in case an exception occurs
+    # while trying to end the transaction, we still attempt to exit the hub.
+    with capture_internal_exceptions():
+        request.ctx._sentry_hub.__exit__(None, None, None)
 
 
 async def _set_transaction(request, route, **_):
@@ -209,7 +212,7 @@ async def _set_transaction(request, route, **_):
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
                 scope.set_transaction_name(
-                    "/%s" % route.path, source=TRANSACTION_SOURCE_COMPONENT
+                    "/%s" % route.path, source=TRANSACTION_SOURCE_ROUTE
                 )
 
 
