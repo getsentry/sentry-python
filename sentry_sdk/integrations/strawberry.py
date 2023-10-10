@@ -19,7 +19,7 @@ try:
     import strawberry.schema.schema as strawberry_schema  # type: ignore
     from strawberry import Schema
     from strawberry.extensions import SchemaExtension  # type: ignore
-    from strawberry.extensions.tracing.utils import should_skip_tracing  # type: ignore
+    from strawberry.extensions.tracing.utils import should_skip_tracing as strawberry_should_skip_tracing  # type: ignore
     from strawberry.extensions.tracing import (  # type: ignore
         SentryTracingExtension as StrawberrySentryAsyncExtension,
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
@@ -204,17 +204,20 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
     def should_skip_tracing(self, _next, info):
         # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], GraphQLResolveInfo) -> bool
-        return should_skip_tracing(_next, info)
+        return strawberry_should_skip_tracing(_next, info)
+
+    async def _resolve(self, _next, root, info, *args, **kwargs):
+        result = _next(root, info, *args, **kwargs)
+
+        if isawaitable(result):
+            result = await result
+
+        return result
 
     async def resolve(self, _next, root, info, *args, **kwargs):
         # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
         if self.should_skip_tracing(_next, info):
-            result = _next(root, info, *args, **kwargs)
-
-            if isawaitable(result):
-                result = await result
-
-            return result
+            return await self._resolve(_next, root, info, *args, **kwargs)
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
@@ -226,12 +229,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
             span.set_data("graphql.field_path", field_path)
             span.set_data("graphql.path", ".".join(map(str, info.path.as_list())))
 
-            result = _next(root, info, *args, **kwargs)
-
-            if isawaitable(result):
-                result = await result
-
-            return result
+            return await self._resolve(_next, root, info, *args, **kwargs)
 
 
 class SentrySyncExtension(SentryAsyncExtension):
@@ -300,17 +298,17 @@ def _patch_execute():
 
 def _patch_views():
     # type: () -> None
-    old_handle_errors_async = async_base_view.AsyncBaseHTTPView._handle_errors
-    old_handle_errors_sync = sync_base_view.SyncBaseHTTPView._handle_errors
+    old_async_view_handle_errors = async_base_view.AsyncBaseHTTPView._handle_errors
+    old_sync_view_handle_errors = sync_base_view.SyncBaseHTTPView._handle_errors
 
-    def _sentry_patched_handle_errors_async(self, errors, response_data):
+    def _sentry_patched_async_view_handle_errors(self, errors, response_data):
         # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
-        old_handle_errors_async(self, errors, response_data)
+        old_async_view_handle_errors(self, errors, response_data)
         _sentry_patched_handle_errors(self, errors, response_data)
 
-    def _sentry_patched_handle_errors_sync(self, errors, response_data):
+    def _sentry_patched_sync_view_handle_errors(self, errors, response_data):
         # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
-        old_handle_errors_sync(self, errors, response_data)
+        old_sync_view_handle_errors(self, errors, response_data)
         _sentry_patched_handle_errors(self, errors, response_data)
 
     def _sentry_patched_handle_errors(self, errors, response_data):
@@ -340,9 +338,11 @@ def _patch_views():
                 hub.capture_event(event, hint=hint)
 
     async_base_view.AsyncBaseHTTPView._handle_errors = (
-        _sentry_patched_handle_errors_async
+        _sentry_patched_async_view_handle_errors
     )
-    sync_base_view.SyncBaseHTTPView._handle_errors = _sentry_patched_handle_errors_sync
+    sync_base_view.SyncBaseHTTPView._handle_errors = (
+        _sentry_patched_sync_view_handle_errors
+    )
 
 
 def _make_request_event_processor(execution_context):
