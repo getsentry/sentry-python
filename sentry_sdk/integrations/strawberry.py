@@ -149,7 +149,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         if self.execution_context.query.strip().startswith("mutation"):
             operation_type = "mutation"
             op = OP.GRAPHQL_MUTATION
-        if self.execution_context.query.strip().startswith("subscription"):
+        elif self.execution_context.query.strip().startswith("subscription"):
             operation_type = "subscription"
             op = OP.GRAPHQL_SUBSCRIPTION
 
