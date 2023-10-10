@@ -153,10 +153,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
             operation_type = "subscription"
             op = OP.GRAPHQL_SUBSCRIPTION
 
+        description = operation_type
         if self._operation_name:
-            description = "{} {}".format(operation_type, self._operation_name)
-        else:
-            description = operation_type
+            description += " {}".format(self._operation_name)
 
         Hub.current.add_breadcrumb(
             category="graphql.operation",
