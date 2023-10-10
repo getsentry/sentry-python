@@ -207,6 +207,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         return strawberry_should_skip_tracing(_next, info)
 
     async def _resolve(self, _next, root, info, *args, **kwargs):
+        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
         result = _next(root, info, *args, **kwargs)
 
         if isawaitable(result):

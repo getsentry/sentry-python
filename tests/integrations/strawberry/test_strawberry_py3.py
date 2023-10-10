@@ -4,6 +4,8 @@ strawberry = pytest.importorskip("strawberry")
 pytest.importorskip("fastapi")
 pytest.importorskip("flask")
 
+from unittest import mock
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from flask import Flask
@@ -23,11 +25,6 @@ from sentry_sdk.integrations.strawberry import (
     SentryAsyncExtension,
     SentrySyncExtension,
 )
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @strawberry.type
@@ -101,6 +98,7 @@ def test_replace_existing_sentry_async_extension(sentry_init):
 
     schema = strawberry.Schema(Query, extensions=[SentryTracingExtension])
     assert SentryTracingExtension not in schema.extensions
+    assert SentrySyncExtension not in schema.extensions
     assert SentryAsyncExtension in schema.extensions
 
 
@@ -109,6 +107,7 @@ def test_replace_existing_sentry_sync_extension(sentry_init):
 
     schema = strawberry.Schema(Query, extensions=[SentryTracingExtensionSync])
     assert SentryTracingExtensionSync not in schema.extensions
+    assert SentryAsyncExtension not in schema.extensions
     assert SentrySyncExtension in schema.extensions
 
 
