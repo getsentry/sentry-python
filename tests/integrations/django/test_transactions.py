@@ -60,9 +60,9 @@ def test_legacy_resolver_included_match():
 def test_capture_multiple_named_groups():
     resolver = RavenResolver()
     result = resolver.resolve(
-        "/api/myproject/product/cb4ef1caf3554c34ae134f3c1b3d605f", example_url_conf
+        "/api/myproject/product/cb4ef1caf3554c34ae134f3c1b3d605f/", example_url_conf
     )
-    assert result == "/api/{project_id}/product/{pid}"
+    assert result == "/api/{project_id}/product/{pid}/"
 
 
 @pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
@@ -82,4 +82,4 @@ def test_legacy_resolver_newstyle_django20_urlconf_multiple_groups():
     url_conf = (path("api/v2/<int:project_id>/product/<int:pid>", lambda x: ""),)
     resolver = RavenResolver()
     result = resolver.resolve("/api/v2/1234/product/5689", url_conf)
-    assert result == "/api/v2/{project_id}/store/{pid}"
+    assert result == "/api/v2/{project_id}/product/{pid}"
