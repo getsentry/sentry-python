@@ -1,7 +1,7 @@
 import uuid
 import random
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
@@ -14,7 +14,6 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
-    from datetime import datetime
     from typing import Any
     from typing import Dict
     from typing import Iterator
@@ -103,8 +102,7 @@ class Span(object):
         "hub",
         "_context_manager_state",
         "_containing_transaction",
-        "emit_metric",
-        "metric_name",
+        "metric",
     )
 
     def __new__(cls, **kwargs):
@@ -135,8 +133,7 @@ class Span(object):
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
-        emit_metric=False,  # type: bool
-        metric_name=None,  # type: Optional[str]
+        metric=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -166,8 +163,8 @@ class Span(object):
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
 
-        self.emit_metric = emit_metric
-        self.metric_name = metric_name
+        #: The name of the metric to emit if there is one.
+        self.metric = metric
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
@@ -486,9 +483,9 @@ class Span(object):
 
         # If we were asked to emit a metric, do so now.  We always record
         # that timing in seconds.
-        if self.emit_metric:
+        if self.metric is not None:
             metrics.timing(
-                self.metric_name or ("span." + (self.op or "generic")),
+                self.metric,
                 timestamp=self.start_timestamp,
                 value=(self.timestamp - self.start_timestamp).total_seconds(),
                 unit="second",

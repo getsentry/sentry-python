@@ -191,7 +191,7 @@ def test_timing_via_span(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     with start_span(
-        op="whatever", start_timestamp=ts, emit_metric=True
+        op="whatever", start_timestamp=ts, metric="my.span"
     ) as span:
         span.set_tag("blub", "blah")
         time.sleep(0.1)
@@ -204,7 +204,7 @@ def test_timing_via_span(sentry_init, capture_envelopes):
     m = parse_metrics(envelope.items[0].payload.get_bytes())
 
     assert len(m) == 1
-    assert m[0][1] == "span.whatever@second"
+    assert m[0][1] == "my.span@second"
     assert m[0][2] == "d"
     assert len(m[0][3]) == 1
     assert float(m[0][3][0]) >= 0.1
