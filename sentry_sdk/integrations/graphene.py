@@ -1,9 +1,10 @@
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    package_version,
+    parse_version,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -27,10 +28,11 @@ class GrapheneIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        version = package_version("graphene")
+        installed_packages = _get_installed_modules()
+        version = parse_version(installed_packages["graphene"])
 
         if version is None:
-            raise DidNotEnable("Unparsable graphene version.")
+            raise DidNotEnable("Unparsable graphene version: {}".format(version))
 
         if version < (3, 3):
             raise DidNotEnable("graphene 3.3 or newer required.")
