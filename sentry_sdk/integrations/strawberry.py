@@ -76,7 +76,7 @@ def _patch_schema_init():
     old_schema_init = Schema.__init__
 
     def _sentry_patched_schema_init(self, *args, **kwargs):
-        # type: (Any, Any, Any) -> None
+        # type: (Schema, Any, Any) -> None
         integration = Hub.current.get_integration(StrawberryIntegration)
         if integration is None:
             return old_schema_init(self, *args, **kwargs)
