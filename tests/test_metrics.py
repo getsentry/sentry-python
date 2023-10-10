@@ -519,6 +519,7 @@ def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch)
     def bad_capture_envelope(*args, **kwargs):
         metrics.incr("bad-metric")
         return real_capture_envelope(*args, **kwargs)
+
     monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
 
     metrics.incr("counter")

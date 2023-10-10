@@ -75,6 +75,7 @@ def metrics_noop(func):
     """Convenient decorator that uses `recursion_protection` to
     make a function a noop.
     """
+
     @wraps(func)
     def new_func(*args, **kwargs):
         # type: (*Any, **Any) -> Any
