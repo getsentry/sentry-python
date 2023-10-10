@@ -418,6 +418,8 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
             return False
         tags["extra"] = "foo"
         del tags["release"]
+        # this better be a noop!
+        metrics.incr("shitty-recursion")
         return True
 
     sentry_init(
@@ -501,3 +503,32 @@ def test_tag_serialization(sentry_init, capture_envelopes):
         "release": "fun-release",
         "environment": "not-fun-env",
     }
+
+
+def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch):
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    envelopes = capture_envelopes()
+    test_client = Hub.current.client
+
+    real_capture_envelope = test_client.transport.capture_envelope
+
+    def bad_capture_envelope(*args, **kwargs):
+        metrics.incr("bad-metric")
+        return real_capture_envelope(*args, **kwargs)
+
+    monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
+
+    metrics.incr("counter")
+
+    # flush twice to see the inner metric
+    Hub.current.flush()
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert len(m) == 1
+    assert m[0][1] == "counter@none"
