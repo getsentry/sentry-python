@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.32.0
+
+### Various fixes & improvements
+
+- Fix mypy errors (#2433) by @sentrivana
+- Capture multiple named groups again (#2432) by @sentrivana
+- Add Strawberry GraphQL integration (#2393) by @sentrivana
+- feat(metrics): Make a consistent noop flush behavior (#2428) by @mitsuhiko
+- lint: fix pre-commit issues (#2424) by @bukzor-sentryio
+- feat(metrics): Stronger recursion protection (#2426) by @mitsuhiko
+- Remove utcnow, utcfromtimestamp deprecated in Python 3.12 (#2415) by @rmad17
+- Update CONTRIBUTING.md (#2411) by @sentrivana
+- Move `importorskip`s in tests to `__init__.py` files (#2412) by @sentrivana
+- Run more `requests`, `celery`, `falcon` tests (#2414) by @sentrivana
+- RQ changed how the set jobs to failed. Dealing with this. (#2405) by @antonpirker
+- fix(tracing) : Add `trace` to `__all__` in top-level `__init__.py` (#2401) by @lobsterkatie
+- Add Ariadne GraphQL error integration (#2387) by @sentrivana
+- Add Graphene GraphQL error integration (#2389) by @sentrivana
+- [Hackweek] Add explain plan to db spans. (#2315) by @antonpirker
+- Pinned some test requirements because new majors break our tests (#2404) by @antonpirker
+- Updated Apidocs (#2397) by @antonpirker
+- feat(metrics): Shift flushing by up to a rollup window (#2396) by @mitsuhiko
+- Add GraphQL client integration  (#2368) by @szokeasaurusrex
+- build(deps): bump sphinx from 7.2.5 to 7.2.6 (#2378) by @dependabot
+- feat(metrics): Move minimetrics code to the SDK (#2385) by @mitsuhiko
+- feat(transport): Added configurable compression levels (#2382) by @mitsuhiko
+- Remove OpenTelemetryIntegration from __init__.py (#2379) by @sentrivana
+- Don't fail when upstream scheme is unusual (#2371) by @vanschelven
+
 ## 1.31.0
 
 ### Various fixes & improvements
