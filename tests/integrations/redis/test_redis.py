@@ -12,6 +12,14 @@ except ImportError:
     import mock  # python < 3.3
 
 
+MOCK_CONNECTION_POOL = mock.MagicMock()
+MOCK_CONNECTION_POOL.connection_kwargs = {
+    "host": "localhost",
+    "port": 63791,
+    "db": 1,
+}
+
+
 def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[RedisIntegration()])
     events = capture_events()
@@ -67,12 +75,10 @@ def test_redis_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == {
-        "redis.commands": {
-            "count": 3,
-            "first_ten": expected_first_ten,
-        },
-        SPANDATA.DB_SYSTEM: "redis",
+    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
+    assert span["data"]["redis.commands"] == {
+        "count": 3,
+        "first_ten": expected_first_ten,
     }
     assert span["tags"] == {
         "redis.transaction": is_transaction,
@@ -242,3 +248,51 @@ def test_breadcrumbs(sentry_init, capture_events):
         },
         "timestamp": crumbs[1]["timestamp"],
     }
+
+
+def test_db_connection_attributes_client(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[RedisIntegration()],
+    )
+    events = capture_events()
+
+    with start_transaction():
+        connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
+        connection.get("foobar")
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == "db.redis"
+    assert span["description"] == "GET 'foobar'"
+    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
+    assert span["data"][SPANDATA.DB_NAME] == "1"
+    assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
+    assert span["data"][SPANDATA.SERVER_PORT] == 63791
+
+
+def test_db_connection_attributes_pipeline(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[RedisIntegration()],
+    )
+    events = capture_events()
+
+    with start_transaction():
+        connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
+        pipeline = connection.pipeline(transaction=False)
+        pipeline.get("foo")
+        pipeline.set("bar", 1)
+        pipeline.set("baz", 2)
+        pipeline.execute()
+
+    (event,) = events
+    (span,) = event["spans"]
+
+    assert span["op"] == "db.redis"
+    assert span["description"] == "redis.pipeline.execute"
+    assert span["data"][SPANDATA.DB_SYSTEM] == "redis"
+    assert span["data"][SPANDATA.DB_NAME] == "1"
+    assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
+    assert span["data"][SPANDATA.SERVER_PORT] == 63791
