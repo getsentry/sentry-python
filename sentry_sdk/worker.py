@@ -1,3 +1,4 @@
+import datetime
 import os
 import threading
 
@@ -16,6 +17,15 @@ if TYPE_CHECKING:
 
 
 _TERMINATOR = object()
+
+import cProfile
+
+
+class ProfiledThread(threading.Thread):
+    # Overrides threading.Thread.run()
+    def run(self):
+        self._anton_profiler = cProfile.Profile()
+        return self._anton_profiler.runcall(threading.Thread.run, self)
 
 
 class BackgroundWorker(object):
@@ -63,7 +73,7 @@ class BackgroundWorker(object):
         # type: () -> None
         with self._lock:
             if not self.is_alive:
-                self._thread = threading.Thread(
+                self._thread = ProfiledThread(
                     target=self._target, name="raven-sentry.BackgroundWorker"
                 )
                 self._thread.daemon = True
@@ -94,6 +104,10 @@ class BackgroundWorker(object):
             if self.is_alive and timeout > 0.0:
                 self._wait_flush(timeout, callback)
         logger.debug("background worker flushed")
+        # self._thread._anton_profiler.dump_stats('%s/profiles/%s.profile' % (os.getcwd(), datetime.datetime.now().strftime("%H%M%S"),))
+        self._thread._anton_profiler.dump_stats(
+            "/profiledata/%s.profile" % (datetime.datetime.now().strftime("%H%M%S"),)
+        )
 
     def full(self):
         # type: () -> bool
