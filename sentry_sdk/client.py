@@ -2,10 +2,9 @@ from importlib import import_module
 import os
 import uuid
 import random
-from datetime import datetime
 import socket
 
-from sentry_sdk._compat import string_types, text_type, iteritems
+from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -292,7 +291,7 @@ class _Client(object):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime.utcnow()
+            event["timestamp"] = datetime_utcnow()
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
@@ -568,7 +567,7 @@ class _Client(object):
         if should_use_envelope_endpoint:
             headers = {
                 "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime.utcnow()),
+                "sent_at": format_timestamp(datetime_utcnow()),
             }
 
             if dynamic_sampling_context:

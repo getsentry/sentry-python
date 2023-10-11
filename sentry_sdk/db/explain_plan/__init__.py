@@ -1,5 +1,6 @@
 import datetime
 
+from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.consts import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -15,7 +16,7 @@ def cache_statement(statement, options):
     # type: (str, dict[str, Any]) -> None
     global EXPLAIN_CACHE
 
-    now = datetime.datetime.utcnow()
+    now = datetime_utcnow()
     explain_cache_timeout_seconds = options.get(
         "explain_cache_timeout_seconds", EXPLAIN_CACHE_TIMEOUT_SECONDS
     )
@@ -31,7 +32,7 @@ def remove_expired_cache_items():
     """
     global EXPLAIN_CACHE
 
-    now = datetime.datetime.utcnow()
+    now = datetime_utcnow()
 
     for key, expiration_time in EXPLAIN_CACHE.items():
         expiration_in_the_past = expiration_time < now

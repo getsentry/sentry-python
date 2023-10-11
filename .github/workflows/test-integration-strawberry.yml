@@ -1,4 +1,4 @@
-name: Test requests
+name: Test strawberry
 
 on:
   push:
@@ -24,7 +24,7 @@ env:
 
 jobs:
   test:
-    name: requests, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: strawberry, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
@@ -48,7 +48,7 @@ jobs:
         run: |
           pip install coverage "tox>=3,<4"
 
-      - name: Test requests
+      - name: Test strawberry
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 15
@@ -60,7 +60,7 @@ jobs:
             coverage erase
 
             # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
 
@@ -69,47 +69,15 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
 
-  test-py27:
-    name: requests, python 2.7, ubuntu-20.04
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-
-      - name: Test requests
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 15
-          max_attempts: 2
-          retry_wait_seconds: 5
-          shell: bash
-          command: |
-            set -x # print commands that are executed
-            coverage erase
-
-            # Run tests
-            ./scripts/runtox.sh "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-            coverage combine .coverage* &&
-            coverage xml -i
 
   check_required_tests:
-    name: All requests tests passed or skipped
-    needs: [test, test-py27]
+    name: All strawberry tests passed or skipped
+    needs: test
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test.result, 'failure')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-      - name: Check for 2.7 failures
-        if: contains(needs.test-py27.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

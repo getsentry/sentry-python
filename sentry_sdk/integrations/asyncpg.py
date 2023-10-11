@@ -12,7 +12,7 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import parse_version, capture_internal_exceptions
 
 try:
-    import asyncpg  # type: ignore[import]
+    import asyncpg  # type: ignore[import-not-found]
 
 except ImportError:
     raise DidNotEnable("asyncpg not installed.")

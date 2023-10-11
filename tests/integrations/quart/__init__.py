@@ -1,3 +1,3 @@
 import pytest
 
-quart = pytest.importorskip("quart")
+pytest.importorskip("quart")

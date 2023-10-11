@@ -22,7 +22,6 @@ from textwrap import dedent
 
 import pytest
 
-boto3 = pytest.importorskip("boto3")
 
 LAMBDA_PRELUDE = """
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap

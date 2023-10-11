@@ -1,7 +1,5 @@
 import pytest
 
-pytest.importorskip("gql")
-
 import responses
 from gql import gql
 from gql import Client
