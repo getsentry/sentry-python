@@ -72,7 +72,6 @@ See [the documentation](https://docs.sentry.io/platforms/python/integrations/) f
 - [Logging](https://docs.sentry.io/platforms/python/integrations/logging/)
 - [Loguru](https://docs.sentry.io/platforms/python/integrations/loguru/)
 - [Redis](https://docs.sentry.io/platforms/python/integrations/redis/)
-- [Requests](https://docs.sentry.io/platforms/python/integrations/requests/)
 - [Apache Airflow](https://docs.sentry.io/platforms/python/integrations/airflow/)
 - [Apache Spark](https://docs.sentry.io/platforms/python/integrations/pyspark/)
 - [AWS Lambda](https://docs.sentry.io/platforms/python/integrations/aws-lambda/)
