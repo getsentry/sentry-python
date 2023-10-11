@@ -62,7 +62,7 @@ class SanicIntegration(Integration):
     identifier = "sanic"
     version = None
 
-    def __init__(self, unsampled_statuses={404}):
+    def __init__(self, unsampled_statuses=frozenset({404})):
         # type: (Optional[Container[int]]) -> None
         """
         The unsampled_statuses parameter can be used to specify for which HTTP statuses the
