@@ -151,7 +151,6 @@ def _setup_sanic():
     # type: () -> None
     Sanic._startup = _startup
     ErrorHandler.lookup = _sentry_error_handler_lookup
-    # _patch_sanic_asgi()
 
 
 def _setup_legacy_sanic():
