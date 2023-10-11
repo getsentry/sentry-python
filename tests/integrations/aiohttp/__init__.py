@@ -1,3 +1,3 @@
 import pytest
 
-aiohttp = pytest.importorskip("aiohttp")
+pytest.importorskip("aiohttp")

@@ -1,6 +1,6 @@
 import sys
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import timedelta
 from os import environ
 
 from sentry_sdk.api import continue_trace
@@ -16,10 +16,11 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._compat import reraise
+from sentry_sdk._compat import datetime_utcnow, reraise
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from typing import Any
     from typing import TypeVar
     from typing import Callable
@@ -323,7 +324,7 @@ def get_lambda_bootstrap():
 
 def _make_request_event_processor(aws_event, aws_context, configured_timeout):
     # type: (Any, Any, Any) -> EventProcessor
-    start_time = datetime.utcnow()
+    start_time = datetime_utcnow()
 
     def event_processor(sentry_event, hint, start_time=start_time):
         # type: (Event, Hint, datetime) -> Optional[Event]
@@ -428,7 +429,7 @@ def _get_cloudwatch_logs_url(aws_context, start_time):
         log_group=aws_context.log_group_name,
         log_stream=aws_context.log_stream_name,
         start_time=(start_time - timedelta(seconds=1)).strftime(formatstring),
-        end_time=(datetime.utcnow() + timedelta(seconds=2)).strftime(formatstring),
+        end_time=(datetime_utcnow() + timedelta(seconds=2)).strftime(formatstring),
     )
 
     return url

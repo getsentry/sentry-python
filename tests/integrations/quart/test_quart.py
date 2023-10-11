@@ -14,8 +14,6 @@ from sentry_sdk import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
 
-quart = pytest.importorskip("quart")
-
 from quart import Quart, Response, abort, stream_with_context
 from quart.views import View
 
