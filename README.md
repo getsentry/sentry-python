@@ -48,7 +48,7 @@ raise ValueError()  # Will also create an event in Sentry.
 ```
 
 - To learn more about how to use the SDK [refer to our docs](https://docs.sentry.io/platforms/python/).
-- Are you coming from raven-python? [Use this migration guide](https://docs.sentry.io/platforms/python/migration/).
+- Are you coming from `raven-python`? [Use this migration guide](https://docs.sentry.io/platforms/python/migration/).
 - To learn about internals use the [API Reference](https://getsentry.github.io/sentry-python/).
 
 ## Integrations
@@ -57,35 +57,47 @@ raise ValueError()  # Will also create an event in Sentry.
 
 See [the documentation](https://docs.sentry.io/platforms/python/integrations/) for an up-to-date list of libraries and frameworks we support. Here are some examples:
 
-- [Django](https://docs.sentry.io/platforms/python/integrations/django/)
-- [Flask](https://docs.sentry.io/platforms/python/integrations/flask/)
-- [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/)
 - [AIOHTTP](https://docs.sentry.io/platforms/python/integrations/aiohttp/)
-- [Bottle](https://docs.sentry.io/platforms/python/integrations/bottle/)
-- [AWS Lambda](https://docs.sentry.io/platforms/python/integrations/aws-lambda/)
-- [Google Cloud Functions](https://docs.sentry.io/platforms/python/integrations/gcp-functions/)
-- [WSGI](https://docs.sentry.io/platforms/python/integrations/wsgi/)
-- [ASGI](https://docs.sentry.io/platforms/python/integrations/asgi/)
-- [Starlette](https://docs.sentry.io/platforms/python/integrations/starlette/)
-- [RQ (Redis Queue)](https://docs.sentry.io/platforms/python/integrations/rq/)
-- [Celery](https://docs.sentry.io/platforms/python/integrations/celery/)
-- [Chalice](https://docs.sentry.io/platforms/python/integrations/chalice/)
-- [Falcon](https://docs.sentry.io/platforms/python/integrations/falcon/)
-- [Quart](https://docs.sentry.io/platforms/python/integrations/quart/)
-- [Sanic](https://docs.sentry.io/platforms/python/integrations/sanic/)
-- [Tornado](https://docs.sentry.io/platforms/python/integrations/tornado/)
-- [Tryton](https://docs.sentry.io/platforms/python/integrations/tryton/)
-- [Pyramid](https://docs.sentry.io/platforms/python/integrations/pyramid/)
-- [Graphene](https://docs.sentry.io/platforms/python/integrations/graphene/)
-- [Strawberry](https://docs.sentry.io/platforms/python/integrations/strawberry/)
-- [Ariadne](https://docs.sentry.io/platforms/python/integrations/ariadne/)
-- [GQL](https://docs.sentry.io/platforms/python/integrations/gql/)
-- [Logging](https://docs.sentry.io/platforms/python/integrations/logging/)
 - [Apache Airflow](https://docs.sentry.io/platforms/python/integrations/airflow/)
 - [Apache Beam](https://docs.sentry.io/platforms/python/integrations/beam/)
 - [Apache Spark](https://docs.sentry.io/platforms/python/integrations/pyspark/)
+- [Ariadne](https://docs.sentry.io/platforms/python/integrations/ariadne/)
+- [ASGI](https://docs.sentry.io/platforms/python/integrations/asgi/)
+- [asyncio](https://docs.sentry.io/platforms/python/integrations/asyncio/)
+- [asyncpg](https://docs.sentry.io/platforms/python/integrations/asyncpg/)
+- [AWS Lambda](https://docs.sentry.io/platforms/python/integrations/aws-lambda/)
+- [Bottle](https://docs.sentry.io/platforms/python/integrations/bottle/)
+- [Celery](https://docs.sentry.io/platforms/python/integrations/celery/)
+- [Chalice](https://docs.sentry.io/platforms/python/integrations/chalice/)
+- [Clickhouse Driver](https://docs.sentry.io/platforms/python/integrations/clickhouse-driver/)
+- [Django](https://docs.sentry.io/platforms/python/integrations/django/)
+- [Falcon](https://docs.sentry.io/platforms/python/integrations/falcon/)
+- [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/)
+- [Flask](https://docs.sentry.io/platforms/python/integrations/flask/)
+- [Google Cloud Functions](https://docs.sentry.io/platforms/python/integrations/gcp-functions/)
+- [GQL](https://docs.sentry.io/platforms/python/integrations/gql/)
+- [Graphene](https://docs.sentry.io/platforms/python/integrations/graphene/)
+- [httpx](https://docs.sentry.io/platforms/python/integrations/httpx/)
+- [huey](https://docs.sentry.io/platforms/python/integrations/huey/)
+- [Logging](https://docs.sentry.io/platforms/python/integrations/logging/)
+- [Loguru](https://docs.sentry.io/platforms/python/integrations/loguru/)
+- [pymongo](https://docs.sentry.io/platforms/python/integrations/pymongo/)
+- [Pyramid](https://docs.sentry.io/platforms/python/integrations/pyramid/)
+- [Quart](https://docs.sentry.io/platforms/python/integrations/quart/)
+- [Redis](https://docs.sentry.io/platforms/python/integrations/redis/)
+- [Redis Cluster](https://docs.sentry.io/platforms/python/integrations/rediscluster/)
+- [Requests](https://docs.sentry.io/platforms/python/integrations/requests/)
+- [RQ (Redis Queue)](https://docs.sentry.io/platforms/python/integrations/rq/)
+- [Sanic](https://docs.sentry.io/platforms/python/integrations/sanic/)
+- [Starlette](https://docs.sentry.io/platforms/python/integrations/starlette/)
+- [Starlite](https://docs.sentry.io/platforms/python/integrations/starlite/)
+- [SQLAlchemy](https://docs.sentry.io/platforms/python/integrations/sqlalchemy/)
+- [Strawberry](https://docs.sentry.io/platforms/python/integrations/strawberry/)
+- [Tornado](https://docs.sentry.io/platforms/python/integrations/tornado/)
+- [Tryton](https://docs.sentry.io/platforms/python/integrations/tryton/)
+- [WSGI](https://docs.sentry.io/platforms/python/integrations/wsgi/)
 
-## Migrating From sentry-raven
+## Migrating From `raven-python`
 
 The old `raven-python` client has entered maintenance mode and was moved [here](https://github.com/getsentry/raven-python).
 
