@@ -6,11 +6,7 @@ from sentry_sdk import continue_trace
 from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
-from sentry_sdk.tracing import (
-    TRANSACTION_SOURCE_COMPONENT,
-    TRANSACTION_SOURCE_ROUTE,
-    TRANSACTION_SOURCE_URL,
-)
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -237,8 +233,9 @@ async def _set_transaction(request, route, **_):
     if request.ctx._sentry_do_integration:
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
+                route_name = route.name.replace(request.app.name, "").strip(".")
                 scope.set_transaction_name(
-                    "/%s" % route.path, source=TRANSACTION_SOURCE_ROUTE
+                    route_name, source=TRANSACTION_SOURCE_COMPONENT
                 )
 
 
