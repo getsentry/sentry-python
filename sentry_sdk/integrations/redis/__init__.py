@@ -2,32 +2,31 @@ from __future__ import absolute_import
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk._compat import text_type
 from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     logger,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
-
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Sequence
+    from typing import Any, Dict, Sequence
     from sentry_sdk.tracing import Span
 
 _SINGLE_KEY_COMMANDS = frozenset(
-    ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"]
+    ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"],
 )
-_MULTI_KEY_COMMANDS = frozenset(["del", "touch", "unlink"])
-
+_MULTI_KEY_COMMANDS = frozenset(
+    ["del", "touch", "unlink"],
+)
 _COMMANDS_INCLUDING_SENSITIVE_DATA = [
     "auth",
 ]
-
 _MAX_NUM_ARGS = 10  # Trim argument lists to this many values
 _MAX_NUM_COMMANDS = 10  # Trim command lists to this many values
-
 _DEFAULT_MAX_DATA_SIZE = 1024
 
 
@@ -59,6 +58,26 @@ def _get_safe_command(name, args):
     return command
 
 
+def _get_span_description(name, *args):
+    # type: (str, *Any) -> str
+    description = name
+
+    with capture_internal_exceptions():
+        description = _get_safe_command(name, args)
+
+    return description
+
+
+def _get_redis_command_args(command):
+    # type: (Any) -> Sequence[Any]
+    return command[0]
+
+
+def _parse_rediscluster_command(command):
+    # type: (Any) -> Sequence[Any]
+    return command.args
+
+
 def _set_pipeline_data(
     span, is_cluster, get_command_args_fn, is_transaction, command_stack
 ):
@@ -84,6 +103,38 @@ def _set_pipeline_data(
     )
 
 
+def _set_client_data(span, is_cluster, name, *args):
+    # type: (Span, bool, str, *Any) -> None
+    span.set_tag("redis.is_cluster", is_cluster)
+    if name:
+        span.set_tag("redis.command", name)
+        span.set_tag(SPANDATA.DB_OPERATION, name)
+
+    if name and args:
+        name_low = name.lower()
+        if (name_low in _SINGLE_KEY_COMMANDS) or (
+            name_low in _MULTI_KEY_COMMANDS and len(args) == 1
+        ):
+            span.set_tag("redis.key", args[0])
+
+
+def _set_db_data(span, connection_params):
+    # type: (Span, Dict[str, Any]) -> None
+    span.set_data(SPANDATA.DB_SYSTEM, "redis")
+
+    db = connection_params.get("db")
+    if db is not None:
+        span.set_data(SPANDATA.DB_NAME, text_type(db))
+
+    host = connection_params.get("host")
+    if host is not None:
+        span.set_data(SPANDATA.SERVER_ADDRESS, host)
+
+    port = connection_params.get("port")
+    if port is not None:
+        span.set_data(SPANDATA.SERVER_PORT, port)
+
+
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
     # type: (Any, bool, Any) -> None
     old_execute = pipeline_cls.execute
@@ -99,6 +150,7 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
             with capture_internal_exceptions():
+                _set_db_data(span, self.connection_pool.connection_kwargs)
                 _set_pipeline_data(
                     span,
                     is_cluster,
@@ -106,21 +158,43 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn):
                     self.transaction,
                     self.command_stack,
                 )
-                span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
             return old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = sentry_patched_execute
 
 
-def _get_redis_command_args(command):
-    # type: (Any) -> Sequence[Any]
-    return command[0]
+def patch_redis_client(cls, is_cluster):
+    # type: (Any, bool) -> None
+    """
+    This function can be used to instrument custom redis client classes or
+    subclasses.
+    """
+    old_execute_command = cls.execute_command
 
+    def sentry_patched_execute_command(self, name, *args, **kwargs):
+        # type: (Any, str, *Any, **Any) -> Any
+        hub = Hub.current
+        integration = hub.get_integration(RedisIntegration)
 
-def _parse_rediscluster_command(command):
-    # type: (Any) -> Sequence[Any]
-    return command.args
+        if integration is None:
+            return old_execute_command(self, name, *args, **kwargs)
+
+        description = _get_span_description(name, *args)
+
+        data_should_be_truncated = (
+            integration.max_data_size and len(description) > integration.max_data_size
+        )
+        if data_should_be_truncated:
+            description = description[: integration.max_data_size - len("...")] + "..."
+
+        with hub.start_span(op=OP.DB_REDIS, description=description) as span:
+            _set_db_data(span, self.connection_pool.connection_kwargs)
+            _set_client_data(span, is_cluster, name, *args)
+
+            return old_execute_command(self, name, *args, **kwargs)
+
+    cls.execute_command = sentry_patched_execute_command
 
 
 def _patch_redis(StrictRedis, client):  # noqa: N803
@@ -206,61 +280,3 @@ class RedisIntegration(Integration):
             _patch_rediscluster()
         except Exception:
             logger.exception("Error occurred while patching `rediscluster` library")
-
-
-def _get_span_description(name, *args):
-    # type: (str, *Any) -> str
-    description = name
-
-    with capture_internal_exceptions():
-        description = _get_safe_command(name, args)
-
-    return description
-
-
-def _set_client_data(span, is_cluster, name, *args):
-    # type: (Span, bool, str, *Any) -> None
-    span.set_data(SPANDATA.DB_SYSTEM, "redis")
-    span.set_tag("redis.is_cluster", is_cluster)
-    if name:
-        span.set_tag("redis.command", name)
-        span.set_tag(SPANDATA.DB_OPERATION, name)
-
-    if name and args:
-        name_low = name.lower()
-        if (name_low in _SINGLE_KEY_COMMANDS) or (
-            name_low in _MULTI_KEY_COMMANDS and len(args) == 1
-        ):
-            span.set_tag("redis.key", args[0])
-
-
-def patch_redis_client(cls, is_cluster):
-    # type: (Any, bool) -> None
-    """
-    This function can be used to instrument custom redis client classes or
-    subclasses.
-    """
-    old_execute_command = cls.execute_command
-
-    def sentry_patched_execute_command(self, name, *args, **kwargs):
-        # type: (Any, str, *Any, **Any) -> Any
-        hub = Hub.current
-        integration = hub.get_integration(RedisIntegration)
-
-        if integration is None:
-            return old_execute_command(self, name, *args, **kwargs)
-
-        description = _get_span_description(name, *args)
-
-        data_should_be_truncated = (
-            integration.max_data_size and len(description) > integration.max_data_size
-        )
-        if data_should_be_truncated:
-            description = description[: integration.max_data_size - len("...")] + "..."
-
-        with hub.start_span(op=OP.DB_REDIS, description=description) as span:
-            _set_client_data(span, is_cluster, name, *args)
-
-            return old_execute_command(self, name, *args, **kwargs)
-
-    cls.execute_command = sentry_patched_execute_command
