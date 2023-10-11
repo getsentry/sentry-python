@@ -43,7 +43,7 @@
 
     ```python
       import sentry_sdk
-      from sentry_sdk.integrations.gql import StrawberryIntegration
+      from sentry_sdk.integrations.strawberry import StrawberryIntegration
 
       sentry_sdk.init(
           dsn='___PUBLIC_DSN___',
@@ -82,16 +82,16 @@
 - Shift flushing by up to a rollup window (#2396) by @mitsuhiko
 - Make a consistent noop flush behavior (#2428) by @mitsuhiko
 - Stronger recursion protection (#2426) by @mitsuhiko
-- Remove OpenTelemetryIntegration from __init__.py (#2379) by @sentrivana
+- Remove `OpenTelemetryIntegration` from `__init__.py` (#2379) by @sentrivana
 - Update API docs (#2397) by @antonpirker
 - Pin some test requirements because new majors break our tests (#2404) by @antonpirker
 - Run more `requests`, `celery`, `falcon` tests (#2414) by @sentrivana
 - Move `importorskip`s in tests to `__init__.py` files (#2412) by @sentrivana
-- Fix mypy errors (#2433) by @sentrivana
+- Fix `mypy` errors (#2433) by @sentrivana
 - Fix pre-commit issues (#2424) by @bukzor-sentryio
-- Update CONTRIBUTING.md (#2411) by @sentrivana
-- Bump sphinx from 7.2.5 to 7.2.6 (#2378) by @dependabot
-- [Experimental] Add explain plan to db spans (#2315) by @antonpirker
+- Update [CONTRIBUTING.md](https://github.com/getsentry/sentry-python/blob/master/CONTRIBUTING.md) (#2411) by @sentrivana
+- Bump `sphinx` from 7.2.5 to 7.2.6 (#2378) by @dependabot
+- [Experimental] Add explain plan to DB spans (#2315) by @antonpirker
 
 ## 1.31.0
 
