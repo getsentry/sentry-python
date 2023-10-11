@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.scope - sentry-python 1.31.0 documentation</title>
+      <title>sentry_sdk.scope - sentry-python 1.32.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -90,8 +90,9 @@ html.dark {
     <div class="sy-lside-inner md:sticky">
       <div class="sy-scrollbar p-6">
         <div class="globaltoc" data-expand-depth="0"><ul>
-<li class="toctree-l1"><a class="reference internal" href="../../api.html">Main API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">Top Level API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../integrations.html">Integrations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../apidocs.html">API Docs</a></li>
 </ul>
 
         </div>
@@ -223,7 +224,7 @@ html.dark {
 </span><span id="1-82">
 </span><span id="1-83">
 <div class="viewcode-block" id="Scope">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope">[docs]</a>
 </span><span id="1-84"><span class="k">class</span> <span class="nc">Scope</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 </span><span id="1-85"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The scope holds extra information that should be sent with all</span>
 </span><span id="1-86"><span class="sd">    events that belong to it.</span>
@@ -340,7 +341,7 @@ html.dark {
 </span><span id="1-197">        <span class="p">}</span>
 </span><span id="1-198">
 <div class="viewcode-block" id="Scope.set_new_propagation_context">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_new_propagation_context">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_new_propagation_context">[docs]</a>
 </span><span id="1-199">    <span class="k">def</span> <span class="nf">set_new_propagation_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-200">        <span class="c1"># type: () -&gt; None</span>
 </span><span id="1-201"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -354,7 +355,7 @@ html.dark {
 
 </span><span id="1-209">
 <div class="viewcode-block" id="Scope.generate_propagation_context">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.generate_propagation_context">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.generate_propagation_context">[docs]</a>
 </span><span id="1-210">    <span class="k">def</span> <span class="nf">generate_propagation_context</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">incoming_data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-211">        <span class="c1"># type: (Optional[Dict[str, str]]) -&gt; None</span>
 </span><span id="1-212"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -377,7 +378,7 @@ html.dark {
 
 </span><span id="1-229">
 <div class="viewcode-block" id="Scope.get_dynamic_sampling_context">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_dynamic_sampling_context">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.get_dynamic_sampling_context">[docs]</a>
 </span><span id="1-230">    <span class="k">def</span> <span class="nf">get_dynamic_sampling_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-231">        <span class="c1"># type: () -&gt; Optional[Dict[str, str]]</span>
 </span><span id="1-232"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -397,7 +398,7 @@ html.dark {
 
 </span><span id="1-246">
 <div class="viewcode-block" id="Scope.get_traceparent">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_traceparent">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.get_traceparent">[docs]</a>
 </span><span id="1-247">    <span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-248">        <span class="c1"># type: () -&gt; Optional[str]</span>
 </span><span id="1-249"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -427,7 +428,7 @@ html.dark {
 </span><span id="1-272">            <span class="k">return</span> <span class="n">Baggage</span><span class="p">(</span><span class="n">dynamic_sampling_context</span><span class="p">)</span>
 </span><span id="1-273">
 <div class="viewcode-block" id="Scope.get_trace_context">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.get_trace_context">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.get_trace_context">[docs]</a>
 </span><span id="1-274">    <span class="k">def</span> <span class="nf">get_trace_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-275">        <span class="c1"># type: () -&gt; Any</span>
 </span><span id="1-276"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -447,7 +448,7 @@ html.dark {
 
 </span><span id="1-290">
 <div class="viewcode-block" id="Scope.iter_headers">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.iter_headers">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.iter_headers">[docs]</a>
 </span><span id="1-291">    <span class="k">def</span> <span class="nf">iter_headers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-292">        <span class="c1"># type: () -&gt; Iterator[Tuple[str, str]]</span>
 </span><span id="1-293"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -465,7 +466,7 @@ html.dark {
 
 </span><span id="1-305">
 <div class="viewcode-block" id="Scope.clear">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.clear">[docs]</a>
 </span><span id="1-306">    <span class="k">def</span> <span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-307">        <span class="c1"># type: () -&gt; None</span>
 </span><span id="1-308"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Clears the entire scope.&quot;&quot;&quot;</span>
@@ -499,7 +500,7 @@ html.dark {
 </span><span id="1-335">        <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">value</span>
 </span><span id="1-336">
 <div class="viewcode-block" id="Scope.set_level">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_level">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_level">[docs]</a>
 </span><span id="1-337">    <span class="k">def</span> <span class="nf">set_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-338">        <span class="c1"># type: (Optional[str]) -&gt; None</span>
 </span><span id="1-339"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the level for the scope.&quot;&quot;&quot;</span>
@@ -556,7 +557,7 @@ html.dark {
 </span><span id="1-389">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">containing_transaction</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">value</span>
 </span><span id="1-390">
 <div class="viewcode-block" id="Scope.set_transaction_name">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_transaction_name">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_transaction_name">[docs]</a>
 </span><span id="1-391">    <span class="k">def</span> <span class="nf">set_transaction_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 </span><span id="1-392">        <span class="c1"># type: (str, Optional[str]) -&gt; None</span>
 </span><span id="1-393"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Set the transaction name and optionally the transaction source.&quot;&quot;&quot;</span>
@@ -578,7 +579,7 @@ html.dark {
 </span><span id="1-408">        <span class="bp">self</span><span class="o">.</span><span class="n">set_user</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 </span><span id="1-409">
 <div class="viewcode-block" id="Scope.set_user">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_user">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_user">[docs]</a>
 </span><span id="1-410">    <span class="k">def</span> <span class="nf">set_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 </span><span id="1-411">        <span class="c1"># type: (Optional[Dict[str, Any]]) -&gt; None</span>
 </span><span id="1-412"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets a user for the scope.&quot;&quot;&quot;</span>
@@ -616,7 +617,7 @@ html.dark {
 </span><span id="1-443">        <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">profile</span>
 </span><span id="1-444">
 <div class="viewcode-block" id="Scope.set_tag">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_tag">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_tag">[docs]</a>
 </span><span id="1-445">    <span class="k">def</span> <span class="nf">set_tag</span><span class="p">(</span>
 </span><span id="1-446">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-447">        <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
@@ -628,7 +629,7 @@ html.dark {
 
 </span><span id="1-453">
 <div class="viewcode-block" id="Scope.remove_tag">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_tag">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.remove_tag">[docs]</a>
 </span><span id="1-454">    <span class="k">def</span> <span class="nf">remove_tag</span><span class="p">(</span>
 </span><span id="1-455">        <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
 </span><span id="1-456">    <span class="p">):</span>
@@ -638,7 +639,7 @@ html.dark {
 
 </span><span id="1-460">
 <div class="viewcode-block" id="Scope.set_context">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_context">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_context">[docs]</a>
 </span><span id="1-461">    <span class="k">def</span> <span class="nf">set_context</span><span class="p">(</span>
 </span><span id="1-462">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-463">        <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
@@ -650,7 +651,7 @@ html.dark {
 
 </span><span id="1-469">
 <div class="viewcode-block" id="Scope.remove_context">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_context">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.remove_context">[docs]</a>
 </span><span id="1-470">    <span class="k">def</span> <span class="nf">remove_context</span><span class="p">(</span>
 </span><span id="1-471">        <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
 </span><span id="1-472">    <span class="p">):</span>
@@ -660,7 +661,7 @@ html.dark {
 
 </span><span id="1-476">
 <div class="viewcode-block" id="Scope.set_extra">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.set_extra">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.set_extra">[docs]</a>
 </span><span id="1-477">    <span class="k">def</span> <span class="nf">set_extra</span><span class="p">(</span>
 </span><span id="1-478">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-479">        <span class="n">key</span><span class="p">,</span>  <span class="c1"># type: str</span>
@@ -672,7 +673,7 @@ html.dark {
 
 </span><span id="1-485">
 <div class="viewcode-block" id="Scope.remove_extra">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.remove_extra">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.remove_extra">[docs]</a>
 </span><span id="1-486">    <span class="k">def</span> <span class="nf">remove_extra</span><span class="p">(</span>
 </span><span id="1-487">        <span class="bp">self</span><span class="p">,</span> <span class="n">key</span>  <span class="c1"># type: str</span>
 </span><span id="1-488">    <span class="p">):</span>
@@ -682,7 +683,7 @@ html.dark {
 
 </span><span id="1-492">
 <div class="viewcode-block" id="Scope.clear_breadcrumbs">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.clear_breadcrumbs">[docs]</a>
 </span><span id="1-493">    <span class="k">def</span> <span class="nf">clear_breadcrumbs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-494">        <span class="c1"># type: () -&gt; None</span>
 </span><span id="1-495"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Clears breadcrumb buffer.&quot;&quot;&quot;</span>
@@ -690,7 +691,7 @@ html.dark {
 
 </span><span id="1-497">
 <div class="viewcode-block" id="Scope.add_attachment">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_attachment">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.add_attachment">[docs]</a>
 </span><span id="1-498">    <span class="k">def</span> <span class="nf">add_attachment</span><span class="p">(</span>
 </span><span id="1-499">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-500">        <span class="nb">bytes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[bytes]</span>
@@ -713,7 +714,7 @@ html.dark {
 
 </span><span id="1-517">
 <div class="viewcode-block" id="Scope.add_event_processor">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_event_processor">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.add_event_processor">[docs]</a>
 </span><span id="1-518">    <span class="k">def</span> <span class="nf">add_event_processor</span><span class="p">(</span>
 </span><span id="1-519">        <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: EventProcessor</span>
 </span><span id="1-520">    <span class="p">):</span>
@@ -733,7 +734,7 @@ html.dark {
 
 </span><span id="1-534">
 <div class="viewcode-block" id="Scope.add_error_processor">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.add_error_processor">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.add_error_processor">[docs]</a>
 </span><span id="1-535">    <span class="k">def</span> <span class="nf">add_error_processor</span><span class="p">(</span>
 </span><span id="1-536">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-537">        <span class="n">func</span><span class="p">,</span>  <span class="c1"># type: ErrorProcessor</span>
@@ -764,7 +765,7 @@ html.dark {
 
 </span><span id="1-562">
 <div class="viewcode-block" id="Scope.apply_to_event">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.apply_to_event">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.apply_to_event">[docs]</a>
 </span><span id="1-563">    <span class="nd">@_disable_capture</span>
 </span><span id="1-564">    <span class="k">def</span> <span class="nf">apply_to_event</span><span class="p">(</span>
 </span><span id="1-565">        <span class="bp">self</span><span class="p">,</span>
@@ -858,7 +859,7 @@ html.dark {
 
 </span><span id="1-653">
 <div class="viewcode-block" id="Scope.update_from_scope">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.update_from_scope">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.update_from_scope">[docs]</a>
 </span><span id="1-654">    <span class="k">def</span> <span class="nf">update_from_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
 </span><span id="1-655">        <span class="c1"># type: (Scope) -&gt; None</span>
 </span><span id="1-656"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope with another scope&#39;s data.&quot;&quot;&quot;</span>
@@ -891,7 +892,7 @@ html.dark {
 
 </span><span id="1-683">
 <div class="viewcode-block" id="Scope.update_from_kwargs">
-<a class="viewcode-back" href="../../api.html#sentry_sdk.Scope.update_from_kwargs">[docs]</a>
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.update_from_kwargs">[docs]</a>
 </span><span id="1-684">    <span class="k">def</span> <span class="nf">update_from_kwargs</span><span class="p">(</span>
 </span><span id="1-685">        <span class="bp">self</span><span class="p">,</span>
 </span><span id="1-686">        <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
@@ -987,7 +988,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=497d83b4"></script>
+      <script src="../../_static/documentation_options.js?v=db025d5f"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3e5c8598"></script>
