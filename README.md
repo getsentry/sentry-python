@@ -53,7 +53,7 @@ raise ValueError()  # Will also create an event in Sentry.
 
 ## Integrations
 
-(If you want to create a new integration, have a look at the [Adding a new integration checklist](CONTRIBUTING.md#adding-a-new-integration-checklist).)
+(If you want to create a new integration, have a look at the [Adding a new integration checklist](https://github.com/getsentry/sentry-python/blob/master/CONTRIBUTING.md#adding-a-new-integration).)
 
 See [the documentation](https://docs.sentry.io/platforms/python/integrations/) for an up-to-date list of libraries and frameworks we support. Here are some examples:
 
