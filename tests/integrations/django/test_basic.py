@@ -649,7 +649,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
             assert (
                 data.get(SPANDATA.DB_NAME)
-                == connections["postgres"].get_dsn_parameters()["database"]
+                == connections["postgres"].get_connection_params()["database"]
             )
             assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
