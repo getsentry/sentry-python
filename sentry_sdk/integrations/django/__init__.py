@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
+import inspect
 import sys
 import threading
 import weakref
@@ -665,12 +666,18 @@ def _set_db_data(span, cursor_or_db):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
-    connection_params = (
-        cursor_or_db.connection.get_dsn_parameters()
-        if hasattr(cursor_or_db, "connection")
+    connection_params = {}
+
+    if (
+        hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
-        else db.get_connection_params()
-    )
+        and inspect.isfunction(cursor_or_db.connection.get_dsn_parameters)
+    ):
+        connection_params = cursor_or_db.connection.get_dsn_parameters()
+
+    elif hasattr(db, "get_connection_params"):
+        connection_params = db.get_connection_params()
+
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
         span.set_data(SPANDATA.DB_NAME, db_name)
