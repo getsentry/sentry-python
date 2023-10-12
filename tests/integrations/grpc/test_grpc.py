@@ -324,11 +324,11 @@ class TestService(gRPCTestServiceServicer):
             yield gRPCTestMessage(text=request.text)
 
     @staticmethod
-    def TestStreamStream(request, context):
+    def TestStreamStream(request, context):  # noqa: N802
         for r in request:
             yield r
 
     @staticmethod
-    def TestStreamUnary(request, context):
+    def TestStreamUnary(request, context):  # noqa: N802
         requests = [r for r in request]
         return requests.pop()
