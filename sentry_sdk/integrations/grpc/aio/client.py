@@ -70,7 +70,7 @@ class SentryUnaryStreamClientInterceptor(
         continuation: Callable[[ClientCallDetails, Message], UnaryStreamCall],
         client_call_details: ClientCallDetails,
         request: Message,
-    ) -> AsyncIterable[Any] | UnaryStreamCall:
+    ) -> Union[AsyncIterable[Any], UnaryStreamCall]:
         hub = Hub.current
         method = client_call_details.method
 
