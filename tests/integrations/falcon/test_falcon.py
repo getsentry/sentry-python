@@ -4,8 +4,6 @@ import logging
 
 import pytest
 
-pytest.importorskip("falcon")
-
 import falcon
 import falcon.testing
 import sentry_sdk

@@ -1,7 +1,7 @@
-import pytest
+import requests
 import responses
 
-requests = pytest.importorskip("requests")
+import pytest
 
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA

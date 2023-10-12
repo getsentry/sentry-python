@@ -3,10 +3,10 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 try:
-    import gql  # type: ignore[import]
-    from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import]
-    from gql.transport import Transport, AsyncTransport  # type: ignore[import]
-    from gql.transport.exceptions import TransportQueryError  # type: ignore[import]
+    import gql  # type: ignore[import-not-found]
+    from graphql import print_ast, get_operation_ast, DocumentNode, VariableDefinitionNode  # type: ignore[import-not-found]
+    from gql.transport import Transport, AsyncTransport  # type: ignore[import-not-found]
+    from gql.transport.exceptions import TransportQueryError  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("gql is not installed")
 

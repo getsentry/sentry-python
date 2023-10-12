@@ -30,7 +30,7 @@ else:
 
 
 try:
-    import clickhouse_driver  # type: ignore[import]
+    import clickhouse_driver  # type: ignore[import-not-found]
 
 except ImportError:
     raise DidNotEnable("clickhouse-driver not installed.")
