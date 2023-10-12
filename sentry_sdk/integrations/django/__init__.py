@@ -675,7 +675,7 @@ def _set_db_data(span, cursor_or_db):
     ):
         # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
         # actually has a `connection` and the `connection` has a `get_dsn_parameters`
-        # attribute, only to explode once you actually want to call the latter.
+        # attribute, only to throw an error once you actually want to call it.
         # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
         # function.
         connection_params = cursor_or_db.connection.get_dsn_parameters()
