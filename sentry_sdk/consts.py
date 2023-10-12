@@ -170,6 +170,13 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GRAPHQL_EXECUTE = "graphql.execute"
+    GRAPHQL_MUTATION = "graphql.mutation"
+    GRAPHQL_PARSE = "graphql.parse"
+    GRAPHQL_RESOLVE = "graphql.resolve"
+    GRAPHQL_SUBSCRIPTION = "graphql.subscription"
+    GRAPHQL_QUERY = "graphql.query"
+    GRAPHQL_VALIDATE = "graphql.validate"
     GRPC_CLIENT = "grpc.client"
     GRPC_SERVER = "grpc.server"
     HTTP_CLIENT = "http.client"
@@ -276,4 +283,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.31.0"
+VERSION = "1.32.0"
