@@ -666,8 +666,6 @@ def _set_db_data(span, cursor_or_db):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
-    connection_params = {}
-
     if (
         hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
@@ -680,9 +678,7 @@ def _set_db_data(span, cursor_or_db):
         # function.
         connection_params = cursor_or_db.connection.get_dsn_parameters()
 
-    elif hasattr(db, "get_connection_params") and inspect.isfunction(
-        db.get_connection_params
-    ):
+    else:
         connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
