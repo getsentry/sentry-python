@@ -666,9 +666,11 @@ def test_set_db_data_custom_backend():
         def __call__(self):
             raise TypeError
 
-    span = Span()
+        def get_connection_params(self):
+            return {}
+
     try:
-        _set_db_data(span, DummyBackend())
+        _set_db_data(Span(), DummyBackend())
     except TypeError:
         pytest.fail("A TypeError was raised")
 

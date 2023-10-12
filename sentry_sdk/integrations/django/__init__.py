@@ -680,7 +680,9 @@ def _set_db_data(span, cursor_or_db):
         # function.
         connection_params = cursor_or_db.connection.get_dsn_parameters()
 
-    elif hasattr(db, "get_connection_params"):
+    elif hasattr(db, "get_connection_params") and inspect.isfunction(
+        db.get_connection_params
+    ):
         connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
