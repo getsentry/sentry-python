@@ -206,21 +206,23 @@ async def _hub_enter(request):
     ).__enter__()
 
 
-async def _hub_exit(request, response):
-    # type: (Request, BaseHTTPResponse) -> None
+async def _hub_exit(request, response=None):
+    # type: (Request, Optional[BaseHTTPResponse]) -> None
     with capture_internal_exceptions():
         if not request.ctx._sentry_do_integration:
             return
 
         integration = Hub.current.get_integration(SanicIntegration)  # type: Integration
 
+        response_status = None if response is None else response.status
+
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
         # happens while trying to end the transaction, we still attempt to exit the hub.
         with capture_internal_exceptions():
-            request.ctx._sentry_transaction.set_http_status(response.status)
+            request.ctx._sentry_transaction.set_http_status(response_status)
             request.ctx._sentry_transaction.sampled &= (
                 isinstance(integration, SanicIntegration)
-                and response.status not in integration._unsampled_statuses
+                and response_status not in integration._unsampled_statuses
             )
             request.ctx._sentry_transaction.__exit__(None, None, None)
 
