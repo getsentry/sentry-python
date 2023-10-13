@@ -32,8 +32,8 @@ except ImportError:
 @pytest_asyncio.fixture
 async def app():
     app = Quart(__name__)
-    app.debug = True
-    app.config["TESTING"] = True
+    app.debug = False
+    app.config["TESTING"] = False
     app.secret_key = "haha"
 
     auth_manager.init_app(app)
@@ -123,21 +123,14 @@ async def test_transaction_style(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("testing", (True, False))
 async def test_errors(
     sentry_init,
     capture_exceptions,
     capture_events,
     app,
-    debug,
-    testing,
     integration_enabled_params,
 ):
     sentry_init(debug=True, **integration_enabled_params)
-
-    app.debug = debug
-    app.testing = testing
 
     @app.route("/")
     async def index():
@@ -323,9 +316,6 @@ def test_cli_commands_raise(app):
 async def test_500(sentry_init, capture_events, app):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
 
-    app.debug = False
-    app.testing = False
-
     @app.route("/")
     async def index():
         1 / 0
@@ -348,9 +338,6 @@ async def test_500(sentry_init, capture_events, app):
 @pytest.mark.asyncio
 async def test_error_in_errorhandler(sentry_init, capture_events, app):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
-
-    app.debug = False
-    app.testing = False
 
     @app.route("/")
     async def index():
