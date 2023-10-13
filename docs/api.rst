@@ -12,6 +12,7 @@ Capturing Data
 .. autofunction:: sentry_sdk.api.capture_event
 .. autofunction:: sentry_sdk.api.capture_exception
 .. autofunction:: sentry_sdk.api.capture_message
+.. autofunction:: sentry_sdk.api.capture_user_feedback
 
 
 Enriching Events

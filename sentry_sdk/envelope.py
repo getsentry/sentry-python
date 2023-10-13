@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Iterator
 
-    from sentry_sdk._types import Event, EventDataCategory
+    from sentry_sdk._types import Event, EventDataCategory, UserFeedback
 
 
 def parse_json(data):
@@ -93,6 +93,13 @@ class Envelope(object):
     ):
         # type: (...) -> None
         self.items.append(item)
+
+    def add_user_feedback(
+        self,
+        feedback,  # type: UserFeedback
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=feedback), type="user_report"))
 
     def get_event(self):
         # type: (...) -> Optional[Event]
@@ -258,6 +265,8 @@ class Item(object):
             return "error"
         elif ty == "client_report":
             return "internal"
+        elif ty == "user_report":
+            return "user_report"
         elif ty == "profile":
             return "profile"
         elif ty == "statsd":

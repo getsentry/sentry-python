@@ -51,6 +51,7 @@ if TYPE_CHECKING:
         Breadcrumb,
         BreadcrumbHint,
         ExcInfo,
+        UserFeedback,
     )
     from sentry_sdk.consts import ClientConstructor
 
@@ -400,6 +401,21 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return self.capture_event(event, hint=hint, scope=scope, **scope_args)
         except Exception:
             self._capture_internal_exception(sys.exc_info())
+
+        return None
+
+    def capture_user_feedback(self, feedback):
+        # type: (UserFeedback) -> None
+        """
+        Captures user feedback.
+
+        :param feedback: The user feedback to send to Sentry.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_user_feedback`.
+        """
+        client, _ = self._stack[-1]
+        if client is not None:
+            client.capture_user_feedback(feedback)
 
         return None
 

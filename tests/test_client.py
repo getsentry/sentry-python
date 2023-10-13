@@ -15,6 +15,7 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
     capture_event,
+    capture_user_feedback,
     start_transaction,
     set_tag,
 )
@@ -589,6 +590,35 @@ def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
     pytest.raises(EventCapturedError, lambda: capture_event({}))
     pytest.raises(EventCapturedError, lambda: capture_event({}))
+
+
+def test_capture_user_feedback_works(sentry_init, capture_envelopes):
+    expected_event_id = "test_event_id"
+    expected_name = "test_name"
+    expected_email = "test_email"
+    expected_comments = "test_comments"
+
+    sentry_init(attach_stacktrace=False)
+    envelopes = capture_envelopes()
+
+    capture_user_feedback({
+        "event_id": expected_event_id,
+        "email": expected_email,
+        "comments": expected_comments,
+        "name": expected_name,
+    })
+
+    assert len(envelopes) == 1
+    user_feedback_envelope = envelopes[0]
+    assert user_feedback_envelope.headers["event_id"] == expected_event_id
+    assert len(user_feedback_envelope.items) == 1
+    user_feedback_item = user_feedback_envelope.items[0]
+    assert user_feedback_item.data_category == "user_report"
+    assert user_feedback_item.headers["type"] == "user_report"
+    assert user_feedback_item.payload.json["event_id"] == expected_event_id
+    assert user_feedback_item.payload.json["email"] == expected_email
+    assert user_feedback_item.payload.json["name"] == expected_name
+    assert user_feedback_item.payload.json["comments"] == expected_comments
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])

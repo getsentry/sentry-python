@@ -22,6 +22,7 @@ __all__ = [  # noqa
     "capture_event",
     "capture_message",
     "capture_exception",
+    "capture_user_feedback",
     "add_breadcrumb",
     "configure_scope",
     "push_scope",

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Type
     from typing import Union
-    from typing_extensions import Literal
+    from typing_extensions import Literal, TypedDict
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
@@ -54,6 +54,7 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "statsd",
+        "user_report",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
@@ -116,3 +117,5 @@ if TYPE_CHECKING:
     FlushedMetricValue = Union[int, float]
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
+
+    UserFeedback = TypedDict('UserFeedback', {"event_id": str, "email": str, "name": str, "comments": str})

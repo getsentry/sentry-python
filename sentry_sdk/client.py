@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from typing import Sequence
 
     from sentry_sdk.scope import Scope
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, Hint, UserFeedback
     from sentry_sdk.session import Session
 
 
@@ -632,6 +632,23 @@ class _Client(object):
             logger.info("Discarded session update because of missing release")
         else:
             self.session_flusher.add_session(session)
+
+    def capture_user_feedback(
+        self,
+        feedback,  # type: UserFeedback
+    ):
+        # type: (...) -> None
+        """Captures user feedback.
+
+        :param feedback: The user feedback to send to Sentry.
+        """
+        headers = {
+            "event_id": feedback["event_id"],
+            "sent_at": format_timestamp(datetime_utcnow()),
+        }
+        envelope = Envelope(headers=headers)
+        envelope.add_user_feedback(feedback)
+        self.transport.capture_envelope(envelope)
 
     def close(
         self,

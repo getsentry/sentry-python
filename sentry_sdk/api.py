@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         BreadcrumbHint,
         ExcInfo,
         MeasurementUnit,
+        UserFeedback,
     )
     from sentry_sdk.tracing import Span
 
@@ -39,6 +40,7 @@ __all__ = [
     "capture_event",
     "capture_message",
     "capture_exception",
+    "capture_user_feedback",
     "add_breadcrumb",
     "configure_scope",
     "push_scope",
@@ -107,6 +109,14 @@ def capture_exception(
 ):
     # type: (...) -> Optional[str]
     return Hub.current.capture_exception(error, scope=scope, **scope_args)
+
+
+@hubmethod
+def capture_user_feedback(
+    feedback  # type: UserFeedback
+):
+    # type: (...) -> None
+    return Hub.current.capture_user_feedback(feedback)
 
 
 @hubmethod
