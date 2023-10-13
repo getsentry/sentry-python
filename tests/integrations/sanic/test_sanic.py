@@ -383,10 +383,14 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     _, response = app.test_client.get(test_config.url)
     assert response.status == test_config.expected_status
 
-    # Extract the transaction event by inspecting the event types
-    transaction_event = next(
-        (e for e in events if "type" in e and e["type"] == "transaction"), None
-    )
+    # Extract the transaction events by inspecting the event types. We should at most have 1 transaction event.
+    transaction_events = [
+        e for e in events if "type" in e and e["type"] == "transaction"
+    ]
+    assert len(transaction_events) <= 1
+
+    # Get the only transaction event, or set to None if there are no transaction events.
+    (transaction_event, *_) = [*transaction_events, None]
 
     # We should have no transaction event if and only if we expect no transactions
     assert (transaction_event is None) == (
