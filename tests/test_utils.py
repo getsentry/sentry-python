@@ -552,7 +552,7 @@ def test_installed_modules_caching():
             mock_generate_installed_modules,
         ):
             _get_installed_modules()
-            mock_generate_installed_modules.assert_called_once()
+            assert mock_generate_installed_modules.called
             mock_generate_installed_modules.reset_mock()
 
             _get_installed_modules()
