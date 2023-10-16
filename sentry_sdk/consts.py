@@ -233,7 +233,7 @@ class ClientConstructor(object):
         max_request_body_size="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=False,  # type: bool
+        debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
