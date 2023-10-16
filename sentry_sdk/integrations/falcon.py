@@ -8,6 +8,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
 )
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -131,9 +132,10 @@ class FalconIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        try:
-            version = tuple(map(int, FALCON_VERSION.split(".")))
-        except (ValueError, TypeError):
+
+        version = parse_version(FALCON_VERSION)
+
+        if version is None:
             raise DidNotEnable("Unparsable Falcon version: {}".format(FALCON_VERSION))
 
         if version < (1, 4):
@@ -204,13 +206,20 @@ def _patch_prepare_middleware():
     original_prepare_middleware = falcon_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
-        middleware=None, independent_middleware=False
+        middleware=None, independent_middleware=False, asgi=False
     ):
-        # type: (Any, Any) -> Any
+        # type: (Any, Any, bool) -> Any
+        if asgi:
+            # We don't support ASGI Falcon apps, so we don't patch anything here
+            return original_prepare_middleware(middleware, independent_middleware, asgi)
+
         hub = Hub.current
         integration = hub.get_integration(FalconIntegration)
         if integration is not None:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
+
+        # We intentionally omit the asgi argument here, since the default is False anyways,
+        # and this way, we remain backwards-compatible with pre-3.0.0 Falcon versions.
         return original_prepare_middleware(middleware, independent_middleware)
 
     falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware

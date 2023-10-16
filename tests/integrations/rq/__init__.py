@@ -1,3 +1,3 @@
 import pytest
 
-rq = pytest.importorskip("rq")
+pytest.importorskip("rq")

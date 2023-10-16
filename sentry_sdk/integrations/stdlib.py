@@ -9,7 +9,9 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
+    is_sentry_url,
     logger,
     safe_repr,
     parse_url,
@@ -68,12 +70,13 @@ def _install_httplib():
     def putrequest(self, method, url, *args, **kwargs):
         # type: (HTTPConnection, str, str, *Any, **Any) -> Any
         hub = Hub.current
-        if hub.get_integration(StdlibIntegration) is None:
-            return real_putrequest(self, method, url, *args, **kwargs)
 
         host = self.host
         port = self.port
         default_port = self.default_port
+
+        if hub.get_integration(StdlibIntegration) is None or is_sentry_url(hub, host):
+            return real_putrequest(self, method, url, *args, **kwargs)
 
         real_url = url
         if real_url is None or not real_url.startswith(("http://", "https://")):
@@ -84,17 +87,21 @@ def _install_httplib():
                 url,
             )
 
-        parsed_url = parse_url(real_url, sanitize=False)
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(real_url, sanitize=False)
 
         span = hub.start_span(
             op=OP.HTTP_CLIENT,
-            description="%s %s" % (method, parsed_url.url),
+            description="%s %s"
+            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
         )
 
         span.set_data(SPANDATA.HTTP_METHOD, method)
-        span.set_data("url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if parsed_url is not None:
+            span.set_data("url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -120,7 +127,6 @@ def _install_httplib():
 
         rv = real_getresponse(self, *args, **kwargs)
 
-        span.set_data("status_code", rv.status)
         span.set_http_status(int(rv.status))
         span.set_data("reason", rv.reason)
         span.finish()

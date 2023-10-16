@@ -5,12 +5,13 @@ from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy import text
 
 from sentry_sdk import capture_message, start_transaction, configure_scope
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
-from sentry_sdk.utils import json_dumps, MAX_STRING_LENGTH
+from sentry_sdk.utils import json_dumps
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -75,7 +76,6 @@ def test_orm_queries(sentry_init, capture_events):
     sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
 )
 def test_transactions(sentry_init, capture_events, render_span_tree):
-
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         _experiments={"record_sql_params": True},
@@ -122,6 +122,9 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
 
     for span in event["spans"]:
         assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+        assert span["data"][SPANDATA.DB_NAME] == ":memory:"
+        assert SPANDATA.SERVER_ADDRESS not in span["data"]
+        assert SPANDATA.SERVER_PORT not in span["data"]
 
     assert (
         render_span_tree(event)
@@ -153,7 +156,7 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     engine = create_engine("sqlite:///:memory:")
     with start_transaction(name="test"):
         with engine.connect() as con:
-            con.execute(" UNION ".join("SELECT {}".format(i) for i in range(100)))
+            con.execute(text(" UNION ".join("SELECT {}".format(i) for i in range(100))))
 
     (event,) = events
     description = event["spans"][0]["description"]
@@ -168,7 +171,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     )
     events = capture_events()
 
-    long_str = "x" * (MAX_STRING_LENGTH + 10)
+    long_str = "x" * (DEFAULT_MAX_VALUE_LENGTH + 10)
 
     with configure_scope() as scope:
 
@@ -181,7 +184,9 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     with start_transaction(name="test"):
         with engine.connect() as con:
             for _ in range(1500):
-                con.execute(" UNION ".join("SELECT {}".format(i) for i in range(100)))
+                con.execute(
+                    text(" UNION ".join("SELECT {}".format(i) for i in range(100)))
+                )
 
     (event,) = events
 
@@ -202,7 +207,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
     assert description.endswith("SELECT 98 UNION SELECT 99")
 
     # Smoke check that truncation of other fields has not changed.
-    assert len(event["message"]) == MAX_STRING_LENGTH
+    assert len(event["message"]) == DEFAULT_MAX_VALUE_LENGTH
 
     # The _meta for other truncated fields should be there as well.
     assert event["_meta"]["message"] == {
@@ -219,4 +224,4 @@ def test_engine_name_not_string(sentry_init):
     engine.dialect.name = b"sqlite"
 
     with engine.connect() as con:
-        con.execute("SELECT 0")
+        con.execute(text("SELECT 0"))

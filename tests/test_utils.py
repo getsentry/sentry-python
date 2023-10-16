@@ -3,13 +3,21 @@ import re
 import sys
 
 from sentry_sdk.utils import (
+    Components,
+    Dsn,
+    get_error_message,
     is_valid_sample_rate,
     logger,
     match_regex_list,
     parse_url,
+    parse_version,
+    safe_str,
     sanitize_url,
     serialize_frame,
+    is_sentry_url,
 )
+
+import sentry_sdk
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -66,6 +74,128 @@ def test_sanitize_url(url, expected_result):
     expected_parts = sorted(re.split(r"\&|\?|\#", expected_result))
 
     assert parts == expected_parts
+
+
+@pytest.mark.parametrize(
+    ("url", "expected_result"),
+    [
+        (
+            "http://localhost:8000",
+            Components(
+                scheme="http", netloc="localhost:8000", path="", query="", fragment=""
+            ),
+        ),
+        (
+            "http://example.com",
+            Components(
+                scheme="http", netloc="example.com", path="", query="", fragment=""
+            ),
+        ),
+        (
+            "https://example.com",
+            Components(
+                scheme="https", netloc="example.com", path="", query="", fragment=""
+            ),
+        ),
+        (
+            "example.com?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="",
+                netloc="",
+                path="example.com",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "http://example.com?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="http",
+                netloc="example.com",
+                path="",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "https://example.com?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="https",
+                netloc="example.com",
+                path="",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "http://localhost:8000/?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="http",
+                netloc="localhost:8000",
+                path="/",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "ftp://username:password@ftp.example.com:9876/bla/blub#foo",
+            Components(
+                scheme="ftp",
+                netloc="[Filtered]:[Filtered]@ftp.example.com:9876",
+                path="/bla/blub",
+                query="",
+                fragment="foo",
+            ),
+        ),
+        (
+            "https://username:password@example.com/bla/blub?token=abc&sessionid=123&save=true#fragment",
+            Components(
+                scheme="https",
+                netloc="[Filtered]:[Filtered]@example.com",
+                path="/bla/blub",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="fragment",
+            ),
+        ),
+        (
+            "bla/blub/foo",
+            Components(
+                scheme="", netloc="", path="bla/blub/foo", query="", fragment=""
+            ),
+        ),
+        (
+            "bla/blub/foo?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="",
+                netloc="",
+                path="bla/blub/foo",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+        (
+            "/bla/blub/foo/?token=abc&sessionid=123&save=true",
+            Components(
+                scheme="",
+                netloc="",
+                path="/bla/blub/foo/",
+                query="token=[Filtered]&sessionid=[Filtered]&save=[Filtered]",
+                fragment="",
+            ),
+        ),
+    ],
+)
+def test_sanitize_url_and_split(url, expected_result):
+    sanitized_url = sanitize_url(url, split=True)
+    # sort query because old Python versions (<3.6) don't preserve order
+    query = sorted(sanitized_url.query.split("&"))
+    expected_query = sorted(expected_result.query.split("&"))
+
+    assert sanitized_url.scheme == expected_result.scheme
+    assert sanitized_url.netloc == expected_result.netloc
+    assert query == expected_query
+    assert sanitized_url.path == expected_result.path
+    assert sanitized_url.fragment == expected_result.fragment
 
 
 @pytest.mark.parametrize(
@@ -263,3 +393,98 @@ def test_include_source_context_when_serializing_frame(include_source_context):
 )
 def test_match_regex_list(item, regex_list, expected_result):
     assert match_regex_list(item, regex_list) == expected_result
+
+
+@pytest.mark.parametrize(
+    "version,expected_result",
+    [
+        ["3.5.15", (3, 5, 15)],
+        ["2.0.9", (2, 0, 9)],
+        ["2.0.0", (2, 0, 0)],
+        ["0.6.0", (0, 6, 0)],
+        ["2.0.0.post1", (2, 0, 0)],
+        ["2.0.0rc3", (2, 0, 0)],
+        ["2.0.0rc2", (2, 0, 0)],
+        ["2.0.0rc1", (2, 0, 0)],
+        ["2.0.0b4", (2, 0, 0)],
+        ["2.0.0b3", (2, 0, 0)],
+        ["2.0.0b2", (2, 0, 0)],
+        ["2.0.0b1", (2, 0, 0)],
+        ["0.6beta3", (0, 6)],
+        ["0.6beta2", (0, 6)],
+        ["0.6beta1", (0, 6)],
+        ["0.4.2b", (0, 4, 2)],
+        ["0.4.2a", (0, 4, 2)],
+        ["0.0.1", (0, 0, 1)],
+        ["0.0.0", (0, 0, 0)],
+        ["1", (1,)],
+        ["1.0", (1, 0)],
+        ["1.0.0", (1, 0, 0)],
+        [" 1.0.0 ", (1, 0, 0)],
+        ["  1.0.0   ", (1, 0, 0)],
+        ["x1.0.0", None],
+        ["1.0.0x", None],
+        ["x1.0.0x", None],
+    ],
+)
+def test_parse_version(version, expected_result):
+    assert parse_version(version) == expected_result
+
+
+@pytest.fixture
+def mock_hub_with_dsn_netloc():
+    """
+    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    """
+
+    mock_hub = mock.Mock(spec=sentry_sdk.Hub)
+    mock_hub.client = mock.Mock(spec=sentry_sdk.Client)
+    mock_hub.client.transport = mock.Mock(spec=sentry_sdk.Transport)
+    mock_hub.client.transport.parsed_dsn = mock.Mock(spec=Dsn)
+
+    mock_hub.client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
+
+    return mock_hub
+
+
+@pytest.mark.parametrize(
+    ["test_url", "is_sentry_url_expected"],
+    [
+        ["https://asdf@abcd1234.ingest.sentry.io/123456789", True],
+        ["https://asdf@abcd1234.ingest.notsentry.io/123456789", False],
+    ],
+)
+def test_is_sentry_url_true(test_url, is_sentry_url_expected, mock_hub_with_dsn_netloc):
+    ret_val = is_sentry_url(mock_hub_with_dsn_netloc, test_url)
+
+    assert ret_val == is_sentry_url_expected
+
+
+def test_is_sentry_url_no_client():
+    hub = mock.Mock()
+    hub.client = None
+
+    test_url = "https://asdf@abcd1234.ingest.sentry.io/123456789"
+
+    ret_val = is_sentry_url(hub, test_url)
+
+    assert not ret_val
+
+
+@pytest.mark.parametrize(
+    "error,expected_result",
+    [
+        ["", lambda x: safe_str(x)],
+        ["some-string", lambda _: "some-string"],
+    ],
+)
+def test_get_error_message(error, expected_result):
+    with pytest.raises(BaseException) as exc_value:
+        exc_value.message = error
+        raise Exception
+    assert get_error_message(exc_value) == expected_result(exc_value)
+
+    with pytest.raises(BaseException) as exc_value:
+        exc_value.detail = error
+        raise Exception
+    assert get_error_message(exc_value) == expected_result(exc_value)

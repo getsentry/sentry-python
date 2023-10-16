@@ -1,10 +1,9 @@
 import inspect
 
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.tracing import NoOpSpan
+from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
     from typing import Any
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
         ExcInfo,
         MeasurementUnit,
     )
-    from sentry_sdk.tracing import Span, Transaction
+    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -54,6 +53,9 @@ __all__ = [
     "set_level",
     "set_measurement",
     "get_current_span",
+    "get_traceparent",
+    "get_baggage",
+    "continue_trace",
 ]
 
 
@@ -241,3 +243,27 @@ def get_current_span(hub=None):
 
     current_span = hub.scope.span
     return current_span
+
+
+def get_traceparent():
+    # type: () -> Optional[str]
+    """
+    Returns the traceparent either from the active span or from the scope.
+    """
+    return Hub.current.get_traceparent()
+
+
+def get_baggage():
+    # type: () -> Optional[str]
+    """
+    Returns Baggage either from the active span or from the scope.
+    """
+    return Hub.current.get_baggage()
+
+
+def continue_trace(environ_or_headers, op=None, name=None, source=None):
+    # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    """
+    Sets the propagation context from environment or headers and returns a transaction.
+    """
+    return Hub.current.continue_trace(environ_or_headers, op, name, source)

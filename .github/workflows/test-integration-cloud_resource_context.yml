@@ -42,7 +42,7 @@ jobs:
         os: [ubuntu-20.04]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -74,6 +74,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
 
+
   check_required_tests:
     name: All cloud_resource_context tests passed or skipped
     needs: test
@@ -84,4 +85,4 @@ jobs:
       - name: Check for failures
         if: contains(needs.test.result, 'failure')
         run: |
-          echo "One of the dependent jobs have failed. You may need to re-run it." && exit 1
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

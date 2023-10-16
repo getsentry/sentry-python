@@ -15,6 +15,7 @@ from sentry_sdk.profiler import (
     ThreadScheduler,
     extract_frame,
     extract_stack,
+    frame_id,
     get_current_thread_id,
     get_frame_name,
     setup_profiler,
@@ -81,6 +82,7 @@ def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
         setup_profiler(make_options(mode))
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -116,6 +118,7 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
     assert not setup_profiler(make_options())
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -144,6 +147,7 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
 def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
@@ -159,6 +163,7 @@ def test_profiles_sample_rate(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
         with start_transaction(name="profiling"):
@@ -171,8 +176,15 @@ def test_profiles_sample_rate(
 
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
+    if profiles_sample_rate is None or profiles_sample_rate == 0:
+        assert reports == []
+    elif profile_count:
+        assert reports == []
+    else:
+        assert reports == [("sample_rate", "profile")]
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -209,6 +221,7 @@ def test_profiles_sample_rate(
 def test_profiles_sampler(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
     profiles_sampler,
     profile_count,
@@ -220,6 +233,7 @@ def test_profiles_sampler(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
         with start_transaction(name="profiling"):
@@ -232,11 +246,17 @@ def test_profiles_sampler(
 
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
+    if profile_count:
+        assert reports == []
+    else:
+        assert reports == [("sample_rate", "profile")]
 
 
+@requires_python_version(3, 3)
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
 ):
     sentry_init(
@@ -245,6 +265,7 @@ def test_minimum_unique_samples_required(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with start_transaction(name="profiling"):
         pass
@@ -258,8 +279,10 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
+    assert reports == [("insufficient_data", "profile")]
 
 
+@requires_python_version(3, 3)
 def test_profile_captured(
     sentry_init,
     capture_envelopes,
@@ -349,6 +372,7 @@ class GetFrame(GetFrameBase):
         return inspect.currentframe()
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("frame", "frame_name"),
     [
@@ -428,6 +452,7 @@ def test_get_frame_name(frame, frame_name):
     assert get_frame_name(frame) == frame_name
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("get_frame", "function"),
     [
@@ -437,7 +462,7 @@ def test_get_frame_name(frame, frame_name):
 def test_extract_frame(get_frame, function):
     cwd = os.getcwd()
     frame = get_frame()
-    extracted_frame = extract_frame(frame, cwd)
+    extracted_frame = extract_frame(frame_id(frame), frame, cwd)
 
     # the abs_path should be equal toe the normalized path of the co_filename
     assert extracted_frame["abs_path"] == os.path.normpath(frame.f_code.co_filename)
@@ -455,6 +480,7 @@ def test_extract_frame(get_frame, function):
     assert isinstance(extracted_frame["lineno"], int)
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("depth", "max_stack_depth", "actual_depth"),
     [
@@ -474,7 +500,10 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
     _, frame_ids, frames = extract_stack(
-        frame, LRUCache(max_size=1), max_stack_depth=max_stack_depth + base_stack_depth
+        frame,
+        LRUCache(max_size=1),
+        max_stack_depth=max_stack_depth + base_stack_depth,
+        cwd=os.getcwd(),
     )
     assert len(frame_ids) == base_stack_depth + actual_depth
     assert len(frames) == base_stack_depth + actual_depth
@@ -493,6 +522,7 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
         assert frames[actual_depth]["function"] == "<lambda>", actual_depth
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("frame", "depth"),
     [(get_frame(depth=1), len(inspect.stack()))],
@@ -500,8 +530,9 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 def test_extract_stack_with_cache(frame, depth):
     # make sure cache has enough room or this test will fail
     cache = LRUCache(max_size=depth)
-    _, _, frames1 = extract_stack(frame, cache)
-    _, _, frames2 = extract_stack(frame, cache)
+    cwd = os.getcwd()
+    _, _, frames1 = extract_stack(frame, cache, cwd=cwd)
+    _, _, frames2 = extract_stack(frame, cache, cwd=cwd)
 
     assert len(frames1) > 0
     assert len(frames2) > 0
@@ -514,6 +545,7 @@ def test_extract_stack_with_cache(frame, depth):
         assert frame1 is frame2, i
 
 
+@requires_python_version(3, 3)
 def test_get_current_thread_id_explicit_thread():
     results = Queue(maxsize=1)
 
@@ -535,6 +567,7 @@ def test_get_current_thread_id_explicit_thread():
     assert thread1.ident == results.get(timeout=1)
 
 
+@requires_python_version(3, 3)
 @requires_gevent
 def test_get_current_thread_id_gevent_in_thread():
     results = Queue(maxsize=1)
@@ -550,6 +583,7 @@ def test_get_current_thread_id_gevent_in_thread():
     assert thread.ident == results.get(timeout=1)
 
 
+@requires_python_version(3, 3)
 def test_get_current_thread_id_running_thread():
     results = Queue(maxsize=1)
 
@@ -562,6 +596,7 @@ def test_get_current_thread_id_running_thread():
     assert thread.ident == results.get(timeout=1)
 
 
+@requires_python_version(3, 3)
 def test_get_current_thread_id_main_thread():
     results = Queue(maxsize=1)
 
@@ -626,6 +661,7 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
     assert len(get_scheduler_threads(scheduler)) == 0
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("scheduler_class",),
     [
@@ -635,7 +671,16 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 )
 @mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
-    sample = [("1", extract_stack(get_frame(), LRUCache(max_size=1)))]
+    sample = [
+        (
+            "1",
+            extract_stack(
+                get_frame(),
+                LRUCache(max_size=1),
+                cwd=os.getcwd(),
+            ),
+        ),
+    ]
 
     with scheduler_class(frequency=1000) as scheduler:
         transaction = Transaction(sampled=True)
@@ -679,11 +724,22 @@ thread_metadata = {
 
 
 sample_stacks = [
-    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=1),
-    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=2),
+    extract_stack(
+        get_frame(),
+        LRUCache(max_size=1),
+        max_stack_depth=1,
+        cwd=os.getcwd(),
+    ),
+    extract_stack(
+        get_frame(),
+        LRUCache(max_size=1),
+        max_stack_depth=2,
+        cwd=os.getcwd(),
+    ),
 ]
 
 
+@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("samples", "expected"),
     [
@@ -772,7 +828,7 @@ sample_stacks = [
                 "stacks": [[0], [1, 0]],
                 "thread_metadata": thread_metadata,
             },
-            id="two identical stacks",
+            id="two different stacks",
         ),
     ],
 )

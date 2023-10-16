@@ -1,8 +1,9 @@
 import sys
 import weakref
 
+from sentry_sdk.api import continue_trace
 from sentry_sdk._compat import reraise
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
@@ -11,13 +12,22 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, Transaction, TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_ROUTE,
+)
+from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    logger,
+    parse_url,
+    parse_version,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
+    SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
 )
 
@@ -25,6 +35,7 @@ try:
     import asyncio
 
     from aiohttp import __version__ as AIOHTTP_VERSION
+    from aiohttp import ClientSession, TraceConfig
     from aiohttp.web import Application, HTTPException, UrlDispatcher
 except ImportError:
     raise DidNotEnable("AIOHTTP not installed")
@@ -34,6 +45,8 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
     from aiohttp.abc import AbstractMatchInfo
+    from aiohttp import TraceRequestStartParams, TraceRequestEndParams
+    from types import SimpleNamespace
     from typing import Any
     from typing import Dict
     from typing import Optional
@@ -64,10 +77,10 @@ class AioHttpIntegration(Integration):
     def setup_once():
         # type: () -> None
 
-        try:
-            version = tuple(map(int, AIOHTTP_VERSION.split(".")[:2]))
-        except (TypeError, ValueError):
-            raise DidNotEnable("AIOHTTP version unparsable: {}".format(AIOHTTP_VERSION))
+        version = parse_version(AIOHTTP_VERSION)
+
+        if version is None:
+            raise DidNotEnable("Unparsable AIOHTTP version: {}".format(AIOHTTP_VERSION))
 
         if version < (3, 4):
             raise DidNotEnable("AIOHTTP 3.4 or newer required.")
@@ -100,7 +113,7 @@ class AioHttpIntegration(Integration):
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
-                    transaction = Transaction.continue_from_headers(
+                    transaction = continue_trace(
                         request.headers,
                         op=OP.HTTP_SERVER,
                         # If this transaction name makes it to the UI, AIOHTTP's
@@ -161,6 +174,82 @@ class AioHttpIntegration(Integration):
             return rv
 
         UrlDispatcher.resolve = sentry_urldispatcher_resolve
+
+        old_client_session_init = ClientSession.__init__
+
+        def init(*args, **kwargs):
+            # type: (Any, Any) -> ClientSession
+            hub = Hub.current
+            if hub.get_integration(AioHttpIntegration) is None:
+                return old_client_session_init(*args, **kwargs)
+
+            client_trace_configs = list(kwargs.get("trace_configs") or ())
+            trace_config = create_trace_config()
+            client_trace_configs.append(trace_config)
+
+            kwargs["trace_configs"] = client_trace_configs
+            return old_client_session_init(*args, **kwargs)
+
+        ClientSession.__init__ = init
+
+
+def create_trace_config():
+    # type: () -> TraceConfig
+    async def on_request_start(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
+        hub = Hub.current
+        if hub.get_integration(AioHttpIntegration) is None:
+            return
+
+        method = params.method.upper()
+
+        parsed_url = None
+        with capture_internal_exceptions():
+            parsed_url = parse_url(str(params.url), sanitize=False)
+
+        span = hub.start_span(
+            op=OP.HTTP_CLIENT,
+            description="%s %s"
+            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+        )
+        span.set_data(SPANDATA.HTTP_METHOD, method)
+        span.set_data("url", parsed_url.url)
+        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        if should_propagate_trace(hub, str(params.url)):
+            for key, value in hub.iter_trace_propagation_headers(span):
+                logger.debug(
+                    "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
+                        key=key, value=value, url=params.url
+                    )
+                )
+                if key == BAGGAGE_HEADER_NAME and params.headers.get(
+                    BAGGAGE_HEADER_NAME
+                ):
+                    # do not overwrite any existing baggage, just append to it
+                    params.headers[key] += "," + value
+                else:
+                    params.headers[key] = value
+
+        trace_config_ctx.span = span
+
+    async def on_request_end(session, trace_config_ctx, params):
+        # type: (ClientSession, SimpleNamespace, TraceRequestEndParams) -> None
+        if trace_config_ctx.span is None:
+            return
+
+        span = trace_config_ctx.span
+        span.set_http_status(int(params.response.status))
+        span.set_data("reason", params.response.reason)
+        span.finish()
+
+    trace_config = TraceConfig()
+
+    trace_config.on_request_start.append(on_request_start)
+    trace_config.on_request_end.append(on_request_end)
+
+    return trace_config
 
 
 def _make_request_processor(weak_request):

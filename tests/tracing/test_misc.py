@@ -1,4 +1,3 @@
-from mock import MagicMock
 import pytest
 import gc
 import uuid
@@ -9,11 +8,14 @@ from sentry_sdk import Hub, start_span, start_transaction, set_measurement
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
+from sentry_sdk.utils import Dsn
 
 try:
     from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
 except ImportError:
     import mock  # python < 3.3
+    from mock import MagicMock
 
 
 def test_span_trimming(sentry_init, capture_events):
@@ -303,6 +305,55 @@ def test_should_propagate_trace(
 ):
     hub = MagicMock()
     hub.client = MagicMock()
+
+    # This test assumes the urls are not Sentry URLs. Use test_should_propagate_trace_to_sentry for sentry URLs.
+    hub.is_sentry_url = lambda _: False
+
     hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
+    hub.client.transport = MagicMock()
+    hub.client.transport.parsed_dsn = Dsn("https://bla@xxx.sentry.io/12312012")
 
     assert should_propagate_trace(hub, url) == expected_propagation_decision
+
+
+@pytest.mark.parametrize(
+    "dsn,url,expected_propagation_decision",
+    [
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "http://example.com",
+            True,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            False,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "http://squirrelchasers.ingest.sentry.io/12312012",
+            False,
+        ),
+        (
+            "https://dogsarebadatkeepingsecrets@squirrelchasers.ingest.sentry.io/12312012",
+            "http://ingest.sentry.io/12312012",
+            True,
+        ),
+        (
+            "https://abc@localsentry.example.com/12312012",
+            "http://localsentry.example.com",
+            False,
+        ),
+    ],
+)
+def test_should_propagate_trace_to_sentry(
+    sentry_init, dsn, url, expected_propagation_decision
+):
+    sentry_init(
+        dsn=dsn,
+        traces_sample_rate=1.0,
+    )
+
+    Hub.current.client.transport.parsed_dsn = Dsn(dsn)
+
+    assert should_propagate_trace(Hub.current, url) == expected_propagation_decision

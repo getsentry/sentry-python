@@ -52,14 +52,16 @@ def test_processors(sentry_init, capture_events):
 
 def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     caplog.set_level(logging.DEBUG)
-    REDIS = 12  # noqa: N806
+    redis_index = _AUTO_ENABLING_INTEGRATIONS.index(
+        "sentry_sdk.integrations.redis.RedisIntegration"
+    )  # noqa: N806
 
     sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
         # Ignore redis in the test case, because it is installed as a
         # dependency for running tests, and therefore always enabled.
-        if _AUTO_ENABLING_INTEGRATIONS[REDIS] == import_string:
+        if _AUTO_ENABLING_INTEGRATIONS[redis_index] == import_string:
             continue
 
         assert any(

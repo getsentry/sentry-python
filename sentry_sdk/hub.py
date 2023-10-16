@@ -1,16 +1,26 @@
 import copy
 import sys
 
-from datetime import datetime
 from contextlib import contextmanager
 
-from sentry_sdk._compat import with_metaclass
+from sentry_sdk._compat import datetime_utcnow, with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.profiler import Profile
-from sentry_sdk.tracing import NoOpSpan, Span, Transaction
+from sentry_sdk.tracing import (
+    NoOpSpan,
+    Span,
+    Transaction,
+    BAGGAGE_HEADER_NAME,
+    SENTRY_TRACE_HEADER_NAME,
+)
 from sentry_sdk.session import Session
+from sentry_sdk.tracing_utils import (
+    has_tracing_enabled,
+    normalize_incoming_data,
+)
+
 from sentry_sdk.utils import (
     exc_info_from_error,
     event_from_exception,
@@ -322,15 +332,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(
-        self,
-        event,  # type: Event
-        hint=None,  # type: Optional[Hint]
-        scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
-    ):
-        # type: (...) -> Optional[str]
-        """Captures an event. Alias of :py:meth:`sentry_sdk.Client.capture_event`."""
+    def capture_event(self, event, hint=None, scope=None, **scope_args):
+        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
+        """
+        Captures an event.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_event`.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+        """
         client, top_scope = self._stack[-1]
         scope = _update_scope(top_scope, scope, scope_args)
         if client is not None:
@@ -341,16 +352,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return rv
         return None
 
-    def capture_message(
-        self,
-        message,  # type: str
-        level=None,  # type: Optional[str]
-        scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
-    ):
-        # type: (...) -> Optional[str]
-        """Captures a message.  The message is just a string.  If no level
-        is provided the default level is `info`.
+    def capture_message(self, message, level=None, scope=None, **scope_args):
+        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
+        """
+        Captures a message.
+
+        :param message: The string to send as the message.
+
+        :param level: If no level is provided, the default level is `info`.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -362,16 +376,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             {"message": message, "level": level}, scope=scope, **scope_args
         )
 
-    def capture_exception(
-        self,
-        error=None,  # type: Optional[Union[BaseException, ExcInfo]]
-        scope=None,  # type: Optional[Any]
-        **scope_args  # type: Any
-    ):
-        # type: (...) -> Optional[str]
+    def capture_exception(self, error=None, scope=None, **scope_args):
+        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
+
+        :param scope_args: For supported `**scope_args` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -403,13 +415,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(
-        self,
-        crumb=None,  # type: Optional[Breadcrumb]
-        hint=None,  # type: Optional[BreadcrumbHint]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> None
+    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
+        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """
         Adds a breadcrumb.
 
@@ -431,7 +438,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         hint = dict(hint or ())  # type: Hint
 
         if crumb.get("timestamp") is None:
-            crumb["timestamp"] = datetime.utcnow()
+            crumb["timestamp"] = datetime_utcnow()
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
@@ -449,29 +456,29 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         while len(scope._breadcrumbs) > max_breadcrumbs:
             scope._breadcrumbs.popleft()
 
-    def start_span(
-        self,
-        span=None,  # type: Optional[Span]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: str
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Span
+    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (Optional[Span], str, Any) -> Span
         """
-        Create and start timing a new span whose parent is the currently active
-        span or transaction, if any. The return value is a span instance,
+        Start a span whose parent is the currently active span or transaction, if any.
+
+        The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
         typically used as a context manager to start and stop timing in a `with`
         block.
 
         Only spans contained in a transaction are sent to Sentry. Most
         integrations start a transaction at the appropriate time, for example
-        for every incoming HTTP request. Use `start_transaction` to start a new
-        transaction when one is not already in progress.
+        for every incoming HTTP request. Use
+        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
+        one is not already in progress.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
+        # THIS BLOCK IS DEPRECATED
         # TODO: consider removing this in a future release.
         # This is for backwards compatibility with releases before
         # start_transaction existed, to allow for a smoother transition.
@@ -480,32 +487,45 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "Deprecated: use start_transaction to start transactions and "
                 "Transaction.start_child to start spans."
             )
+
             if isinstance(span, Transaction):
                 logger.warning(deprecation_msg)
                 return self.start_transaction(span)
+
             if "transaction" in kwargs:
                 logger.warning(deprecation_msg)
                 name = kwargs.pop("transaction")
                 return self.start_transaction(name=name, **kwargs)
 
+        # THIS BLOCK IS DEPRECATED
+        # We do not pass a span into start_span in our code base, so I deprecate this.
         if span is not None:
+            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future."
+            logger.warning(deprecation_msg)
             return span
 
         kwargs.setdefault("hub", self)
 
-        span = self.scope.span
-        if span is not None:
-            return span.start_child(**kwargs)
+        active_span = self.scope.span
+        if active_span is not None:
+            new_child_span = active_span.start_child(**kwargs)
+            return new_child_span
+
+        # If there is already a trace_id in the propagation context, use it.
+        # This does not need to be done for `start_child` above because it takes
+        # the trace_id from the parent span.
+        if "trace_id" not in kwargs:
+            traceparent = self.get_traceparent()
+            trace_id = traceparent.split("-")[0] if traceparent else None
+            if trace_id is not None:
+                kwargs["trace_id"] = trace_id
 
         return Span(**kwargs)
 
     def start_transaction(
-        self,
-        transaction=None,  # type: Optional[Transaction]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: str
-        **kwargs  # type: Any
+        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (...) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -527,6 +547,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         configuration_instrumenter = self.client and self.client.options["instrumenter"]
 
@@ -562,6 +584,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return transaction
 
+    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+        """
+        Sets the propagation context from environment or headers and returns a transaction.
+        """
+        with self.configure_scope() as scope:
+            scope.generate_propagation_context(environ_or_headers)
+
+        transaction = Transaction.continue_from_headers(
+            normalize_incoming_data(environ_or_headers),
+            op=op,
+            name=name,
+            source=source,
+        )
+        return transaction
+
     @overload
     def push_scope(
         self, callback=None  # type: Optional[None]
@@ -577,7 +615,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         pass
 
     def push_scope(  # noqa
-        self, callback=None  # type: Optional[Callable[[Scope], None]]
+        self,
+        callback=None,  # type: Optional[Callable[[Scope], None]]
+        continue_trace=True,  # type: bool
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
         """
@@ -595,7 +635,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
 
         client, scope = self._stack[-1]
-        new_layer = (client, copy.copy(scope))
+
+        new_scope = copy.copy(scope)
+
+        if continue_trace:
+            new_scope.generate_propagation_context()
+
+        new_layer = (client, new_scope)
         self._stack.append(new_layer)
 
         return _ScopeManager(self)
@@ -626,7 +672,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         pass
 
     def configure_scope(  # noqa
-        self, callback=None  # type: Optional[Callable[[Scope], None]]
+        self,
+        callback=None,  # type: Optional[Callable[[Scope], None]]
+        continue_trace=True,  # type: bool
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
 
@@ -639,6 +687,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
 
         client, scope = self._stack[-1]
+
+        if continue_trace:
+            scope.generate_propagation_context()
+
         if callback is not None:
             if client is not None:
                 callback(scope)
@@ -714,6 +766,36 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
+    def get_traceparent(self):
+        # type: () -> Optional[str]
+        """
+        Returns the traceparent either from the active span or from the scope.
+        """
+        if self.client is not None:
+            if has_tracing_enabled(self.client.options) and self.scope.span is not None:
+                return self.scope.span.to_traceparent()
+
+        return self.scope.get_traceparent()
+
+    def get_baggage(self):
+        # type: () -> Optional[str]
+        """
+        Returns Baggage either from the active span or from the scope.
+        """
+        if (
+            self.client is not None
+            and has_tracing_enabled(self.client.options)
+            and self.scope.span is not None
+        ):
+            baggage = self.scope.span.to_baggage()
+        else:
+            baggage = self.scope.get_baggage()
+
+        if baggage is not None:
+            return baggage.serialize()
+
+        return None
+
     def iter_trace_propagation_headers(self, span=None):
         # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
         """
@@ -721,29 +803,46 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        span = span or self.scope.span
-        if not span:
-            return
-
         client = self._stack[-1][0]
-
         propagate_traces = client and client.options["propagate_traces"]
         if not propagate_traces:
             return
 
-        for header in span.iter_headers():
-            yield header
+        span = span or self.scope.span
+
+        if client and has_tracing_enabled(client.options) and span is not None:
+            for header in span.iter_headers():
+                yield header
+        else:
+            for header in self.scope.iter_headers():
+                yield header
 
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str
         """
-        Return meta tags which should be injected into the HTML template
-        to allow propagation of trace data.
+        Return meta tags which should be injected into HTML templates
+        to allow propagation of trace information.
         """
+        if span is not None:
+            logger.warning(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            )
+
         meta = ""
 
-        for name, content in self.iter_trace_propagation_headers(span):
-            meta += '<meta name="%s" content="%s">' % (name, content)
+        sentry_trace = self.get_traceparent()
+        if sentry_trace is not None:
+            meta += '<meta name="%s" content="%s">' % (
+                SENTRY_TRACE_HEADER_NAME,
+                sentry_trace,
+            )
+
+        baggage = self.get_baggage()
+        if baggage is not None:
+            meta += '<meta name="%s" content="%s">' % (
+                BAGGAGE_HEADER_NAME,
+                baggage,
+            )
 
         return meta
 

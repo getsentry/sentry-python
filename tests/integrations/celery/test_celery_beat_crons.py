@@ -1,8 +1,4 @@
-import mock
-
 import pytest
-
-pytest.importorskip("celery")
 
 from sentry_sdk.integrations.celery import (
     _get_headers,
@@ -16,9 +12,16 @@ from sentry_sdk.integrations.celery import (
 from sentry_sdk.crons import MonitorStatus
 from celery.schedules import crontab, schedule
 
+try:
+    from unittest import mock  # python 3.3 and above
+    from unittest.mock import MagicMock
+except ImportError:
+    import mock  # python < 3.3
+    from mock import MagicMock
+
 
 def test_get_headers():
-    fake_task = mock.MagicMock()
+    fake_task = MagicMock()
     fake_task.request = {
         "bla": "blub",
         "foo": "bar",
@@ -54,9 +57,11 @@ def test_get_headers():
 @pytest.mark.parametrize(
     "seconds, expected_tuple",
     [
-        (0, (1, "minute")),
-        (0.00001, (1, "minute")),
-        (1, (1, "minute")),
+        (0, (0, "second")),
+        (1, (1, "second")),
+        (0.00001, (0, "second")),
+        (59, (59, "second")),
+        (60, (1, "minute")),
         (100, (1, "minute")),
         (1000, (16, "minute")),
         (10000, (2, "hour")),
@@ -69,7 +74,7 @@ def test_get_humanized_interval(seconds, expected_tuple):
 
 
 def test_crons_task_success():
-    fake_task = mock.MagicMock()
+    fake_task = MagicMock()
     fake_task.request = {
         "headers": {
             "sentry-monitor-slug": "test123",
@@ -113,7 +118,7 @@ def test_crons_task_success():
 
 
 def test_crons_task_failure():
-    fake_task = mock.MagicMock()
+    fake_task = MagicMock()
     fake_task.request = {
         "headers": {
             "sentry-monitor-slug": "test123",
@@ -157,7 +162,7 @@ def test_crons_task_failure():
 
 
 def test_crons_task_retry():
-    fake_task = mock.MagicMock()
+    fake_task = MagicMock()
     fake_task.request = {
         "headers": {
             "sentry-monitor-slug": "test123",
@@ -200,14 +205,13 @@ def test_crons_task_retry():
             )
 
 
-def test_get_monitor_config():
-    app = mock.MagicMock()
-    app.conf = mock.MagicMock()
+def test_get_monitor_config_crontab():
+    app = MagicMock()
+    app.conf = MagicMock()
     app.conf.timezone = "Europe/Vienna"
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
-
-    monitor_config = _get_monitor_config(celery_schedule, app)
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
     assert monitor_config == {
         "schedule": {
             "type": "crontab",
@@ -217,9 +221,33 @@ def test_get_monitor_config():
     }
     assert "unit" not in monitor_config["schedule"]
 
-    celery_schedule = schedule(run_every=3)
 
-    monitor_config = _get_monitor_config(celery_schedule, app)
+def test_get_monitor_config_seconds():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=3)  # seconds
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.logger.warning"
+    ) as mock_logger_warning:
+        monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+        mock_logger_warning.assert_called_with(
+            "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+            "foo",
+            3,
+        )
+        assert monitor_config == {}
+
+
+def test_get_monitor_config_minutes():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Europe/Vienna"
+
+    celery_schedule = schedule(run_every=60)  # seconds
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
     assert monitor_config == {
         "schedule": {
             "type": "interval",
@@ -229,19 +257,25 @@ def test_get_monitor_config():
         "timezone": "Europe/Vienna",
     }
 
-    unknown_celery_schedule = mock.MagicMock()
-    monitor_config = _get_monitor_config(unknown_celery_schedule, app)
+
+def test_get_monitor_config_unknown():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Europe/Vienna"
+
+    unknown_celery_schedule = MagicMock()
+    monitor_config = _get_monitor_config(unknown_celery_schedule, app, "foo")
     assert monitor_config == {}
 
 
 def test_get_monitor_config_default_timezone():
-    app = mock.MagicMock()
-    app.conf = mock.MagicMock()
+    app = MagicMock()
+    app.conf = MagicMock()
     app.conf.timezone = None
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
 
-    monitor_config = _get_monitor_config(celery_schedule, app)
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
 
     assert monitor_config["timezone"] == "UTC"
 
@@ -259,18 +293,18 @@ def test_exclude_beat_tasks_option(
     """
     Test excluding Celery Beat tasks from automatic instrumentation.
     """
-    fake_apply_entry = mock.MagicMock()
+    fake_apply_entry = MagicMock()
 
-    fake_scheduler = mock.MagicMock()
+    fake_scheduler = MagicMock()
     fake_scheduler.apply_entry = fake_apply_entry
 
-    fake_integration = mock.MagicMock()
+    fake_integration = MagicMock()
     fake_integration.exclude_beat_tasks = exclude_beat_tasks
 
-    fake_schedule_entry = mock.MagicMock()
+    fake_schedule_entry = MagicMock()
     fake_schedule_entry.name = task_name
 
-    fake_get_monitor_config = mock.MagicMock()
+    fake_get_monitor_config = MagicMock()
 
     with mock.patch(
         "sentry_sdk.integrations.celery.Scheduler", fake_scheduler
@@ -290,10 +324,10 @@ def test_exclude_beat_tasks_option(
 
                 if task_in_excluded_beat_tasks:
                     # Only the original Scheduler.apply_entry() is called, _get_monitor_config is NOT called.
-                    fake_apply_entry.assert_called_once()
+                    assert fake_apply_entry.call_count == 1
                     _get_monitor_config.assert_not_called()
 
                 else:
                     # The original Scheduler.apply_entry() is called, AND _get_monitor_config is called.
-                    fake_apply_entry.assert_called_once()
-                    _get_monitor_config.assert_called_once()
+                    assert fake_apply_entry.call_count == 1
+                    assert _get_monitor_config.call_count == 1

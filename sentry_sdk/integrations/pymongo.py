@@ -85,6 +85,27 @@ def _strip_pii(command):
     return command
 
 
+def _get_db_data(event):
+    # type: (Any) -> Dict[str, Any]
+    data = {}
+
+    data[SPANDATA.DB_SYSTEM] = "mongodb"
+
+    db_name = event.database_name
+    if db_name is not None:
+        data[SPANDATA.DB_NAME] = db_name
+
+    server_address = event.connection_id[0]
+    if server_address is not None:
+        data[SPANDATA.SERVER_ADDRESS] = server_address
+
+    server_port = event.connection_id[1]
+    if server_port is not None:
+        data[SPANDATA.SERVER_PORT] = server_port
+
+    return data
+
+
 class CommandTracer(monitoring.CommandListener):
     def __init__(self):
         # type: () -> None
@@ -121,10 +142,10 @@ class CommandTracer(monitoring.CommandListener):
                 pass
 
             data = {"operation_ids": {}}  # type: Dict[str, Any]
-
             data["operation_ids"]["operation"] = event.operation_id
             data["operation_ids"]["request"] = event.request_id
-            data[SPANDATA.DB_SYSTEM] = "mongodb"
+
+            data.update(_get_db_data(event))
 
             try:
                 lsid = command.pop("lsid")["id"]

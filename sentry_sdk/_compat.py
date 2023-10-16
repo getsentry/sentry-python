@@ -1,4 +1,7 @@
 import sys
+import contextlib
+from datetime import datetime
+from functools import wraps
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -8,6 +11,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Type
     from typing import TypeVar
+    from typing import Callable
 
     T = TypeVar("T")
 
@@ -29,16 +33,59 @@ if PY2:
     iteritems = lambda x: x.iteritems()  # noqa: B301
     binary_sequence_types = (bytearray, memoryview)
 
+    def datetime_utcnow():
+        return datetime.utcnow()
+
+    def utc_from_timestamp(timestamp):
+        return datetime.utcfromtimestamp(timestamp)
+
     def implements_str(cls):
         # type: (T) -> T
         cls.__unicode__ = cls.__str__
         cls.__str__ = lambda x: unicode(x).encode("utf-8")  # noqa
         return cls
 
+    # The line below is written as an "exec" because it triggers a syntax error in Python 3
     exec("def reraise(tp, value, tb=None):\n raise tp, value, tb")
 
+    def contextmanager(func):
+        # type: (Callable) -> Callable
+        """
+        Decorator which creates a contextmanager that can also be used as a
+        decorator, similar to how the built-in contextlib.contextmanager
+        function works in Python 3.2+.
+        """
+        contextmanager_func = contextlib.contextmanager(func)
+
+        @wraps(func)
+        class DecoratorContextManager:
+            def __init__(self, *args, **kwargs):
+                # type: (...) -> None
+                self.the_contextmanager = contextmanager_func(*args, **kwargs)
+
+            def __enter__(self):
+                # type: () -> None
+                self.the_contextmanager.__enter__()
+
+            def __exit__(self, *args, **kwargs):
+                # type: (...) -> None
+                self.the_contextmanager.__exit__(*args, **kwargs)
+
+            def __call__(self, decorated_func):
+                # type: (Callable) -> Callable[...]
+                @wraps(decorated_func)
+                def when_called(*args, **kwargs):
+                    # type: (...) -> Any
+                    with self.the_contextmanager:
+                        return_val = decorated_func(*args, **kwargs)
+                    return return_val
+
+                return when_called
+
+        return DecoratorContextManager
 
 else:
+    from datetime import timezone
     import urllib.parse as urlparse  # noqa
 
     text_type = str
@@ -47,6 +94,14 @@ else:
     int_types = (int,)
     iteritems = lambda x: x.items()
     binary_sequence_types = (bytes, bytearray, memoryview)
+
+    def datetime_utcnow():
+        # type: () -> datetime
+        return datetime.now(timezone.utc)
+
+    def utc_from_timestamp(timestamp):
+        # type: (float) -> datetime
+        return datetime.fromtimestamp(timestamp, timezone.utc)
 
     def implements_str(x):
         # type: (T) -> T
@@ -58,6 +113,9 @@ else:
         if value.__traceback__ is not tb:
             raise value.with_traceback(tb)
         raise value
+
+    # contextlib.contextmanager already can be used as decorator in Python 3.2+
+    contextmanager = contextlib.contextmanager
 
 
 def with_metaclass(meta, *bases):
@@ -82,7 +140,10 @@ def check_thread_support():
     if "threads" in opt:
         return
 
-    if str(opt.get("enable-threads", "0")).lower() in ("false", "off", "no", "0"):
+    # put here because of circular import
+    from sentry_sdk.consts import FALSE_VALUES
+
+    if str(opt.get("enable-threads", "0")).lower() in FALSE_VALUES:
         from warnings import warn
 
         warn(

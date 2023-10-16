@@ -6,16 +6,18 @@ import certifi
 import gzip
 import time
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from collections import defaultdict
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 
+from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from datetime import datetime
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -107,6 +109,10 @@ class Transport(object):
         """
         return None
 
+    def is_healthy(self):
+        # type: () -> bool
+        return True
+
     def __del__(self):
         # type: () -> None
         try:
@@ -118,7 +124,7 @@ class Transport(object):
 def _parse_rate_limits(header, now=None):
     # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
     if now is None:
-        now = datetime.utcnow()
+        now = datetime_utcnow()
 
     for limit in header.split(","):
         try:
@@ -158,6 +164,11 @@ class HttpTransport(Transport):
             ca_certs=options["ca_certs"],
             proxy_headers=options["proxy_headers"],
         )
+
+        compresslevel = options.get("_experiments", {}).get(
+            "transport_zlib_compression_level"
+        )
+        self._compresslevel = 9 if compresslevel is None else int(compresslevel)
 
         from sentry_sdk import Hub
 
@@ -200,7 +211,7 @@ class HttpTransport(Transport):
         # sentries if a proxy in front wants to globally slow things down.
         elif response.status == 429:
             logger.warning("Rate-limited via 429")
-            self._disabled_until[None] = datetime.utcnow() + timedelta(
+            self._disabled_until[None] = datetime_utcnow() + timedelta(
                 seconds=self._retry.get_retry_after(response) or 60
             )
 
@@ -307,9 +318,21 @@ class HttpTransport(Transport):
         def _disabled(bucket):
             # type: (Any) -> bool
             ts = self._disabled_until.get(bucket)
-            return ts is not None and ts > datetime.utcnow()
+            return ts is not None and ts > datetime_utcnow()
 
         return _disabled(category) or _disabled(None)
+
+    def _is_rate_limited(self):
+        # type: () -> bool
+        return any(ts > datetime_utcnow() for ts in self._disabled_until.values())
+
+    def _is_worker_full(self):
+        # type: () -> bool
+        return self._worker.full()
+
+    def is_healthy(self):
+        # type: () -> bool
+        return not (self._is_worker_full() or self._is_rate_limited())
 
     def _send_event(
         self, event  # type: Event
@@ -322,8 +345,13 @@ class HttpTransport(Transport):
             return None
 
         body = io.BytesIO()
-        with gzip.GzipFile(fileobj=body, mode="w") as f:
-            f.write(json_dumps(event))
+        if self._compresslevel == 0:
+            body.write(json_dumps(event))
+        else:
+            with gzip.GzipFile(
+                fileobj=body, mode="w", compresslevel=self._compresslevel
+            ) as f:
+                f.write(json_dumps(event))
 
         assert self.parsed_dsn is not None
         logger.debug(
@@ -336,10 +364,14 @@ class HttpTransport(Transport):
                 self.parsed_dsn.host,
             )
         )
-        self._send_request(
-            body.getvalue(),
-            headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
-        )
+
+        headers = {
+            "Content-Type": "application/json",
+        }
+        if self._compresslevel > 0:
+            headers["Content-Encoding"] = "gzip"
+
+        self._send_request(body.getvalue(), headers=headers)
         return None
 
     def _send_envelope(
@@ -374,8 +406,13 @@ class HttpTransport(Transport):
             envelope.items.append(client_report_item)
 
         body = io.BytesIO()
-        with gzip.GzipFile(fileobj=body, mode="w") as f:
-            envelope.serialize_into(f)
+        if self._compresslevel == 0:
+            envelope.serialize_into(body)
+        else:
+            with gzip.GzipFile(
+                fileobj=body, mode="w", compresslevel=self._compresslevel
+            ) as f:
+                envelope.serialize_into(f)
 
         assert self.parsed_dsn is not None
         logger.debug(
@@ -385,12 +422,15 @@ class HttpTransport(Transport):
             self.parsed_dsn.host,
         )
 
+        headers = {
+            "Content-Type": "application/x-sentry-envelope",
+        }
+        if self._compresslevel > 0:
+            headers["Content-Encoding"] = "gzip"
+
         self._send_request(
             body.getvalue(),
-            headers={
-                "Content-Type": "application/x-sentry-envelope",
-                "Content-Encoding": "gzip",
-            },
+            headers=headers,
             endpoint_type="envelope",
             envelope=envelope,
         )
@@ -441,7 +481,24 @@ class HttpTransport(Transport):
             if proxy_headers:
                 opts["proxy_headers"] = proxy_headers
 
-            return urllib3.ProxyManager(proxy, **opts)
+            if proxy.startswith("socks"):
+                use_socks_proxy = True
+                try:
+                    # Check if PySocks depencency is available
+                    from urllib3.contrib.socks import SOCKSProxyManager
+                except ImportError:
+                    use_socks_proxy = False
+                    logger.warning(
+                        "You have configured a SOCKS proxy (%s) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.",
+                        proxy,
+                    )
+
+                if use_socks_proxy:
+                    return SOCKSProxyManager(proxy, **opts)
+                else:
+                    return urllib3.PoolManager(**opts)
+            else:
+                return urllib3.ProxyManager(proxy, **opts)
         else:
             return urllib3.PoolManager(**opts)
 

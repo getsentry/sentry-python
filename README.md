@@ -34,7 +34,6 @@ sentry_sdk.init(
 
     # Set traces_sample_rate to 1.0 to capture 100%
     # of transactions for performance monitoring.
-    # We recommend adjusting this value in production.
     traces_sample_rate=1.0,
 )
 ```
@@ -48,39 +47,36 @@ capture_message("Hello World")  # Will create an event in Sentry.
 raise ValueError()  # Will also create an event in Sentry.
 ```
 
-- To learn more about how to use the SDK [refer to our docs](https://docs.sentry.io/platforms/python/)
-- Are you coming from raven-python? [Use this migration guide](https://docs.sentry.io/platforms/python/migration/)
-- To learn about internals use the [API Reference](https://getsentry.github.io/sentry-python/)
+- To learn more about how to use the SDK [refer to our docs](https://docs.sentry.io/platforms/python/).
+- Are you coming from `raven-python`? [Use this migration guide](https://docs.sentry.io/platforms/python/migration/).
+- To learn about internals use the [API Reference](https://getsentry.github.io/sentry-python/).
 
 ## Integrations
 
-(If you want to create a new integration have a look at the [Adding a new integration checklist](CONTRIBUTING.md#adding-a-new-integration-checklist).)
+(If you want to create a new integration, have a look at the [Adding a new integration checklist](https://github.com/getsentry/sentry-python/blob/master/CONTRIBUTING.md#adding-a-new-integration).)
 
-- [Django](https://docs.sentry.io/platforms/python/guides/django/)
-- [Flask](https://docs.sentry.io/platforms/python/guides/flask/)
-- [Bottle](https://docs.sentry.io/platforms/python/guides/bottle/)
-- [AWS Lambda](https://docs.sentry.io/platforms/python/guides/aws-lambda/)
-- [Google Cloud Functions](https://docs.sentry.io/platforms/python/guides/gcp-functions/)
-- [WSGI](https://docs.sentry.io/platforms/python/guides/wsgi/)
-- [ASGI](https://docs.sentry.io/platforms/python/guides/asgi/)
-- [Starlette](https://docs.sentry.io/platforms/python/guides/starlette/)
-- [FastAPI](https://docs.sentry.io/platforms/python/guides/fastapi/)
-- [AIOHTTP](https://docs.sentry.io/platforms/python/guides/aiohttp/)
-- [RQ (Redis Queue)](https://docs.sentry.io/platforms/python/guides/rq/)
-- [Celery](https://docs.sentry.io/platforms/python/guides/celery/)
-- [Chalice](https://docs.sentry.io/platforms/python/guides/chalice/)
-- [Falcon](https://docs.sentry.io/platforms/python/guides/falcon/)
-- [Quart](https://docs.sentry.io/platforms/python/guides/quart/)
-- [Sanic](https://docs.sentry.io/platforms/python/guides/sanic/)
-- [Tornado](https://docs.sentry.io/platforms/python/guides/tornado/)
-- [Tryton](https://docs.sentry.io/platforms/python/guides/tryton/)
-- [Pyramid](https://docs.sentry.io/platforms/python/guides/pyramid/)
-- [Logging](https://docs.sentry.io/platforms/python/guides/logging/)
-- [Apache Airflow](https://docs.sentry.io/platforms/python/guides/airflow/)
-- [Apache Beam](https://docs.sentry.io/platforms/python/guides/beam/)
-- [Apache Spark](https://docs.sentry.io/platforms/python/guides/pyspark/)
+See [the documentation](https://docs.sentry.io/platforms/python/integrations/) for an up-to-date list of libraries and frameworks we support. Here are some examples:
 
-## Migrate From sentry-raven
+- [Django](https://docs.sentry.io/platforms/python/integrations/django/)
+- [Flask](https://docs.sentry.io/platforms/python/integrations/flask/)
+- [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/)
+- [AIOHTTP](https://docs.sentry.io/platforms/python/integrations/aiohttp/)
+- [SQLAlchemy](https://docs.sentry.io/platforms/python/integrations/sqlalchemy/)
+- [asyncpg](https://docs.sentry.io/platforms/python/integrations/asyncpg/)
+- [Redis](https://docs.sentry.io/platforms/python/integrations/redis/)
+- [Celery](https://docs.sentry.io/platforms/python/integrations/celery/)
+- [Apache Airflow](https://docs.sentry.io/platforms/python/integrations/airflow/)
+- [Apache Spark](https://docs.sentry.io/platforms/python/integrations/pyspark/)
+- [asyncio](https://docs.sentry.io/platforms/python/integrations/asyncio/)
+- [Graphene](https://docs.sentry.io/platforms/python/integrations/graphene/)
+- [Logging](https://docs.sentry.io/platforms/python/integrations/logging/)
+- [Loguru](https://docs.sentry.io/platforms/python/integrations/loguru/)
+- [HTTPX](https://docs.sentry.io/platforms/python/integrations/httpx/)
+- [AWS Lambda](https://docs.sentry.io/platforms/python/integrations/aws-lambda/)
+- [Google Cloud Functions](https://docs.sentry.io/platforms/python/integrations/gcp-functions/)
+
+
+## Migrating From `raven-python`
 
 The old `raven-python` client has entered maintenance mode and was moved [here](https://github.com/getsentry/raven-python).
 
@@ -90,7 +86,7 @@ If you're using `raven-python`, we recommend you to migrate to this new SDK. You
 
 Please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Getting help/support
+## Getting Help/Support
 
 If you need help setting up or configuring the Python SDK (or anything else in the Sentry universe) please head over to the [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr). There is a ton of great people in our Discord community ready to help you!
 

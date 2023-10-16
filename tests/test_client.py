@@ -1,7 +1,6 @@
 # coding: utf-8
 import os
 import json
-import mock
 import pytest
 import subprocess
 import sys
@@ -25,7 +24,12 @@ from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -248,14 +252,18 @@ def test_proxy(monkeypatch, testcase):
         monkeypatch.setenv("HTTPS_PROXY", testcase["env_https_proxy"])
     if testcase.get("env_no_proxy") is not None:
         monkeypatch.setenv("NO_PROXY", testcase["env_no_proxy"])
+
     kwargs = {}
+
     if testcase["arg_http_proxy"] is not None:
         kwargs["http_proxy"] = testcase["arg_http_proxy"]
     if testcase["arg_https_proxy"] is not None:
         kwargs["https_proxy"] = testcase["arg_https_proxy"]
     if testcase.get("arg_proxy_headers") is not None:
         kwargs["proxy_headers"] = testcase["arg_proxy_headers"]
+
     client = Client(testcase["dsn"], **kwargs)
+
     if testcase["expected_proxy_scheme"] is None:
         assert client.transport._pool.proxy is None
     else:
@@ -263,6 +271,77 @@ def test_proxy(monkeypatch, testcase):
 
         if testcase.get("arg_proxy_headers") is not None:
             assert client.transport._pool.proxy_headers == testcase["arg_proxy_headers"]
+
+
+@pytest.mark.parametrize(
+    "testcase",
+    [
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "http://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.poolmanager.ProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks4a://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks4://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks5h://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": "socks5://localhost/123",
+            "arg_https_proxy": None,
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks4a://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks4://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks5h://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+        {
+            "dsn": "https://foo@sentry.io/123",
+            "arg_http_proxy": None,
+            "arg_https_proxy": "socks5://localhost/123",
+            "expected_proxy_class": "<class 'urllib3.contrib.socks.SOCKSProxyManager'>",
+        },
+    ],
+)
+def test_socks_proxy(testcase):
+    kwargs = {}
+
+    if testcase["arg_http_proxy"] is not None:
+        kwargs["http_proxy"] = testcase["arg_http_proxy"]
+    if testcase["arg_https_proxy"] is not None:
+        kwargs["https_proxy"] = testcase["arg_https_proxy"]
+
+    client = Client(testcase["dsn"], **kwargs)
+    assert str(type(client.transport._pool)) == testcase["expected_proxy_class"]
 
 
 def test_simple_transport(sentry_init):
@@ -331,6 +410,20 @@ def test_include_local_variables_deprecation(sentry_init):
         assert not client.options["include_local_variables"]
 
         fake_warning.assert_not_called()
+
+
+def test_request_bodies_deprecation(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(request_bodies="small")
+
+        client = Hub.current.client
+        assert "request_bodies" not in client.options
+        assert "max_request_body_size" in client.options
+        assert client.options["max_request_body_size"] == "small"
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+        )
 
 
 def test_include_local_variables_enabled(sentry_init, capture_events):
@@ -1025,3 +1118,21 @@ def test_multiple_positional_args(sentry_init):
     with pytest.raises(TypeError) as exinfo:
         sentry_init(1, None)
     assert "Only single positional argument is expected" in str(exinfo.value)
+
+
+@pytest.mark.parametrize(
+    "sdk_options, expected_data_length",
+    [
+        ({}, DEFAULT_MAX_VALUE_LENGTH),
+        ({"max_value_length": 1800}, 1800),
+    ],
+)
+def test_max_value_length_option(
+    sentry_init, capture_events, sdk_options, expected_data_length
+):
+    sentry_init(sdk_options)
+    events = capture_events()
+
+    capture_message("a" * 2000)
+
+    assert len(events[0]["message"]) == expected_data_length
