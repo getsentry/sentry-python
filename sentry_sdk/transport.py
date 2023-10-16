@@ -244,7 +244,9 @@ class HttpTransport(Transport):
                 str(self._auth.get_api_url(endpoint_type)),
                 body=body,
                 headers=headers,
+                preload_content=False,
             )
+            response.release_conn()
         except Exception:
             self.on_dropped_event("network")
             record_loss("network_error")
@@ -263,9 +265,8 @@ class HttpTransport(Transport):
 
             elif response.status >= 300 or response.status < 200:
                 logger.error(
-                    "Unexpected status code: %s (body: %s)",
+                    "Unexpected status code: %s",
                     response.status,
-                    response.data,
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
