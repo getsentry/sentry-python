@@ -541,3 +541,19 @@ def test_installed_modules():
         assert installed_distributions == pkg_resources_distributions
     else:
         pytest.fail("Neither importlib nor pkg_resources is available")
+
+
+def test_installed_modules_caching():
+    mock_generate_installed_modules = mock.Mock()
+    mock_generate_installed_modules.return_value = {"package": "1.0.0"}
+    with mock.patch("sentry_sdk.utils._installed_modules", None):
+        with mock.patch(
+            "sentry_sdk.utils._generate_installed_modules",
+            mock_generate_installed_modules,
+        ):
+            _get_installed_modules()
+            mock_generate_installed_modules.assert_called_once()
+            mock_generate_installed_modules.reset_mock()
+
+            _get_installed_modules()
+            mock_generate_installed_modules.assert_not_called()
