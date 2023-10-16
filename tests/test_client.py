@@ -1182,10 +1182,7 @@ def test_debug_option(
     env_var_value,
     debug_output_expected,
 ):
-    if env_var_value is None and "SENTRY_DEBUG" in os.environ:
-        monkeypatch.delenv("SENTRY_DEBUG")
-    else:
-        monkeypatch.setenv("SENTRY_DEBUG", env_var_value)
+    monkeypatch.setenv("SENTRY_DEBUG", env_var_value)
 
     if client_option is None:
         sentry_init()
