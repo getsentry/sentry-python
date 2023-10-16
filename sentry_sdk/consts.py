@@ -170,6 +170,13 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GRAPHQL_EXECUTE = "graphql.execute"
+    GRAPHQL_MUTATION = "graphql.mutation"
+    GRAPHQL_PARSE = "graphql.parse"
+    GRAPHQL_RESOLVE = "graphql.resolve"
+    GRAPHQL_SUBSCRIPTION = "graphql.subscription"
+    GRAPHQL_QUERY = "graphql.query"
+    GRAPHQL_VALIDATE = "graphql.validate"
     GRPC_CLIENT = "grpc.client"
     GRPC_SERVER = "grpc.server"
     HTTP_CLIENT = "http.client"
@@ -226,7 +233,7 @@ class ClientConstructor(object):
         max_request_body_size="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=False,  # type: bool
+        debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
@@ -276,4 +283,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.31.0"
+VERSION = "1.32.0"

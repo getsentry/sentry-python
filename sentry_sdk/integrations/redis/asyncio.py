@@ -2,19 +2,18 @@ from __future__ import absolute_import
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
-from sentry_sdk.utils import capture_internal_exceptions
 from sentry_sdk.integrations.redis import (
     RedisIntegration,
     _get_redis_command_args,
     _get_span_description,
     _set_client_data,
+    _set_db_data,
     _set_pipeline_data,
 )
+from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.utils import capture_internal_exceptions
 
-
-from sentry_sdk._types import MYPY
-
-if MYPY:
+if TYPE_CHECKING:
     from typing import Any
 
 
@@ -33,6 +32,7 @@ def patch_redis_async_pipeline(pipeline_cls):
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
             with capture_internal_exceptions():
+                _set_db_data(span, self.connection_pool.connection_kwargs)
                 _set_pipeline_data(
                     span,
                     False,
@@ -60,6 +60,7 @@ def patch_redis_async_client(cls):
         description = _get_span_description(name, *args)
 
         with hub.start_span(op=OP.DB_REDIS, description=description) as span:
+            _set_db_data(span, self.connection_pool.connection_kwargs)
             _set_client_data(span, False, name, *args)
 
             return await old_execute_command(self, name, *args, **kwargs)

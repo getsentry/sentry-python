@@ -1136,3 +1136,63 @@ def test_max_value_length_option(
     capture_message("a" * 2000)
 
     assert len(events[0]["message"]) == expected_data_length
+
+
+@pytest.mark.parametrize(
+    "client_option,env_var_value,debug_output_expected",
+    [
+        (None, "", False),
+        (None, "t", True),
+        (None, "1", True),
+        (None, "True", True),
+        (None, "true", True),
+        (None, "f", False),
+        (None, "0", False),
+        (None, "False", False),
+        (None, "false", False),
+        (None, "xxx", False),
+        (True, "", True),
+        (True, "t", True),
+        (True, "1", True),
+        (True, "True", True),
+        (True, "true", True),
+        (True, "f", True),
+        (True, "0", True),
+        (True, "False", True),
+        (True, "false", True),
+        (True, "xxx", True),
+        (False, "", False),
+        (False, "t", False),
+        (False, "1", False),
+        (False, "True", False),
+        (False, "true", False),
+        (False, "f", False),
+        (False, "0", False),
+        (False, "False", False),
+        (False, "false", False),
+        (False, "xxx", False),
+    ],
+)
+@pytest.mark.tests_internal_exceptions
+def test_debug_option(
+    sentry_init,
+    monkeypatch,
+    caplog,
+    client_option,
+    env_var_value,
+    debug_output_expected,
+):
+    monkeypatch.setenv("SENTRY_DEBUG", env_var_value)
+
+    if client_option is None:
+        sentry_init()
+    else:
+        sentry_init(debug=client_option)
+
+    Hub.current._capture_internal_exception(
+        (ValueError, ValueError("something is wrong"), None)
+    )
+    if debug_output_expected:
+        assert "something is wrong" in caplog.text
+    else:
+        assert "something is wrong" not in caplog.text

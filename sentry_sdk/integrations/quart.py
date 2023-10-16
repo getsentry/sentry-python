@@ -38,7 +38,6 @@ try:
         request,
         websocket,
     )
-    from quart.scaffold import Scaffold  # type: ignore
     from quart.signals import (  # type: ignore
         got_background_exception,
         got_request_exception,
@@ -49,6 +48,12 @@ try:
     from quart.utils import is_coroutine_function  # type: ignore
 except ImportError:
     raise DidNotEnable("Quart is not installed")
+else:
+    # Quart 0.19 is based on Flask and hence no longer has a Scaffold
+    try:
+        from quart.scaffold import Scaffold  # type: ignore
+    except ImportError:
+        from flask.sansio.scaffold import Scaffold  # type: ignore
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
