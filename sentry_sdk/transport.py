@@ -440,7 +440,7 @@ class HttpTransport(Transport):
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
         return {
-            "num_pools": 2,
+            "num_pools": 10,
             "cert_reqs": "CERT_REQUIRED",
             "ca_certs": ca_certs or certifi.where(),
         }
