@@ -157,14 +157,6 @@ class HttpTransport(Transport):
         )  # type: DefaultDict[Tuple[str, str], int]
         self._last_client_report_sent = time.time()
 
-        self._pool = self._make_pool(
-            self.parsed_dsn,
-            http_proxy=options["http_proxy"],
-            https_proxy=options["https_proxy"],
-            ca_certs=options["ca_certs"],
-            proxy_headers=options["proxy_headers"],
-        )
-
         compresslevel = options.get("_experiments", {}).get(
             "transport_zlib_compression_level"
         )
@@ -172,6 +164,14 @@ class HttpTransport(Transport):
 
         num_pools = options.get("_experiments", {}).get("transport_num_pools")
         self._num_pools = 2 if num_pools is None else int(num_pools)
+
+        self._pool = self._make_pool(
+            self.parsed_dsn,
+            http_proxy=options["http_proxy"],
+            https_proxy=options["https_proxy"],
+            ca_certs=options["ca_certs"],
+            proxy_headers=options["proxy_headers"],
+        )
 
         from sentry_sdk import Hub
 
