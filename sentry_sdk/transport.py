@@ -263,8 +263,9 @@ class HttpTransport(Transport):
 
             elif response.status >= 300 or response.status < 200:
                 logger.error(
-                    "Unexpected status code: %s",
+                    "Unexpected status code: %s (body: %s)",
                     response.status,
+                    response.data,
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
