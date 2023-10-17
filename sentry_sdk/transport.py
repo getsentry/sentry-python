@@ -244,9 +244,7 @@ class HttpTransport(Transport):
                 str(self._auth.get_api_url(endpoint_type)),
                 body=body,
                 headers=headers,
-                preload_content=False,
             )
-            response.release_conn()
         except Exception:
             self.on_dropped_event("network")
             record_loss("network_error")
