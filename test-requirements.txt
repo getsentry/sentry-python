@@ -3,7 +3,7 @@ mock ; python_version<'3.3'
 pytest<7
 pytest-cov==2.8.1
 pytest-forked<=1.4.0
-pytest-localserver==0.5.0
+pytest-localserver==0.5.1  # TODO(py3): 0.6.0 drops 2.7 support: https://github.com/pytest-dev/pytest-localserver/releases/tag/v0.6.0
 pytest-watch==4.2.0
 tox==3.7.0
 jsonschema==3.2.0
