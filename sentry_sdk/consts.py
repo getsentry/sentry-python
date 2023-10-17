@@ -43,6 +43,7 @@ if TYPE_CHECKING:
             "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
         },
@@ -233,7 +234,7 @@ class ClientConstructor(object):
         max_request_body_size="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=False,  # type: bool
+        debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
