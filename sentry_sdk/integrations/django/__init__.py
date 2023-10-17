@@ -362,12 +362,13 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             transaction_name = transaction_from_function(getattr(fn, "view_class", fn))
 
         elif transaction_style == "url":
-            if hasattr(request, "urlconf"):
-                transaction_name = LEGACY_RESOLVER.resolve(
-                    request.path_info, urlconf=request.urlconf
-                )
-            else:
-                transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
+            transaction_name = request.resolver_match.route
+            # if hasattr(request, "urlconf"):
+            #    transaction_name = LEGACY_RESOLVER.resolve(
+            #        request.path_info, urlconf=request.urlconf
+            #    )
+            # else:
+            #    transaction_name = LEGACY_RESOLVER.resolve(request.path_info)
 
         if transaction_name is None:
             transaction_name = request.path_info
