@@ -170,6 +170,9 @@ class HttpTransport(Transport):
         )
         self._compresslevel = 9 if compresslevel is None else int(compresslevel)
 
+        num_pools = options.get("_experiments", {}).get("transport_num_pools")
+        self._num_pools = 2 if num_pools is None else int(num_pools)
+
         from sentry_sdk import Hub
 
         self.hub_cls = Hub
@@ -439,7 +442,7 @@ class HttpTransport(Transport):
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
         return {
-            "num_pools": 10,
+            "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
             "ca_certs": ca_certs or certifi.where(),
         }
