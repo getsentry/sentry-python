@@ -109,6 +109,13 @@ def _get_options(*args, **kwargs):
     if rv["environment"] is None:
         rv["environment"] = os.environ.get("SENTRY_ENVIRONMENT") or "production"
 
+    if rv["debug"] is None:
+        rv["debug"] = os.environ.get("SENTRY_DEBUG", "False").lower() in (
+            "true",
+            "1",
+            "t",
+        )
+
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
 
