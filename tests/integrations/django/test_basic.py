@@ -22,10 +22,11 @@ except ImportError:
 from sentry_sdk._compat import PY2, PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.tracing import Span
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
@@ -654,6 +655,24 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
             )
             assert data.get(SPANDATA.SERVER_PORT) == "5432"
+
+
+def test_set_db_data_custom_backend():
+    class DummyBackend(object):
+        # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
+        def __getattr__(self, attr):
+            return self
+
+        def __call__(self):
+            raise TypeError
+
+        def get_connection_params(self):
+            return {}
+
+    try:
+        _set_db_data(Span(), DummyBackend())
+    except TypeError:
+        pytest.fail("A TypeError was raised")
 
 
 @pytest.mark.parametrize(

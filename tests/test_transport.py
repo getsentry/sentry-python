@@ -132,6 +132,25 @@ def test_transport_works(
     assert any("Sending event" in record.msg for record in caplog.records) == debug
 
 
+@pytest.mark.parametrize(
+    "num_pools,expected_num_pools",
+    (
+        (None, 2),
+        (2, 2),
+        (10, 10),
+    ),
+)
+def test_transport_num_pools(make_client, num_pools, expected_num_pools):
+    _experiments = {}
+    if num_pools is not None:
+        _experiments["transport_num_pools"] = num_pools
+
+    client = make_client(_experiments=_experiments)
+
+    options = client.transport._get_pool_options([])
+    assert options["num_pools"] == expected_num_pools
+
+
 def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
