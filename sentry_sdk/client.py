@@ -456,10 +456,11 @@ class _Client(object):
         event,  # type: Event
     ):
         # type: (...) -> bool
-        not_in_sample_rate = (
-            self.options["sample_rate"] < 1.0
-            and random.random() >= self.options["sample_rate"]
-        )
+        try:
+            sample_rate = self.options["issues_sampler"](event)
+        except (KeyError, TypeError):
+            sample_rate = self.options["sample_rate"]
+        not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
         if not_in_sample_rate:
             # because we will not sample this event, record a "lost event".
             if self.transport:

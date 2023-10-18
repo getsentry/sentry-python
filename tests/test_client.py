@@ -1196,3 +1196,39 @@ def test_debug_option(
         assert "something is wrong" in caplog.text
     else:
         assert "something is wrong" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("sampler_function_mock", "sample_rate", "expected_events"),
+    (
+        # Baseline test with issues_sampler only, both floats and bools
+        (mock.MagicMock(return_value=1.0), None, 1),
+        (mock.MagicMock(return_value=0.0), None, 0),
+        (mock.MagicMock(return_value=True), None, 1),
+        (mock.MagicMock(return_value=False), None, 0),
+        # Baseline test with sample_rate only
+        (None, 0.0, 0),
+        (None, 1.0, 1),
+        # issues_sampler takes precedence over sample_rate
+        (mock.MagicMock(return_value=1.0), 0.0, 1),
+        (mock.MagicMock(return_value=0.0), 1.0, 0),
+    ),
+)
+def test_issues_sampler(
+    sentry_init, capture_events, sampler_function_mock, sample_rate, expected_events
+):
+    sentry_init(issues_sampler=sampler_function_mock, sample_rate=sample_rate)
+
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+    assert len(events) == expected_events
+
+    try:
+        sampler_function_mock.assert_called_once()
+    except AttributeError:
+        ...  # sampler_function_mock is None
