@@ -118,5 +118,5 @@ if TYPE_CHECKING:
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
 
-    GenericCallable = Callable[..., object]
-    GenericAsyncCallable = Callable[..., Awaitable[object]]
+    GenericCallable = Callable[..., Any]
+    GenericAsyncCallable = Callable[..., Awaitable[Any]]
