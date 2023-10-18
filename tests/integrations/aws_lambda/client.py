@@ -8,7 +8,7 @@ import boto3
 import uuid
 import base64
 
-MAX_RETRIES = 10
+MAX_RETRIES = 20
 
 
 def get_boto_client():
@@ -183,6 +183,9 @@ def run_lambda_function(
             except client.exceptions.ResourceConflictException:
                 num_retries += 1
 
+        assert (
+            response is not None
+        ), "Failed to create Lambda function in time (max retries exceeded)"
         assert 200 <= response["StatusCode"] < 300, response
         return response
 
