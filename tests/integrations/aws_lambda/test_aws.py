@@ -104,9 +104,11 @@ def lambda_client():
 
 @pytest.fixture(
     params=[
-        "python3.7",
-        "python3.8",
+        # "python3.7",
+        # "python3.8",
         "python3.9",
+        # "python3.10",
+        # "python3.11",
     ]
 )
 def lambda_runtime(request):

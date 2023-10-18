@@ -2,10 +2,13 @@ import sys
 import os
 import shutil
 import tempfile
+import time
 import subprocess
 import boto3
 import uuid
 import base64
+
+MAX_RETRIES = 10
 
 
 def get_boto_client():
@@ -134,6 +137,7 @@ def run_lambda_function(
                     Code={"ZipFile": zip.read()},
                     Description="Created as part of testsuite for getsentry/sentry-python",
                 )
+
         else:
             subprocess.run(
                 ["zip", "-q", "-x", "**/__pycache__/*", "-r", "ball.zip", "./"],
@@ -163,12 +167,21 @@ def run_lambda_function(
             for manager in managers:
                 manager.clear()
 
-        response = client.invoke(
-            FunctionName=fn_name,
-            InvocationType="RequestResponse",
-            LogType="Tail",
-            Payload=payload,
-        )
+        response = None
+        num_retries = 0
+
+        # It takes some time for the Lambda function to be created, so we retry
+        while response is None and num_retries < MAX_RETRIES:
+            try:
+                response = client.invoke(
+                    FunctionName=fn_name,
+                    InvocationType="RequestResponse",
+                    LogType="Tail",
+                    Payload=payload,
+                )
+                time.sleep(0.2)
+            except client.exceptions.ResourceConflictException:
+                num_retries += 1
 
         assert 200 <= response["StatusCode"] < 300, response
         return response
