@@ -70,17 +70,11 @@ def envelope_processor(envelope):
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
-        # we need to print something (blank or newline does not work)
-        # for Lambda to add a new line to the log output
-        print(".")
-        print("EVENT: {}".format(json.dumps(event)))
+        print("\\nEVENT: {}\\n".format(json.dumps(event)))
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
-        # we need to print something (blank or newline does not work)
-        # for Lambda to add a new line to the log output
-        print(".")
-        print("ENVELOPE: {}".format(json.dumps(envelope)))
+        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
