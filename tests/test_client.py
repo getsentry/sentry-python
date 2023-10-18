@@ -1230,5 +1230,10 @@ def test_issues_sampler(
 
     try:
         sampler_function_mock.assert_called_once()
+
+        # Ensure one argument (the event) was passed to the sampler function
+        assert len(sampler_function_mock.call_args[0]) == 1
     except AttributeError:
-        ...  # sampler_function_mock is None
+        # sampler_function_mock should be None in this case,
+        # but let's double-check to ensure the test is working correctly
+        assert sampler_function_mock is None
