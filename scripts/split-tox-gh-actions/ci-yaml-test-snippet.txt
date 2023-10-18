@@ -29,8 +29,6 @@
             coverage erase
 
             # Run tests
-            echo "##############################"
-            printenv | sort
             ./scripts/runtox.sh "py${{ matrix.python-version }}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
