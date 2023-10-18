@@ -12,6 +12,7 @@ import time
 from collections import namedtuple
 from copy import copy
 from decimal import Decimal
+from functools import wraps
 from numbers import Real
 
 try:
@@ -51,6 +52,7 @@ import sentry_sdk
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.hub import Hub
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -67,8 +69,9 @@ if TYPE_CHECKING:
         Type,
         Union,
     )
+    from sentry_sdk.integrations import Integration
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import EndpointType, ExcInfo, GenericCallable
 
 
 epoch = datetime(1970, 1, 1)
@@ -1561,6 +1564,26 @@ def parse_version(version):
         return None
 
     return release_tuple
+
+
+def integration_patched(original_function, integration=None):
+    # type: (GenericCallable, Optional[type[Integration]]) -> Callable[[GenericCallable], GenericCallable]
+    def patcher(sentry_patched_function):
+        # type: (GenericCallable) -> GenericCallable
+        @wraps(original_function)
+        def runner(*args, **kwargs):
+            # type: (*object, **object) -> object
+            if (
+                integration is not None
+                and Hub.current.get_integration(integration) is None
+            ):
+                return original_function(*args, **kwargs)
+
+            return sentry_patched_function(*args, **kwargs)
+
+        return runner
+
+    return patcher
 
 
 if PY37:

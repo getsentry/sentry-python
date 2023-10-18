@@ -9,6 +9,7 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
     from types import TracebackType
     from typing import Any
     from typing import Callable
@@ -116,3 +117,6 @@ if TYPE_CHECKING:
     FlushedMetricValue = Union[int, float]
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
+
+    GenericCallable = Callable[..., object]
+    GenericAsyncCallable = Callable[..., Awaitable[object]]
