@@ -49,10 +49,10 @@ except ImportError:
     _PARTIALMETHOD_AVAILABLE = False
 
 import sentry_sdk
+import sentry_sdk.hub
 from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk.hub import Hub
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -1575,7 +1575,7 @@ def integration_patched(original_function, integration=None):
             # type: (*object, **object) -> object
             if (
                 integration is not None
-                and Hub.current.get_integration(integration) is None
+                and sentry_sdk.hub.Hub.current.get_integration(integration) is None
             ):
                 return original_function(*args, **kwargs)
 
