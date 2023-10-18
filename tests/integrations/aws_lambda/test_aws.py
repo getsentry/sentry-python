@@ -70,16 +70,17 @@ def envelope_processor(envelope):
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
-        # Writing a single string to stdout holds the GIL (seems like) and
-        # therefore cannot be interleaved with other threads. This is why we
-        # explicitly add a newline at the end even though `print` would provide
-        # us one.
-        print("\\nEVENT: {}\\n".format(json.dumps(event)))
+        # we need to print something (blank or newline does not work)
+        # for Lambda to add a new line to the log output
+        print(".")
+        print("EVENT: {}".format(json.dumps(event)))
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
-
+        # we need to print something (blank or newline does not work)
+        # for Lambda to add a new line to the log output
+        print(".")
+        print("ENVELOPE: {}".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -104,11 +105,9 @@ def lambda_client():
 
 @pytest.fixture(
     params=[
-        # "python3.7",
-        # "python3.8",
         "python3.9",
-        # "python3.10",
-        # "python3.11",
+        "python3.10",
+        "python3.11",
     ]
 )
 def lambda_runtime(request):
