@@ -98,7 +98,6 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         transport=TestTransport,
         integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
-        debug=False,
         **extra_init_args
     )
 """
@@ -290,7 +289,11 @@ def test_request_data(run_lambda_function):
 
 def test_init_error(run_lambda_function, lambda_runtime):
     envelopes, events, response = run_lambda_function(
-        LAMBDA_PRELUDE + ("init_sdk()\n" "func()"),
+        LAMBDA_PRELUDE
+        + (
+            "init_sdk()\n",
+            "func()",
+        ),
         b'{"foo": "bar"}',
         syntax_check=False,
     )
@@ -625,7 +628,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         "test_dir.test_lambda.test_handler",
     ]:
         print("Testing Initial Handler ", initial_handler)
-        _, _, response = run_lambda_function(
+        envelopes, events, response = run_lambda_function(
             dedent(
                 """
             import sentry_sdk
@@ -658,7 +661,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -691,7 +694,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -725,7 +728,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
-    envelopes, _, _ = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -764,7 +767,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
-    _, events, _ = run_lambda_function(
+    envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
