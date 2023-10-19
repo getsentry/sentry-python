@@ -4,7 +4,6 @@ import shutil
 import tempfile
 import subprocess
 import boto3
-import uuid
 import base64
 
 
@@ -122,9 +121,28 @@ def run_lambda_function(
     initial_handler=None,
     subprocess_kwargs=(),
 ):
+    """
+    Creates a Lambda function with the given code, and invoces it.
+
+    If the same code is run multiple times the function will NOT be
+    created anew each time but the existing function will be reused.
+    """
     subprocess_kwargs = dict(subprocess_kwargs)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    dir_prefix = str(hash(code))
+    fn_name = "test_function_{}".format(dir_prefix)
+
+    tmp_base_dir = tempfile.gettempdir()
+    dir_already_existing = any(
+        [x.startswith(fn_name) for x in os.listdir(tmp_base_dir)]
+    )
+
+    if dir_already_existing:
+        print("Lambda function directory already exists, skipping creation")
+
+    if not dir_already_existing:
+        tmpdir = tempfile.mkdtemp(prefix="%s-" % fn_name)
+
         if initial_handler:
             # If Initial handler value is provided i.e. it is not the default
             # `test_lambda.test_handler`, then create another dir level so that our path is
@@ -148,8 +166,6 @@ def run_lambda_function(
             # crash when not running in Lambda (but rather a local deployment tool
             # such as chalice's)
             subprocess.check_call([sys.executable, test_lambda_py])
-
-        fn_name = "test_function_{}".format(uuid.uuid4())
 
         if layer is None:
             setup_cfg = os.path.join(tmpdir, "setup.cfg")
@@ -206,8 +222,6 @@ def run_lambda_function(
 
         @add_finalizer
         def clean_up():
-            client.delete_function(FunctionName=fn_name)
-
             # this closes the web socket so we don't get a
             #   ResourceWarning: unclosed <ssl.SSLSocket ... >
             # warning on every test
@@ -221,18 +235,18 @@ def run_lambda_function(
         waiter = client.get_waiter("function_active_v2")
         waiter.wait(FunctionName=fn_name)
 
-        response = client.invoke(
-            FunctionName=fn_name,
-            InvocationType="RequestResponse",
-            LogType="Tail",
-            Payload=payload,
-        )
+    response = client.invoke(
+        FunctionName=fn_name,
+        InvocationType="RequestResponse",
+        LogType="Tail",
+        Payload=payload,
+    )
 
-        assert (
-            response is not None
-        ), "Failed to create Lambda function in time (max retries exceeded)"
-        assert 200 <= response["StatusCode"] < 300, response
-        return response
+    assert (
+        response is not None
+    ), "Failed to create Lambda function in time (max retries exceeded)"
+    assert 200 <= response["StatusCode"] < 300, response
+    return response
 
 
 _REPL_CODE = """
