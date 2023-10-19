@@ -454,12 +454,17 @@ class _Client(object):
     def _should_sample_error(
         self,
         event,  # type: Event
+        hint,  # type: Hint
     ):
         # type: (...) -> bool
-        try:
-            sample_rate = self.options["issues_sampler"](event)
-        except (KeyError, TypeError):
+        sampler = self.options.get("issues_sampler", None)
+
+        if callable(sampler):
+            with capture_internal_exceptions():
+                sample_rate = sampler(event, hint)
+        else:
             sample_rate = self.options["sample_rate"]
+
         not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
         if not_in_sample_rate:
             # because we will not sample this event, record a "lost event".
@@ -557,7 +562,7 @@ class _Client(object):
         if (
             not is_transaction
             and not is_checkin
-            and not self._should_sample_error(event)
+            and not self._should_sample_error(event, hint)
         ):
             return None
 

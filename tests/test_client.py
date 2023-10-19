@@ -1238,12 +1238,12 @@ class IssuesSamplerTestConfig:
     "test_config",
     (
         # Baseline test with issues_sampler only, both floats and bools
-        IssuesSamplerTestConfig(sampler_function=lambda _: 1.0, expected_events=1),
-        IssuesSamplerTestConfig(sampler_function=lambda _: 0.7, expected_events=1),
-        IssuesSamplerTestConfig(sampler_function=lambda _: 0.6, expected_events=0),
-        IssuesSamplerTestConfig(sampler_function=lambda _: 0.0, expected_events=0),
-        IssuesSamplerTestConfig(sampler_function=lambda _: True, expected_events=1),
-        IssuesSamplerTestConfig(sampler_function=lambda _: False, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 1.0, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.7, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.6, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.0, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: True, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: False, expected_events=0),
         # Baseline test with sample_rate only
         IssuesSamplerTestConfig(sample_rate=1.0, expected_events=1),
         IssuesSamplerTestConfig(sample_rate=0.7, expected_events=1),
@@ -1251,14 +1251,14 @@ class IssuesSamplerTestConfig:
         IssuesSamplerTestConfig(sample_rate=0.0, expected_events=0),
         # issues_sampler takes precedence over sample_rate
         IssuesSamplerTestConfig(
-            sampler_function=lambda _: 1.0, sample_rate=0.0, expected_events=1
+            sampler_function=lambda *_: 1.0, sample_rate=0.0, expected_events=1
         ),
         IssuesSamplerTestConfig(
-            sampler_function=lambda _: 0.0, sample_rate=1.0, expected_events=0
+            sampler_function=lambda *_: 0.0, sample_rate=1.0, expected_events=0
         ),
-        # Different sample rates based on exception
+        # Different sample rates based on exception, retrieved both from event and hint
         IssuesSamplerTestConfig(
-            sampler_function=lambda event: {
+            sampler_function=lambda event, _: {
                 "ZeroDivisionError": 1.0,
                 "AttributeError": 0.0,
             }[event["exception"]["values"][0]["type"]],
@@ -1266,10 +1266,26 @@ class IssuesSamplerTestConfig:
             expected_events=1,
         ),
         IssuesSamplerTestConfig(
-            sampler_function=lambda event: {
+            sampler_function=lambda event, _: {
                 "ZeroDivisionError": 1.0,
                 "AttributeError": 0.0,
             }[event["exception"]["values"][0]["type"]],
+            exception_to_raise=AttributeError,
+            expected_events=0,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda _, hint: {
+                ZeroDivisionError: 1.0,
+                AttributeError: 0.0,
+            }[hint["exc_info"][0]],
+            exception_to_raise=ZeroDivisionError,
+            expected_events=1,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda _, hint: {
+                ZeroDivisionError: 1.0,
+                AttributeError: 0.0,
+            }[hint["exc_info"][0]],
             exception_to_raise=AttributeError,
             expected_events=0,
         ),
@@ -1290,5 +1306,5 @@ def test_issues_sampler(_, sentry_init, capture_events, test_config):
     if test_config.sampler_function_mock is not None:
         assert test_config.sampler_function_mock.call_count == 1
 
-        # Ensure one argument (the event) was passed to the sampler function
-        assert len(test_config.sampler_function_mock.call_args[0]) == 1
+        # Ensure two arguments (the event and hint) were passed to the sampler function
+        assert len(test_config.sampler_function_mock.call_args[0]) == 2
