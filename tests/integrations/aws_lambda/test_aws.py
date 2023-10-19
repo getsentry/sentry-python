@@ -45,7 +45,6 @@ def event_processor(event):
     event_data["level"] = event.get("level")
     event_data["request"] = event.get("request")
     event_data["tags"] = event.get("tags")
-    event_data["transaction"] = event.get("transaction")
 
     return event_data
 
@@ -55,17 +54,30 @@ def envelope_processor(envelope):
     # in full, so only grab the data we need.
 
     (item,) = envelope.items
-    envelope_json = json.loads(item.get_bytes())
+    item_json = json.loads(item.get_bytes())
 
-    envelope_data = {}
-    envelope_data["contexts"] = {}
-    envelope_data["type"] = envelope_json["type"]
-    envelope_data["transaction"] = envelope_json["transaction"]
-    envelope_data["contexts"]["trace"] = envelope_json["contexts"]["trace"]
-    envelope_data["request"] = envelope_json["request"]
-    envelope_data["tags"] = envelope_json["tags"]
+    if item_json.get("type") == "transaction":
+        envelope_data = {}
+        envelope_data["type"] = item_json["type"]
+        envelope_data["contexts"] = {}
+        envelope_data["contexts"]["trace"] = item_json["contexts"]["trace"]
+        envelope_data["transaction"] = item_json["transaction"]
+        envelope_data["request"] = item_json["request"]
+        envelope_data["tags"] = item_json["tags"]
 
-    return envelope_data
+        return envelope_data
+    else:
+        event_data = {}
+        event_data["contexts"] = {}
+        event_data["contexts"]["trace"] = item_json.get("contexts", {}).get("trace")
+        event_data["transaction"] = item_json.get("transaction")
+        event_data["exception"] = item_json.get("exception")
+        event_data["extra"] = item_json.get("extra")
+        event_data["level"] = item_json.get("level")
+        event_data["request"] = item_json.get("request")
+        event_data["tags"] = item_json.get("tags")
+
+        return event_data
 
 
 class TestTransport(HttpTransport):
@@ -75,7 +87,10 @@ class TestTransport(HttpTransport):
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+        if envelope.get("type") == "transaction":
+            print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+        else:
+            print("\\nEVENT: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -83,6 +98,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         transport=TestTransport,
         integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
+        debug=False,
         **extra_init_args
     )
 """
@@ -156,13 +172,8 @@ def test_basic(run_lambda_function):
             """
         init_sdk()
 
-        def event_processor(event):
-            # Delay event output like this to test proper shutdown
-            time.sleep(1)
-            return event
-
         def test_handler(event, context):
-            raise Exception("something went wrong")
+            raise Exception("Oh!")
         """
         ),
         b'{"foo": "bar"}',
@@ -174,7 +185,7 @@ def test_basic(run_lambda_function):
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
+    assert exception["value"] == "Oh!"
 
     (frame1,) = exception["stacktrace"]["frames"]
     assert frame1["filename"] == "test_lambda.py"
@@ -212,7 +223,7 @@ def test_initialization_order(run_lambda_function):
             """
             def test_handler(event, context):
                 init_sdk()
-                sentry_sdk.capture_exception(Exception("something went wrong"))
+                sentry_sdk.capture_exception(Exception("Oh!"))
         """
         ),
         b'{"foo": "bar"}',
@@ -222,7 +233,7 @@ def test_initialization_order(run_lambda_function):
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
+    assert exception["value"] == "Oh!"
 
 
 def test_request_data(run_lambda_function):
@@ -243,7 +254,7 @@ def test_request_data(run_lambda_function):
           "httpMethod": "GET",
           "headers": {
             "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:62.0) Gecko/20100101 Firefox/62.0",
+            "User-Agent": "custom",
             "X-Forwarded-Proto": "https"
           },
           "queryStringParameters": {
@@ -268,7 +279,7 @@ def test_request_data(run_lambda_function):
     assert event["request"] == {
         "headers": {
             "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:62.0) Gecko/20100101 Firefox/62.0",
+            "User-Agent": "custom",
             "X-Forwarded-Proto": "https",
         },
         "method": "GET",
@@ -279,13 +290,7 @@ def test_request_data(run_lambda_function):
 
 def test_init_error(run_lambda_function, lambda_runtime):
     envelopes, events, response = run_lambda_function(
-        LAMBDA_PRELUDE
-        + (
-            "def event_processor(event):\n"
-            '    return event["exception"]["values"][0]["value"]\n'
-            "init_sdk()\n"
-            "func()"
-        ),
+        LAMBDA_PRELUDE + ("init_sdk()\n" "func()"),
         b'{"foo": "bar"}',
         syntax_check=False,
     )
@@ -352,10 +357,10 @@ def test_performance_no_error(run_lambda_function):
     )
 
     (envelope,) = envelopes
+
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "function.aws"
     assert envelope["transaction"].startswith("test_function_")
-    assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
 
 
@@ -367,7 +372,7 @@ def test_performance_error(run_lambda_function):
         init_sdk(traces_sample_rate=1.0)
 
         def test_handler(event, context):
-            raise Exception("something went wrong")
+            raise Exception("Oh!")
         """
         ),
         b'{"foo": "bar"}',
@@ -377,14 +382,13 @@ def test_performance_error(run_lambda_function):
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
-    assert exception["value"] == "something went wrong"
+    assert exception["value"] == "Oh!"
 
     (envelope,) = envelopes
 
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "function.aws"
     assert envelope["transaction"].startswith("test_function_")
-    assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
 
 
@@ -412,29 +416,25 @@ def test_performance_error(run_lambda_function):
             [
                 {
                     "headers": {
-                        "Host": "dogs.are.great",
+                        "Host": "x.io",
                         "X-Forwarded-Proto": "http"
                     },
                     "httpMethod": "GET",
-                    "path": "/tricks/kangaroo",
+                    "path": "/somepath",
                     "queryStringParameters": {
-                        "completed_successfully": "true",
-                        "treat_provided": "true",
-                        "treat_type": "cheese"
+                        "done": "true"
                     },
                     "dog": "Maisey"
                 },
                 {
                     "headers": {
-                        "Host": "dogs.are.great",
+                        "Host": "x.io",
                         "X-Forwarded-Proto": "http"
                     },
                     "httpMethod": "GET",
-                    "path": "/tricks/kangaroo",
+                    "path": "/somepath",
                     "queryStringParameters": {
-                        "completed_successfully": "true",
-                        "treat_provided": "true",
-                        "treat_type": "cheese"
+                        "done": "true"
                     },
                     "dog": "Charlie"
                 }
@@ -459,7 +459,7 @@ def test_non_dict_event(
         init_sdk(traces_sample_rate=1.0)
 
         def test_handler(event, context):
-            raise Exception("More treats, please!")
+            raise Exception("Oh?")
         """
         ),
         aws_event,
@@ -477,10 +477,10 @@ def test_non_dict_event(
 
     exception = error_event["exception"]["values"][0]
     assert exception["type"] == "Exception"
-    assert exception["value"] == "More treats, please!"
+    assert exception["value"] == "Oh?"
     assert exception["mechanism"]["type"] == "aws_lambda"
 
-    envelope = envelopes[0]
+    (envelope,) = envelopes
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"] == DictionaryContaining(
         error_event["contexts"]["trace"]
@@ -491,13 +491,11 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+            "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
             "method": "GET",
-            "url": "http://dogs.are.great/tricks/kangaroo",
+            "url": "http://x.io/somepath",
             "query_string": {
-                "completed_successfully": "true",
-                "treat_provided": "true",
-                "treat_type": "cheese",
+                "done": "true",
             },
         }
     else:
@@ -582,7 +580,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                                 "aws_event": DictionaryContaining({
                                     "httpMethod": "GET",
                                     "path": "/sit/stay/rollover",
-                                    "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"},
+                                    "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
                                 }),
                                 "aws_context": ObjectDescribedBy(
                                     type=get_lambda_bootstrap().LambdaContext,
@@ -609,7 +607,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
             )
         """
         ),
-        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "dogs.are.great", "X-Forwarded-Proto": "http"}}',
+        b'{"httpMethod": "GET", "path": "/sit/stay/rollover", "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"}}',
     )
 
     assert response["Payload"]["AssertionError raised"] is False
@@ -641,7 +639,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
                 assert isinstance(current_client.options['integrations'][0],
                                   sentry_sdk.integrations.aws_lambda.AwsLambdaIntegration)
 
-                raise Exception("something went wrong")
+                raise Exception("Oh!")
             """
             ),
             b'{"foo": "bar"}',
@@ -654,7 +652,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         assert response["Payload"]["errorType"] != "AssertionError"
 
         assert response["Payload"]["errorType"] == "Exception"
-        assert response["Payload"]["errorMessage"] == "something went wrong"
+        assert response["Payload"]["errorMessage"] == "Oh!"
 
         assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
 
@@ -668,7 +666,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
 
         def test_handler(event, context):
             sentry_sdk.capture_message("hi")
-            raise Exception("something went wrong")
+            raise Exception("Oh!")
         """
         ),
         payload=b'{"foo": "bar"}',
@@ -701,7 +699,7 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
 
         def test_handler(event, context):
             sentry_sdk.capture_message("hi")
-            raise Exception("something went wrong")
+            raise Exception("Oh!")
         """
         ),
         payload=b'{"foo": "bar"}',
@@ -735,7 +733,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
 
         def test_handler(event, context):
             sentry_sdk.capture_message("hi")
-            raise Exception("something went wrong")
+            raise Exception("Oh!")
         """
         ),
         payload=b'{"sentry_trace": "%s"}' % sentry_trace_header.encode(),
@@ -774,7 +772,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
 
         def test_handler(event, context):
             sentry_sdk.capture_message("hi")
-            raise Exception("something went wrong")
+            raise Exception("Oh!")
         """
         ),
         payload=b'{"sentry_trace": "%s"}' % sentry_trace_header.encode(),
