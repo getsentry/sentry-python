@@ -7,9 +7,14 @@ import boto3
 import uuid
 import base64
 
+
 AWS_REGION_NAME = "us-east-1"
 AWS_ENDPOINT_LOCALSTACK = "http://localhost:4566"
 AWS_LAMBDA_EXECUTION_ROLE_ARN = None
+AWS_FAKE_CREDS_FOR_LOCALSTACK = {
+    "aws_access_key_id": "foobar",
+    "aws_secret_access_key": "foobar",
+}
 
 
 def get_or_create_lambda_execution_role():
@@ -34,6 +39,7 @@ def get_or_create_lambda_execution_role():
         "iam",
         endpoint_url=AWS_ENDPOINT_LOCALSTACK,
         region_name=AWS_REGION_NAME,
+        **AWS_FAKE_CREDS_FOR_LOCALSTACK,
     )
 
     try:
@@ -61,6 +67,7 @@ def get_boto_client():
         "lambda",
         endpoint_url=AWS_ENDPOINT_LOCALSTACK,
         region_name=AWS_REGION_NAME,
+        **AWS_FAKE_CREDS_FOR_LOCALSTACK,
     )
 
 
@@ -151,14 +158,14 @@ def run_lambda_function(
 
             subprocess.check_call(
                 [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             subprocess.check_call(
                 "pip install mock==3.0.0 funcsigs -t .",
                 cwd=tmpdir,
                 shell=True,
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
@@ -166,7 +173,7 @@ def run_lambda_function(
                 "pip install ../*.tar.gz -t .",
                 cwd=tmpdir,
                 shell=True,
-                **subprocess_kwargs
+                **subprocess_kwargs,
             )
 
             shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
