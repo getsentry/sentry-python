@@ -7,13 +7,14 @@ import boto3
 import uuid
 import base64
 
-
+AWS_REGION_NAME = "us-east-1"
 AWS_ENDPOINT_LOCALSTACK = "http://localhost:4566"
 AWS_LAMBDA_EXECUTION_ROLE_ARN = None
 
 
 def get_or_create_lambda_execution_role():
     global AWS_LAMBDA_EXECUTION_ROLE_ARN
+
     role_name = "lambda-ex"
     policy = """
     {
@@ -29,7 +30,11 @@ def get_or_create_lambda_execution_role():
         ]
     }
     """
-    iam_client = boto3.client("iam", endpoint_url=AWS_ENDPOINT_LOCALSTACK)
+    iam_client = boto3.client(
+        "iam",
+        endpoint_url=AWS_ENDPOINT_LOCALSTACK,
+        region_name=AWS_REGION_NAME,
+    )
 
     try:
         response = iam_client.get_role(RoleName=role_name)
@@ -55,6 +60,7 @@ def get_boto_client():
     return boto3.client(
         "lambda",
         endpoint_url=AWS_ENDPOINT_LOCALSTACK,
+        region_name=AWS_REGION_NAME,
     )
 
 
