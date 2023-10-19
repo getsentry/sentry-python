@@ -1287,12 +1287,8 @@ def test_issues_sampler(_, sentry_init, capture_events, test_config):
 
     assert len(events) == test_config.expected_events
 
-    try:
+    if test_config.sampler_function_mock is not None:
         assert test_config.sampler_function_mock.call_count == 1
 
         # Ensure one argument (the event) was passed to the sampler function
         assert len(test_config.sampler_function_mock.call_args[0]) == 1
-    except AttributeError:
-        # sampler_function_mock should be None in this case,
-        # but let's double-check to ensure the test is working correctly
-        assert test_config.sampler_function_mock is None
