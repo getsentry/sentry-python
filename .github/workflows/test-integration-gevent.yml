@@ -18,9 +18,6 @@ permissions:
   contents: read
 
 env:
-  SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
-  SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
-  SENTRY_PYTHON_TEST_AWS_IAM_ROLE: ${{ secrets.SENTRY_PYTHON_TEST_AWS_IAM_ROLE }}
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless

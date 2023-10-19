@@ -16,6 +16,7 @@
         run: |
           pip install coverage "tox>=3,<4"
           {{ setup_postgres }}
+          {{ setup_localstack }}
 
       - name: Test {{ framework }}
         uses: nick-fields/retry@v2

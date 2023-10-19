@@ -2,21 +2,59 @@ import sys
 import os
 import shutil
 import tempfile
-import time
 import subprocess
 import boto3
 import uuid
 import base64
 
-MAX_RETRIES = 20
+
+AWS_ENDPOINT_LOCALSTACK = "http://localhost:4566"
+AWS_LAMBDA_EXECUTION_ROLE_ARN = None
+
+
+def get_or_create_lambda_execution_role():
+    global AWS_LAMBDA_EXECUTION_ROLE_ARN
+    role_name = "lambda-ex"
+    policy = """
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            }
+        ]
+    }
+    """
+    iam_client = boto3.client("iam", endpoint_url=AWS_ENDPOINT_LOCALSTACK)
+
+    try:
+        response = iam_client.get_role(RoleName=role_name)
+        AWS_LAMBDA_EXECUTION_ROLE_ARN = response["Role"]["Arn"]
+    except iam_client.exceptions.NoSuchEntityException:
+        # create role for lambda execution
+        response = iam_client.create_role(
+            RoleName=role_name,
+            AssumeRolePolicyDocument=policy,
+        )
+        AWS_LAMBDA_EXECUTION_ROLE_ARN = response["Role"]["Arn"]
+
+        # attach policy to role
+        iam_client.attach_role_policy(
+            RoleName=role_name,
+            PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+        )
 
 
 def get_boto_client():
+    get_or_create_lambda_execution_role()
+
     return boto3.client(
         "lambda",
-        aws_access_key_id=os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
-        region_name="us-east-1",
+        endpoint_url=AWS_ENDPOINT_LOCALSTACK,
     )
 
 
@@ -51,7 +89,7 @@ def build_no_code_serverless_function_and_layer(
                     "SENTRY_TRACES_SAMPLE_RATE": "1.0",
                 }
             },
-            Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
+            Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
             Handler="sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
             Layers=[response["LayerVersionArn"]],
             Code={"ZipFile": zip.read()},
@@ -132,7 +170,7 @@ def run_lambda_function(
                     FunctionName=fn_name,
                     Runtime=runtime,
                     Timeout=timeout,
-                    Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
+                    Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
                     Handler="test_lambda.test_handler",
                     Code={"ZipFile": zip.read()},
                     Description="Created as part of testsuite for getsentry/sentry-python",
@@ -167,21 +205,15 @@ def run_lambda_function(
             for manager in managers:
                 manager.clear()
 
-        response = None
-        num_retries = 0
+        waiter = client.get_waiter("function_active_v2")
+        waiter.wait(FunctionName=fn_name)
 
-        # It takes some time for the Lambda function to be created, so we retry
-        while response is None and num_retries < MAX_RETRIES:
-            try:
-                response = client.invoke(
-                    FunctionName=fn_name,
-                    InvocationType="RequestResponse",
-                    LogType="Tail",
-                    Payload=payload,
-                )
-                time.sleep(0.2)
-            except client.exceptions.ResourceConflictException:
-                num_retries += 1
+        response = client.invoke(
+            FunctionName=fn_name,
+            InvocationType="RequestResponse",
+            LogType="Tail",
+            Payload=payload,
+        )
 
         assert (
             response is not None

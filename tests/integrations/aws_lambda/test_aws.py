@@ -1,13 +1,16 @@
 """
 # AWS Lambda system tests
 
-This testsuite uses boto3 to upload actual lambda functions to AWS, execute
-them and assert some things about the externally observed behavior. What that
-means for you is that those tests won't run without AWS access keys:
+This testsuite uses boto3 to upload actual Lambda functions to a locally running
+localstack instance. (Localstack is a fully functional local AWS stack. See https://localstack.cloud/)
 
-    export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
-    export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
-    export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::920901907255:role/service-role/lambda"
+Run localstack on your machine:
+    docker run \
+        --rm -it \
+        -p 4566:4566 \
+        -p 4510-4559:4510-4559 \
+        -v "/var/run/docker.sock:/var/run/docker.sock" \
+        localstack/localstack
 
 If you need to debug a new runtime, use this REPL to figure things out:
 
@@ -16,12 +19,10 @@ If you need to debug a new runtime, use this REPL to figure things out:
 """
 import base64
 import json
-import os
 import re
 from textwrap import dedent
 
 import pytest
-
 
 LAMBDA_PRELUDE = """
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
@@ -89,9 +90,6 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 
 @pytest.fixture
 def lambda_client():
-    if "SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID" not in os.environ:
-        pytest.skip("AWS environ vars not set")
-
     from tests.integrations.aws_lambda.client import get_boto_client
 
     return get_boto_client()
