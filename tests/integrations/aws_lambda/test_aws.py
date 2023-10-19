@@ -353,7 +353,7 @@ def test_performance_no_error(run_lambda_function):
 
     (envelope,) = envelopes
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "function.aws.lambda"
+    assert envelope["contexts"]["trace"]["op"] == "function.aws"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
@@ -382,7 +382,7 @@ def test_performance_error(run_lambda_function):
     (envelope,) = envelopes
 
     assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "function.aws.lambda"
+    assert envelope["contexts"]["trace"]["op"] == "function.aws"
     assert envelope["transaction"].startswith("test_function_")
     assert envelope["transaction_info"] == {"source": "component"}
     assert envelope["transaction"] in envelope["request"]["url"]
@@ -467,9 +467,9 @@ def test_non_dict_event(
 
     assert response["FunctionError"] == "Unhandled"
 
-    error_event = events[0]
+    (error_event,) = events
     assert error_event["level"] == "error"
-    assert error_event["contexts"]["trace"]["op"] == "function.aws.lambda"
+    assert error_event["contexts"]["trace"]["op"] == "function.aws"
 
     function_name = error_event["extra"]["lambda"]["function_name"]
     assert function_name.startswith("test_function_")
