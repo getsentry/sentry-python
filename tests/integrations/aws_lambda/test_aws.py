@@ -32,52 +32,74 @@ import time
 
 from sentry_sdk.transport import HttpTransport
 
-def event_processor(event):
+def truncate_data(data):
     # AWS Lambda truncates the log output to 4kb, which is small enough to miss
     # parts of even a single error-event/transaction-envelope pair if considered
     # in full, so only grab the data we need.
 
-    event_data = {}
-    event_data["contexts"] = {}
-    event_data["contexts"]["trace"] = event.get("contexts", {}).get("trace")
-    event_data["exception"] = event.get("exception")
-    event_data["extra"] = event.get("extra")
-    event_data["level"] = event.get("level")
-    event_data["request"] = event.get("request")
-    event_data["tags"] = event.get("tags")
+    cleaned_data = {}
 
-    return event_data
+    if data.get("type") is not None:
+        cleaned_data["type"] = data["type"]
+
+    if data.get("contexts") is not None:
+        cleaned_data["contexts"] = {}
+
+        if data["contexts"].get("trace") is not None:
+            cleaned_data["contexts"]["trace"] = data["contexts"].get("trace")
+
+    if data.get("transaction") is not None:
+        cleaned_data["transaction"] = data.get("transaction")
+
+    if data.get("request") is not None:
+        cleaned_data["request"] = data.get("request")
+
+    if data.get("tags") is not None:
+        cleaned_data["tags"] = data.get("tags")
+
+    if data.get("exception") is not None:
+        cleaned_data["exception"] = data.get("exception")
+
+        for value in cleaned_data["exception"]["values"]:
+            for frame in value["stacktrace"]["frames"]:
+                del frame["vars"]
+                del frame["pre_context"]
+                del frame["context_line"]
+                del frame["post_context"]
+
+    if data.get("extra") is not None:
+        cleaned_data["extra"] = {}
+
+        for key in data["extra"].keys():
+            if key == "lambda":
+                for lambda_key in data["extra"]["lambda"].keys():
+                    if lambda_key in ["function_name"]:
+                        cleaned_data["extra"].setdefault("lambda", {})[lambda_key] = data["extra"]["lambda"][lambda_key]
+            elif key == "cloudwatch logs":
+                for cloudwatch_key in data["extra"]["cloudwatch logs"].keys():
+                    if cloudwatch_key in ["url", "log_group", "log_stream"]:
+                        cleaned_data["extra"].setdefault("cloudwatch logs", {})[cloudwatch_key] = data["extra"]["cloudwatch logs"][cloudwatch_key]
+
+    if data.get("level") is not None:
+        cleaned_data["level"] = data.get("level")
+
+    if data.get("message") is not None:
+        cleaned_data["message"] = data.get("message")
+
+    if "contexts" not in cleaned_data:
+        raise Exception(json.dumps(data))
+
+    return cleaned_data
+
+def event_processor(event):
+    return truncate_data(event)
 
 def envelope_processor(envelope):
-    # AWS Lambda truncates the log output to 4kb, which is small enough to miss
-    # parts of even a single error-event/transaction-envelope pair if considered
-    # in full, so only grab the data we need.
-
     (item,) = envelope.items
     item_json = json.loads(item.get_bytes())
 
-    if item_json.get("type") == "transaction":
-        envelope_data = {}
-        envelope_data["type"] = item_json["type"]
-        envelope_data["contexts"] = {}
-        envelope_data["contexts"]["trace"] = item_json["contexts"]["trace"]
-        envelope_data["transaction"] = item_json["transaction"]
-        envelope_data["request"] = item_json["request"]
-        envelope_data["tags"] = item_json["tags"]
+    return truncate_data(item_json)
 
-        return envelope_data
-    else:
-        event_data = {}
-        event_data["contexts"] = {}
-        event_data["contexts"]["trace"] = item_json.get("contexts", {}).get("trace")
-        event_data["transaction"] = item_json.get("transaction")
-        event_data["exception"] = item_json.get("exception")
-        event_data["extra"] = item_json.get("extra")
-        event_data["level"] = item_json.get("level")
-        event_data["request"] = item_json.get("request")
-        event_data["tags"] = item_json.get("tags")
-
-        return event_data
 
 class TestTransport(HttpTransport):
     def _send_event(self, event):
@@ -86,10 +108,7 @@ class TestTransport(HttpTransport):
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
-        if envelope.get("type") == "transaction":
-            print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
-        else:
-            print("\\nEVENT: {}\\n".format(json.dumps(envelope)))
+        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
