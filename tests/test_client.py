@@ -1289,6 +1289,11 @@ class IssuesSamplerTestConfig:
             exception_to_raise=AttributeError,
             expected_events=0,
         ),
+        # If sampler returns invalid value, we should still send the event
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: "This is an invalid return value for the sampler",
+            expected_events=1,
+        ),
     ),
 )
 def test_events_sampler(_, sentry_init, capture_events, test_config):
