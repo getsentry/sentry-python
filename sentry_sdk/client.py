@@ -457,7 +457,7 @@ class _Client(object):
         hint,  # type: Hint
     ):
         # type: (...) -> bool
-        sampler = self.options.get("events_sampler", None)
+        sampler = self.options.get("error_sampler", None)
 
         if callable(sampler):
             with capture_internal_exceptions():
@@ -469,7 +469,7 @@ class _Client(object):
             not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
         except TypeError:
             parameter, verb = (
-                ("events_sampler", "returned")
+                ("error_sampler", "returned")
                 if callable(sampler)
                 else ("sample_rate", "contains")
             )
@@ -479,7 +479,7 @@ class _Client(object):
             )
 
             # If the sample_rate has an invalid value, we should sample the event, since the default behavior
-            # (when no sample_rate or events_sampler is provided) is to sample all events.
+            # (when no sample_rate or error_sampler is provided) is to sample all events.
             not_in_sample_rate = False
 
         if not_in_sample_rate:

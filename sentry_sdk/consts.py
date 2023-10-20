@@ -262,7 +262,7 @@ class ClientConstructor(object):
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
         enable_backpressure_handling=True,  # type: bool
-        events_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
+        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
     ):
         # type: (...) -> None
         pass

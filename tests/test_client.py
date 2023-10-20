@@ -1225,7 +1225,7 @@ class IssuesSamplerTestConfig:
     def init_sdk(self, sentry_init):
         # type: (Callable[[*Any], None]) -> None
         sentry_init(
-            events_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
+            error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
         )
 
     def raise_exception(self):
@@ -1237,7 +1237,7 @@ class IssuesSamplerTestConfig:
 @pytest.mark.parametrize(
     "test_config",
     (
-        # Baseline test with events_sampler only, both floats and bools
+        # Baseline test with error_sampler only, both floats and bools
         IssuesSamplerTestConfig(sampler_function=lambda *_: 1.0, expected_events=1),
         IssuesSamplerTestConfig(sampler_function=lambda *_: 0.7, expected_events=1),
         IssuesSamplerTestConfig(sampler_function=lambda *_: 0.6, expected_events=0),
@@ -1249,7 +1249,7 @@ class IssuesSamplerTestConfig:
         IssuesSamplerTestConfig(sample_rate=0.7, expected_events=1),
         IssuesSamplerTestConfig(sample_rate=0.6, expected_events=0),
         IssuesSamplerTestConfig(sample_rate=0.0, expected_events=0),
-        # events_sampler takes precedence over sample_rate
+        # error_sampler takes precedence over sample_rate
         IssuesSamplerTestConfig(
             sampler_function=lambda *_: 1.0, sample_rate=0.0, expected_events=1
         ),
@@ -1296,7 +1296,7 @@ class IssuesSamplerTestConfig:
         ),
     ),
 )
-def test_events_sampler(_, sentry_init, capture_events, test_config):
+def test_error_sampler(_, sentry_init, capture_events, test_config):
     test_config.init_sdk(sentry_init)
 
     events = capture_events()
