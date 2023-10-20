@@ -79,7 +79,6 @@ def envelope_processor(envelope):
 
         return event_data
 
-
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
@@ -290,9 +289,11 @@ def test_request_data(run_lambda_function):
 def test_init_error(run_lambda_function, lambda_runtime):
     envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
-        + (
-            "init_sdk()\n",
-            "func()",
+        + dedent(
+            """
+        init_sdk()
+        func()
+        """
         ),
         b'{"foo": "bar"}',
         syntax_check=False,
@@ -315,7 +316,7 @@ def test_timeout_error(run_lambda_function):
         """
         ),
         b'{"foo": "bar"}',
-        timeout=3,
+        timeout=2,
     )
 
     (event,) = events
@@ -323,8 +324,8 @@ def test_timeout_error(run_lambda_function):
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ServerlessTimeoutWarning"
     assert exception["value"] in (
-        "WARNING : Function is expected to get timed out. Configured timeout duration = 4 seconds.",
         "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds.",
+        "WARNING : Function is expected to get timed out. Configured timeout duration = 2 seconds.",
     )
 
     assert exception["mechanism"]["type"] == "threading"
