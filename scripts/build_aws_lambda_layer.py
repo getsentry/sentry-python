@@ -1,9 +1,14 @@
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
+from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import VERSION as SDK_VERSION
+
+if TYPE_CHECKING:
+    from typing import Optional
 
 DIST_PATH = "dist"  # created by "make dist" that is called by "make aws-lambda-layer"
 PYTHON_SITE_PACKAGES = "python"  # see https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
@@ -13,11 +18,16 @@ class LayerBuilder:
     def __init__(
         self,
         base_dir,  # type: str
+        out_zip_filename=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.base_dir = base_dir
         self.python_site_packages = os.path.join(self.base_dir, PYTHON_SITE_PACKAGES)
-        self.out_zip_filename = f"sentry-python-serverless-{SDK_VERSION}.zip"
+        self.out_zip_filename = (
+            f"sentry-python-serverless-{SDK_VERSION}.zip"
+            if out_zip_filename is None
+            else out_zip_filename
+        )
 
     def make_directories(self):
         # type: (...) -> None
@@ -80,13 +90,22 @@ class LayerBuilder:
         )
 
 
-def build_packaged_zip():
-    with tempfile.TemporaryDirectory() as base_dir:
-        layer_builder = LayerBuilder(base_dir)
-        layer_builder.make_directories()
-        layer_builder.install_python_packages()
-        layer_builder.create_init_serverless_sdk_package()
-        layer_builder.zip()
+def build_packaged_zip(dest_abs_path=None, make_dist=False, out_zip_filename=None):
+    if dest_abs_path is None:
+        dest_abs_path = tempfile.mkdtemp()
+
+    if make_dist:
+        subprocess.check_call(
+            [sys.executable, "setup.py", "sdist", "bdist_wheel", "-d", DIST_PATH],
+        )
+
+    layer_builder = LayerBuilder(dest_abs_path, out_zip_filename=out_zip_filename)
+    layer_builder.make_directories()
+    layer_builder.install_python_packages()
+    layer_builder.create_init_serverless_sdk_package()
+    layer_builder.zip()
+
+    shutil.rmtree(dest_abs_path)
 
 
 if __name__ == "__main__":

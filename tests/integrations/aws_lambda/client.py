@@ -78,9 +78,11 @@ def build_no_code_serverless_function_and_layer(
     sdk by creating a layer containing the Python-sdk, and then creating a func
     that uses that layer
     """
-    from scripts.build_aws_lambda_layer import build_layer_dir
+    from scripts.build_aws_lambda_layer import build_packaged_zip
 
-    build_layer_dir(dest_abs_path=tmpdir)
+    build_packaged_zip(
+        dest_abs_path=tmpdir, make_dist=True, out_zip_filename="serverless-ball.zip"
+    )
 
     with open(os.path.join(tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
         response = client.publish_layer_version(
