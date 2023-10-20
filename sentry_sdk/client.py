@@ -454,12 +454,34 @@ class _Client(object):
     def _should_sample_error(
         self,
         event,  # type: Event
+        hint,  # type: Hint
     ):
         # type: (...) -> bool
-        not_in_sample_rate = (
-            self.options["sample_rate"] < 1.0
-            and random.random() >= self.options["sample_rate"]
-        )
+        sampler = self.options.get("error_sampler", None)
+
+        if callable(sampler):
+            with capture_internal_exceptions():
+                sample_rate = sampler(event, hint)
+        else:
+            sample_rate = self.options["sample_rate"]
+
+        try:
+            not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
+        except TypeError:
+            parameter, verb = (
+                ("error_sampler", "returned")
+                if callable(sampler)
+                else ("sample_rate", "contains")
+            )
+            logger.warning(
+                "The provided %s %s an invalid value of %s. The value should be a float or a bool. Defaulting to sampling the event."
+                % (parameter, verb, repr(sample_rate))
+            )
+
+            # If the sample_rate has an invalid value, we should sample the event, since the default behavior
+            # (when no sample_rate or error_sampler is provided) is to sample all events.
+            not_in_sample_rate = False
+
         if not_in_sample_rate:
             # because we will not sample this event, record a "lost event".
             if self.transport:
@@ -556,7 +578,7 @@ class _Client(object):
         if (
             not is_transaction
             and not is_checkin
-            and not self._should_sample_error(event)
+            and not self._should_sample_error(event, hint)
         ):
             return None
 
