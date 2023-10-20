@@ -61,7 +61,7 @@ def truncate_data(data):
         cleaned_data["exception"] = data.get("exception")
 
         for value in cleaned_data["exception"]["values"]:
-            for frame in value["stacktrace"]["frames"]:
+            for frame in value.get("stacktrace", {}).get("frames", []):
                 del frame["vars"]
                 del frame["pre_context"]
                 del frame["context_line"]
@@ -247,6 +247,7 @@ def test_initialization_order(run_lambda_function):
     )
 
     (event,) = events
+
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
@@ -401,18 +402,20 @@ def test_performance_error(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
-    (event,) = events
-    assert event["level"] == "error"
-    (exception,) = event["exception"]["values"]
+    (
+        error_event,
+        transaction_event,
+    ) = envelopes
+
+    assert error_event["level"] == "error"
+    (exception,) = error_event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
 
-    (envelope,) = envelopes
-
-    assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"]["op"] == "function.aws"
-    assert envelope["transaction"].startswith("test_function_")
-    assert envelope["transaction"] in envelope["request"]["url"]
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["contexts"]["trace"]["op"] == "function.aws"
+    assert transaction_event["transaction"].startswith("test_function_")
+    assert transaction_event["transaction"] in transaction_event["request"]["url"]
 
 
 @pytest.mark.parametrize(
@@ -490,7 +493,10 @@ def test_non_dict_event(
 
     assert response["FunctionError"] == "Unhandled"
 
-    (error_event,) = events
+    (
+        error_event,
+        transaction_event,
+    ) = envelopes
     assert error_event["level"] == "error"
     assert error_event["contexts"]["trace"]["op"] == "function.aws"
 
@@ -503,14 +509,13 @@ def test_non_dict_event(
     assert exception["value"] == "Oh?"
     assert exception["mechanism"]["type"] == "aws_lambda"
 
-    (envelope,) = envelopes
-    assert envelope["type"] == "transaction"
-    assert envelope["contexts"]["trace"] == DictionaryContaining(
+    assert transaction_event["type"] == "transaction"
+    assert transaction_event["contexts"]["trace"] == DictionaryContaining(
         error_event["contexts"]["trace"]
     )
-    assert envelope["contexts"]["trace"]["status"] == "internal_error"
-    assert envelope["transaction"] == error_event["transaction"]
-    assert envelope["request"]["url"] == error_event["request"]["url"]
+    assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
+    assert transaction_event["transaction"] == error_event["transaction"]
+    assert transaction_event["request"]["url"] == error_event["request"]["url"]
 
     if has_request_data:
         request_data = {
@@ -525,13 +530,13 @@ def test_non_dict_event(
         request_data = {"url": "awslambda:///{}".format(function_name)}
 
     assert error_event["request"] == request_data
-    assert envelope["request"] == request_data
+    assert transaction_event["request"] == request_data
 
     if batch_size > 1:
         assert error_event["tags"]["batch_size"] == batch_size
         assert error_event["tags"]["batch_request"] is True
-        assert envelope["tags"]["batch_size"] == batch_size
-        assert envelope["tags"]["batch_request"] is True
+        assert transaction_event["tags"]["batch_size"] == batch_size
+        assert transaction_event["tags"]["batch_request"] is True
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
