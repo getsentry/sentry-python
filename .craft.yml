@@ -14,14 +14,13 @@ targets:
       - name: python
         versions:
           # The number of versions must be, at most, the maximum number of
-          # runtimes AWS Lambda permits for a layer.
+          # runtimes AWS Lambda permits for a layer (currently 15).
           # On the other hand, AWS Lambda does not support every Python runtime.
           # The supported runtimes are available in the following link:
           # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html
-          - python3.6
-          - python3.7
-          - python3.8
           - python3.9
+          - python3.10
+          - python3.11
     license: MIT
   - name: sentry-pypi
     internalPypiRepo: getsentry/pypi
