@@ -474,8 +474,8 @@ class _Client(object):
                 else ("sample_rate", "contains")
             )
             logger.warning(
-                "The provided %s %s an invalid value. The value should be a float or a bool. Defaulting to sampling the event."
-                % (parameter, verb)
+                "The provided %s %s an invalid value of %s. The value should be a float or a bool. Defaulting to sampling the event."
+                % (parameter, verb, repr(sample_rate))
             )
 
             # If the sample_rate has an invalid value, we should sample the event, since the default behavior
