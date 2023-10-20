@@ -457,7 +457,7 @@ class _Client(object):
         hint,  # type: Hint
     ):
         # type: (...) -> bool
-        sampler = self.options.get("issues_sampler", None)
+        sampler = self.options.get("events_sampler", None)
 
         if callable(sampler):
             with capture_internal_exceptions():
