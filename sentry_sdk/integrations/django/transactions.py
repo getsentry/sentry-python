@@ -1,6 +1,8 @@
 """
-Copied from raven-python. Used for
-`DjangoIntegration(transaction_fron="raven_legacy")`.
+Copied from raven-python.
+
+Despite being called "legacy" in some places this resolver is very much still
+in use.
 """
 
 from __future__ import absolute_import
@@ -10,17 +12,20 @@ import re
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from django.urls.resolvers import URLResolver
     from typing import Dict
     from typing import List
     from typing import Optional
-    from django.urls.resolvers import URLPattern
     from typing import Tuple
     from typing import Union
     from re import Pattern
+    from django.urls.resolvers import URLPattern, URLResolver
+    from django.http.request import HttpRequest
+
+from django import VERSION as DJANGO_VERSION
 
 try:
     from django.urls import get_resolver
+    from django.urls.resolvers import RoutePattern  # XXX
 except ImportError:
     from django.core.urlresolvers import get_resolver
 
@@ -36,6 +41,9 @@ def get_regex(resolver_or_pattern):
 
 
 class RavenResolver(object):
+    _new_style_group_matcher = re.compile(
+        r"<(?:(?P<converter>[^>:]+):)?(?P<parameter>[^>]+)>"
+    )  # https://github.com/django/django/blob/21382e2743d06efbf5623e7c9b6dccf2a325669b/django/urls/resolvers.py#L245-L247
     _optional_group_matcher = re.compile(r"\(\?\:([^\)]+)\)")
     _named_group_matcher = re.compile(r"\(\?P<(\w+)>[^\)]+\)+")
     _non_named_group_matcher = re.compile(r"\([^\)]+\)")
@@ -59,8 +67,16 @@ class RavenResolver(object):
         # remove optional params
         # TODO(dcramer): it'd be nice to change these into [%s] but it currently
         # conflicts with the other rules because we're doing regexp matches
+
+        if DJANGO_VERSION >= (2, 0) and isinstance(pattern.pattern, RoutePattern):
+            result = self._new_style_group_matcher.sub(
+                lambda m: "{%s}" % m.group(1), pattern.pattern._route
+            )
+
+        result = get_regex(pattern).pattern
+
         # rather than parsing tokens
-        result = self._optional_group_matcher.sub(lambda m: "%s" % m.group(1), pattern)
+        result = self._optional_group_matcher.sub(lambda m: "%s" % m.group(1), result)
 
         # handle named groups first
         result = self._named_group_matcher.sub(lambda m: "{%s}" % m.group(1), result)
@@ -113,8 +129,8 @@ class RavenResolver(object):
             except KeyError:
                 pass
 
-            prefix = "".join(self._simplify(get_regex(p).pattern) for p in parents)
-            result = prefix + self._simplify(get_regex(pattern).pattern)
+            prefix = "".join(self._simplify(p) for p in parents)
+            result = prefix + self._simplify(pattern)
             if not result.startswith("/"):
                 result = "/" + result
             self._cache[pattern] = result
