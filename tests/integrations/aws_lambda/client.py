@@ -11,13 +11,13 @@ AWS_CREDENTIALS = {
     "aws_access_key_id": os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
     "aws_secret_access_key": os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
 }
+AWS_LAMBDA_EXECUTION_ROLE_NAME = "lambda-ex"
 AWS_LAMBDA_EXECUTION_ROLE_ARN = None
 
 
 def get_or_create_lambda_execution_role():
     global AWS_LAMBDA_EXECUTION_ROLE_ARN
 
-    role_name = "lambda-ex"
     policy = """{
         "Version": "2012-10-17",
         "Statement": [
@@ -38,19 +38,19 @@ def get_or_create_lambda_execution_role():
     )
 
     try:
-        response = iam_client.get_role(RoleName=role_name)
+        response = iam_client.get_role(RoleName=AWS_LAMBDA_EXECUTION_ROLE_NAME)
         AWS_LAMBDA_EXECUTION_ROLE_ARN = response["Role"]["Arn"]
     except iam_client.exceptions.NoSuchEntityException:
         # create role for lambda execution
         response = iam_client.create_role(
-            RoleName=role_name,
+            RoleName=AWS_LAMBDA_EXECUTION_ROLE_NAME,
             AssumeRolePolicyDocument=policy,
         )
         AWS_LAMBDA_EXECUTION_ROLE_ARN = response["Role"]["Arn"]
 
         # attach policy to role
         iam_client.attach_role_policy(
-            RoleName=role_name,
+            RoleName=AWS_LAMBDA_EXECUTION_ROLE_NAME,
             PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
         )
 

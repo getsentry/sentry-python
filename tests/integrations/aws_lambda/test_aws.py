@@ -104,12 +104,14 @@ def envelope_processor(envelope):
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
-        print("x")  # force AWS lambda logging to start a new line (when printing a stacktrace it swallows the \n from the next print statement)
+        print("x")  # force AWS lambda logging to start a new line
+                    # (when printing a stacktrace it swallows the \\n from the next print statement)
         print("\\nEVENT: {}\\n".format(json.dumps(event)))
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
-        print("x")  # force AWS lambda logging to start a new line (when printing a stacktrace it swallows the \n from the next print statement)
+        print("x")  # force AWS lambda logging to start a new line
+                    # (when printing a stacktrace it swallows the \\n from the next print statement)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
