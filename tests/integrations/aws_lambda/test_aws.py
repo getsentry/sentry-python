@@ -104,10 +104,12 @@ def envelope_processor(envelope):
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
+        print("x")  # force AWS lambda logging to start a new line (when printing a stacktrace it swallows the \n from the next print statement)
         print("\\nEVENT: {}\\n".format(json.dumps(event)))
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
+        print("x")  # force AWS lambda logging to start a new line (when printing a stacktrace it swallows the \n from the next print statement)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
@@ -320,7 +322,7 @@ def test_init_error(run_lambda_function, lambda_runtime):
     )
 
     (event,) = events
-    assert "name 'func' is not defined" in event
+    assert event["exception"]["values"][0]["value"] == "name 'func' is not defined"
 
 
 def test_timeout_error(run_lambda_function):
