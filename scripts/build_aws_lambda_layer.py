@@ -105,8 +105,6 @@ def build_packaged_zip(dest_abs_path=None, make_dist=False, out_zip_filename=Non
     layer_builder.create_init_serverless_sdk_package()
     layer_builder.zip()
 
-    shutil.rmtree(dest_abs_path)
-
 
 if __name__ == "__main__":
     build_packaged_zip()

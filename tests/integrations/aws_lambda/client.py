@@ -1,6 +1,5 @@
 import sys
 import os
-import shutil
 import tempfile
 import subprocess
 import boto3
@@ -65,47 +64,6 @@ def get_boto_client():
     )
 
 
-def build_no_code_serverless_function_and_layer(
-    client, tmpdir, fn_name, runtime, timeout, initial_handler
-):
-    """
-    Util function that auto instruments the no code implementation of the python
-    sdk by creating a layer containing the Python-sdk, and then creating a func
-    that uses that layer
-    """
-    from scripts.build_aws_lambda_layer import build_packaged_zip
-
-    build_packaged_zip(
-        dest_abs_path=tmpdir, make_dist=True, out_zip_filename="serverless-ball.zip"
-    )
-
-    with open(os.path.join(tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
-        response = client.publish_layer_version(
-            LayerName="python-serverless-sdk-test",
-            Description="Created as part of testsuite for getsentry/sentry-python",
-            Content={"ZipFile": serverless_zip.read()},
-        )
-
-    with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
-        client.create_function(
-            FunctionName=fn_name,
-            Runtime=runtime,
-            Timeout=timeout,
-            Environment={
-                "Variables": {
-                    "SENTRY_INITIAL_HANDLER": initial_handler,
-                    "SENTRY_DSN": "https://123abc@example.com/123",
-                    "SENTRY_TRACES_SAMPLE_RATE": "1.0",
-                }
-            },
-            Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
-            Handler="sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
-            Layers=[response["LayerVersionArn"]],
-            Code={"ZipFile": zip.read()},
-            Description="Created as part of testsuite for getsentry/sentry-python",
-        )
-
-
 def run_lambda_function(
     client,
     runtime,
@@ -126,29 +84,18 @@ def run_lambda_function(
     """
     subprocess_kwargs = dict(subprocess_kwargs)
 
-    dir_prefix = str(hash(code))
-    fn_name = "test_function_{}".format(dir_prefix)
+    function_hash = str(hash(code)).replace("-", "_")
+    fn_name = "test_function_{}".format(function_hash)
 
     tmp_base_dir = tempfile.gettempdir()
-    dir_already_existing = any(
-        [x.startswith(fn_name) for x in os.listdir(tmp_base_dir)]
-    )
+    tmpdir = os.path.join(tmp_base_dir, fn_name)
+    dir_already_existing = os.path.isdir(tmpdir)
 
     if dir_already_existing:
         print("Lambda function directory already exists, skipping creation")
 
-    # if dir not existing
-    # create function directory
-    # syntax check
-    # if layer
-    # add layer to dir
-    # publish_layer_version
-    # create function (and swallow "already existing" error)
-    # invoke function
-
     if not dir_already_existing:
-        tmpdir = tempfile.mkdtemp(prefix="%s-" % fn_name)
-
+        os.mkdir(tmpdir)
         if initial_handler:
             # If Initial handler value is provided i.e. it is not the default
             # `test_lambda.test_handler`, then create another dir level so that our path is
@@ -174,6 +121,7 @@ def run_lambda_function(
             subprocess.check_call([sys.executable, test_lambda_py])
 
         if layer is None:
+            # Install dependencies into Lambda function package
             setup_cfg = os.path.join(tmpdir, "setup.cfg")
             with open(setup_cfg, "w") as f:
                 f.write("[install]\nprefix=")
@@ -182,14 +130,12 @@ def run_lambda_function(
                 [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
                 **subprocess_kwargs,
             )
-
             subprocess.check_call(
                 "pip install mock==3.0.0 funcsigs -t .",
                 cwd=tmpdir,
                 shell=True,
                 **subprocess_kwargs,
             )
-
             # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
             subprocess.check_call(
                 "pip install ../*.tar.gz -t .",
@@ -198,32 +144,44 @@ def run_lambda_function(
                 **subprocess_kwargs,
             )
 
-            shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
-
-            with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
-                client.create_function(
-                    FunctionName=fn_name,
-                    Runtime=runtime,
-                    Timeout=timeout,
-                    Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
-                    Handler="test_lambda.test_handler",
-                    Code={"ZipFile": zip.read()},
-                    Description="Created as part of testsuite for getsentry/sentry-python",
-                )
-
-        else:
+            # Create Lambda function zip package
             subprocess.run(
-                ["zip", "-q", "-x", "**/__pycache__/*", "-r", "ball.zip", "./"],
+                [
+                    "zip",
+                    "-q",
+                    "-x",
+                    "**/__pycache__/*",
+                    "-r",
+                    "lambda-function-package.zip",
+                    "./",
+                ],
                 cwd=tmpdir,
                 check=True,
             )
 
-            # Default initial handler
-            if not initial_handler:
-                initial_handler = "test_lambda.test_handler"
+        else:
+            # Create Lambda function zip package
+            subprocess.run(
+                [
+                    "zip",
+                    "-q",
+                    "-x",
+                    "**/__pycache__/*",
+                    "-r",
+                    "lambda-function-package.zip",
+                    "./",
+                ],
+                cwd=tmpdir,
+                check=True,
+            )
 
-            build_no_code_serverless_function_and_layer(
-                client, tmpdir, fn_name, runtime, timeout, initial_handler
+            # Create Lambda layer zip package
+            from scripts.build_aws_lambda_layer import build_packaged_zip
+
+            build_packaged_zip(
+                dest_abs_path=tmpdir,
+                make_dist=True,
+                out_zip_filename="lambda-layer-package.zip",
             )
 
         @add_finalizer
@@ -238,11 +196,55 @@ def run_lambda_function(
             for manager in managers:
                 manager.clear()
 
-        waiter = client.get_waiter("function_active_v2")
-        waiter.wait(FunctionName=fn_name)
+    layers = []
+    environment = {}
+    handler = initial_handler or "test_lambda.test_handler"
+
+    if layer is not None:
+        with open(
+            os.path.join(tmpdir, "lambda-layer-package.zip"), "rb"
+        ) as lambda_layer_zip:
+            response = client.publish_layer_version(
+                LayerName="python-serverless-sdk-test",
+                Description="Created as part of testsuite for getsentry/sentry-python",
+                Content={"ZipFile": lambda_layer_zip.read()},
+            )
+
+        layers = [response["LayerVersionArn"]]
+        handler = "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler"
+        environment = {
+            "Variables": {
+                "SENTRY_INITIAL_HANDLER": initial_handler or "test_lambda.test_handler",
+                "SENTRY_DSN": "https://123abc@example.com/123",
+                "SENTRY_TRACES_SAMPLE_RATE": "1.0",
+            }
+        }
+
+    full_fn_name = fn_name + runtime.replace(".", "")
+    try:
+        with open(
+            os.path.join(tmpdir, "lambda-function-package.zip"), "rb"
+        ) as lambda_function_zip:
+            client.create_function(
+                Description="Created as part of testsuite for getsentry/sentry-python",
+                FunctionName=full_fn_name,
+                Runtime=runtime,
+                Timeout=timeout,
+                Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
+                Handler=handler,
+                Code={"ZipFile": lambda_function_zip.read()},
+                Environment=environment,
+                Layers=layers,
+            )
+
+            waiter = client.get_waiter("function_active_v2")
+            waiter.wait(FunctionName=full_fn_name)
+    except client.exceptions.ResourceConflictException:
+        # Ignore if function is already existing
+        pass
 
     response = client.invoke(
-        FunctionName=fn_name,
+        FunctionName=full_fn_name,
         InvocationType="RequestResponse",
         LogType="Tail",
         Payload=payload,

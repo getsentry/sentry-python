@@ -115,6 +115,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
         transport=TestTransport,
         integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
         shutdown_timeout=10,
+        debug=True,
         **extra_init_args
     )
 """
