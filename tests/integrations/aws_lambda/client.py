@@ -248,9 +248,6 @@ def run_lambda_function(
         Payload=payload,
     )
 
-    assert (
-        response is not None
-    ), "Failed to create Lambda function in time (max retries exceeded)"
     assert 200 <= response["StatusCode"] < 300, response
     return response
 
