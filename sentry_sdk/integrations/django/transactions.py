@@ -19,15 +19,18 @@ if TYPE_CHECKING:
     from typing import Union
     from re import Pattern
     from django.urls.resolvers import URLPattern, URLResolver
-    from django.http.request import HttpRequest
 
 from django import VERSION as DJANGO_VERSION
 
 try:
     from django.urls import get_resolver
-    from django.urls.resolvers import RoutePattern  # XXX
 except ImportError:
     from django.core.urlresolvers import get_resolver
+
+try:
+    from django.urls.resolvers import RoutePattern
+except ImportError:
+    RoutePattern = type(None)
 
 
 def get_regex(resolver_or_pattern):
@@ -42,7 +45,7 @@ def get_regex(resolver_or_pattern):
 
 class RavenResolver(object):
     _new_style_group_matcher = re.compile(
-        r"<(?:(?P<converter>[^>:]+):)?(?P<parameter>[^>]+)>"
+        r"<(?:([^>:]+):)?([^>]+)>"
     )  # https://github.com/django/django/blob/21382e2743d06efbf5623e7c9b6dccf2a325669b/django/urls/resolvers.py#L245-L247
     _optional_group_matcher = re.compile(r"\(\?\:([^\)]+)\)")
     _named_group_matcher = re.compile(r"\(\?P<(\w+)>[^\)]+\)+")
@@ -70,10 +73,10 @@ class RavenResolver(object):
 
         if DJANGO_VERSION >= (2, 0) and isinstance(pattern.pattern, RoutePattern):
             result = self._new_style_group_matcher.sub(
-                lambda m: "{%s}" % m.group(1), pattern.pattern._route
+                lambda m: "{%s}" % m.group(2), pattern.pattern._route
             )
-
-        result = get_regex(pattern).pattern
+        else:
+            result = get_regex(pattern).pattern
 
         # rather than parsing tokens
         result = self._optional_group_matcher.sub(lambda m: "%s" % m.group(1), result)

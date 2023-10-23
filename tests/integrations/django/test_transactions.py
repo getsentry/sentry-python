@@ -10,11 +10,9 @@ from werkzeug.test import Client
 if django.VERSION >= (2, 0):
     from django.urls import path, re_path
     from django.conf.urls import include
-    from django.urls.converters import PathConverter
 else:
     from django.conf.urls import url as re_path, include
 
-from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.transactions import RavenResolver
 from tests.integrations.django.myapp.wsgi import application
 
@@ -47,13 +45,13 @@ def test_resolver_no_match():
     assert result is None
 
 
-def test_resolver_complex_match():
+def test_resolver_re_path_complex_match():
     resolver = RavenResolver()
     result = resolver.resolve("/api/1234/store/", example_url_conf)
     assert result == "/api/{project_id}/store/"
 
 
-def test_resolver_complex_either_match():
+def test_resolver_re_path_complex_either_match():
     resolver = RavenResolver()
     result = resolver.resolve("/api/v1/author/", example_url_conf)
     assert result == "/api/{version}/author/"
@@ -61,13 +59,13 @@ def test_resolver_complex_either_match():
     assert result == "/api/{version}/author/"
 
 
-def test_resolver_included_match():
+def test_resolver_re_path_included_match():
     resolver = RavenResolver()
     result = resolver.resolve("/example/foo/bar/baz", example_url_conf)
     assert result == "/example/foo/bar/{param}"
 
 
-def test_resolver_multiple_groups():
+def test_resolver_re_path_multiple_groups():
     resolver = RavenResolver()
     result = resolver.resolve(
         "/api/myproject/product/cb4ef1caf3554c34ae134f3c1b3d605f/", example_url_conf
@@ -76,7 +74,7 @@ def test_resolver_multiple_groups():
 
 
 @pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
-def test_resolver_new_style_group():
+def test_resolver_path_group():
     url_conf = (path("api/v2/<int:project_id>/store/", lambda x: ""),)
     resolver = RavenResolver()
     result = resolver.resolve("/api/v2/1234/store/", url_conf)
@@ -84,7 +82,7 @@ def test_resolver_new_style_group():
 
 
 @pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
-def test_resolver_new_style_multiple_groups():
+def test_resolver_path_multiple_groups():
     url_conf = (path("api/v2/<int:project_id>/product/<int:pid>", lambda x: ""),)
     resolver = RavenResolver()
     result = resolver.resolve("/api/v2/1234/product/5689", url_conf)
