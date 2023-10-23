@@ -1,16 +1,11 @@
 """
 # AWS Lambda system tests
 
-This testsuite uses boto3 to upload actual Lambda functions to a locally running
-localstack instance. (Localstack is a fully functional local AWS stack. See https://localstack.cloud/)
+This testsuite uses boto3 to upload actual Lambda functions to AWS Lambda.
 
-Run localstack on your machine:
-    docker run \
-        --rm -it \
-        -p 4566:4566 \
-        -p 4510-4559:4510-4559 \
-        -v "/var/run/docker.sock:/var/run/docker.sock" \
-        localstack/localstack
+For running test locally you need to set these env vars (You can find the values in the Sentry password manager):
+export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID="..."
+export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY="..."
 
 If you need to debug a new runtime, use this REPL to figure things out:
 

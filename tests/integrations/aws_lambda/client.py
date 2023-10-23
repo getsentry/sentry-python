@@ -137,6 +137,15 @@ def run_lambda_function(
     if dir_already_existing:
         print("Lambda function directory already exists, skipping creation")
 
+    # if dir not existing
+    # create function directory
+    # syntax check
+    # if layer
+    # add layer to dir
+    # publish_layer_version
+    # create function (and swallow "already existing" error)
+    # invoke function
+
     if not dir_already_existing:
         tmpdir = tempfile.mkdtemp(prefix="%s-" % fn_name)
 

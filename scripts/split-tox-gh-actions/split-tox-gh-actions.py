@@ -28,7 +28,7 @@ TEMPLATE_DIR = Path(__file__).resolve().parent
 TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
 TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
 TEMPLATE_FILE_SETUP_DB = TEMPLATE_DIR / "ci-yaml-setup-db.txt"
-TEMPLATE_FILE_SETUP_LOCALSTACK = TEMPLATE_DIR / "ci-yaml-setup-localstack.txt"
+TEMPLATE_FILE_AWS_CREDENTIALS = TEMPLATE_DIR / "ci-yaml-aws-credentials.txt"
 TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
 TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
 
@@ -133,9 +133,9 @@ def write_yaml_file(
                 f = open(TEMPLATE_FILE_SETUP_DB, "r")
                 out += "".join(f.readlines())
 
-        elif template_line.strip() == "{{ setup_localstack }}":
+        elif template_line.strip() == "{{ aws_credentials }}":
             if current_framework in FRAMEWORKS_NEEDING_AWS:
-                f = open(TEMPLATE_FILE_SETUP_LOCALSTACK, "r")
+                f = open(TEMPLATE_FILE_AWS_CREDENTIALS, "r")
                 out += "".join(f.readlines())
 
         elif template_line.strip() == "{{ additional_uses }}":

@@ -18,12 +18,12 @@ permissions:
   contents: read
 
 env:
-  BUILD_CACHE_KEY: ${{ github.sha }}
-  CACHED_BUILD_PATHS: |
-    ${{ github.workspace }}/dist-serverless
   SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
   SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
   SENTRY_PYTHON_TEST_AWS_IAM_ROLE: ${{ secrets.SENTRY_PYTHON_TEST_AWS_IAM_ROLE }}
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
 
 jobs:
   test:
@@ -50,16 +50,6 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-          pip install localstack awscli-local[ver1] # install LocalStack cli
-          docker pull localstack/localstack         # Make sure to pull the latest version of the image
-          localstack start -d                       # Start LocalStack in the background
-
-          echo "Waiting for LocalStack startup..."  # Wait 30 seconds for the LocalStack container
-          localstack wait -t 30                     # to become ready before timing out
-          echo "Startup complete"
-
-          awslocal lambda list-functions
-          echo "done listing functions"
 
       - name: Test aws_lambda
         uses: nick-fields/retry@v2
