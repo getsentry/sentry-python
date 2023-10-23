@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        Hint,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
@@ -43,6 +44,7 @@ if TYPE_CHECKING:
             "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
         },
@@ -260,6 +262,7 @@ class ClientConstructor(object):
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
         enable_backpressure_handling=True,  # type: bool
+        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
     ):
         # type: (...) -> None
         pass
