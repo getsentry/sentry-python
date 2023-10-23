@@ -59,8 +59,6 @@ jobs:
             set -x # print commands that are executed
             coverage erase
 
-            printenv
-
             # Run tests
             ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
