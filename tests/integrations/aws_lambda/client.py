@@ -14,7 +14,100 @@ AWS_LAMBDA_EXECUTION_ROLE_NAME = "lambda-ex"
 AWS_LAMBDA_EXECUTION_ROLE_ARN = None
 
 
-def get_or_create_lambda_execution_role():
+def _install_depencencies(base_dir, subprocess_kwargs):
+    """
+    Installs dependencies for AWS Lambda function
+    """
+    setup_cfg = os.path.join(base_dir, "setup.cfg")
+    with open(setup_cfg, "w") as f:
+        f.write("[install]\nprefix=")
+
+    subprocess.check_call(
+        [sys.executable, "setup.py", "sdist", "-d", os.path.join(base_dir, "..")],
+        **subprocess_kwargs,
+    )
+    subprocess.check_call(
+        "pip install mock==3.0.0 funcsigs -t .",
+        cwd=base_dir,
+        shell=True,
+        **subprocess_kwargs,
+    )
+    # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
+    subprocess.check_call(
+        "pip install ../*.tar.gz -t .",
+        cwd=base_dir,
+        shell=True,
+        **subprocess_kwargs,
+    )
+
+
+def _create_lambda_function_zip(base_dir):
+    """
+    Zips the given base_dir omitting Python cache files
+    """
+    subprocess.run(
+        [
+            "zip",
+            "-q",
+            "-x",
+            "**/__pycache__/*",
+            "-r",
+            "lambda-function-package.zip",
+            "./",
+        ],
+        cwd=base_dir,
+        check=True,
+    )
+
+
+def _create_lambda_package(
+    base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
+):
+    """
+    Creates deployable packages (as zip files) for AWS Lambda function and layer
+    """
+    if initial_handler:
+        # If Initial handler value is provided i.e. it is not the default
+        # `test_lambda.test_handler`, then create another dir level so that our path is
+        # test_dir.test_lambda.test_handler
+        test_dir_path = os.path.join(base_dir, "test_dir")
+        python_init_file = os.path.join(test_dir_path, "__init__.py")
+        os.makedirs(test_dir_path)
+        with open(python_init_file, "w"):
+            # Create __init__ file to make it a python package
+            pass
+
+        test_lambda_py = os.path.join(base_dir, "test_dir", "test_lambda.py")
+    else:
+        test_lambda_py = os.path.join(base_dir, "test_lambda.py")
+
+    with open(test_lambda_py, "w") as f:
+        f.write(code)
+
+    if syntax_check:
+        # Check file for valid syntax first, and that the integration does not
+        # crash when not running in Lambda (but rather a local deployment tool
+        # such as chalice's)
+        subprocess.check_call([sys.executable, test_lambda_py])
+
+    if layer is None:
+        _install_depencencies(base_dir, subprocess_kwargs)
+        _create_lambda_function_zip(base_dir)
+
+    else:
+        _create_lambda_function_zip(base_dir)
+
+        # Create Lambda layer zip package
+        from scripts.build_aws_lambda_layer import build_packaged_zip
+
+        build_packaged_zip(
+            dest_abs_path=base_dir,
+            make_dist=True,
+            out_zip_filename="lambda-layer-package.zip",
+        )
+
+
+def _get_or_create_lambda_execution_role():
     global AWS_LAMBDA_EXECUTION_ROLE_ARN
 
     policy = """{
@@ -55,7 +148,7 @@ def get_or_create_lambda_execution_role():
 
 
 def get_boto_client():
-    get_or_create_lambda_execution_role()
+    _get_or_create_lambda_execution_role()
 
     return boto3.client(
         "lambda",
@@ -88,101 +181,17 @@ def run_lambda_function(
     fn_name = "test_function_{}".format(function_hash)
 
     tmp_base_dir = tempfile.gettempdir()
-    tmpdir = os.path.join(tmp_base_dir, fn_name)
-    dir_already_existing = os.path.isdir(tmpdir)
+    base_dir = os.path.join(tmp_base_dir, fn_name)
+    dir_already_existing = os.path.isdir(base_dir)
 
     if dir_already_existing:
         print("Lambda function directory already exists, skipping creation")
 
     if not dir_already_existing:
-        os.mkdir(tmpdir)
-        if initial_handler:
-            # If Initial handler value is provided i.e. it is not the default
-            # `test_lambda.test_handler`, then create another dir level so that our path is
-            # test_dir.test_lambda.test_handler
-            test_dir_path = os.path.join(tmpdir, "test_dir")
-            python_init_file = os.path.join(test_dir_path, "__init__.py")
-            os.makedirs(test_dir_path)
-            with open(python_init_file, "w"):
-                # Create __init__ file to make it a python package
-                pass
-
-            test_lambda_py = os.path.join(tmpdir, "test_dir", "test_lambda.py")
-        else:
-            test_lambda_py = os.path.join(tmpdir, "test_lambda.py")
-
-        with open(test_lambda_py, "w") as f:
-            f.write(code)
-
-        if syntax_check:
-            # Check file for valid syntax first, and that the integration does not
-            # crash when not running in Lambda (but rather a local deployment tool
-            # such as chalice's)
-            subprocess.check_call([sys.executable, test_lambda_py])
-
-        if layer is None:
-            # Install dependencies into Lambda function package
-            setup_cfg = os.path.join(tmpdir, "setup.cfg")
-            with open(setup_cfg, "w") as f:
-                f.write("[install]\nprefix=")
-
-            subprocess.check_call(
-                [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-                **subprocess_kwargs,
-            )
-            subprocess.check_call(
-                "pip install mock==3.0.0 funcsigs -t .",
-                cwd=tmpdir,
-                shell=True,
-                **subprocess_kwargs,
-            )
-            # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
-            subprocess.check_call(
-                "pip install ../*.tar.gz -t .",
-                cwd=tmpdir,
-                shell=True,
-                **subprocess_kwargs,
-            )
-
-            # Create Lambda function zip package
-            subprocess.run(
-                [
-                    "zip",
-                    "-q",
-                    "-x",
-                    "**/__pycache__/*",
-                    "-r",
-                    "lambda-function-package.zip",
-                    "./",
-                ],
-                cwd=tmpdir,
-                check=True,
-            )
-
-        else:
-            # Create Lambda function zip package
-            subprocess.run(
-                [
-                    "zip",
-                    "-q",
-                    "-x",
-                    "**/__pycache__/*",
-                    "-r",
-                    "lambda-function-package.zip",
-                    "./",
-                ],
-                cwd=tmpdir,
-                check=True,
-            )
-
-            # Create Lambda layer zip package
-            from scripts.build_aws_lambda_layer import build_packaged_zip
-
-            build_packaged_zip(
-                dest_abs_path=tmpdir,
-                make_dist=True,
-                out_zip_filename="lambda-layer-package.zip",
-            )
+        os.mkdir(base_dir)
+        _create_lambda_package(
+            base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
+        )
 
         @add_finalizer
         def clean_up():
@@ -202,7 +211,7 @@ def run_lambda_function(
 
     if layer is not None:
         with open(
-            os.path.join(tmpdir, "lambda-layer-package.zip"), "rb"
+            os.path.join(base_dir, "lambda-layer-package.zip"), "rb"
         ) as lambda_layer_zip:
             response = client.publish_layer_version(
                 LayerName="python-serverless-sdk-test",
@@ -223,7 +232,7 @@ def run_lambda_function(
     full_fn_name = fn_name + runtime.replace(".", "")
     try:
         with open(
-            os.path.join(tmpdir, "lambda-function-package.zip"), "rb"
+            os.path.join(base_dir, "lambda-function-package.zip"), "rb"
         ) as lambda_function_zip:
             client.create_function(
                 Description="Created as part of testsuite for getsentry/sentry-python",
@@ -240,8 +249,7 @@ def run_lambda_function(
             waiter = client.get_waiter("function_active_v2")
             waiter.wait(FunctionName=full_fn_name)
     except client.exceptions.ResourceConflictException:
-        # Ignore if function is already existing
-        pass
+        print("Lambda function already exists, this is fine, we will just invoke it.")
 
     response = client.invoke(
         FunctionName=full_fn_name,
