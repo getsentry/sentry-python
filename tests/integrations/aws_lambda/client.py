@@ -6,14 +6,17 @@ import subprocess
 import boto3
 import base64
 
+# export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID=..
+# export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY=...
+# export SENTRY_PYTHON_TEST_AWS_IAM_ROLE="arn:aws:iam::920901907255:role/service-role/lambda"
 
 AWS_REGION_NAME = "us-east-1"
 AWS_ENDPOINT_LOCALSTACK = "http://localhost:4566"
-AWS_LAMBDA_EXECUTION_ROLE_ARN = None
 AWS_FAKE_CREDS_FOR_LOCALSTACK = {
-    "aws_access_key_id": "foobar",
-    "aws_secret_access_key": "foobar",
+    "aws_access_key_id": os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
+    "aws_secret_access_key": os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
 }
+AWS_LAMBDA_EXECUTION_ROLE_ARN = os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"]
 
 
 def get_or_create_lambda_execution_role():
@@ -64,7 +67,7 @@ def get_boto_client():
 
     return boto3.client(
         "lambda",
-        endpoint_url=AWS_ENDPOINT_LOCALSTACK,
+        # endpoint_url=AWS_ENDPOINT_LOCALSTACK,
         region_name=AWS_REGION_NAME,
         **AWS_FAKE_CREDS_FOR_LOCALSTACK,
     )
