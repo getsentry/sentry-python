@@ -649,7 +649,7 @@ class Transaction(Span):
         return self
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
 
@@ -957,7 +957,7 @@ class NoOpSpan(Span):
         return {}
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
         pass
 
     def set_measurement(self, name, value, unit=""):
