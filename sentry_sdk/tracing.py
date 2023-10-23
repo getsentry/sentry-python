@@ -448,7 +448,7 @@ class Span(object):
         return self.status == "ok"
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
         # Note: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
         """Sets the end timestamp of the span.
@@ -472,6 +472,8 @@ class Span(object):
 
         try:
             if end_timestamp:
+                if isinstance(end_timestamp, float):
+                    end_timestamp = datetime.utcfromtimestamp(end_timestamp)
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
