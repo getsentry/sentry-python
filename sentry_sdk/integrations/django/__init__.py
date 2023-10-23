@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
+import inspect
 import sys
 import threading
 import weakref
@@ -665,12 +666,21 @@ def _set_db_data(span, cursor_or_db):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
-    connection_params = (
-        cursor_or_db.connection.get_dsn_parameters()
-        if hasattr(cursor_or_db, "connection")
+    if (
+        hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
-        else db.get_connection_params()
-    )
+        and inspect.isfunction(cursor_or_db.connection.get_dsn_parameters)
+    ):
+        # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
+        # actually has a `connection` and the `connection` has a `get_dsn_parameters`
+        # attribute, only to throw an error once you actually want to call it.
+        # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
+        # function.
+        connection_params = cursor_or_db.connection.get_dsn_parameters()
+
+    else:
+        connection_params = db.get_connection_params()
+
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
         span.set_data(SPANDATA.DB_NAME, db_name)

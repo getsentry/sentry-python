@@ -8,12 +8,20 @@ import pytest
 
 from sentry_sdk import capture_message, configure_scope
 from sentry_sdk.integrations.sanic import SanicIntegration
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
 from sanic.exceptions import SanicException
 
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Container
+    from typing import Any, Optional
+
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
+PERFORMANCE_SUPPORTED = SANIC_VERSION >= (21, 9)
 
 
 @pytest.fixture
@@ -48,6 +56,10 @@ def app():
     def hi_with_id(request, message_id):
         capture_message("hi with id")
         return response.text("ok with id")
+
+    @app.route("/500")
+    def fivehundred(_):
+        1 / 0
 
     return app
 
@@ -88,7 +100,7 @@ def test_request_data(sentry_init, app, capture_events):
         ("/message/123456", "hi_with_id", "component"),
     ],
 )
-def test_transaction(
+def test_transaction_name(
     sentry_init, app, capture_events, url, expected_transaction, expected_source
 ):
     sentry_init(integrations=[SanicIntegration()])
@@ -284,3 +296,114 @@ def test_concurrency(sentry_init, app):
 
     with configure_scope() as scope:
         assert not scope._tags
+
+
+class TransactionTestConfig:
+    """
+    Data class to store configurations for each performance transaction test run, including
+    both the inputs and relevant expected results.
+    """
+
+    def __init__(
+        self,
+        integration_args,
+        url,
+        expected_status,
+        expected_transaction_name,
+        expected_source=None,
+    ):
+        # type: (Iterable[Optional[Container[int]]], str, int, Optional[str], Optional[str]) -> None
+        """
+        expected_transaction_name of None indicates we expect to not receive a transaction
+        """
+        self.integration_args = integration_args
+        self.url = url
+        self.expected_status = expected_status
+        self.expected_transaction_name = expected_transaction_name
+        self.expected_source = expected_source
+
+
+@pytest.mark.skipif(
+    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
+)
+@pytest.mark.parametrize(
+    "test_config",
+    [
+        TransactionTestConfig(
+            # Transaction for successful page load
+            integration_args=(),
+            url="/message",
+            expected_status=200,
+            expected_transaction_name="hi",
+            expected_source=TRANSACTION_SOURCE_COMPONENT,
+        ),
+        TransactionTestConfig(
+            # Transaction still recorded when we have an internal server error
+            integration_args=(),
+            url="/500",
+            expected_status=500,
+            expected_transaction_name="fivehundred",
+            expected_source=TRANSACTION_SOURCE_COMPONENT,
+        ),
+        TransactionTestConfig(
+            # By default, no transaction when we have a 404 error
+            integration_args=(),
+            url="/404",
+            expected_status=404,
+            expected_transaction_name=None,
+        ),
+        TransactionTestConfig(
+            # With no ignored HTTP statuses, we should get transactions for 404 errors
+            integration_args=(None,),
+            url="/404",
+            expected_status=404,
+            expected_transaction_name="/404",
+            expected_source=TRANSACTION_SOURCE_URL,
+        ),
+        TransactionTestConfig(
+            # Transaction can be suppressed for other HTTP statuses, too, by passing config to the integration
+            integration_args=({200},),
+            url="/message",
+            expected_status=200,
+            expected_transaction_name=None,
+        ),
+    ],
+)
+def test_transactions(test_config, sentry_init, app, capture_events):
+    # type: (TransactionTestConfig, Any, Any, Any) -> None
+
+    # Init the SanicIntegration with the desired arguments
+    sentry_init(
+        integrations=[SanicIntegration(*test_config.integration_args)],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    # Make request to the desired URL
+    _, response = app.test_client.get(test_config.url)
+    assert response.status == test_config.expected_status
+
+    # Extract the transaction events by inspecting the event types. We should at most have 1 transaction event.
+    transaction_events = [
+        e for e in events if "type" in e and e["type"] == "transaction"
+    ]
+    assert len(transaction_events) <= 1
+
+    # Get the only transaction event, or set to None if there are no transaction events.
+    (transaction_event, *_) = [*transaction_events, None]
+
+    # We should have no transaction event if and only if we expect no transactions
+    assert (transaction_event is None) == (
+        test_config.expected_transaction_name is None
+    )
+
+    # If a transaction was expected, ensure it is correct
+    assert (
+        transaction_event is None
+        or transaction_event["transaction"] == test_config.expected_transaction_name
+    )
+    assert (
+        transaction_event is None
+        or transaction_event["transaction_info"]["source"]
+        == test_config.expected_source
+    )
