@@ -180,9 +180,12 @@ def run_lambda_function(
     """
     subprocess_kwargs = dict(subprocess_kwargs)
 
-    function_hash = hashlib.md5((code + SDK_VERSION).encode("utf-8")).hexdigest()
-    fn_name = "test_function_{}".format(function_hash)
-    full_fn_name = fn_name + "_" + runtime.replace(".", "")
+    function_hash = hashlib.shake_256((code + SDK_VERSION).encode("utf-8")).hexdigest(5)
+    fn_name = "tstfun_{}".format(function_hash)
+    full_fn_name = fn_name + "_" + runtime.replace(".", "").replace("python", "py")
+    import ipdb
+
+    ipdb.set_trace()
 
     function_exists_in_aws = True
     try:
