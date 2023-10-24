@@ -19,13 +19,13 @@ if django.VERSION >= (2, 0):
 else:
     from django.conf.urls import url as re_path, include
 
-from sentry_sdk.integrations.django.transactions import RavenResolver
-
-
 if django.VERSION < (1, 9):
     included_url_conf = (re_path(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "", ""
 else:
     included_url_conf = ((re_path(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "")
+
+from sentry_sdk.integrations.django.transactions import RavenResolver
+
 
 example_url_conf = (
     re_path(r"^api/(?P<project_id>[\w_-]+)/store/$", lambda x: ""),

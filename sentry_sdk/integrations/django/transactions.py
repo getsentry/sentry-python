@@ -12,13 +12,14 @@ import re
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from django.urls.resolvers import URLResolver
     from typing import Dict
     from typing import List
     from typing import Optional
+    from django.urls.resolvers import URLPattern
     from typing import Tuple
     from typing import Union
     from re import Pattern
-    from django.urls.resolvers import URLPattern, URLResolver
 
 from django import VERSION as DJANGO_VERSION
 
