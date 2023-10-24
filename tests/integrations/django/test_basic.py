@@ -647,6 +647,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
         if span.get("op") == "db":
             data = span.get("data")
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
+            assert connections["postgres"].get_connection_params() == "abc"
             assert (
                 data.get(SPANDATA.DB_NAME)
                 == connections["postgres"].get_connection_params()["database"]
