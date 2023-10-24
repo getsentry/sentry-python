@@ -752,6 +752,14 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
+    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
+    # as the `headers` dict in the event passed to the Lambda function.
+    payload = {
+        "headers": {
+            "sentry-trace": sentry_trace_header,
+        }
+    }
+
     envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
@@ -763,7 +771,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
             raise Exception("Oh!")
         """
         ),
-        payload=b'{"sentry_trace": "%s"}' % sentry_trace_header.encode(),
+        payload=json.dumps(payload).encode(),
     )
 
     (msg_event, error_event, transaction_event) = envelopes
@@ -791,6 +799,14 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
+    # We simulate here AWS Api Gateway's behavior of passing HTTP headers
+    # as the `headers` dict in the event passed to the Lambda function.
+    payload = {
+        "headers": {
+            "sentry-trace": sentry_trace_header,
+        }
+    }
+
     envelopes, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
@@ -802,7 +818,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
             raise Exception("Oh!")
         """
         ),
-        payload=b'{"sentry_trace": "%s"}' % sentry_trace_header.encode(),
+        payload=json.dumps(payload).encode(),
     )
 
     (msg_event, error_event) = events
