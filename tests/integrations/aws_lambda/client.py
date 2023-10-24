@@ -180,77 +180,94 @@ def run_lambda_function(
 
     function_hash = hashlib.md5(code.encode("utf-8")).hexdigest()
     fn_name = "test_function_{}".format(function_hash)
-
-    tmp_base_dir = tempfile.gettempdir()
-    base_dir = os.path.join(tmp_base_dir, fn_name)
-    dir_already_existing = os.path.isdir(base_dir)
-
-    if dir_already_existing:
-        print("Lambda function directory already exists, skipping creation")
-
-    if not dir_already_existing:
-        os.mkdir(base_dir)
-        _create_lambda_package(
-            base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
-        )
-
-        @add_finalizer
-        def clean_up():
-            # this closes the web socket so we don't get a
-            #   ResourceWarning: unclosed <ssl.SSLSocket ... >
-            # warning on every test
-            # based on https://github.com/boto/botocore/pull/1810
-            # (if that's ever merged, this can just become client.close())
-            session = client._endpoint.http_session
-            managers = [session._manager] + list(session._proxy_managers.values())
-            for manager in managers:
-                manager.clear()
-
-    layers = []
-    environment = {}
-    handler = initial_handler or "test_lambda.test_handler"
-
-    if layer is not None:
-        with open(
-            os.path.join(base_dir, "lambda-layer-package.zip"), "rb"
-        ) as lambda_layer_zip:
-            response = client.publish_layer_version(
-                LayerName="python-serverless-sdk-test",
-                Description="Created as part of testsuite for getsentry/sentry-python",
-                Content={"ZipFile": lambda_layer_zip.read()},
-            )
-
-        layers = [response["LayerVersionArn"]]
-        handler = "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler"
-        environment = {
-            "Variables": {
-                "SENTRY_INITIAL_HANDLER": initial_handler or "test_lambda.test_handler",
-                "SENTRY_DSN": "https://123abc@example.com/123",
-                "SENTRY_TRACES_SAMPLE_RATE": "1.0",
-            }
-        }
-
     full_fn_name = fn_name + runtime.replace(".", "")
+
+    function_exists_in_aws = True
     try:
-        with open(
-            os.path.join(base_dir, "lambda-function-package.zip"), "rb"
-        ) as lambda_function_zip:
-            client.create_function(
-                Description="Created as part of testsuite for getsentry/sentry-python",
-                FunctionName=full_fn_name,
-                Runtime=runtime,
-                Timeout=timeout,
-                Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
-                Handler=handler,
-                Code={"ZipFile": lambda_function_zip.read()},
-                Environment=environment,
-                Layers=layers,
+        client.get_function(
+            FunctionName=full_fn_name,
+        )
+        print(
+            "Lambda function in AWS already existing, taking it (and do not create a local one)"
+        )
+    except client.exceptions.ResourceNotFoundException:
+        function_exists_in_aws = False
+
+    if not function_exists_in_aws:
+        tmp_base_dir = tempfile.gettempdir()
+        base_dir = os.path.join(tmp_base_dir, fn_name)
+        dir_already_existing = os.path.isdir(base_dir)
+
+        if dir_already_existing:
+            print("Local Lambda function directory already exists, skipping creation")
+
+        if not dir_already_existing:
+            os.mkdir(base_dir)
+            _create_lambda_package(
+                base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
             )
 
-            waiter = client.get_waiter("function_active_v2")
-            waiter.wait(FunctionName=full_fn_name)
-    except client.exceptions.ResourceConflictException:
-        print("Lambda function already exists, this is fine, we will just invoke it.")
+            @add_finalizer
+            def clean_up():
+                # this closes the web socket so we don't get a
+                #   ResourceWarning: unclosed <ssl.SSLSocket ... >
+                # warning on every test
+                # based on https://github.com/boto/botocore/pull/1810
+                # (if that's ever merged, this can just become client.close())
+                session = client._endpoint.http_session
+                managers = [session._manager] + list(session._proxy_managers.values())
+                for manager in managers:
+                    manager.clear()
+
+        layers = []
+        environment = {}
+        handler = initial_handler or "test_lambda.test_handler"
+
+        if layer is not None:
+            with open(
+                os.path.join(base_dir, "lambda-layer-package.zip"), "rb"
+            ) as lambda_layer_zip:
+                response = client.publish_layer_version(
+                    LayerName="python-serverless-sdk-test",
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                    Content={"ZipFile": lambda_layer_zip.read()},
+                )
+
+            layers = [response["LayerVersionArn"]]
+            handler = (
+                "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler"
+            )
+            environment = {
+                "Variables": {
+                    "SENTRY_INITIAL_HANDLER": initial_handler
+                    or "test_lambda.test_handler",
+                    "SENTRY_DSN": "https://123abc@example.com/123",
+                    "SENTRY_TRACES_SAMPLE_RATE": "1.0",
+                }
+            }
+
+        try:
+            with open(
+                os.path.join(base_dir, "lambda-function-package.zip"), "rb"
+            ) as lambda_function_zip:
+                client.create_function(
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                    FunctionName=full_fn_name,
+                    Runtime=runtime,
+                    Timeout=timeout,
+                    Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
+                    Handler=handler,
+                    Code={"ZipFile": lambda_function_zip.read()},
+                    Environment=environment,
+                    Layers=layers,
+                )
+
+                waiter = client.get_waiter("function_active_v2")
+                waiter.wait(FunctionName=full_fn_name)
+        except client.exceptions.ResourceConflictException:
+            print(
+                "Lambda function already exists, this is fine, we will just invoke it."
+            )
 
     response = client.invoke(
         FunctionName=full_fn_name,
@@ -261,6 +278,15 @@ def run_lambda_function(
 
     assert 200 <= response["StatusCode"] < 300, response
     return response
+
+
+# This is for inspecting new Python runtime environments in AWS Lambda
+# If you need to debug a new runtime, use this REPL to run arbitrary Python or bash commands
+# in that runtime in a Lambda function:
+#
+#    pip3 install click
+#    python3 tests/integrations/aws_lambda/client.py --runtime=python4.0
+#
 
 
 _REPL_CODE = """
