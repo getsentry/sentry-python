@@ -137,7 +137,8 @@ def _wrap_middleware(middleware, middleware_name):
             self.get_response = get_response
             self._call_method = None
             if self.async_capable:
-                super(SentryWrappingMiddleware, self).__init__(get_response)
+                ##super(SentryWrappingMiddleware, self).__init__(get_response)
+                super(SentryWrappingMiddleware, self).__init__()
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
