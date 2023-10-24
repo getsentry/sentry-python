@@ -63,9 +63,6 @@ class RavenResolver(object):
         To:
         > "{sport_slug}/athletes/{athlete_slug}/"
         """
-        # remove optional params
-        # TODO(dcramer): it'd be nice to change these into [%s] but it currently
-        # conflicts with the other rules because we're doing regexp matches
 
         if DJANGO_VERSION >= (2, 0):
             from django.urls.resolvers import RoutePattern
@@ -77,6 +74,9 @@ class RavenResolver(object):
 
         result = get_regex(pattern).pattern
 
+        # remove optional params
+        # TODO(dcramer): it'd be nice to change these into [%s] but it currently
+        # conflicts with the other rules because we're doing regexp matches
         # rather than parsing tokens
         result = self._optional_group_matcher.sub(lambda m: "%s" % m.group(1), result)
 
