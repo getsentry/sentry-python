@@ -63,7 +63,8 @@ class RavenResolver(object):
         To:
         > "{sport_slug}/athletes/{athlete_slug}/"
         """
-
+        # "new-style" path patterns can be parsed directly without turning them
+        # into regexes first
         if DJANGO_VERSION >= (2, 0):
             from django.urls.resolvers import RoutePattern
 
