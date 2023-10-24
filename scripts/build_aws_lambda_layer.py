@@ -90,20 +90,34 @@ class LayerBuilder:
         )
 
 
-def build_packaged_zip(dest_abs_path=None, make_dist=False, out_zip_filename=None):
-    if dest_abs_path is None:
-        dest_abs_path = tempfile.mkdtemp()
+def build_packaged_zip(base_dir=None, make_dist=False, out_zip_filename=None):
+    if base_dir is None:
+        base_dir = tempfile.mkdtemp()
 
     if make_dist:
+        # Same thing that is done by "make dist"
+        # (which is a dependency of "make aws-lambda-layer")
         subprocess.check_call(
             [sys.executable, "setup.py", "sdist", "bdist_wheel", "-d", DIST_PATH],
         )
 
-    layer_builder = LayerBuilder(dest_abs_path, out_zip_filename=out_zip_filename)
+    layer_builder = LayerBuilder(base_dir, out_zip_filename=out_zip_filename)
     layer_builder.make_directories()
     layer_builder.install_python_packages()
     layer_builder.create_init_serverless_sdk_package()
     layer_builder.zip()
+
+    print("Created Lambda Layer package with this information:")
+    print(" - Base directory for generating package: {}".format(layer_builder.base_dir))
+    print(
+        " - Created Python SDK distribution (in `{}`): {}".format(
+            os.path.abspath(DIST_PATH), make_dist
+        )
+    )
+    if not make_dist:
+        print("    If 'False' we assume it was already created (by 'make dist')")
+    print(" - Package zip filename: {}".format(layer_builder.out_zip_filename))
+    print(" - Copied package zip to: {}".format(os.path.abspath(DIST_PATH)))
 
 
 if __name__ == "__main__":

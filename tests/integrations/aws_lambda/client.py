@@ -104,7 +104,7 @@ def _create_lambda_package(
         from scripts.build_aws_lambda_layer import build_packaged_zip
 
         build_packaged_zip(
-            dest_abs_path=base_dir,
+            base_dir=base_dir,
             make_dist=True,
             out_zip_filename="lambda-layer-package.zip",
         )
