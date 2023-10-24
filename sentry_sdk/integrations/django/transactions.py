@@ -73,11 +73,11 @@ class RavenResolver(object):
         # conflicts with the other rules because we're doing regexp matches
 
         if DJANGO_VERSION >= (2, 0) and isinstance(pattern.pattern, RoutePattern):
-            result = self._new_style_group_matcher.sub(
+            return self._new_style_group_matcher.sub(
                 lambda m: "{%s}" % m.group(2), pattern.pattern._route
             )
-        else:
-            result = get_regex(pattern).pattern
+
+        result = get_regex(pattern).pattern
 
         # rather than parsing tokens
         result = self._optional_group_matcher.sub(lambda m: "%s" % m.group(1), result)
