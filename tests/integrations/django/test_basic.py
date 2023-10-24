@@ -648,6 +648,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
             data = span.get("data")
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
             conn_params = connections["postgres"].get_connection_params()
+            assert data.get(SPANDATA.DB_NAME) is not None
             assert data.get(SPANDATA.DB_NAME) == conn_params.get(
                 "database"
             ) or conn_params.get("dbname")
