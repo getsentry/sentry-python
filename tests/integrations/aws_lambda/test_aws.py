@@ -3,8 +3,8 @@
 
 This testsuite uses boto3 to upload actual Lambda functions to AWS Lambda and invoke them.
 
-For running test locally you need to set these env vars
-(You can find the values in the Sentry password manager by search for "AWS Lambda for Python SDK Tests"):
+For running test locally you need to set these env vars:
+(You can find the values in the Sentry password manager by searching for "AWS Lambda for Python SDK Tests").
 
     export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID="..."
     export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY="..."
