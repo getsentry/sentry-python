@@ -104,14 +104,10 @@ def envelope_processor(envelope):
 class TestTransport(HttpTransport):
     def _send_event(self, event):
         event = event_processor(event)
-        print("x")  # force AWS lambda logging to start a new line
-                    # (when printing a stacktrace it swallows the \\n from the next print statement)
         print("\\nEVENT: {}\\n".format(json.dumps(event)))
 
     def _send_envelope(self, envelope):
         envelope = envelope_processor(envelope)
-        print("x")  # force AWS lambda logging to start a new line
-                    # (when printing a stacktrace it swallows the \\n from the next print statement)
         print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
@@ -162,8 +158,13 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             initial_handler=initial_handler,
         )
 
-        # for better debugging
-        response["LogResult"] = base64.b64decode(response["LogResult"]).splitlines()
+        # Make sure the "ENVELOPE:" and "EVENT:" log entries are always starting a new line. (Sometimes they don't.)
+        response["LogResult"] = (
+            base64.b64decode(response["LogResult"])
+            .replace(b"EVENT:", b"\nEVENT:")
+            .replace(b"ENVELOPE:", b"\nENVELOPE:")
+            .splitlines()
+        )
         response["Payload"] = json.loads(response["Payload"].read().decode("utf-8"))
         del response["ResponseMetadata"]
 
