@@ -107,17 +107,17 @@ def build_packaged_zip(base_dir=None, make_dist=False, out_zip_filename=None):
     layer_builder.create_init_serverless_sdk_package()
     layer_builder.zip()
 
+    # Just for debugging
+    dist_path = os.path.abspath(DIST_PATH)
     print("Created Lambda Layer package with this information:")
     print(" - Base directory for generating package: {}".format(layer_builder.base_dir))
     print(
-        " - Created Python SDK distribution (in `{}`): {}".format(
-            os.path.abspath(DIST_PATH), make_dist
-        )
+        " - Created Python SDK distribution (in `{}`): {}".format(dist_path, make_dist)
     )
     if not make_dist:
         print("    If 'False' we assume it was already created (by 'make dist')")
     print(" - Package zip filename: {}".format(layer_builder.out_zip_filename))
-    print(" - Copied package zip to: {}".format(os.path.abspath(DIST_PATH)))
+    print(" - Copied package zip to: {}".format(dist_path))
 
 
 if __name__ == "__main__":
