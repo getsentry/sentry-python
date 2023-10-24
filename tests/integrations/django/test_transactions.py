@@ -2,24 +2,23 @@ from __future__ import absolute_import
 
 import pytest
 import django
-from werkzeug.test import Client
 
-# django<2.0 had only `url` with regex based patterns.
-# django>=2.0 renamed `url` to `re_path`, and additionally introduced `path`
-# for new style URL patterns, e.g. <article_id:int>.
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 if django.VERSION >= (2, 0):
     from django.urls import path, re_path
+    from django.urls.converters import PathConverter
     from django.conf.urls import include
 else:
+    # django<2.0 has only `url` with regex based patterns.
+    # django>=2.0 renames `url` to `re_path`, and additionally introduces `path`
+    # for new style URL patterns, e.g. <int:article_id>.
     from django.conf.urls import url as re_path, include
 
 from sentry_sdk.integrations.django.transactions import RavenResolver
-from tests.integrations.django.myapp.wsgi import application
-
-
-@pytest.fixture
-def client():
-    return Client(application)
 
 
 if django.VERSION < (1, 9):
@@ -73,7 +72,10 @@ def test_resolver_re_path_multiple_groups():
     assert result == "/api/{project_id}/product/{pid}/"
 
 
-@pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
+@pytest.mark.skipif(
+    django.VERSION < (2, 0),
+    reason="Django>=2.0 required for <converter:parameter> patterns",
+)
 def test_resolver_path_group():
     url_conf = (path("api/v2/<int:project_id>/store/", lambda x: ""),)
     resolver = RavenResolver()
@@ -81,9 +83,35 @@ def test_resolver_path_group():
     assert result == "/api/v2/{project_id}/store/"
 
 
-@pytest.mark.skipif(django.VERSION < (2, 0), reason="Requires Django > 2.0")
+@pytest.mark.skipif(
+    django.VERSION < (2, 0),
+    reason="Django>=2.0 required for <converter:parameter> patterns",
+)
 def test_resolver_path_multiple_groups():
-    url_conf = (path("api/v2/<int:project_id>/product/<int:pid>", lambda x: ""),)
+    url_conf = (path("api/v2/<str:project_id>/product/<int:pid>", lambda x: ""),)
     resolver = RavenResolver()
-    result = resolver.resolve("/api/v2/1234/product/5689", url_conf)
+    result = resolver.resolve("/api/v2/myproject/product/5689", url_conf)
     assert result == "/api/v2/{project_id}/product/{pid}"
+
+
+@pytest.mark.skipif(
+    django.VERSION < (2, 0),
+    reason="Django>=2.0 required for <converter:parameter> patterns",
+)
+def test_resolver_path_complex_path():
+    class CustomPathConverter(PathConverter):
+        regex = r"[^/]+(/[^/]+){0,2}"
+
+        def to_python(self, value):
+            return value.split("/")
+
+        def to_url(self, value):
+            return "/".join(value)
+
+    with mock.patch(
+        "django.urls.resolvers.get_converter", return_value=CustomPathConverter
+    ):
+        url_conf = (path("api/v3/<path:custom_path>", lambda x: ""),)
+        resolver = RavenResolver()
+        result = resolver.resolve("/api/v3/abc/def/ghi", url_conf)
+        assert result == "/api/v3/{custom_path}"

@@ -57,7 +57,7 @@ class RavenResolver(object):
     _cache = {}  # type: Dict[URLPattern, str]
 
     def _simplify(self, pattern):
-        # type: (str) -> str
+        # type: (Union[URLPattern, URLResolver]) -> str
         r"""
         Clean up urlpattern regexes into something readable by humans:
 
