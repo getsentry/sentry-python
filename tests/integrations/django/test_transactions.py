@@ -115,3 +115,14 @@ def test_resolver_path_complex_path():
         resolver = RavenResolver()
         result = resolver.resolve("/api/v3/abc/def/ghi", url_conf)
         assert result == "/api/v3/{custom_path}"
+
+
+@pytest.mark.skipif(
+    django.VERSION < (2, 0),
+    reason="Django>=2.0 required for <converter:parameter> patterns",
+)
+def test_resolver_path_no_converter():
+    url_conf = (path("api/v4/<project_id>", lambda x: ""),)
+    resolver = RavenResolver()
+    result = resolver.resolve("/api/v4/myproject", url_conf)
+    assert result == "/api/v4/{project_id}"
