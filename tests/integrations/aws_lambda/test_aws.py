@@ -182,7 +182,7 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
 
 
 def test_basic(run_lambda_function):
-    envelopes, events, response = run_lambda_function(
+    _, events, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -233,7 +233,7 @@ def test_initialization_order(run_lambda_function):
     as seen by AWS already runs. At this point at least draining the queue
     should work."""
 
-    envelopes, events, _response = run_lambda_function(
+    _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -254,7 +254,7 @@ def test_initialization_order(run_lambda_function):
 
 
 def test_request_data(run_lambda_function):
-    envelopes, events, _response = run_lambda_function(
+    _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -306,7 +306,7 @@ def test_request_data(run_lambda_function):
 
 
 def test_init_error(run_lambda_function, lambda_runtime):
-    envelopes, events, response = run_lambda_function(
+    _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -323,7 +323,7 @@ def test_init_error(run_lambda_function, lambda_runtime):
 
 
 def test_timeout_error(run_lambda_function):
-    envelopes, events, response = run_lambda_function(
+    _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -366,7 +366,7 @@ def test_timeout_error(run_lambda_function):
 
 
 def test_performance_no_error(run_lambda_function):
-    envelopes, events, response = run_lambda_function(
+    envelopes, _, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -388,7 +388,7 @@ def test_performance_no_error(run_lambda_function):
 
 
 def test_performance_error(run_lambda_function):
-    envelopes, events, response = run_lambda_function(
+    envelopes, _, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -477,7 +477,7 @@ def test_non_dict_event(
     batch_size,
     DictionaryContaining,  # noqa:N803
 ):
-    envelopes, events, response = run_lambda_function(
+    envelopes, _, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -572,7 +572,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    envelopes, events, response = run_lambda_function(
+    _, _, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(inspect.getsource(StringContaining))
         + dedent(inspect.getsource(DictionaryContaining))
@@ -652,7 +652,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         "test_dir.test_lambda.test_handler",
     ]:
         print("Testing Initial Handler ", initial_handler)
-        envelopes, events, response = run_lambda_function(
+        _, _, response = run_lambda_function(
             dedent(
                 """
             import sentry_sdk
@@ -685,7 +685,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
-    envelopes, events, response = run_lambda_function(
+    envelopes, _, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -718,7 +718,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
-    envelopes, events, response = run_lambda_function(
+    _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -760,7 +760,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
         }
     }
 
-    envelopes, events, response = run_lambda_function(
+    envelopes, _, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -807,7 +807,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
         }
     }
 
-    envelopes, events, response = run_lambda_function(
+    _, events, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
