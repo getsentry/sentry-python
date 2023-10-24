@@ -1,9 +1,10 @@
-import sys
-import os
-import tempfile
-import subprocess
-import boto3
 import base64
+import boto3
+import hashlib
+import os
+import subprocess
+import sys
+import tempfile
 
 AWS_REGION_NAME = "us-east-1"
 AWS_CREDENTIALS = {
@@ -177,7 +178,7 @@ def run_lambda_function(
     """
     subprocess_kwargs = dict(subprocess_kwargs)
 
-    function_hash = str(hash(code)).replace("-", "_")
+    function_hash = hashlib.md5(code.encode("utf-8")).hexdigest()
     fn_name = "test_function_{}".format(function_hash)
 
     tmp_base_dir = tempfile.gettempdir()

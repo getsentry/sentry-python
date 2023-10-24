@@ -14,3 +14,5 @@ for func in $(aws lambda list-functions --output text --query 'Functions[?starts
     echo "Deleting $func"
     aws lambda delete-function --function-name "$func"
 done
+
+echo "All done! Have a nice day!"
