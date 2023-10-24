@@ -8,14 +8,15 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+
+# django<2.0 has only `url` with regex based patterns.
+# django>=2.0 renames `url` to `re_path`, and additionally introduces `path`
+# for new style URL patterns, e.g. <int:article_id>.
 if django.VERSION >= (2, 0):
     from django.urls import path, re_path
     from django.urls.converters import PathConverter
     from django.conf.urls import include
 else:
-    # django<2.0 has only `url` with regex based patterns.
-    # django>=2.0 renames `url` to `re_path`, and additionally introduces `path`
-    # for new style URL patterns, e.g. <int:article_id>.
     from django.conf.urls import url as re_path, include
 
 from sentry_sdk.integrations.django.transactions import RavenResolver
@@ -102,19 +103,13 @@ def test_resolver_path_complex_path():
     class CustomPathConverter(PathConverter):
         regex = r"[^/]+(/[^/]+){0,2}"
 
-        def to_python(self, value):
-            return value.split("/")
-
-        def to_url(self, value):
-            return "/".join(value)
-
     with mock.patch(
         "django.urls.resolvers.get_converter", return_value=CustomPathConverter
     ):
-        url_conf = (path("api/v3/<path:custom_path>", lambda x: ""),)
+        url_conf = (path("api/v3/<custom_path:my_path>", lambda x: ""),)
         resolver = RavenResolver()
         result = resolver.resolve("/api/v3/abc/def/ghi", url_conf)
-        assert result == "/api/v3/{custom_path}"
+        assert result == "/api/v3/{my_path}"
 
 
 @pytest.mark.skipif(
