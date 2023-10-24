@@ -1,13 +1,15 @@
 """
 # AWS Lambda system tests
 
-This testsuite uses boto3 to upload actual Lambda functions to AWS Lambda.
+This testsuite uses boto3 to upload actual Lambda functions to AWS Lambda and invoke them.
 
 For running test locally you need to set these env vars (You can find the values in the Sentry password manager):
 export SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID="..."
 export SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY="..."
 
-If you need to debug a new runtime, use this REPL to figure things out:
+
+If you need to debug a new runtime, use this REPL to run arbitrary Python or bash commands
+in that runtime in a Lambda function: (see the bottom of client.py for more information.)
 
     pip3 install click
     python3 tests/integrations/aws_lambda/client.py --runtime=python4.0
