@@ -219,13 +219,13 @@ def test_basic(run_lambda_function):
     assert exception["mechanism"]["type"] == "aws_lambda"
     assert not exception["mechanism"]["handled"]
 
-    assert event["extra"]["lambda"]["function_name"].startswith("tstfun_")
+    assert event["extra"]["lambda"]["function_name"].startswith("test_")
 
     logs_url = event["extra"]["cloudwatch logs"]["url"]
     assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region=")
     assert not re.search("(=;|=$)", logs_url)
     assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
-        "/aws/lambda/tstfun_"
+        "/aws/lambda/test_"
     )
 
     log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
@@ -356,13 +356,13 @@ def test_timeout_error(run_lambda_function):
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
-    assert event["extra"]["lambda"]["function_name"].startswith("tstfun_")
+    assert event["extra"]["lambda"]["function_name"].startswith("test_")
 
     logs_url = event["extra"]["cloudwatch logs"]["url"]
     assert logs_url.startswith("https://console.aws.amazon.com/cloudwatch/home?region=")
     assert not re.search("(=;|=$)", logs_url)
     assert event["extra"]["cloudwatch logs"]["log_group"].startswith(
-        "/aws/lambda/tstfun_"
+        "/aws/lambda/test_"
     )
 
     log_stream_re = "^[0-9]{4}/[0-9]{2}/[0-9]{2}/\\[[^\\]]+][a-f0-9]+$"
@@ -389,7 +389,7 @@ def test_performance_no_error(run_lambda_function):
 
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "function.aws"
-    assert envelope["transaction"].startswith("tstfun_")
+    assert envelope["transaction"].startswith("test_")
     assert envelope["transaction"] in envelope["request"]["url"]
 
 
@@ -419,7 +419,7 @@ def test_performance_error(run_lambda_function):
 
     assert transaction_event["type"] == "transaction"
     assert transaction_event["contexts"]["trace"]["op"] == "function.aws"
-    assert transaction_event["transaction"].startswith("tstfun_")
+    assert transaction_event["transaction"].startswith("test_")
     assert transaction_event["transaction"] in transaction_event["request"]["url"]
 
 
@@ -506,7 +506,7 @@ def test_non_dict_event(
     assert error_event["contexts"]["trace"]["op"] == "function.aws"
 
     function_name = error_event["extra"]["lambda"]["function_name"]
-    assert function_name.startswith("tstfun_")
+    assert function_name.startswith("test_")
     assert error_event["transaction"] == function_name
 
     exception = error_event["exception"]["values"][0]
@@ -618,7 +618,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
                                 "aws_context": ObjectDescribedBy(
                                     type=get_lambda_bootstrap().LambdaContext,
                                     attrs={
-                                        'function_name': StringContaining("tstfun_"),
+                                        'function_name': StringContaining("test_"),
                                         'function_version': '$LATEST',
                                     }
                                 )

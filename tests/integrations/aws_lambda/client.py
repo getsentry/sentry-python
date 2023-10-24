@@ -184,8 +184,10 @@ def run_lambda_function(
     # The name needs to be short so the generated event/envelope json blobs are small enought to be output
     # in the log result of the Lambda function.
     function_hash = hashlib.shake_256((code + SDK_VERSION).encode("utf-8")).hexdigest(5)
-    fn_name = "tstfun_{}".format(function_hash)
-    full_fn_name = fn_name + "_" + runtime.replace(".", "").replace("python", "py")
+    fn_name = "test_{}".format(function_hash)
+    full_fn_name = "{}_{}".format(
+        fn_name, runtime.replace(".", "").replace("python", "py")
+    )
 
     function_exists_in_aws = True
     try:
