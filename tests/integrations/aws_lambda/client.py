@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 
+from sentry_sdk.consts import VERSION as SDK_VERSION
+
 AWS_REGION_NAME = "us-east-1"
 AWS_CREDENTIALS = {
     "aws_access_key_id": os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
@@ -178,9 +180,9 @@ def run_lambda_function(
     """
     subprocess_kwargs = dict(subprocess_kwargs)
 
-    function_hash = hashlib.md5(code.encode("utf-8")).hexdigest()
+    function_hash = hashlib.md5((code + SDK_VERSION).encode("utf-8")).hexdigest()
     fn_name = "test_function_{}".format(function_hash)
-    full_fn_name = fn_name + runtime.replace(".", "")
+    full_fn_name = fn_name + "_" + runtime.replace(".", "")
 
     function_exists_in_aws = True
     try:
