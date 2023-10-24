@@ -28,11 +28,6 @@ try:
 except ImportError:
     from django.core.urlresolvers import get_resolver
 
-try:
-    from django.urls.resolvers import RoutePattern
-except ImportError:
-    RoutePattern = type(None)
-
 
 def get_regex(resolver_or_pattern):
     # type: (Union[URLPattern, URLResolver]) -> Pattern[str]
@@ -72,10 +67,13 @@ class RavenResolver(object):
         # TODO(dcramer): it'd be nice to change these into [%s] but it currently
         # conflicts with the other rules because we're doing regexp matches
 
-        if DJANGO_VERSION >= (2, 0) and isinstance(pattern.pattern, RoutePattern):
-            return self._new_style_group_matcher.sub(
-                lambda m: "{%s}" % m.group(2), pattern.pattern._route
-            )
+        if DJANGO_VERSION >= (2, 0):
+            from django.urls.resolvers import RoutePattern
+
+            if isinstance(pattern.pattern, RoutePattern):
+                return self._new_style_group_matcher.sub(
+                    lambda m: "{%s}" % m.group(2), pattern.pattern._route
+                )
 
         result = get_regex(pattern).pattern
 
