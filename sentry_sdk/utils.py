@@ -1159,7 +1159,7 @@ def _is_contextvars_broken():
         pass
 
     try:
-        import greenlet
+        import greenlet  # type: ignore
         from eventlet.patcher import is_monkey_patched  # type: ignore
 
         version_tuple = tuple(
