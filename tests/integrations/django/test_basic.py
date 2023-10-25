@@ -1034,6 +1034,7 @@ def test_csrf(sentry_init, client):
     assert b"".join(content) == b"ok"
 
 
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
