@@ -1,5 +1,6 @@
 import base64
 import boto3
+import glob
 import hashlib
 import os
 import subprocess
@@ -25,21 +26,56 @@ def _install_dependencies(base_dir, subprocess_kwargs):
     with open(setup_cfg, "w") as f:
         f.write("[install]\nprefix=")
 
+    # Install requirements for Lambda Layer (these are more limited than the SDK requirements,
+    # because Lambda does not support the newest versions of some packages)
     subprocess.check_call(
-        [sys.executable, "setup.py", "sdist", "-d", os.path.join(base_dir, "..")],
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            "aws-lambda-layer-requirements.txt",
+            "--target",
+            base_dir,
+        ],
         **subprocess_kwargs,
     )
+    # Install requirements used for testing
     subprocess.check_call(
-        "pip install mock==3.0.0 funcsigs -t .",
-        cwd=base_dir,
-        shell=True,
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "mock==3.0.0",
+            "funcsigs",
+            "--target",
+            base_dir,
+        ],
         **subprocess_kwargs,
     )
-    # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
+    # Create a source distribution of the Sentry SDK (in parent directory of base_dir)
     subprocess.check_call(
-        "pip install ../*.tar.gz -t .",
-        cwd=base_dir,
-        shell=True,
+        [sys.executable, "setup.py", "sdist", "--dist-dir", os.path.dirname(base_dir)],
+        **subprocess_kwargs,
+    )
+    # Install the created Sentry SDK source distribution into the target directory
+    # Do not install the dependencies of the SDK, because they where installed by aws-lambda-layer-requirements.txt above
+    source_distribution_archive = glob.glob(
+        "{}/*.tar.gz".format(os.path.dirname(base_dir))
+    )[0]
+    subprocess.check_call(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            source_distribution_archive,
+            "--no-deps",
+            "--target",
+            base_dir,
+        ],
         **subprocess_kwargs,
     )
 
@@ -67,7 +103,8 @@ def _create_lambda_package(
     base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
 ):
     """
-    Creates deployable packages (as zip files) for AWS Lambda function and layer
+    Creates deployable packages (as zip files) for AWS Lambda function
+    and optional the accompanying Sentry Lambda layer
     """
     if initial_handler:
         # If Initial handler value is provided i.e. it is not the default
