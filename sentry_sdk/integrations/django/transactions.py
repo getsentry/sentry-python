@@ -70,7 +70,11 @@ class RavenResolver(object):
         """
         # "new-style" path patterns can be parsed directly without turning them
         # into regexes first
-        if RoutePattern is not None and isinstance(pattern.pattern, RoutePattern):
+        if (
+            RoutePattern is not None
+            and hasattr(pattern, "pattern")
+            and isinstance(pattern.pattern, RoutePattern)
+        ):
             return self._new_style_group_matcher.sub(
                 lambda m: "{%s}" % m.group(2), pattern.pattern._route
             )
