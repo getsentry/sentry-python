@@ -17,7 +17,7 @@ AWS_LAMBDA_EXECUTION_ROLE_NAME = "lambda-ex"
 AWS_LAMBDA_EXECUTION_ROLE_ARN = None
 
 
-def _install_depencencies(base_dir, subprocess_kwargs):
+def _install_dependencies(base_dir, subprocess_kwargs):
     """
     Installs dependencies for AWS Lambda function
     """
@@ -94,7 +94,7 @@ def _create_lambda_package(
         subprocess.check_call([sys.executable, test_lambda_py])
 
     if layer is None:
-        _install_depencencies(base_dir, subprocess_kwargs)
+        _install_dependencies(base_dir, subprocess_kwargs)
         _create_lambda_function_zip(base_dir)
 
     else:
@@ -173,7 +173,7 @@ def run_lambda_function(
     subprocess_kwargs=(),
 ):
     """
-    Creates a Lambda function with the given code, and invoces it.
+    Creates a Lambda function with the given code, and invokes it.
 
     If the same code is run multiple times the function will NOT be
     created anew each time but the existing function will be reused.
@@ -181,7 +181,7 @@ def run_lambda_function(
     subprocess_kwargs = dict(subprocess_kwargs)
 
     # Making a unique function name depending on all the code that is run in it (function code plus SDK version)
-    # The name needs to be short so the generated event/envelope json blobs are small enought to be output
+    # The name needs to be short so the generated event/envelope json blobs are small enough to be output
     # in the log result of the Lambda function.
     function_hash = hashlib.shake_256((code + SDK_VERSION).encode("utf-8")).hexdigest(5)
     fn_name = "test_{}".format(function_hash)
