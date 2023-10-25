@@ -1159,9 +1159,18 @@ def _is_contextvars_broken():
         pass
 
     try:
+        import greenlet  # type: ignore
         from eventlet.patcher import is_monkey_patched  # type: ignore
 
-        if is_monkey_patched("thread"):
+        greenlet_version = parse_version(greenlet.__version__)
+
+        if greenlet_version is None:
+            logger.error(
+                "Internal error in Sentry SDK: Could not parse Greenlet version from greenlet.__version__."
+            )
+            return False
+
+        if is_monkey_patched("thread") and greenlet_version < (0, 5):
             return True
     except ImportError:
         pass
