@@ -87,6 +87,7 @@ class Transport(object):
         self,
         timeout,  # type: float
         callback=None,  # type: Optional[Any]
+        shutdown=False,  # type: bool
     ):
         # type: (...) -> None
         """Wait `timeout` seconds for the current events to be sent out."""
