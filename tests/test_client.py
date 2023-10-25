@@ -25,6 +25,12 @@ from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any, Optional, Union
+    from sentry_sdk._types import Event
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -1196,3 +1202,114 @@ def test_debug_option(
         assert "something is wrong" in caplog.text
     else:
         assert "something is wrong" not in caplog.text
+
+
+class IssuesSamplerTestConfig:
+    def __init__(
+        self,
+        expected_events,
+        sampler_function=None,
+        sample_rate=None,
+        exception_to_raise=Exception,
+    ):
+        # type: (int, Optional[Callable[[Event], Union[float, bool]]], Optional[float], type[Exception]) -> None
+        self.sampler_function_mock = (
+            None
+            if sampler_function is None
+            else mock.MagicMock(side_effect=sampler_function)
+        )
+        self.expected_events = expected_events
+        self.sample_rate = sample_rate
+        self.exception_to_raise = exception_to_raise
+
+    def init_sdk(self, sentry_init):
+        # type: (Callable[[*Any], None]) -> None
+        sentry_init(
+            error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
+        )
+
+    def raise_exception(self):
+        # type: () -> None
+        raise self.exception_to_raise()
+
+
+@mock.patch("sentry_sdk.client.random.random", return_value=0.618)
+@pytest.mark.parametrize(
+    "test_config",
+    (
+        # Baseline test with error_sampler only, both floats and bools
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 1.0, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.7, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.6, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.0, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: True, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: False, expected_events=0),
+        # Baseline test with sample_rate only
+        IssuesSamplerTestConfig(sample_rate=1.0, expected_events=1),
+        IssuesSamplerTestConfig(sample_rate=0.7, expected_events=1),
+        IssuesSamplerTestConfig(sample_rate=0.6, expected_events=0),
+        IssuesSamplerTestConfig(sample_rate=0.0, expected_events=0),
+        # error_sampler takes precedence over sample_rate
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: 1.0, sample_rate=0.0, expected_events=1
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: 0.0, sample_rate=1.0, expected_events=0
+        ),
+        # Different sample rates based on exception, retrieved both from event and hint
+        IssuesSamplerTestConfig(
+            sampler_function=lambda event, _: {
+                "ZeroDivisionError": 1.0,
+                "AttributeError": 0.0,
+            }[event["exception"]["values"][0]["type"]],
+            exception_to_raise=ZeroDivisionError,
+            expected_events=1,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda event, _: {
+                "ZeroDivisionError": 1.0,
+                "AttributeError": 0.0,
+            }[event["exception"]["values"][0]["type"]],
+            exception_to_raise=AttributeError,
+            expected_events=0,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda _, hint: {
+                ZeroDivisionError: 1.0,
+                AttributeError: 0.0,
+            }[hint["exc_info"][0]],
+            exception_to_raise=ZeroDivisionError,
+            expected_events=1,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda _, hint: {
+                ZeroDivisionError: 1.0,
+                AttributeError: 0.0,
+            }[hint["exc_info"][0]],
+            exception_to_raise=AttributeError,
+            expected_events=0,
+        ),
+        # If sampler returns invalid value, we should still send the event
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: "This is an invalid return value for the sampler",
+            expected_events=1,
+        ),
+    ),
+)
+def test_error_sampler(_, sentry_init, capture_events, test_config):
+    test_config.init_sdk(sentry_init)
+
+    events = capture_events()
+
+    try:
+        test_config.raise_exception()
+    except Exception:
+        capture_exception()
+
+    assert len(events) == test_config.expected_events
+
+    if test_config.sampler_function_mock is not None:
+        assert test_config.sampler_function_mock.call_count == 1
+
+        # Ensure two arguments (the event and hint) were passed to the sampler function
+        assert len(test_config.sampler_function_mock.call_args[0]) == 2
