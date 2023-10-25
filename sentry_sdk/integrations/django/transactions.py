@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 
 from django import VERSION as DJANGO_VERSION
 
+if DJANGO_VERSION >= (2, 0):
+    from django.urls.resolvers import RoutePattern
+else:
+    RoutePattern = None
+
 try:
     from django.urls import get_resolver
 except ImportError:
@@ -65,13 +70,10 @@ class RavenResolver(object):
         """
         # "new-style" path patterns can be parsed directly without turning them
         # into regexes first
-        if DJANGO_VERSION >= (2, 0):
-            from django.urls.resolvers import RoutePattern
-
-            if isinstance(pattern.pattern, RoutePattern):
-                return self._new_style_group_matcher.sub(
-                    lambda m: "{%s}" % m.group(2), pattern.pattern._route
-                )
+        if RoutePattern is not None and isinstance(pattern.pattern, RoutePattern):
+            return self._new_style_group_matcher.sub(
+                lambda m: "{%s}" % m.group(2), pattern.pattern._route
+            )
 
         result = get_regex(pattern).pattern
 
