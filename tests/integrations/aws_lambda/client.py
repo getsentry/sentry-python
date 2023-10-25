@@ -319,7 +319,7 @@ else:
 
     @click.command()
     @click.option(
-        "--runtime", required=True, help="name of the runtime to use, eg python3.8"
+        "--runtime", required=True, help="name of the runtime to use, eg python3.11"
     )
     @click.option("--verbose", is_flag=True, default=False)
     def repl(runtime, verbose):
