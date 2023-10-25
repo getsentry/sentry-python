@@ -57,7 +57,13 @@ def _install_dependencies(base_dir, subprocess_kwargs):
     )
     # Create a source distribution of the Sentry SDK (in parent directory of base_dir)
     subprocess.check_call(
-        [sys.executable, "setup.py", "sdist", "--dist-dir", os.path.dirname(base_dir)],
+        [
+            sys.executable,
+            "setup.py",
+            "sdist",
+            "--dist-dir",
+            os.path.dirname(base_dir),
+        ],
         **subprocess_kwargs,
     )
     # Install the created Sentry SDK source distribution into the target directory
