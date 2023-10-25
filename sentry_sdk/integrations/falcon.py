@@ -241,7 +241,15 @@ def _exception_leads_to_http_5xx(ex, response):
     is_unhandled_error = not isinstance(
         ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
     )
-    return (is_server_error or is_unhandled_error) and _has_http_5xx_status(response)
+
+    # We only check the HTTP status on Falcon 3 because in Falcon 2, the status on the response
+    # at the stage where we capture it is listed as 200, even though we would expect to see a 500
+    # status. Since at the time of this change, Falcon 2 is ca. 4 years old, we have decided to
+    # only perform this check on Falcon 3+, despite the risk that some handled errors might be
+    # reported to Sentry as unhandled on Falcon 2.
+    return (is_server_error or is_unhandled_error) and (
+        not FALCON3 or _has_http_5xx_status(response)
+    )
 
 
 def _has_http_5xx_status(response):

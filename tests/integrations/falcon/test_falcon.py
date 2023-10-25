@@ -9,6 +9,7 @@ import falcon.testing
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.utils import parse_version
 
 
 try:
@@ -17,6 +18,9 @@ except ImportError:
     pass
 else:
     import falcon.inspect  # We only need this module for the ASGI test
+
+
+FALCON_VERSION = parse_version(falcon.__version__)
 
 
 @pytest.fixture
@@ -433,6 +437,10 @@ def test_falcon_not_breaking_asgi(sentry_init):
         pytest.fail("Falcon integration causing errors in ASGI apps.")
 
 
+@pytest.mark.skipif(
+    (FALCON_VERSION or ()) < (3,),
+    reason="The Sentry Falcon integration only supports custom error handlers on Falcon 3+",
+)
 def test_falcon_custom_error_handler(sentry_init, make_app, capture_events):
     """
     When a custom error handler handles what otherwise would have resulted in a 5xx error,
