@@ -60,7 +60,6 @@ apidocs-hotfix: apidocs
 .PHONY: apidocs-hotfix
 
 aws-lambda-layer: dist
-	$(VENV_PATH)/bin/pip install urllib3
-	$(VENV_PATH)/bin/pip install certifi
+	$(VENV_PATH)/bin/pip install -r aws-lambda-layer-requirements.txt
 	$(VENV_PATH)/bin/python -m scripts.build_aws_lambda_layer
 .PHONY: aws-lambda-layer
