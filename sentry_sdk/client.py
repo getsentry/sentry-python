@@ -637,6 +637,7 @@ class _Client(object):
         self,
         timeout=None,  # type: Optional[float]
         callback=None,  # type: Optional[Callable[[int, float], None]]
+        shutdown=False,  # type: bool
     ):
         # type: (...) -> None
         """
@@ -644,7 +645,7 @@ class _Client(object):
         semantics as :py:meth:`Client.flush`.
         """
         if self.transport is not None:
-            self.flush(timeout=timeout, callback=callback)
+            self.flush(timeout=timeout, callback=callback, shutdown=shutdown)
             self.session_flusher.kill()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.kill()
@@ -657,14 +658,15 @@ class _Client(object):
         self,
         timeout=None,  # type: Optional[float]
         callback=None,  # type: Optional[Callable[[int, float], None]]
+        shutdown=False,  # type: bool
     ):
         # type: (...) -> None
         """
         Wait for the current events to be sent.
 
         :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.
-
         :param callback: Is invoked with the number of pending events and the configured timeout.
+        :param shutdown: `flush` has been invoked on interpreter shutdown.
         """
         if self.transport is not None:
             if timeout is None:
@@ -672,7 +674,7 @@ class _Client(object):
             self.session_flusher.flush()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.flush()
-            self.transport.flush(timeout=timeout, callback=callback)
+            self.transport.flush(timeout=timeout, callback=callback, shutdown=shutdown)
 
     def __enter__(self):
         # type: () -> _Client

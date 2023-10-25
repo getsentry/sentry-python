@@ -58,4 +58,4 @@ class AtexitIntegration(Integration):
 
                 # If an integration is there, a client has to be there.
                 client = hub.client  # type: Any
-                client.close(callback=integration.callback)
+                client.close(callback=integration.callback, shutdown=True)

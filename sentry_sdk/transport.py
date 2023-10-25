@@ -544,9 +544,13 @@ class HttpTransport(Transport):
         self,
         timeout,  # type: float
         callback=None,  # type: Optional[Any]
+        shutdown=False,  # type: bool
     ):
         # type: (...) -> None
         logger.debug("Flushing HTTP transport")
+
+        if shutdown:
+            self._worker.prepare_shutdown()
 
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))

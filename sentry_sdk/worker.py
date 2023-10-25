@@ -26,6 +26,7 @@ class BackgroundWorker(object):
         self._lock = threading.Lock()
         self._thread = None  # type: Optional[threading.Thread]
         self._thread_for_pid = None  # type: Optional[int]
+        self._can_start_threads = True  # type: bool
 
     @property
     def is_alive(self):
@@ -63,11 +64,15 @@ class BackgroundWorker(object):
         # type: () -> None
         with self._lock:
             if not self.is_alive:
-                self._thread = threading.Thread(
-                    target=self._target, name="raven-sentry.BackgroundWorker"
-                )
-                self._thread.daemon = True
-                self._thread.start()
+                if self._can_start_threads:
+                    self._thread = threading.Thread(
+                        target=self._target, name="raven-sentry.BackgroundWorker"
+                    )
+                    self._thread.daemon = True
+                    self._thread.start()
+                else:
+                    self._thread = threading.main_thread()
+
                 self._thread_for_pid = os.getpid()
 
     def kill(self):
@@ -78,7 +83,7 @@ class BackgroundWorker(object):
         """
         logger.debug("background worker got kill request")
         with self._lock:
-            if self._thread:
+            if self._thread and self._thread != threading.main_thread():
                 try:
                     self._queue.put_nowait(_TERMINATOR)
                 except FullError:
@@ -135,3 +140,10 @@ class BackgroundWorker(object):
             finally:
                 self._queue.task_done()
             sleep(0)
+
+    def prepare_shutdown(self):
+        # If the Python 3.12+ interpreter is shutting down, trying to start a new
+        # thread throws a RuntimeError. If we're shutting down and the worker has
+        # no active thread, use the main thread instead of spawning a new one.
+        # See https://github.com/python/cpython/pull/104826
+        self._can_start_threads = False
