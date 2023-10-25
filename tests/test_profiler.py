@@ -147,6 +147,7 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
 def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
@@ -162,6 +163,7 @@ def test_profiles_sample_rate(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
         with start_transaction(name="profiling"):
@@ -174,6 +176,12 @@ def test_profiles_sample_rate(
 
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
+    if profiles_sample_rate is None or profiles_sample_rate == 0:
+        assert reports == []
+    elif profile_count:
+        assert reports == []
+    else:
+        assert reports == [("sample_rate", "profile")]
 
 
 @requires_python_version(3, 3)
@@ -213,6 +221,7 @@ def test_profiles_sample_rate(
 def test_profiles_sampler(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
     profiles_sampler,
     profile_count,
@@ -224,6 +233,7 @@ def test_profiles_sampler(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
         with start_transaction(name="profiling"):
@@ -236,12 +246,17 @@ def test_profiles_sampler(
 
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
+    if profile_count:
+        assert reports == []
+    else:
+        assert reports == [("sample_rate", "profile")]
 
 
 @requires_python_version(3, 3)
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
+    capture_client_reports,
     teardown_profiling,
 ):
     sentry_init(
@@ -250,6 +265,7 @@ def test_minimum_unique_samples_required(
     )
 
     envelopes = capture_envelopes()
+    reports = capture_client_reports()
 
     with start_transaction(name="profiling"):
         pass
@@ -263,6 +279,7 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
+    assert reports == [("insufficient_data", "profile")]
 
 
 @requires_python_version(3, 3)
@@ -483,7 +500,10 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
     # increase the max_depth by the `base_stack_depth` to account
     # for the extra frames pytest will add
     _, frame_ids, frames = extract_stack(
-        frame, LRUCache(max_size=1), max_stack_depth=max_stack_depth + base_stack_depth
+        frame,
+        LRUCache(max_size=1),
+        max_stack_depth=max_stack_depth + base_stack_depth,
+        cwd=os.getcwd(),
     )
     assert len(frame_ids) == base_stack_depth + actual_depth
     assert len(frames) == base_stack_depth + actual_depth
@@ -510,8 +530,9 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
 def test_extract_stack_with_cache(frame, depth):
     # make sure cache has enough room or this test will fail
     cache = LRUCache(max_size=depth)
-    _, _, frames1 = extract_stack(frame, cache)
-    _, _, frames2 = extract_stack(frame, cache)
+    cwd = os.getcwd()
+    _, _, frames1 = extract_stack(frame, cache, cwd=cwd)
+    _, _, frames2 = extract_stack(frame, cache, cwd=cwd)
 
     assert len(frames1) > 0
     assert len(frames2) > 0
@@ -650,7 +671,16 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
 )
 @mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
-    sample = [("1", extract_stack(get_frame(), LRUCache(max_size=1)))]
+    sample = [
+        (
+            "1",
+            extract_stack(
+                get_frame(),
+                LRUCache(max_size=1),
+                cwd=os.getcwd(),
+            ),
+        ),
+    ]
 
     with scheduler_class(frequency=1000) as scheduler:
         transaction = Transaction(sampled=True)
@@ -694,8 +724,18 @@ thread_metadata = {
 
 
 sample_stacks = [
-    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=1),
-    extract_stack(get_frame(), LRUCache(max_size=1), max_stack_depth=2),
+    extract_stack(
+        get_frame(),
+        LRUCache(max_size=1),
+        max_stack_depth=1,
+        cwd=os.getcwd(),
+    ),
+    extract_stack(
+        get_frame(),
+        LRUCache(max_size=1),
+        max_stack_depth=2,
+        cwd=os.getcwd(),
+    ),
 ]
 
 
@@ -788,7 +828,7 @@ sample_stacks = [
                 "stacks": [[0], [1, 0]],
                 "thread_metadata": thread_metadata,
             },
-            id="two identical stacks",
+            id="two different stacks",
         ),
     ],
 )

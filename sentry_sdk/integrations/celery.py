@@ -11,7 +11,7 @@ from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -140,43 +140,65 @@ def _wrap_apply_async(f):
         # type: (*Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
-        if integration is not None and integration.propagate_traces:
-            with hub.start_span(
-                op=OP.QUEUE_SUBMIT_CELERY, description=args[0].name
-            ) as span:
-                with capture_internal_exceptions():
-                    headers = dict(hub.iter_trace_propagation_headers(span))
-                    if integration.monitor_beat_tasks:
-                        headers.update(
-                            {
-                                "sentry-monitor-start-timestamp-s": "%.9f"
-                                % _now_seconds_since_epoch(),
-                            }
+
+        if integration is None:
+            return f(*args, **kwargs)
+
+        # Note: kwargs can contain headers=None, so no setdefault!
+        # Unsure which backend though.
+        kwarg_headers = kwargs.get("headers") or {}
+        propagate_traces = kwarg_headers.pop(
+            "sentry-propagate-traces", integration.propagate_traces
+        )
+
+        if not propagate_traces:
+            return f(*args, **kwargs)
+
+        with hub.start_span(
+            op=OP.QUEUE_SUBMIT_CELERY, description=args[0].name
+        ) as span:
+            with capture_internal_exceptions():
+                headers = dict(hub.iter_trace_propagation_headers(span))
+                if integration.monitor_beat_tasks:
+                    headers.update(
+                        {
+                            "sentry-monitor-start-timestamp-s": "%.9f"
+                            % _now_seconds_since_epoch(),
+                        }
+                    )
+
+                if headers:
+                    existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
+                    sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
+
+                    combined_baggage = sentry_baggage or existing_baggage
+                    if sentry_baggage and existing_baggage:
+                        combined_baggage = "{},{}".format(
+                            existing_baggage,
+                            sentry_baggage,
                         )
 
-                    if headers:
-                        # Note: kwargs can contain headers=None, so no setdefault!
-                        # Unsure which backend though.
-                        kwarg_headers = kwargs.get("headers") or {}
-                        kwarg_headers.update(headers)
+                    kwarg_headers.update(headers)
+                    if combined_baggage:
+                        kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
-                        # https://github.com/celery/celery/issues/4875
-                        #
-                        # Need to setdefault the inner headers too since other
-                        # tracing tools (dd-trace-py) also employ this exact
-                        # workaround and we don't want to break them.
-                        kwarg_headers.setdefault("headers", {}).update(headers)
+                    # https://github.com/celery/celery/issues/4875
+                    #
+                    # Need to setdefault the inner headers too since other
+                    # tracing tools (dd-trace-py) also employ this exact
+                    # workaround and we don't want to break them.
+                    kwarg_headers.setdefault("headers", {}).update(headers)
+                    if combined_baggage:
+                        kwarg_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
 
-                        # Add the Sentry options potentially added in `sentry_apply_entry`
-                        # to the headers (done when auto-instrumenting Celery Beat tasks)
-                        for key, value in kwarg_headers.items():
-                            if key.startswith("sentry-"):
-                                kwarg_headers["headers"][key] = value
+                    # Add the Sentry options potentially added in `sentry_apply_entry`
+                    # to the headers (done when auto-instrumenting Celery Beat tasks)
+                    for key, value in kwarg_headers.items():
+                        if key.startswith("sentry-"):
+                            kwarg_headers["headers"][key] = value
 
-                        kwargs["headers"] = kwarg_headers
+                    kwargs["headers"] = kwarg_headers
 
-                return f(*args, **kwargs)
-        else:
             return f(*args, **kwargs)
 
     return apply_async  # type: ignore
@@ -378,8 +400,8 @@ def _get_humanized_interval(seconds):
     return (int(seconds), "second")
 
 
-def _get_monitor_config(celery_schedule, app):
-    # type: (Any, Celery) -> Dict[str, Any]
+def _get_monitor_config(celery_schedule, app, monitor_name):
+    # type: (Any, Celery, str) -> Dict[str, Any]
     monitor_config = {}  # type: Dict[str, Any]
     schedule_type = None  # type: Optional[str]
     schedule_value = None  # type: Optional[Union[str, int]]
@@ -402,7 +424,9 @@ def _get_monitor_config(celery_schedule, app):
 
         if schedule_unit == "second":
             logger.warning(
-                "Intervals shorter than one minute are not supported by Sentry Crons."
+                "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
+                monitor_name,
+                schedule_value,
             )
             return {}
 
@@ -445,30 +469,34 @@ def _patch_beat_apply_entry():
         if match_regex_list(monitor_name, integration.exclude_beat_tasks):
             return original_apply_entry(*args, **kwargs)
 
-        monitor_config = _get_monitor_config(celery_schedule, app)
+        with hub.configure_scope() as scope:
+            # When tasks are started from Celery Beat, make sure each task has its own trace.
+            scope.set_new_propagation_context()
 
-        is_supported_schedule = bool(monitor_config)
-        if is_supported_schedule:
-            headers = schedule_entry.options.pop("headers", {})
-            headers.update(
-                {
-                    "sentry-monitor-slug": monitor_name,
-                    "sentry-monitor-config": monitor_config,
-                }
-            )
+            monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
 
-            check_in_id = capture_checkin(
-                monitor_slug=monitor_name,
-                monitor_config=monitor_config,
-                status=MonitorStatus.IN_PROGRESS,
-            )
-            headers.update({"sentry-monitor-check-in-id": check_in_id})
+            is_supported_schedule = bool(monitor_config)
+            if is_supported_schedule:
+                headers = schedule_entry.options.pop("headers", {})
+                headers.update(
+                    {
+                        "sentry-monitor-slug": monitor_name,
+                        "sentry-monitor-config": monitor_config,
+                    }
+                )
 
-            # Set the Sentry configuration in the options of the ScheduleEntry.
-            # Those will be picked up in `apply_async` and added to the headers.
-            schedule_entry.options["headers"] = headers
+                check_in_id = capture_checkin(
+                    monitor_slug=monitor_name,
+                    monitor_config=monitor_config,
+                    status=MonitorStatus.IN_PROGRESS,
+                )
+                headers.update({"sentry-monitor-check-in-id": check_in_id})
 
-        return original_apply_entry(*args, **kwargs)
+                # Set the Sentry configuration in the options of the ScheduleEntry.
+                # Those will be picked up in `apply_async` and added to the headers.
+                schedule_entry.options["headers"] = headers
+
+            return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
 

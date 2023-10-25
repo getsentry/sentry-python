@@ -1,5 +1,335 @@
 # Changelog
 
+## 1.32.0
+
+### Various fixes & improvements
+
+- **New:** Error monitoring for some of the most popular Python GraphQL libraries:
+  - Add [GQL GraphQL integration](https://docs.sentry.io/platforms/python/integrations/gql/) (#2368) by @szokeasaurusrex
+
+    Usage:
+
+    ```python
+      import sentry_sdk
+      from sentry_sdk.integrations.gql import GQLIntegration
+
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              GQLIntegration(),
+          ],
+      )
+    ```
+
+  - Add [Graphene GraphQL error integration](https://docs.sentry.io/platforms/python/integrations/graphene/) (#2389) by @sentrivana
+
+    Usage:
+
+    ```python
+      import sentry_sdk
+      from sentry_sdk.integrations.graphene import GrapheneIntegration
+
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              GrapheneIntegration(),
+          ],
+      )
+    ```
+
+  - Add [Strawberry GraphQL error & tracing integration](https://docs.sentry.io/platforms/python/integrations/strawberry/) (#2393) by @sentrivana
+
+    Usage:
+
+    ```python
+      import sentry_sdk
+      from sentry_sdk.integrations.strawberry import StrawberryIntegration
+
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              # make sure to set async_execution to False if you're executing
+              # GraphQL queries synchronously
+              StrawberryIntegration(async_execution=True),
+          ],
+          traces_sample_rate=1.0,
+      )
+    ```
+
+  - Add [Ariadne GraphQL error integration](https://docs.sentry.io/platforms/python/integrations/ariadne/) (#2387) by @sentrivana
+
+    Usage:
+
+    ```python
+      import sentry_sdk
+      from sentry_sdk.integrations.ariadne import AriadneIntegration
+
+      sentry_sdk.init(
+          dsn='___PUBLIC_DSN___',
+          integrations=[
+              AriadneIntegration(),
+          ],
+      )
+    ```
+
+- Capture multiple named groups again (#2432) by @sentrivana
+- Don't fail when upstream scheme is unusual (#2371) by @vanschelven
+- Support new RQ version (#2405) by @antonpirker
+- Remove `utcnow`, `utcfromtimestamp` deprecated in Python 3.12 (#2415) by @rmad17
+- Add `trace` to `__all__` in top-level `__init__.py` (#2401) by @lobsterkatie
+- Move minimetrics code to the SDK (#2385) by @mitsuhiko
+- Add configurable compression levels (#2382) by @mitsuhiko
+- Shift flushing by up to a rollup window (#2396) by @mitsuhiko
+- Make a consistent noop flush behavior (#2428) by @mitsuhiko
+- Stronger recursion protection (#2426) by @mitsuhiko
+- Remove `OpenTelemetryIntegration` from `__init__.py` (#2379) by @sentrivana
+- Update API docs (#2397) by @antonpirker
+- Pin some test requirements because new majors break our tests (#2404) by @antonpirker
+- Run more `requests`, `celery`, `falcon` tests (#2414) by @sentrivana
+- Move `importorskip`s in tests to `__init__.py` files (#2412) by @sentrivana
+- Fix `mypy` errors (#2433) by @sentrivana
+- Fix pre-commit issues (#2424) by @bukzor-sentryio
+- Update [CONTRIBUTING.md](https://github.com/getsentry/sentry-python/blob/master/CONTRIBUTING.md) (#2411) by @sentrivana
+- Bump `sphinx` from 7.2.5 to 7.2.6 (#2378) by @dependabot
+- [Experimental] Add explain plan to DB spans (#2315) by @antonpirker
+
+## 1.31.0
+
+### Various fixes & improvements
+
+- **New:** Add integration for `clickhouse-driver` (#2167) by @mimre25
+
+  For more information, see the documentation for [clickhouse-driver](https://docs.sentry.io/platforms/python/configuration/integrations/clickhouse-driver) for more information.
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
+
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            ClickhouseDriverIntegration(),
+        ],
+    )
+  ```
+
+- **New:** Add integration for `asyncpg` (#2314) by @mimre25
+
+  For more information, see the documentation for [asyncpg](https://docs.sentry.io/platforms/python/configuration/integrations/asyncpg/) for more information.
+
+  Usage:
+
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
+
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            AsyncPGIntegration(),
+        ],
+    )
+  ```
+
+- **New:** Allow to override `propagate_traces` in `Celery` per task (#2331) by @jan-auer
+
+  For more information, see the documentation for [Celery](https://docs.sentry.io//platforms/python/guides/celery/#distributed-traces) for more information.
+
+  Usage:
+  ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+
+    # Enable global distributed traces (this is the default, just to be explicit.)
+    sentry_sdk.init(
+        dsn='___PUBLIC_DSN___',
+        integrations=[
+            CeleryIntegration(propagate_traces=True),
+        ],
+    )
+
+    ...
+
+    # This will NOT propagate the trace. (The task will start its own trace):
+    my_task_b.apply_async(
+        args=("some_parameter", ),
+        headers={"sentry-propagate-traces": False},
+    )
+  ```
+
+- Prevent Falcon integration from breaking ASGI apps (#2359) by @szokeasaurusrex
+- Backpressure: only downsample a max of 10 times (#2347) by @sl0thentr0py
+- Made NoOpSpan compatible to Transactions. (#2364) by @antonpirker
+- Cleanup ASGI integration (#2335) by @antonpirker
+- Pin anyio in tests (dep of httpx), because new major 4.0.0 breaks tests. (#2336) by @antonpirker
+- Added link to backpressure section in docs. (#2354) by @antonpirker
+- Add .vscode to .gitignore (#2317) by @shoaib-mohd
+- Documenting Spans and Transactions (#2358) by @antonpirker
+- Fix in profiler: do not call getcwd from module root (#2329) by @Zylphrex
+- Fix deprecated version attribute (#2338) by @vagi8
+- Fix transaction name in Starlette and FastAPI (#2341) by @antonpirker
+- Fix tests using Postgres (#2362) by @antonpirker
+- build(deps): Updated linting tooling (#2350) by @antonpirker
+- build(deps): bump sphinx from 7.2.4 to 7.2.5 (#2344) by @dependabot
+- build(deps): bump actions/checkout from 2 to 4 (#2352) by @dependabot
+- build(deps): bump checkouts/data-schemas from `ebc77d3` to `68def1e` (#2351) by @dependabot
+
+## 1.30.0
+
+### Various fixes & improvements
+
+- Officially support Python 3.11 (#2300) by @sentrivana
+- Context manager monitor (#2290) by @szokeasaurusrex
+- Set response status code in transaction `response` context. (#2312) by @antonpirker
+- Add missing context kwarg to `_sentry_task_factory` (#2267) by @JohnnyDeuss
+- In Postgres take the connection params from the connection  (#2308) by @antonpirker
+- Experimental: Allow using OTel for performance instrumentation (#2272) by @sentrivana
+
+    This release includes experimental support for replacing Sentry's default
+    performance monitoring solution with one powered by OpenTelemetry without having
+    to do any manual setup.
+
+    Try it out by installing `pip install sentry-sdk[opentelemetry-experimental]` and
+    then initializing the SDK with:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        _experiments={"otel_powered_performance": True},
+    )
+    ```
+
+    This enables OpenTelemetry performance monitoring support for some of the most
+    popular frameworks and libraries (Flask, Django, FastAPI, requests...).
+
+    We're looking forward to your feedback! Please let us know about your experience
+    in this discussion: https://github.com/getsentry/sentry/discussions/55023
+
+    **Important note:** Please note that this feature is experimental and in a
+    proof-of-concept stage and is not meant for production use. It may be changed or
+    removed at any point.
+
+- Enable backpressure handling by default (#2298) by @sl0thentr0py
+
+    The SDK now dynamically downsamples transactions to reduce backpressure in high
+    throughput systems. It starts a new `Monitor` thread to perform some health checks
+    which decide to downsample (halved each time) in 10 second intervals till the system
+    is healthy again.
+
+    To disable this behavior, use:
+
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        enable_backpressure_handling=False,
+    )
+    ```
+
+    If your system serves heavy load, please let us know how this feature works for you!
+
+    Check out the [documentation](https://docs.sentry.io/platforms/python/configuration/options/#enable-backpressure-handling) for more information.
+
+- Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
+- Add test for `ThreadPoolExecutor` (#2259) by @gggritso
+- Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
+- Moved `is_sentry_url` to utils (#2304) by @szokeasaurusrex
+- Fix: arq attribute error on settings, support worker args (#2260) by @rossmacarthur
+- Fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
+- build(deps): bump mypy from 1.4.1 to 1.5.1 (#2319) by @dependabot
+- build(deps): bump sphinx from 7.1.2 to 7.2.4 (#2322) by @dependabot
+- build(deps): bump sphinx from 7.0.1 to 7.1.2 (#2296) by @dependabot
+- build(deps): bump checkouts/data-schemas from `1b85152` to `ebc77d3` (#2254) by @dependabot
+
+## 1.29.2
+
+### Various fixes & improvements
+
+- Revert GraphQL integration (#2287) by @sentrivana
+
+## 1.29.1
+
+### Various fixes & improvements
+
+- Fix GraphQL integration swallowing responses (#2286) by @sentrivana
+- Fix typo (#2283) by @sentrivana
+
+## 1.29.0
+
+### Various fixes & improvements
+
+- Capture GraphQL client errors (#2243) by @sentrivana
+  - The SDK will now create dedicated errors whenever an HTTP client makes a request to a `/graphql` endpoint and the response contains an error. You can opt out of this by providing `capture_graphql_errors=False` to the HTTP client integration.
+- Read MAX_VALUE_LENGTH from client options (#2121) (#2171) by @puittenbroek
+- Rename `request_bodies` to `max_request_body_size` (#2247) by @mgaligniana
+- Always sample checkin regardless of `sample_rate` (#2279) by @szokeasaurusrex
+- Add information to short-interval cron error message (#2246) by @lobsterkatie
+- Add DB connection attributes in spans (#2274) by @antonpirker
+- Add `db.system` to remaining Redis spans (#2271) by @AbhiPrasad
+- Clarified the procedure for running tests (#2276) by @szokeasaurusrex
+- Fix Chalice tests (#2278) by @sentrivana
+- Bump Black from 23.3.0 to 23.7.0 (#2256) by @dependabot
+- Remove py3.4 from tox.ini (#2248) by @sentrivana
+
+## 1.28.1
+
+### Various fixes & improvements
+
+- Redis: Add support for redis.asyncio (#1933) by @Zhenay
+- Make sure each task that is started by Celery Beat has its own trace. (#2249) by @antonpirker
+- Add Sampling Decision to Trace Envelope Header (#2239) by @antonpirker
+- Do not add trace headers (`sentry-trace` and `baggage`) to HTTP requests to Sentry (#2240) by @antonpirker
+- Prevent adding `sentry-trace` header multiple times (#2235) by @antonpirker
+- Skip distributions with incomplete metadata (#2231) by @rominf
+- Remove stale.yml (#2245) by @hubertdeng123
+- Django: Fix 404 Handler handler being labeled as "generic ASGI request" (#1277) by @BeryJu
+
+## 1.28.0
+
+### Various fixes & improvements
+
+- Add support for cron jobs in ARQ integration (#2088) by @lewazo
+- Backpressure handling prototype (#2189) by @sl0thentr0py
+- Add "replay" context to event payload (#2234) by @antonpirker
+- Update test Django app to be compatible for Django 4.x (#1794) by @DilLip-Chowdary-Codes
+
+## 1.27.1
+
+### Various fixes & improvements
+
+- Add Starlette/FastAPI template tag for adding Sentry tracing information (#2225) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Starlette/FastAPI Jinja2 templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+- Fixed generation of baggage when a DSC is already in propagation context (#2232) by @antonpirker
+- Handle explicitly passing `None` for `trace_configs` in `aiohttp` (#2230) by @Harmon758
+- Support newest Starlette versions (#2227) by @antonpirker
+
+## 1.27.0
+
+### Various fixes & improvements
+
+- Support for SQLAlchemy 2.0 (#2200) by @antonpirker
+- Add instrumentation of `aiohttp` client requests (#1761) by @md384
+- Add Django template tag for adding Sentry tracing information (#2222) by @antonpirker
+  - By adding `{{ sentry_trace_meta }}` to your Django templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
+
+- Update Flask HTML meta helper (#2203) by @antonpirker
+- Take trace ID always from propagation context (#2209) by @antonpirker
+- Fix trace context in event payload (#2205) by @antonpirker
+- Use new top level API in `trace_propagation_meta` (#2202) by @antonpirker
+- Do not overwrite existing baggage on outgoing requests (#2191, #2214) by @sentrivana
+- Set the transaction/span status from an OTel span (#2115) by @daniil-konovalenko
+- Fix propagation of OTel `NonRecordingSpan` (#2187) by @hartungstenio
+- Fix `TaskLockedException` handling in Huey integration (#2206) by @Zhenay
+- Add message format configuration arguments to Loguru integration (#2208) by @Gwill
+- Profiling: Add client reports for profiles (#2207) by @Zylphrex
+- CI: Fix CI (#2220) by @antonpirker
+- Dependencies: Bump `checkouts/data-schemas` from `7fdde87` to `1b85152` (#2218) by @dependabot
+- Dependencies: Bump `mypy` from 1.3.0 to 1.4.1 (#2194) by @dependabot
+- Docs: Change API doc theme (#2210) by @sentrivana
+- Docs: Allow (some) autocompletion for top-level API (#2213) by @sentrivana
+- Docs: Revert autocomplete hack (#2224) by @sentrivana
+
 ## 1.26.0
 
 ### Various fixes & improvements

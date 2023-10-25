@@ -2,9 +2,6 @@ import json
 import pytest
 import logging
 
-
-pytest.importorskip("bottle")
-
 from io import BytesIO
 from bottle import Bottle, debug as set_debug, abort, redirect
 from sentry_sdk import capture_message
@@ -211,7 +208,7 @@ def test_too_large_raw_request(
     sentry_init, input_char, capture_events, app, get_client
 ):
     sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], request_bodies="small"
+        integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="small"
     )
 
     data = input_char * 2000
@@ -241,7 +238,7 @@ def test_too_large_raw_request(
 
 def test_files_and_form(sentry_init, capture_events, app, get_client):
     sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], request_bodies="always"
+        integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="always"
     )
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
@@ -276,11 +273,11 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
     assert not event["request"]["data"]["file"]
 
 
-def test_json_not_truncated_if_request_bodies_is_always(
+def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, app, get_client
 ):
     sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], request_bodies="always"
+        integrations=[bottle_sentry.BottleIntegration()], max_request_body_size="always"
     )
 
     data = {

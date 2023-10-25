@@ -162,11 +162,14 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_span.op = otel_span.name
 
+        self._update_span_with_otel_status(sentry_span, otel_span)
+
         if isinstance(sentry_span, Transaction):
             sentry_span.name = otel_span.name
             sentry_span.set_context(
                 OPEN_TELEMETRY_CONTEXT, self._get_otel_context(otel_span)
             )
+            self._update_transaction_with_otel_data(sentry_span, otel_span)
 
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
@@ -234,6 +237,20 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         return trace_data
 
+    def _update_span_with_otel_status(self, sentry_span, otel_span):
+        # type: (SentrySpan, OTelSpan) -> None
+        """
+        Set the Sentry span status from the OTel span
+        """
+        if otel_span.status.is_unset:
+            return
+
+        if otel_span.status.is_ok:
+            sentry_span.set_status("ok")
+            return
+
+        sentry_span.set_status("internal_error")
+
     def _update_span_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
         """
@@ -290,3 +307,21 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_span.op = op
         sentry_span.description = description
+
+    def _update_transaction_with_otel_data(self, sentry_span, otel_span):
+        # type: (SentrySpan, OTelSpan) -> None
+        http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD)
+
+        if http_method:
+            status_code = otel_span.attributes.get(SpanAttributes.HTTP_STATUS_CODE)
+            if status_code:
+                sentry_span.set_http_status(status_code)
+
+            op = "http"
+
+            if otel_span.kind == SpanKind.SERVER:
+                op += ".server"
+            elif otel_span.kind == SpanKind.CLIENT:
+                op += ".client"
+
+            sentry_span.op = op

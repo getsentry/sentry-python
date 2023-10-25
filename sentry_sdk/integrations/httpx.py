@@ -1,6 +1,7 @@
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -72,7 +73,13 @@ def _install_httpx_client():
                             key=key, value=value, url=request.url
                         )
                     )
-                    request.headers[key] = value
+                    if key == BAGGAGE_HEADER_NAME and request.headers.get(
+                        BAGGAGE_HEADER_NAME
+                    ):
+                        # do not overwrite any existing baggage, just append to it
+                        request.headers[key] += "," + value
+                    else:
+                        request.headers[key] = value
 
             rv = real_send(self, request, **kwargs)
 
@@ -119,7 +126,13 @@ def _install_httpx_async_client():
                             key=key, value=value, url=request.url
                         )
                     )
-                    request.headers[key] = value
+                    if key == BAGGAGE_HEADER_NAME and request.headers.get(
+                        BAGGAGE_HEADER_NAME
+                    ):
+                        # do not overwrite any existing baggage, just append to it
+                        request.headers[key] += "," + value
+                    else:
+                        request.headers[key] = value
 
             rv = await real_send(self, request, **kwargs)
 

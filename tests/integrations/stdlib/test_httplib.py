@@ -84,7 +84,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     }
 
 
-def test_empty_realurl(sentry_init, capture_events):
+def test_empty_realurl(sentry_init):
     """
     Ensure that after using sentry_sdk.init you can putrequest a
     None url.
@@ -114,7 +114,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     conn.request("GET", "/200")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         # This raises an exception, because we didn't call `getresponse` for
         # the previous request yet.
         #
@@ -228,6 +228,7 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
         expected_outgoing_baggage_items = [
             "sentry-trace_id=%s" % transaction.trace_id,
             "sentry-sample_rate=0.5",
+            "sentry-sampled=%s" % "true" if transaction.sampled else "false",
             "sentry-release=foo",
             "sentry-environment=production",
         ]

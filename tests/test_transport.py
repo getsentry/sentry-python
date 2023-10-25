@@ -13,12 +13,13 @@ from werkzeug.wrappers import Request, Response
 from pytest_localserver.http import WSGIServer
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
+from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
-CapturedData = namedtuple("CapturedData", ["path", "event", "envelope"])
+CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
 
 class CapturingServer(WSGIServer):
@@ -42,15 +43,25 @@ class CapturingServer(WSGIServer):
         """
         request = Request(environ)
         event = envelope = None
-        if request.mimetype == "application/json":
-            event = parse_json(gzip.GzipFile(fileobj=io.BytesIO(request.data)).read())
+        if request.headers.get("content-encoding") == "gzip":
+            rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
+            compressed = True
         else:
-            envelope = Envelope.deserialize_from(
-                gzip.GzipFile(fileobj=io.BytesIO(request.data))
-            )
+            rdr = io.BytesIO(request.data)
+            compressed = False
+
+        if request.mimetype == "application/json":
+            event = parse_json(rdr.read())
+        else:
+            envelope = Envelope.deserialize_from(rdr)
 
         self.captured.append(
-            CapturedData(path=request.path, event=event, envelope=envelope)
+            CapturedData(
+                path=request.path,
+                event=event,
+                envelope=envelope,
+                compressed=compressed,
+            )
         )
 
         response = Response(status=self.code)
@@ -81,6 +92,7 @@ def make_client(request, capturing_server):
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
 @pytest.mark.parametrize("use_pickle", (True, False))
+@pytest.mark.parametrize("compressionlevel", (0, 9))
 def test_transport_works(
     capturing_server,
     request,
@@ -90,10 +102,16 @@ def test_transport_works(
     make_client,
     client_flush_method,
     use_pickle,
+    compressionlevel,
     maybe_monkeypatched_threading,
 ):
     caplog.set_level(logging.DEBUG)
-    client = make_client(debug=debug)
+    client = make_client(
+        debug=debug,
+        _experiments={
+            "transport_zlib_compression_level": compressionlevel,
+        },
+    )
 
     if use_pickle:
         client = pickle.loads(pickle.dumps(client))
@@ -101,7 +119,7 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.utcnow())
+    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
     capture_message("löl")
 
     getattr(client, client_flush_method)()
@@ -109,8 +127,28 @@ def test_transport_works(
     out, err = capsys.readouterr()
     assert not err and not out
     assert capturing_server.captured
+    assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
     assert any("Sending event" in record.msg for record in caplog.records) == debug
+
+
+@pytest.mark.parametrize(
+    "num_pools,expected_num_pools",
+    (
+        (None, 2),
+        (2, 2),
+        (10, 10),
+    ),
+)
+def test_transport_num_pools(make_client, num_pools, expected_num_pools):
+    _experiments = {}
+    if num_pools is not None:
+        _experiments["transport_num_pools"] = num_pools
+
+    client = make_client(_experiments=_experiments)
+
+    options = client.transport._get_pool_options([])
+    assert options["num_pools"] == expected_num_pools
 
 
 def test_transport_infinite_loop(capturing_server, request, make_client):

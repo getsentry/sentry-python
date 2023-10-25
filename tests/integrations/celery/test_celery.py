@@ -2,16 +2,13 @@ import threading
 
 import pytest
 
-pytest.importorskip("celery")
-
-from sentry_sdk import Hub, configure_scope, start_transaction
+from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
 
 from sentry_sdk._compat import text_type
 
 from celery import Celery, VERSION
 from celery.bin import worker
-from celery.signals import task_success
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -360,7 +357,7 @@ def test_retry(celery, capture_events):
 # TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
 @pytest.mark.skip
 @pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, tmpdir):
+def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
@@ -376,7 +373,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe, t
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         # Celery 4.1 raises a gibberish exception
         res.wait()
 
@@ -493,17 +490,68 @@ def test_task_headers(celery):
         "sentry-monitor-check-in-id": "123abc",
     }
 
-    @celery.task(name="dummy_task")
-    def dummy_task(x, y):
-        return x + y
-
-    def crons_task_success(sender, **kwargs):
-        headers = _get_headers(sender)
-        assert headers == sentry_crons_setup
-
-    task_success.connect(crons_task_success)
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, x, y):
+        return _get_headers(self)
 
     # This is how the Celery Beat auto-instrumentation starts a task
     # in the monkey patched version of `apply_async`
     # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
-    dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
+    result = dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
+    assert result.get() == sentry_crons_setup
+
+
+def test_baggage_propagation(init_celery):
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, x, y):
+        return _get_headers(self)
+
+    with start_transaction() as transaction:
+        result = dummy_task.apply_async(
+            args=(1, 0),
+            headers={"baggage": "custom=value"},
+        ).get()
+
+        assert sorted(result["baggage"].split(",")) == sorted(
+            [
+                "sentry-release=abcdef",
+                "sentry-trace_id={}".format(transaction.trace_id),
+                "sentry-environment=production",
+                "sentry-sample_rate=1.0",
+                "sentry-sampled=true",
+                "custom=value",
+            ]
+        )
+
+
+def test_sentry_propagate_traces_override(init_celery):
+    """
+    Test if the `sentry-propagate-traces` header given to `apply_async`
+    overrides the `propagate_traces` parameter in the integration constructor.
+    """
+    celery = init_celery(
+        propagate_traces=True, traces_sample_rate=1.0, release="abcdef"
+    )
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, message):
+        trace_id = get_current_span().trace_id
+        return trace_id
+
+    with start_transaction() as transaction:
+        transaction_trace_id = transaction.trace_id
+
+        # should propagate trace
+        task_transaction_id = dummy_task.apply_async(
+            args=("some message",),
+        ).get()
+        assert transaction_trace_id == task_transaction_id
+
+        # should NOT propagate trace (overrides `propagate_traces` parameter in integration constructor)
+        task_transaction_id = dummy_task.apply_async(
+            args=("another message",),
+            headers={"sentry-propagate-traces": False},
+        ).get()
+        assert transaction_trace_id != task_transaction_id

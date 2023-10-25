@@ -4,13 +4,6 @@ import threading
 import pytest
 import pytest_asyncio
 
-quart = pytest.importorskip("quart")
-
-from quart import Quart, Response, abort, stream_with_context
-from quart.views import View
-
-from quart_auth import AuthManager, AuthUser, login_user
-
 from sentry_sdk import (
     set_tag,
     configure_scope,
@@ -21,15 +14,26 @@ from sentry_sdk import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
 
+from quart import Quart, Response, abort, stream_with_context
+from quart.views import View
 
-auth_manager = AuthManager()
+from quart_auth import AuthUser, login_user
+
+try:
+    from quart_auth import QuartAuth
+
+    auth_manager = QuartAuth()
+except ImportError:
+    from quart_auth import AuthManager
+
+    auth_manager = AuthManager()
 
 
 @pytest_asyncio.fixture
 async def app():
     app = Quart(__name__)
-    app.debug = True
-    app.config["TESTING"] = True
+    app.debug = False
+    app.config["TESTING"] = False
     app.secret_key = "haha"
 
     auth_manager.init_app(app)
@@ -119,21 +123,14 @@ async def test_transaction_style(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("testing", (True, False))
 async def test_errors(
     sentry_init,
     capture_exceptions,
     capture_events,
     app,
-    debug,
-    testing,
     integration_enabled_params,
 ):
     sentry_init(debug=True, **integration_enabled_params)
-
-    app.debug = debug
-    app.testing = testing
 
     @app.route("/")
     async def index():
@@ -319,9 +316,6 @@ def test_cli_commands_raise(app):
 async def test_500(sentry_init, capture_events, app):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
 
-    app.debug = False
-    app.testing = False
-
     @app.route("/")
     async def index():
         1 / 0
@@ -344,9 +338,6 @@ async def test_500(sentry_init, capture_events, app):
 @pytest.mark.asyncio
 async def test_error_in_errorhandler(sentry_init, capture_events, app):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
-
-    app.debug = False
-    app.testing = False
 
     @app.route("/")
     async def index():

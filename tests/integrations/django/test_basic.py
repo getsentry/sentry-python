@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 
 import json
-import pytest
+import os
 import random
+import re
+import pytest
 from functools import partial
 
 from werkzeug.test import Client
@@ -20,10 +22,11 @@ except ImportError:
 from sentry_sdk._compat import PY2, PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.tracing import Span
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
@@ -583,9 +586,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_django_connect_breadcrumbs(
-    sentry_init, client, capture_events, render_span_tree
-):
+def test_django_connect_breadcrumbs(sentry_init, capture_events):
     """
     Verify we record a breadcrumb when opening a new database.
     """
@@ -617,6 +618,62 @@ def test_django_connect_breadcrumbs(
         {"message": "connect", "category": "query", "type": "default"},
         {"message": "select 1", "category": "query", "data": {}, "type": "default"},
     ]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_connection_span_data(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+    )
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    content, status, headers = client.get(reverse("postgres_select"))
+    assert status == "200 OK"
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db":
+            data = span.get("data")
+            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
+            conn_params = connections["postgres"].get_connection_params()
+            assert data.get(SPANDATA.DB_NAME) is not None
+            assert data.get(SPANDATA.DB_NAME) == conn_params.get(
+                "database"
+            ) or conn_params.get("dbname")
+            assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
+                "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
+            )
+            assert data.get(SPANDATA.SERVER_PORT) == "5432"
+
+
+def test_set_db_data_custom_backend():
+    class DummyBackend(object):
+        # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
+        def __getattr__(self, attr):
+            return self
+
+        def __call__(self):
+            raise TypeError
+
+        def get_connection_params(self):
+            return {}
+
+    try:
+        _set_db_data(Span(), DummyBackend())
+    except TypeError:
+        pytest.fail("A TypeError was raised")
 
 
 @pytest.mark.parametrize(
@@ -704,6 +761,29 @@ def test_read_request(sentry_init, client, capture_events):
     (event,) = events
 
     assert "data" not in event["request"]
+
+
+def test_template_tracing_meta(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    content, _, _ = client.get(reverse("template_test3"))
+    rendered_meta = b"".join(content).decode("utf-8")
+
+    traceparent, baggage = events[0]["message"].split("\n")
+    assert traceparent != ""
+    assert baggage != ""
+
+    match = re.match(
+        r'^<meta name="sentry-trace" content="([^\"]*)"><meta name="baggage" content="([^\"]*)">\n',
+        rendered_meta,
+    )
+    assert match is not None
+    assert match.group(1) == traceparent
+
+    # Python 2 does not preserve sort order
+    rendered_baggage = match.group(2)
+    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
@@ -1035,11 +1115,7 @@ def test_get_receiver_name():
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_middleware(
-    sentry_init,
-    client,
-    capture_events,
-    use_django_caching_with_middlewares,
-    settings,
+    sentry_init, client, capture_events, use_django_caching_with_middlewares
 ):
     sentry_init(
         integrations=[
@@ -1117,11 +1193,7 @@ def test_cache_spans_disabled_templatetag(
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
-    sentry_init,
-    client,
-    capture_events,
-    use_django_caching_with_middlewares,
-    settings,
+    sentry_init, client, capture_events, use_django_caching_with_middlewares
 ):
     sentry_init(
         integrations=[

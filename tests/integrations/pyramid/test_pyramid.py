@@ -203,10 +203,10 @@ def test_flask_empty_json_request(sentry_init, capture_events, route, get_client
     assert event["request"]["data"] == data
 
 
-def test_json_not_truncated_if_request_bodies_is_always(
+def test_json_not_truncated_if_max_request_body_size_is_always(
     sentry_init, capture_events, route, get_client
 ):
-    sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
+    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
 
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
@@ -229,7 +229,7 @@ def test_json_not_truncated_if_request_bodies_is_always(
 
 
 def test_files_and_form(sentry_init, capture_events, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()], request_bodies="always")
+    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
 
     data = {"foo": "a" * 2000, "file": (BytesIO(b"hello"), "hello.txt")}
 

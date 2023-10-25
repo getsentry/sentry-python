@@ -132,7 +132,7 @@ def test_trim_databag_breadth(body_normalizer):
         assert data.get(key) == value
 
 
-def test_no_trimming_if_request_bodies_is_always(body_normalizer):
+def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):
     data = {
         "key{}".format(i): "value{}".format(i) for i in range(MAX_DATABAG_BREADTH + 10)
     }
@@ -141,6 +141,23 @@ def test_no_trimming_if_request_bodies_is_always(body_normalizer):
         curr["nested"] = {}
         curr = curr["nested"]
 
-    result = body_normalizer(data, request_bodies="always")
+    result = body_normalizer(data, max_request_body_size="always")
 
     assert result == data
+
+
+def test_max_value_length_default(body_normalizer):
+    data = {"key": "a" * 2000}
+
+    result = body_normalizer(data)
+
+    assert len(result["key"]) == 1024  # fallback max length
+
+
+def test_max_value_length(body_normalizer):
+    data = {"key": "a" * 2000}
+
+    max_value_length = 1800
+    result = body_normalizer(data, max_value_length=max_value_length)
+
+    assert len(result["key"]) == max_value_length

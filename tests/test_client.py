@@ -24,7 +24,13 @@ from sentry_sdk._compat import reraise, text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any, Optional, Union
+    from sentry_sdk._types import Event
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -410,6 +416,20 @@ def test_include_local_variables_deprecation(sentry_init):
         assert not client.options["include_local_variables"]
 
         fake_warning.assert_not_called()
+
+
+def test_request_bodies_deprecation(sentry_init):
+    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
+        sentry_init(request_bodies="small")
+
+        client = Hub.current.client
+        assert "request_bodies" not in client.options
+        assert "max_request_body_size" in client.options
+        assert client.options["max_request_body_size"] == "small"
+
+        fake_warning.assert_called_once_with(
+            "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+        )
 
 
 def test_include_local_variables_enabled(sentry_init, capture_events):
@@ -1104,3 +1124,192 @@ def test_multiple_positional_args(sentry_init):
     with pytest.raises(TypeError) as exinfo:
         sentry_init(1, None)
     assert "Only single positional argument is expected" in str(exinfo.value)
+
+
+@pytest.mark.parametrize(
+    "sdk_options, expected_data_length",
+    [
+        ({}, DEFAULT_MAX_VALUE_LENGTH),
+        ({"max_value_length": 1800}, 1800),
+    ],
+)
+def test_max_value_length_option(
+    sentry_init, capture_events, sdk_options, expected_data_length
+):
+    sentry_init(sdk_options)
+    events = capture_events()
+
+    capture_message("a" * 2000)
+
+    assert len(events[0]["message"]) == expected_data_length
+
+
+@pytest.mark.parametrize(
+    "client_option,env_var_value,debug_output_expected",
+    [
+        (None, "", False),
+        (None, "t", True),
+        (None, "1", True),
+        (None, "True", True),
+        (None, "true", True),
+        (None, "f", False),
+        (None, "0", False),
+        (None, "False", False),
+        (None, "false", False),
+        (None, "xxx", False),
+        (True, "", True),
+        (True, "t", True),
+        (True, "1", True),
+        (True, "True", True),
+        (True, "true", True),
+        (True, "f", True),
+        (True, "0", True),
+        (True, "False", True),
+        (True, "false", True),
+        (True, "xxx", True),
+        (False, "", False),
+        (False, "t", False),
+        (False, "1", False),
+        (False, "True", False),
+        (False, "true", False),
+        (False, "f", False),
+        (False, "0", False),
+        (False, "False", False),
+        (False, "false", False),
+        (False, "xxx", False),
+    ],
+)
+@pytest.mark.tests_internal_exceptions
+def test_debug_option(
+    sentry_init,
+    monkeypatch,
+    caplog,
+    client_option,
+    env_var_value,
+    debug_output_expected,
+):
+    monkeypatch.setenv("SENTRY_DEBUG", env_var_value)
+
+    if client_option is None:
+        sentry_init()
+    else:
+        sentry_init(debug=client_option)
+
+    Hub.current._capture_internal_exception(
+        (ValueError, ValueError("something is wrong"), None)
+    )
+    if debug_output_expected:
+        assert "something is wrong" in caplog.text
+    else:
+        assert "something is wrong" not in caplog.text
+
+
+class IssuesSamplerTestConfig:
+    def __init__(
+        self,
+        expected_events,
+        sampler_function=None,
+        sample_rate=None,
+        exception_to_raise=Exception,
+    ):
+        # type: (int, Optional[Callable[[Event], Union[float, bool]]], Optional[float], type[Exception]) -> None
+        self.sampler_function_mock = (
+            None
+            if sampler_function is None
+            else mock.MagicMock(side_effect=sampler_function)
+        )
+        self.expected_events = expected_events
+        self.sample_rate = sample_rate
+        self.exception_to_raise = exception_to_raise
+
+    def init_sdk(self, sentry_init):
+        # type: (Callable[[*Any], None]) -> None
+        sentry_init(
+            error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
+        )
+
+    def raise_exception(self):
+        # type: () -> None
+        raise self.exception_to_raise()
+
+
+@mock.patch("sentry_sdk.client.random.random", return_value=0.618)
+@pytest.mark.parametrize(
+    "test_config",
+    (
+        # Baseline test with error_sampler only, both floats and bools
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 1.0, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.7, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.6, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: 0.0, expected_events=0),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: True, expected_events=1),
+        IssuesSamplerTestConfig(sampler_function=lambda *_: False, expected_events=0),
+        # Baseline test with sample_rate only
+        IssuesSamplerTestConfig(sample_rate=1.0, expected_events=1),
+        IssuesSamplerTestConfig(sample_rate=0.7, expected_events=1),
+        IssuesSamplerTestConfig(sample_rate=0.6, expected_events=0),
+        IssuesSamplerTestConfig(sample_rate=0.0, expected_events=0),
+        # error_sampler takes precedence over sample_rate
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: 1.0, sample_rate=0.0, expected_events=1
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: 0.0, sample_rate=1.0, expected_events=0
+        ),
+        # Different sample rates based on exception, retrieved both from event and hint
+        IssuesSamplerTestConfig(
+            sampler_function=lambda event, _: {
+                "ZeroDivisionError": 1.0,
+                "AttributeError": 0.0,
+            }[event["exception"]["values"][0]["type"]],
+            exception_to_raise=ZeroDivisionError,
+            expected_events=1,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda event, _: {
+                "ZeroDivisionError": 1.0,
+                "AttributeError": 0.0,
+            }[event["exception"]["values"][0]["type"]],
+            exception_to_raise=AttributeError,
+            expected_events=0,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda _, hint: {
+                ZeroDivisionError: 1.0,
+                AttributeError: 0.0,
+            }[hint["exc_info"][0]],
+            exception_to_raise=ZeroDivisionError,
+            expected_events=1,
+        ),
+        IssuesSamplerTestConfig(
+            sampler_function=lambda _, hint: {
+                ZeroDivisionError: 1.0,
+                AttributeError: 0.0,
+            }[hint["exc_info"][0]],
+            exception_to_raise=AttributeError,
+            expected_events=0,
+        ),
+        # If sampler returns invalid value, we should still send the event
+        IssuesSamplerTestConfig(
+            sampler_function=lambda *_: "This is an invalid return value for the sampler",
+            expected_events=1,
+        ),
+    ),
+)
+def test_error_sampler(_, sentry_init, capture_events, test_config):
+    test_config.init_sdk(sentry_init)
+
+    events = capture_events()
+
+    try:
+        test_config.raise_exception()
+    except Exception:
+        capture_exception()
+
+    assert len(events) == test_config.expected_events
+
+    if test_config.sampler_function_mock is not None:
+        assert test_config.sampler_function_mock.call_count == 1
+
+        # Ensure two arguments (the event and hint) were passed to the sampler function
+        assert len(test_config.sampler_function_mock.call_args[0]) == 2
