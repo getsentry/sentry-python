@@ -1,5 +1,6 @@
 import sys
 import contextlib
+from datetime import datetime
 from functools import wraps
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -31,6 +32,12 @@ if PY2:
     int_types = (int, long)  # noqa
     iteritems = lambda x: x.iteritems()  # noqa: B301
     binary_sequence_types = (bytearray, memoryview)
+
+    def datetime_utcnow():
+        return datetime.utcnow()
+
+    def utc_from_timestamp(timestamp):
+        return datetime.utcfromtimestamp(timestamp)
 
     def implements_str(cls):
         # type: (T) -> T
@@ -78,6 +85,7 @@ if PY2:
         return DecoratorContextManager
 
 else:
+    from datetime import timezone
     import urllib.parse as urlparse  # noqa
 
     text_type = str
@@ -86,6 +94,14 @@ else:
     int_types = (int,)
     iteritems = lambda x: x.items()
     binary_sequence_types = (bytes, bytearray, memoryview)
+
+    def datetime_utcnow():
+        # type: () -> datetime
+        return datetime.now(timezone.utc)
+
+    def utc_from_timestamp(timestamp):
+        # type: (float) -> datetime
+        return datetime.fromtimestamp(timestamp, timezone.utc)
 
     def implements_str(x):
         # type: (T) -> T

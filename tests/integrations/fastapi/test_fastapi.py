@@ -5,8 +5,6 @@ import threading
 import pytest
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
-fastapi = pytest.importorskip("fastapi")
-
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware

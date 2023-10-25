@@ -5,10 +5,9 @@ import pytest
 from sentry_sdk import capture_exception, capture_message, last_event_id
 from sentry_sdk.integrations.starlite import StarliteIntegration
 
-starlite = pytest.importorskip("starlite")
-
 from typing import Any, Dict
 
+import starlite
 from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig

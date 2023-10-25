@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 import logging
-import datetime
 from fnmatch import fnmatch
 
 from sentry_sdk.hub import Hub
@@ -12,7 +11,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
-from sentry_sdk._compat import iteritems
+from sentry_sdk._compat import iteritems, utc_from_timestamp
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -282,6 +281,6 @@ class BreadcrumbHandler(_BaseHandler):
             "level": self._logging_to_event_level(record),
             "category": record.name,
             "message": record.message,
-            "timestamp": datetime.datetime.utcfromtimestamp(record.created),
+            "timestamp": utc_from_timestamp(record.created),
             "data": self._extra_from_record(record),
         }
