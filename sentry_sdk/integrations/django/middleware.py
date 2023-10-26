@@ -34,10 +34,11 @@ else:
     import_string_name = "import_string"
 
 
-if DJANGO_VERSION < (3, 1):
-    _asgi_middleware_mixin_factory = lambda _: object
-else:
+django_supports_async_middleware = DJANGO_VERSION >= (3, 1)
+if django_supports_async_middleware:
     from .asgi import _asgi_middleware_mixin_factory
+else:
+    _asgi_middleware_mixin_factory = lambda _: object
 
 
 def patch_django_middlewares():
@@ -126,7 +127,10 @@ def _wrap_middleware(middleware, middleware_name):
     class SentryWrappingMiddleware(
         _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
-        async_capable = getattr(middleware, "async_capable", False)
+        async_capable = (
+            django_supports_async_middleware
+            and getattr(middleware, "async_capable", False)
+        )
 
         def __init__(self, get_response=None, *args, **kwargs):
             # type: (Optional[Callable[..., Any]], *Any, **Any) -> None
@@ -137,8 +141,7 @@ def _wrap_middleware(middleware, middleware_name):
             self.get_response = get_response
             self._call_method = None
             if self.async_capable:
-                ##super(SentryWrappingMiddleware, self).__init__(get_response)
-                super(SentryWrappingMiddleware, self).__init__()
+                super(SentryWrappingMiddleware, self).__init__(get_response)
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.
