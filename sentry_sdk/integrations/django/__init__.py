@@ -501,7 +501,7 @@ def _make_event_processor(weak_request, integration):
 def _get_cleansed_multivaluedict(request, multivaluedict):
     # type: (WSGIRequest, MultiValueDict) -> MultiValueDict
     """
-    Replace the keys in a MultiValueDict marked as sensitive with stars.
+    Replace the keys in a MultiValueDict marked as sensitive with SENSITIVE_DATA_SUBSTITUTE.
     This mitigates leaking sensitive POST parameters if something like
     request.POST['nonexistent_key'] throws an exception
     """
@@ -567,7 +567,7 @@ def _clean_event(
 def _cleanse_sensitive_vars(
     request,  # type: WSGIRequest
     event,  # type: Event
-    sensitive_variables,  # type: dict[str, Any]
+    sensitive_variables,  # type: Union[dict[str, Any], str]
     reverse_exception_idx,  # type: int
     frame_idx,  # type: int
 ):

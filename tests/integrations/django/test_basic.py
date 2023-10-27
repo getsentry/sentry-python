@@ -1034,6 +1034,7 @@ def test_csrf(sentry_init, client):
     assert b"".join(content) == b"ok"
 
 
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
@@ -1351,7 +1352,10 @@ def test_sensitive_variables_wrapper(sentry_init, client, capture_events, route)
     last_frame = exception["stacktrace"]["frames"][-1]
     assert last_frame["vars"]["foo"].replace("'", "") == SENSITIVE_DATA_SUBSTITUTE
     if route == "hide_sensitive_variables":
-        assert last_frame["vars"]["zoo"].replace("'", "") == body["zoo"]
+        if PY2:
+            assert last_frame["vars"]["zoo"].replace("'", "")[1:] == body["zoo"]
+        else:
+            assert last_frame["vars"]["zoo"].replace("'", "") == body["zoo"]
     else:
         assert last_frame["vars"]["zoo"].replace("'", "") == SENSITIVE_DATA_SUBSTITUTE
 
@@ -1408,10 +1412,16 @@ def test_nested_sensitive_data(sentry_init, client, capture_events):
     for frame in frames:
         if "to_be_hidden" in frame["vars"]:
             if frame["function"] == "after_after_req":
-                assert (
-                    frame["vars"]["to_be_hidden"].replace("'", "")
-                    == body["to_be_hidden"]
-                )
+                if PY2:
+                    assert (
+                        frame["vars"]["to_be_hidden"].replace("'", "")[1:]
+                        == body["to_be_hidden"]
+                    )
+                else:
+                    assert (
+                        frame["vars"]["to_be_hidden"].replace("'", "")
+                        == body["to_be_hidden"]
+                    )
             else:
                 assert (
                     frame["vars"]["to_be_hidden"].replace("'", "")
