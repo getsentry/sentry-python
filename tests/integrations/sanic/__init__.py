@@ -1,3 +1,3 @@
 import pytest
 
-sanic = pytest.importorskip("sanic")
+pytest.importorskip("sanic")

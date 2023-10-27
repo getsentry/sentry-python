@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        Hint,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
+            "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
             # TODO: Remove these 2 profiling related experiments
@@ -42,6 +44,7 @@ if TYPE_CHECKING:
             "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
+            "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
         },
@@ -169,6 +172,13 @@ class OP:
     FUNCTION = "function"
     FUNCTION_AWS = "function.aws"
     FUNCTION_GCP = "function.gcp"
+    GRAPHQL_EXECUTE = "graphql.execute"
+    GRAPHQL_MUTATION = "graphql.mutation"
+    GRAPHQL_PARSE = "graphql.parse"
+    GRAPHQL_RESOLVE = "graphql.resolve"
+    GRAPHQL_SUBSCRIPTION = "graphql.subscription"
+    GRAPHQL_QUERY = "graphql.query"
+    GRAPHQL_VALIDATE = "graphql.validate"
     GRPC_CLIENT = "grpc.client"
     GRPC_SERVER = "grpc.server"
     HTTP_CLIENT = "http.client"
@@ -225,7 +235,7 @@ class ClientConstructor(object):
         max_request_body_size="medium",  # type: str
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=False,  # type: bool
+        debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
@@ -252,6 +262,7 @@ class ClientConstructor(object):
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
         enable_backpressure_handling=True,  # type: bool
+        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
     ):
         # type: (...) -> None
         pass
@@ -275,4 +286,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.31.0"
+VERSION = "1.32.0"

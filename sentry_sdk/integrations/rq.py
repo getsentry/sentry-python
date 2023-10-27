@@ -20,6 +20,7 @@ try:
     from rq.timeouts import JobTimeoutException
     from rq.version import VERSION as RQ_VERSION
     from rq.worker import Worker
+    from rq.job import JobStatus
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
@@ -95,7 +96,9 @@ class RqIntegration(Integration):
 
         def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
             # type: (Worker, Any, *Any, **Any) -> Any
-            if job.is_failed:
+            # Note, the order of the `or` here is important,
+            # because calling `job.is_failed` will change `_status`.
+            if job._status == JobStatus.FAILED or job.is_failed:
                 _capture_exception(exc_info)  # type: ignore
 
             return old_handle_exception(self, job, *exc_info, **kwargs)

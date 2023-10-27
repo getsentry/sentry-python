@@ -1,6 +1,7 @@
 import pytest
 
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
 from fakeredis.aioredis import FakeRedis
@@ -67,7 +68,13 @@ async def test_async_redis_pipeline(
         "redis.commands": {
             "count": 3,
             "first_ten": expected_first_ten,
-        }
+        },
+        SPANDATA.DB_SYSTEM: "redis",
+        SPANDATA.DB_NAME: "0",
+        SPANDATA.SERVER_ADDRESS: connection.connection_pool.connection_kwargs.get(
+            "host"
+        ),
+        SPANDATA.SERVER_PORT: 6379,
     }
     assert span["tags"] == {
         "redis.transaction": is_transaction,

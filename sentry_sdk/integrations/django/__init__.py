@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
+import inspect
 import sys
 import threading
 import weakref
@@ -9,6 +10,7 @@ from importlib import import_module
 from sentry_sdk._compat import string_types, text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
@@ -741,6 +743,17 @@ def install_sql_hook():
             hub, self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
             _set_db_data(span, self)
+            if hub.client:
+                options = hub.client.options["_experiments"].get("attach_explain_plans")
+                if options is not None:
+                    attach_explain_plan_to_span(
+                        span,
+                        self.cursor.connection,
+                        sql,
+                        params,
+                        self.mogrify,
+                        options,
+                    )
             return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
@@ -781,12 +794,21 @@ def _set_db_data(span, cursor_or_db):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
-    connection_params = (
-        cursor_or_db.connection.get_dsn_parameters()
-        if hasattr(cursor_or_db, "connection")
+    if (
+        hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
-        else db.get_connection_params()
-    )
+        and inspect.isfunction(cursor_or_db.connection.get_dsn_parameters)
+    ):
+        # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
+        # actually has a `connection` and the `connection` has a `get_dsn_parameters`
+        # attribute, only to throw an error once you actually want to call it.
+        # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
+        # function.
+        connection_params = cursor_or_db.connection.get_dsn_parameters()
+
+    else:
+        connection_params = db.get_connection_params()
+
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
         span.set_data(SPANDATA.DB_NAME, db_name)

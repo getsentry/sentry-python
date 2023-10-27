@@ -13,6 +13,7 @@ from werkzeug.wrappers import Request, Response
 from pytest_localserver.http import WSGIServer
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
+from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -118,7 +119,7 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime.utcnow())
+    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
     capture_message("löl")
 
     getattr(client, client_flush_method)()
@@ -129,6 +130,25 @@ def test_transport_works(
     assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
     assert any("Sending event" in record.msg for record in caplog.records) == debug
+
+
+@pytest.mark.parametrize(
+    "num_pools,expected_num_pools",
+    (
+        (None, 2),
+        (2, 2),
+        (10, 10),
+    ),
+)
+def test_transport_num_pools(make_client, num_pools, expected_num_pools):
+    _experiments = {}
+    if num_pools is not None:
+        _experiments["transport_num_pools"] = num_pools
+
+    client = make_client(_experiments=_experiments)
+
+    options = client.transport._get_pool_options([])
+    assert options["num_pools"] == expected_num_pools
 
 
 def test_transport_infinite_loop(capturing_server, request, make_client):
