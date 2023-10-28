@@ -74,7 +74,7 @@ class BackgroundWorker(object):
                     # At this point we can no longer start because the interpreter
                     # is already shutting down.  Sadly at this point we can no longer
                     # send out events.
-                    self.is_alive = False
+                    self._thread = None
 
     def kill(self):
         # type: () -> None
