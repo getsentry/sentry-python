@@ -22,7 +22,7 @@ aws lambda publish-layer-version \
     --region "eu-central-1" \
     --zip-file "fileb://dist/$ZIP" \
     --description "Local test build of SentryPythonServerlessSDK (can be deleted)" \
-    --compatible-runtimes python3.6 python3.7 python3.8 python3.9
+    --compatible-runtimes python3.7 python3.8 python3.9 python3.10 python3.11 \
     --no-cli-pager
 
 echo "Done deploying zipped Lambda layer to AWS as 'SentryPythonServerlessSDK-local-dev'."
