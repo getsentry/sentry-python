@@ -18,6 +18,15 @@ in that runtime in a Lambda function: (see the bottom of client.py for more info
 
     pip3 install click
     python3 tests/integrations/aws_lambda/client.py --runtime=python4.0
+
+IMPORTANT:
+
+During running of this test suite temporary folders will be created for compiling the Lambda functions.
+This temporary folders will not be cleaned up. This is because in CI generated files have to be shared
+between tests and thus the folders can not be deleted right after use.
+
+If you run your tests locally, you need to clean up the temporary folders manually. The location of
+the temporary folders is printed when running a test.
 """
 
 import base64
