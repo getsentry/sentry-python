@@ -53,7 +53,14 @@ class Monitor(object):
 
             thread = Thread(name=self.name, target=_thread)
             thread.daemon = True
-            thread.start()
+            try:
+                thread.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self._running = False
+                return None
+
             self._thread = thread
             self._thread_for_pid = os.getpid()
 
