@@ -1,59 +1,206 @@
-import sys
-import os
-import shutil
-import tempfile
-import subprocess
-import boto3
-import uuid
 import base64
+import boto3
+import glob
+import hashlib
+import os
+import subprocess
+import sys
+import tempfile
+
+from sentry_sdk.consts import VERSION as SDK_VERSION
+
+AWS_REGION_NAME = "us-east-1"
+AWS_CREDENTIALS = {
+    "aws_access_key_id": os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
+    "aws_secret_access_key": os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
+}
+AWS_LAMBDA_EXECUTION_ROLE_NAME = "lambda-ex"
+AWS_LAMBDA_EXECUTION_ROLE_ARN = None
 
 
-def get_boto_client():
-    return boto3.client(
-        "lambda",
-        aws_access_key_id=os.environ["SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID"],
-        aws_secret_access_key=os.environ["SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY"],
-        region_name="us-east-1",
+def _install_dependencies(base_dir, subprocess_kwargs):
+    """
+    Installs dependencies for AWS Lambda function
+    """
+    setup_cfg = os.path.join(base_dir, "setup.cfg")
+    with open(setup_cfg, "w") as f:
+        f.write("[install]\nprefix=")
+
+    # Install requirements for Lambda Layer (these are more limited than the SDK requirements,
+    # because Lambda does not support the newest versions of some packages)
+    subprocess.check_call(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            "aws-lambda-layer-requirements.txt",
+            "--target",
+            base_dir,
+        ],
+        **subprocess_kwargs,
+    )
+    # Install requirements used for testing
+    subprocess.check_call(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "mock==3.0.0",
+            "funcsigs",
+            "--target",
+            base_dir,
+        ],
+        **subprocess_kwargs,
+    )
+    # Create a source distribution of the Sentry SDK (in parent directory of base_dir)
+    subprocess.check_call(
+        [
+            sys.executable,
+            "setup.py",
+            "sdist",
+            "--dist-dir",
+            os.path.dirname(base_dir),
+        ],
+        **subprocess_kwargs,
+    )
+    # Install the created Sentry SDK source distribution into the target directory
+    # Do not install the dependencies of the SDK, because they where installed by aws-lambda-layer-requirements.txt above
+    source_distribution_archive = glob.glob(
+        "{}/*.tar.gz".format(os.path.dirname(base_dir))
+    )[0]
+    subprocess.check_call(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            source_distribution_archive,
+            "--no-deps",
+            "--target",
+            base_dir,
+        ],
+        **subprocess_kwargs,
     )
 
 
-def build_no_code_serverless_function_and_layer(
-    client, tmpdir, fn_name, runtime, timeout, initial_handler
+def _create_lambda_function_zip(base_dir):
+    """
+    Zips the given base_dir omitting Python cache files
+    """
+    subprocess.run(
+        [
+            "zip",
+            "-q",
+            "-x",
+            "**/__pycache__/*",
+            "-r",
+            "lambda-function-package.zip",
+            "./",
+        ],
+        cwd=base_dir,
+        check=True,
+    )
+
+
+def _create_lambda_package(
+    base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
 ):
     """
-    Util function that auto instruments the no code implementation of the python
-    sdk by creating a layer containing the Python-sdk, and then creating a func
-    that uses that layer
+    Creates deployable packages (as zip files) for AWS Lambda function
+    and optional the accompanying Sentry Lambda layer
     """
-    from scripts.build_aws_lambda_layer import build_layer_dir
+    if initial_handler:
+        # If Initial handler value is provided i.e. it is not the default
+        # `test_lambda.test_handler`, then create another dir level so that our path is
+        # test_dir.test_lambda.test_handler
+        test_dir_path = os.path.join(base_dir, "test_dir")
+        python_init_file = os.path.join(test_dir_path, "__init__.py")
+        os.makedirs(test_dir_path)
+        with open(python_init_file, "w"):
+            # Create __init__ file to make it a python package
+            pass
 
-    build_layer_dir(dest_abs_path=tmpdir)
+        test_lambda_py = os.path.join(base_dir, "test_dir", "test_lambda.py")
+    else:
+        test_lambda_py = os.path.join(base_dir, "test_lambda.py")
 
-    with open(os.path.join(tmpdir, "serverless-ball.zip"), "rb") as serverless_zip:
-        response = client.publish_layer_version(
-            LayerName="python-serverless-sdk-test",
-            Description="Created as part of testsuite for getsentry/sentry-python",
-            Content={"ZipFile": serverless_zip.read()},
+    with open(test_lambda_py, "w") as f:
+        f.write(code)
+
+    if syntax_check:
+        # Check file for valid syntax first, and that the integration does not
+        # crash when not running in Lambda (but rather a local deployment tool
+        # such as chalice's)
+        subprocess.check_call([sys.executable, test_lambda_py])
+
+    if layer is None:
+        _install_dependencies(base_dir, subprocess_kwargs)
+        _create_lambda_function_zip(base_dir)
+
+    else:
+        _create_lambda_function_zip(base_dir)
+
+        # Create Lambda layer zip package
+        from scripts.build_aws_lambda_layer import build_packaged_zip
+
+        build_packaged_zip(
+            base_dir=base_dir,
+            make_dist=True,
+            out_zip_filename="lambda-layer-package.zip",
         )
 
-    with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
-        client.create_function(
-            FunctionName=fn_name,
-            Runtime=runtime,
-            Timeout=timeout,
-            Environment={
-                "Variables": {
-                    "SENTRY_INITIAL_HANDLER": initial_handler,
-                    "SENTRY_DSN": "https://123abc@example.com/123",
-                    "SENTRY_TRACES_SAMPLE_RATE": "1.0",
-                }
-            },
-            Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-            Handler="sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
-            Layers=[response["LayerVersionArn"]],
-            Code={"ZipFile": zip.read()},
-            Description="Created as part of testsuite for getsentry/sentry-python",
+
+def _get_or_create_lambda_execution_role():
+    global AWS_LAMBDA_EXECUTION_ROLE_ARN
+
+    policy = """{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+            }
+        ]
+    }
+    """
+    iam_client = boto3.client(
+        "iam",
+        region_name=AWS_REGION_NAME,
+        **AWS_CREDENTIALS,
+    )
+
+    try:
+        response = iam_client.get_role(RoleName=AWS_LAMBDA_EXECUTION_ROLE_NAME)
+        AWS_LAMBDA_EXECUTION_ROLE_ARN = response["Role"]["Arn"]
+    except iam_client.exceptions.NoSuchEntityException:
+        # create role for lambda execution
+        response = iam_client.create_role(
+            RoleName=AWS_LAMBDA_EXECUTION_ROLE_NAME,
+            AssumeRolePolicyDocument=policy,
         )
+        AWS_LAMBDA_EXECUTION_ROLE_ARN = response["Role"]["Arn"]
+
+        # attach policy to role
+        iam_client.attach_role_policy(
+            RoleName=AWS_LAMBDA_EXECUTION_ROLE_NAME,
+            PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+        )
+
+
+def get_boto_client():
+    _get_or_create_lambda_execution_role()
+
+    return boto3.client(
+        "lambda",
+        region_name=AWS_REGION_NAME,
+        **AWS_CREDENTIALS,
+    )
 
 
 def run_lambda_function(
@@ -68,110 +215,128 @@ def run_lambda_function(
     initial_handler=None,
     subprocess_kwargs=(),
 ):
+    """
+    Creates a Lambda function with the given code, and invokes it.
+
+    If the same code is run multiple times the function will NOT be
+    created anew each time but the existing function will be reused.
+    """
     subprocess_kwargs = dict(subprocess_kwargs)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        if initial_handler:
-            # If Initial handler value is provided i.e. it is not the default
-            # `test_lambda.test_handler`, then create another dir level so that our path is
-            # test_dir.test_lambda.test_handler
-            test_dir_path = os.path.join(tmpdir, "test_dir")
-            python_init_file = os.path.join(test_dir_path, "__init__.py")
-            os.makedirs(test_dir_path)
-            with open(python_init_file, "w"):
-                # Create __init__ file to make it a python package
-                pass
+    # Making a unique function name depending on all the code that is run in it (function code plus SDK version)
+    # The name needs to be short so the generated event/envelope json blobs are small enough to be output
+    # in the log result of the Lambda function.
+    function_hash = hashlib.shake_256((code + SDK_VERSION).encode("utf-8")).hexdigest(5)
+    fn_name = "test_{}".format(function_hash)
+    full_fn_name = "{}_{}".format(
+        fn_name, runtime.replace(".", "").replace("python", "py")
+    )
 
-            test_lambda_py = os.path.join(tmpdir, "test_dir", "test_lambda.py")
-        else:
-            test_lambda_py = os.path.join(tmpdir, "test_lambda.py")
+    function_exists_in_aws = True
+    try:
+        client.get_function(
+            FunctionName=full_fn_name,
+        )
+        print(
+            "Lambda function in AWS already existing, taking it (and do not create a local one)"
+        )
+    except client.exceptions.ResourceNotFoundException:
+        function_exists_in_aws = False
 
-        with open(test_lambda_py, "w") as f:
-            f.write(code)
+    if not function_exists_in_aws:
+        tmp_base_dir = tempfile.gettempdir()
+        base_dir = os.path.join(tmp_base_dir, fn_name)
+        dir_already_existing = os.path.isdir(base_dir)
 
-        if syntax_check:
-            # Check file for valid syntax first, and that the integration does not
-            # crash when not running in Lambda (but rather a local deployment tool
-            # such as chalice's)
-            subprocess.check_call([sys.executable, test_lambda_py])
+        if dir_already_existing:
+            print("Local Lambda function directory already exists, skipping creation")
 
-        fn_name = "test_function_{}".format(uuid.uuid4())
-
-        if layer is None:
-            setup_cfg = os.path.join(tmpdir, "setup.cfg")
-            with open(setup_cfg, "w") as f:
-                f.write("[install]\nprefix=")
-
-            subprocess.check_call(
-                [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
-                **subprocess_kwargs
+        if not dir_already_existing:
+            os.mkdir(base_dir)
+            _create_lambda_package(
+                base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
             )
 
-            subprocess.check_call(
-                "pip install mock==3.0.0 funcsigs -t .",
-                cwd=tmpdir,
-                shell=True,
-                **subprocess_kwargs
+            @add_finalizer
+            def clean_up():
+                # this closes the web socket so we don't get a
+                #   ResourceWarning: unclosed <ssl.SSLSocket ... >
+                # warning on every test
+                # based on https://github.com/boto/botocore/pull/1810
+                # (if that's ever merged, this can just become client.close())
+                session = client._endpoint.http_session
+                managers = [session._manager] + list(session._proxy_managers.values())
+                for manager in managers:
+                    manager.clear()
+
+        layers = []
+        environment = {}
+        handler = initial_handler or "test_lambda.test_handler"
+
+        if layer is not None:
+            with open(
+                os.path.join(base_dir, "lambda-layer-package.zip"), "rb"
+            ) as lambda_layer_zip:
+                response = client.publish_layer_version(
+                    LayerName="python-serverless-sdk-test",
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                    Content={"ZipFile": lambda_layer_zip.read()},
+                )
+
+            layers = [response["LayerVersionArn"]]
+            handler = (
+                "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler"
             )
+            environment = {
+                "Variables": {
+                    "SENTRY_INITIAL_HANDLER": initial_handler
+                    or "test_lambda.test_handler",
+                    "SENTRY_DSN": "https://123abc@example.com/123",
+                    "SENTRY_TRACES_SAMPLE_RATE": "1.0",
+                }
+            }
 
-            # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python-how-to-create-deployment-package.html
-            subprocess.check_call(
-                "pip install ../*.tar.gz -t .",
-                cwd=tmpdir,
-                shell=True,
-                **subprocess_kwargs
-            )
-
-            shutil.make_archive(os.path.join(tmpdir, "ball"), "zip", tmpdir)
-
-            with open(os.path.join(tmpdir, "ball.zip"), "rb") as zip:
+        try:
+            with open(
+                os.path.join(base_dir, "lambda-function-package.zip"), "rb"
+            ) as lambda_function_zip:
                 client.create_function(
-                    FunctionName=fn_name,
+                    Description="Created as part of testsuite for getsentry/sentry-python",
+                    FunctionName=full_fn_name,
                     Runtime=runtime,
                     Timeout=timeout,
-                    Role=os.environ["SENTRY_PYTHON_TEST_AWS_IAM_ROLE"],
-                    Handler="test_lambda.test_handler",
-                    Code={"ZipFile": zip.read()},
-                    Description="Created as part of testsuite for getsentry/sentry-python",
+                    Role=AWS_LAMBDA_EXECUTION_ROLE_ARN,
+                    Handler=handler,
+                    Code={"ZipFile": lambda_function_zip.read()},
+                    Environment=environment,
+                    Layers=layers,
                 )
-        else:
-            subprocess.run(
-                ["zip", "-q", "-x", "**/__pycache__/*", "-r", "ball.zip", "./"],
-                cwd=tmpdir,
-                check=True,
+
+                waiter = client.get_waiter("function_active_v2")
+                waiter.wait(FunctionName=full_fn_name)
+        except client.exceptions.ResourceConflictException:
+            print(
+                "Lambda function already exists, this is fine, we will just invoke it."
             )
 
-            # Default initial handler
-            if not initial_handler:
-                initial_handler = "test_lambda.test_handler"
+    response = client.invoke(
+        FunctionName=full_fn_name,
+        InvocationType="RequestResponse",
+        LogType="Tail",
+        Payload=payload,
+    )
 
-            build_no_code_serverless_function_and_layer(
-                client, tmpdir, fn_name, runtime, timeout, initial_handler
-            )
+    assert 200 <= response["StatusCode"] < 300, response
+    return response
 
-        @add_finalizer
-        def clean_up():
-            client.delete_function(FunctionName=fn_name)
 
-            # this closes the web socket so we don't get a
-            #   ResourceWarning: unclosed <ssl.SSLSocket ... >
-            # warning on every test
-            # based on https://github.com/boto/botocore/pull/1810
-            # (if that's ever merged, this can just become client.close())
-            session = client._endpoint.http_session
-            managers = [session._manager] + list(session._proxy_managers.values())
-            for manager in managers:
-                manager.clear()
-
-        response = client.invoke(
-            FunctionName=fn_name,
-            InvocationType="RequestResponse",
-            LogType="Tail",
-            Payload=payload,
-        )
-
-        assert 200 <= response["StatusCode"] < 300, response
-        return response
+# This is for inspecting new Python runtime environments in AWS Lambda
+# If you need to debug a new runtime, use this REPL to run arbitrary Python or bash commands
+# in that runtime in a Lambda function:
+#
+#    pip3 install click
+#    python3 tests/integrations/aws_lambda/client.py --runtime=python4.0
+#
 
 
 _REPL_CODE = """
@@ -197,7 +362,7 @@ else:
 
     @click.command()
     @click.option(
-        "--runtime", required=True, help="name of the runtime to use, eg python3.8"
+        "--runtime", required=True, help="name of the runtime to use, eg python3.11"
     )
     @click.option("--verbose", is_flag=True, default=False)
     def repl(runtime, verbose):
