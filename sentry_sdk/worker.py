@@ -42,6 +42,21 @@ class BackgroundWorker(object):
         if not self.is_alive:
             self.start()
 
+    def _get_main_thread(self):
+        # type: () -> Optional[threading.Thread]
+        main_thread = None
+
+        try:
+            main_thread = threading.main_thread()
+        except AttributeError:
+            # Python 2.7 doesn't have threading.main_thread()
+            for thread in threading.enumerate():
+                if isinstance(thread, threading._MainThread):
+                    main_thread = thread
+                    break
+
+        return main_thread
+
     def _timed_queue_join(self, timeout):
         # type: (float) -> bool
         deadline = time() + timeout
@@ -71,7 +86,7 @@ class BackgroundWorker(object):
                     self._thread.daemon = True
                     self._thread.start()
                 else:
-                    self._thread = threading.main_thread()
+                    self._thread = self._get_main_thread()
 
                 self._thread_for_pid = os.getpid()
 
@@ -83,7 +98,7 @@ class BackgroundWorker(object):
         """
         logger.debug("background worker got kill request")
         with self._lock:
-            if self._thread and self._thread != threading.main_thread():
+            if self._thread and self._thread != self._get_main_thread():
                 try:
                     self._queue.put_nowait(_TERMINATOR)
                 except FullError:
