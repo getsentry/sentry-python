@@ -51,7 +51,7 @@ class BackgroundWorker(object):
         except AttributeError:
             # Python 2.7 doesn't have threading.main_thread()
             for thread in threading.enumerate():
-                if isinstance(thread, threading._MainThread):
+                if isinstance(thread, threading._MainThread):  # type: ignore[attr-defined]
                     main_thread = thread
                     break
 
@@ -157,6 +157,7 @@ class BackgroundWorker(object):
             sleep(0)
 
     def prepare_shutdown(self):
+        # type: () -> None
         # If the Python 3.12+ interpreter is shutting down, trying to start a new
         # thread throws a RuntimeError. If we're shutting down and the worker has
         # no active thread, use the main thread instead of spawning a new one.
