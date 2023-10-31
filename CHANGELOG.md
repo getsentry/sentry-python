@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.33.1
+
+### Various fixes & improvements
+
+- Make parse_version work in utils.py itself. (#2474) by @antonpirker
+
 ## 1.33.0
 
 ### Various fixes & improvements
