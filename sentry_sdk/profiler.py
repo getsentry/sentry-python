@@ -918,7 +918,13 @@ class ThreadScheduler(Scheduler):
             # can keep the application running after other threads
             # have exited
             self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
-            self.thread.start()
+            try:
+                self.thread.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a start that no
+                # longer allows us to spawn a thread and we have to bail.
+                self.running = False
+                return
 
     def run(self):
         # type: () -> None
