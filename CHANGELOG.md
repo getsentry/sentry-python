@@ -4,24 +4,24 @@
 
 ### Various fixes & improvements
 
-- feat: Detect interpreter in shutdown state on thread spawn (#2468) by @mitsuhiko
-- Load AWS Lambda secrets in Github CI (#2153) by @antonpirker
-- Fix parsing of Django `path` patterns (#2452) by @sentrivana
-- fix(integrations): Falcon integration checks response status before reporting error (#2465) by @szokeasaurusrex
+- New: Added `error_sampler` option (#2456) by @szokeasaurusrex
+- Python 3.12: Detect interpreter in shutdown state on thread spawn (#2468) by @mitsuhiko
 - Patch eventlet under Sentry SDK (#2464) by @szokeasaurusrex
-- Add Django 4.2 to test suite (#2462) by @sentrivana
-- feat(api): Added `error_sampler` option (#2456) by @szokeasaurusrex
-- Update compatible runtimes for AWS Lambda layer (#2453) by @antonpirker
-- Make sure `get_dsn_parameters` is an actual function (#2441) by @sentrivana
 - Mitigate CPU spikes when sending lots of events with lots of data (#2449) by @antonpirker
 - Make `debug` option also configurable via environment (#2450) by @antonpirker
+- Make sure `get_dsn_parameters` is an actual function (#2441) by @sentrivana
 - Bump pytest-localserver, add compat comment (#2448) by @sentrivana
-- Update CONTRIBUTING.md (#2443) by @krishvsoni
-- Support Quart 0.19 onwards (#2403) by @pgjones
-- Sanic integration initial version (#2419) by @szokeasaurusrex
-- Update README.md (#2435) by @sentrivana
-- Connection attributes in `redis` database spans (#2398) by @antonpirker
+- AWS Lambda: Update compatible runtimes for AWS Lambda layer (#2453) by @antonpirker
+- AWS Lambda: Load AWS Lambda secrets in Github CI (#2153) by @antonpirker
+- Redis: Connection attributes in `redis` database spans (#2398) by @antonpirker
+- Falcon: Falcon integration checks response status before reporting error (#2465) by @szokeasaurusrex
+- Quart: Support Quart 0.19 onwards (#2403) by @pgjones
+- Sanic: Sanic integration initial version (#2419) by @szokeasaurusrex
+- Django: Fix parsing of Django `path` patterns (#2452) by @sentrivana
+- Django: Add Django 4.2 to test suite (#2462) by @sentrivana
 - Polish changelog (#2434) by @sentrivana
+- Update CONTRIBUTING.md (#2443) by @krishvsoni
+- Update README.md (#2435) by @sentrivana
 
 ## 1.32.0
 
