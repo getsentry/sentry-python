@@ -921,7 +921,7 @@ class ThreadScheduler(Scheduler):
             try:
                 self.thread.start()
             except RuntimeError:
-                # Unfortunately at this point the interpreter is in a start that no
+                # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
                 self.running = False
                 return
