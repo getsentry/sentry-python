@@ -898,6 +898,14 @@ class ThreadScheduler(Scheduler):
 
     def ensure_running(self):
         # type: () -> None
+        """
+        Check that the profiler has an active thread to run in, and start one if
+        that's not the case.
+
+        Note that this might fail (e.g. in Python 3.12 it's not possible to
+        spawn new threads at interpreter shutdown). In that case self.running
+        will be False after running this function.
+        """
         pid = os.getpid()
 
         # is running on the right process
@@ -918,7 +926,14 @@ class ThreadScheduler(Scheduler):
             # can keep the application running after other threads
             # have exited
             self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
-            self.thread.start()
+            try:
+                self.thread.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self.running = False
+                self.thread = None
+                return
 
     def run(self):
         # type: () -> None
@@ -1004,7 +1019,14 @@ class GeventScheduler(Scheduler):
             self.running = True
 
             self.thread = ThreadPool(1)
-            self.thread.spawn(self.run)
+            try:
+                self.thread.spawn(self.run)
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self.running = False
+                self.thread = None
+                return
 
     def run(self):
         # type: () -> None
