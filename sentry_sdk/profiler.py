@@ -788,7 +788,8 @@ class Scheduler(object):
     def start_profiling(self, profile):
         # type: (Profile) -> None
         self.ensure_running()
-        self.new_profiles.append(profile)
+        if self.running:
+            self.new_profiles.append(profile)
 
     def stop_profiling(self, profile):
         # type: (Profile) -> None
@@ -898,6 +899,14 @@ class ThreadScheduler(Scheduler):
 
     def ensure_running(self):
         # type: () -> None
+        """
+        Check that the profiler has an active thread to run in, and start one if
+        that's not the case.
+
+        Note that this might fail (e.g. in Python 3.12 it's not possible to
+        spawn new threads at interpreter shutdown). In that case self.running
+        will be False after running this function.
+        """
         pid = os.getpid()
 
         # is running on the right process
