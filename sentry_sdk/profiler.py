@@ -788,8 +788,7 @@ class Scheduler(object):
     def start_profiling(self, profile):
         # type: (Profile) -> None
         self.ensure_running()
-        if self.running:
-            self.new_profiles.append(profile)
+        self.new_profiles.append(profile)
 
     def stop_profiling(self, profile):
         # type: (Profile) -> None
