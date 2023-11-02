@@ -1018,7 +1018,13 @@ class GeventScheduler(Scheduler):
             self.running = True
 
             self.thread = ThreadPool(1)
-            self.thread.spawn(self.run)
+            try:
+                self.thread.spawn(self.run)
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self.running = False
+                return
 
     def run(self):
         # type: () -> None
