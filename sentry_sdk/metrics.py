@@ -332,18 +332,27 @@ class MetricsAggregator(object):
         self._ensure_thread()
 
     def _ensure_thread(self):
-        # type: (...) -> None
+        # type: (...) -> bool
         """For forking processes we might need to restart this thread.
         This ensures that our process actually has that thread running.
         """
+        if not self._running:
+            return False
         pid = os.getpid()
         if self._flusher_pid == pid:
-            return
+            return True
         with self._lock:
             self._flusher_pid = pid
             self._flusher = Thread(target=self._flush_loop)
             self._flusher.daemon = True
-            self._flusher.start()
+            try:
+                self._flusher.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a start that no
+                # longer allows us to spawn a thread and we have to bail.
+                self._running = False
+                return False
+        return True
 
     def _flush_loop(self):
         # type: (...) -> None
@@ -400,9 +409,7 @@ class MetricsAggregator(object):
         timestamp=None,  # type: Optional[float]
     ):
         # type: (...) -> None
-        self._ensure_thread()
-
-        if self._flusher is None:
+        if not self._ensure_thread() or self._flusher is None:
             return
 
         if timestamp is None:
