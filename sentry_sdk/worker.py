@@ -69,12 +69,13 @@ class BackgroundWorker(object):
                 self._thread.daemon = True
                 try:
                     self._thread.start()
-                    self._thread_for_pid = os.getpid()
                 except RuntimeError:
                     # At this point we can no longer start because the interpreter
-                    # is already shutting down.  Sadly at this point we can no longer
-                    # send out events.
-                    self._thread = None
+                    # is already shutting down. Let's use the main thread for
+                    # sending pending events instead.
+                    self._thread = self._get_main_thread()
+
+                self._thread_for_pid = os.getpid()
 
     def kill(self):
         # type: () -> None
@@ -141,3 +142,18 @@ class BackgroundWorker(object):
             finally:
                 self._queue.task_done()
             sleep(0)
+
+    def _get_main_thread(self):
+        # type: () -> Optional[threading.Thread]
+        main_thread = None
+
+        try:
+            main_thread = threading.main_thread()
+        except AttributeError:
+            # Python 2.7 doesn't have threading.main_thread()
+            for thread in threading.enumerate():
+                if isinstance(thread, threading._MainThread):  # type: ignore[attr-defined]
+                    main_thread = thread
+                    break
+
+        return main_thread
