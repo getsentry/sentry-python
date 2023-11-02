@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.profiler - sentry-python 1.33.1 documentation</title>
+      <title>sentry_sdk.profiler - sentry-python 1.34.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1043,131 +1043,153 @@ html.dark {
 </span><span id="1-898">
 </span><span id="1-899">    <span class="k">def</span> <span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 </span><span id="1-900">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-901">        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
-</span><span id="1-902">
-</span><span id="1-903">        <span class="c1"># is running on the right process</span>
-</span><span id="1-904">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
-</span><span id="1-905">            <span class="k">return</span>
-</span><span id="1-906">
-</span><span id="1-907">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
-</span><span id="1-908">            <span class="c1"># another thread may have tried to acquire the lock</span>
-</span><span id="1-909">            <span class="c1"># at the same time so it may start another thread</span>
-</span><span id="1-910">            <span class="c1"># make sure to check again before proceeding</span>
-</span><span id="1-911">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
-</span><span id="1-912">                <span class="k">return</span>
-</span><span id="1-913">
-</span><span id="1-914">            <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="n">pid</span>
-</span><span id="1-915">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="1-916">
-</span><span id="1-917">            <span class="c1"># make sure the thread is a daemon here otherwise this</span>
-</span><span id="1-918">            <span class="c1"># can keep the application running after other threads</span>
-</span><span id="1-919">            <span class="c1"># have exited</span>
-</span><span id="1-920">            <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="1-921">            <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
-</span><span id="1-922">
-</span><span id="1-923">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-924">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-925">        <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-</span><span id="1-926">
-</span><span id="1-927">        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
-</span><span id="1-928">            <span class="bp">self</span><span class="o">.</span><span class="n">sampler</span><span class="p">()</span>
-</span><span id="1-929">
-</span><span id="1-930">            <span class="c1"># some time may have elapsed since the last time</span>
-</span><span id="1-931">            <span class="c1"># we sampled, so we need to account for that and</span>
-</span><span id="1-932">            <span class="c1"># not sleep for too long</span>
-</span><span id="1-933">            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span>
-</span><span id="1-934">            <span class="k">if</span> <span class="n">elapsed</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">:</span>
-</span><span id="1-935">                <span class="n">thread_sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">-</span> <span class="n">elapsed</span><span class="p">)</span>
-</span><span id="1-936">
-</span><span id="1-937">            <span class="c1"># after sleeping, make sure to take the current</span>
-</span><span id="1-938">            <span class="c1"># timestamp so we can use it next iteration</span>
-</span><span id="1-939">            <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-</span><span id="1-940">
+</span><span id="1-901"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-902"><span class="sd">        Check that the profiler has an active thread to run in, and start one if</span>
+</span><span id="1-903"><span class="sd">        that&#39;s not the case.</span>
+</span><span id="1-904">
+</span><span id="1-905"><span class="sd">        Note that this might fail (e.g. in Python 3.12 it&#39;s not possible to</span>
+</span><span id="1-906"><span class="sd">        spawn new threads at interpreter shutdown). In that case self.running</span>
+</span><span id="1-907"><span class="sd">        will be False after running this function.</span>
+</span><span id="1-908"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-909">        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
+</span><span id="1-910">
+</span><span id="1-911">        <span class="c1"># is running on the right process</span>
+</span><span id="1-912">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
+</span><span id="1-913">            <span class="k">return</span>
+</span><span id="1-914">
+</span><span id="1-915">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+</span><span id="1-916">            <span class="c1"># another thread may have tried to acquire the lock</span>
+</span><span id="1-917">            <span class="c1"># at the same time so it may start another thread</span>
+</span><span id="1-918">            <span class="c1"># make sure to check again before proceeding</span>
+</span><span id="1-919">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
+</span><span id="1-920">                <span class="k">return</span>
+</span><span id="1-921">
+</span><span id="1-922">            <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="n">pid</span>
+</span><span id="1-923">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="1-924">
+</span><span id="1-925">            <span class="c1"># make sure the thread is a daemon here otherwise this</span>
+</span><span id="1-926">            <span class="c1"># can keep the application running after other threads</span>
+</span><span id="1-927">            <span class="c1"># have exited</span>
+</span><span id="1-928">            <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="1-929">            <span class="k">try</span><span class="p">:</span>
+</span><span id="1-930">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</span><span id="1-931">            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+</span><span id="1-932">                <span class="c1"># Unfortunately at this point the interpreter is in a state that no</span>
+</span><span id="1-933">                <span class="c1"># longer allows us to spawn a thread and we have to bail.</span>
+</span><span id="1-934">                <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-935">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-936">                <span class="k">return</span>
+</span><span id="1-937">
+</span><span id="1-938">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-939">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-940">        <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 </span><span id="1-941">
-</span><span id="1-942"><span class="k">class</span> <span class="nc">GeventScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
-</span><span id="1-943"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-944"><span class="sd">    This scheduler is based on the thread scheduler but adapted to work with</span>
-</span><span id="1-945"><span class="sd">    gevent. When using gevent, it may monkey patch the threading modules</span>
-</span><span id="1-946"><span class="sd">    (`threading` and `_thread`). This results in the use of greenlets instead</span>
-</span><span id="1-947"><span class="sd">    of native threads.</span>
-</span><span id="1-948">
-</span><span id="1-949"><span class="sd">    This is an issue because the sampler CANNOT run in a greenlet because</span>
-</span><span id="1-950"><span class="sd">    1. Other greenlets doing sync work will prevent the sampler from running</span>
-</span><span id="1-951"><span class="sd">    2. The greenlet runs in the same thread as other greenlets so when taking</span>
-</span><span id="1-952"><span class="sd">       a sample, other greenlets will have been evicted from the thread. This</span>
-</span><span id="1-953"><span class="sd">       results in a sample containing only the sampler&#39;s code.</span>
-</span><span id="1-954"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-942">        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
+</span><span id="1-943">            <span class="bp">self</span><span class="o">.</span><span class="n">sampler</span><span class="p">()</span>
+</span><span id="1-944">
+</span><span id="1-945">            <span class="c1"># some time may have elapsed since the last time</span>
+</span><span id="1-946">            <span class="c1"># we sampled, so we need to account for that and</span>
+</span><span id="1-947">            <span class="c1"># not sleep for too long</span>
+</span><span id="1-948">            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span>
+</span><span id="1-949">            <span class="k">if</span> <span class="n">elapsed</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">:</span>
+</span><span id="1-950">                <span class="n">thread_sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">-</span> <span class="n">elapsed</span><span class="p">)</span>
+</span><span id="1-951">
+</span><span id="1-952">            <span class="c1"># after sleeping, make sure to take the current</span>
+</span><span id="1-953">            <span class="c1"># timestamp so we can use it next iteration</span>
+</span><span id="1-954">            <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 </span><span id="1-955">
-</span><span id="1-956">    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;gevent&quot;</span>  <span class="c1"># type: ProfilerMode</span>
-</span><span id="1-957">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.profiler.GeventScheduler&quot;</span>
-</span><span id="1-958">
-</span><span id="1-959">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
-</span><span id="1-960">        <span class="c1"># type: (int) -&gt; None</span>
-</span><span id="1-961">
-</span><span id="1-962">        <span class="k">if</span> <span class="n">ThreadPool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-963">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Profiler mode: </span><span class="si">{}</span><span class="s2"> is not available&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">))</span>
-</span><span id="1-964">
-</span><span id="1-965">        <span class="nb">super</span><span class="p">(</span><span class="n">GeventScheduler</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
-</span><span id="1-966">
-</span><span id="1-967">        <span class="c1"># used to signal to the thread that it should stop</span>
-</span><span id="1-968">        <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-969">        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[ThreadPool]</span>
-</span><span id="1-970">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[int]</span>
-</span><span id="1-971">
-</span><span id="1-972">        <span class="c1"># This intentionally uses the gevent patched threading.Lock.</span>
-</span><span id="1-973">        <span class="c1"># The lock will be required when first trying to start profiles</span>
-</span><span id="1-974">        <span class="c1"># as we need to spawn the profiler thread from the greenlets.</span>
-</span><span id="1-975">        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+</span><span id="1-956">
+</span><span id="1-957"><span class="k">class</span> <span class="nc">GeventScheduler</span><span class="p">(</span><span class="n">Scheduler</span><span class="p">):</span>
+</span><span id="1-958"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-959"><span class="sd">    This scheduler is based on the thread scheduler but adapted to work with</span>
+</span><span id="1-960"><span class="sd">    gevent. When using gevent, it may monkey patch the threading modules</span>
+</span><span id="1-961"><span class="sd">    (`threading` and `_thread`). This results in the use of greenlets instead</span>
+</span><span id="1-962"><span class="sd">    of native threads.</span>
+</span><span id="1-963">
+</span><span id="1-964"><span class="sd">    This is an issue because the sampler CANNOT run in a greenlet because</span>
+</span><span id="1-965"><span class="sd">    1. Other greenlets doing sync work will prevent the sampler from running</span>
+</span><span id="1-966"><span class="sd">    2. The greenlet runs in the same thread as other greenlets so when taking</span>
+</span><span id="1-967"><span class="sd">       a sample, other greenlets will have been evicted from the thread. This</span>
+</span><span id="1-968"><span class="sd">       results in a sample containing only the sampler&#39;s code.</span>
+</span><span id="1-969"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-970">
+</span><span id="1-971">    <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;gevent&quot;</span>  <span class="c1"># type: ProfilerMode</span>
+</span><span id="1-972">    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;sentry.profiler.GeventScheduler&quot;</span>
+</span><span id="1-973">
+</span><span id="1-974">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frequency</span><span class="p">):</span>
+</span><span id="1-975">        <span class="c1"># type: (int) -&gt; None</span>
 </span><span id="1-976">
-</span><span id="1-977">    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-978">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-979">        <span class="k">pass</span>
-</span><span id="1-980">
-</span><span id="1-981">    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-982">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-983">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
-</span><span id="1-984">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-985">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-986">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
-</span><span id="1-987">
-</span><span id="1-988">    <span class="k">def</span> <span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-989">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-990">        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
+</span><span id="1-977">        <span class="k">if</span> <span class="n">ThreadPool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-978">            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Profiler mode: </span><span class="si">{}</span><span class="s2"> is not available&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">))</span>
+</span><span id="1-979">
+</span><span id="1-980">        <span class="nb">super</span><span class="p">(</span><span class="n">GeventScheduler</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">frequency</span><span class="o">=</span><span class="n">frequency</span><span class="p">)</span>
+</span><span id="1-981">
+</span><span id="1-982">        <span class="c1"># used to signal to the thread that it should stop</span>
+</span><span id="1-983">        <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-984">        <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[ThreadPool]</span>
+</span><span id="1-985">        <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[int]</span>
+</span><span id="1-986">
+</span><span id="1-987">        <span class="c1"># This intentionally uses the gevent patched threading.Lock.</span>
+</span><span id="1-988">        <span class="c1"># The lock will be required when first trying to start profiles</span>
+</span><span id="1-989">        <span class="c1"># as we need to spawn the profiler thread from the greenlets.</span>
+</span><span id="1-990">        <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
 </span><span id="1-991">
-</span><span id="1-992">        <span class="c1"># is running on the right process</span>
-</span><span id="1-993">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
-</span><span id="1-994">            <span class="k">return</span>
+</span><span id="1-992">    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-993">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-994">        <span class="k">pass</span>
 </span><span id="1-995">
-</span><span id="1-996">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
-</span><span id="1-997">            <span class="c1"># another thread may have tried to acquire the lock</span>
-</span><span id="1-998">            <span class="c1"># at the same time so it may start another thread</span>
-</span><span id="1-999">            <span class="c1"># make sure to check again before proceeding</span>
-</span><span id="1-1000">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
-</span><span id="1-1001">                <span class="k">return</span>
+</span><span id="1-996">    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-997">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-998">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
+</span><span id="1-999">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-1000">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-1001">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
 </span><span id="1-1002">
-</span><span id="1-1003">            <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="n">pid</span>
-</span><span id="1-1004">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="1-1005">
-</span><span id="1-1006">            <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="n">ThreadPool</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="1-1007">            <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">spawn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">)</span>
-</span><span id="1-1008">
-</span><span id="1-1009">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-1010">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-1011">        <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-</span><span id="1-1012">
-</span><span id="1-1013">        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
-</span><span id="1-1014">            <span class="bp">self</span><span class="o">.</span><span class="n">sampler</span><span class="p">()</span>
-</span><span id="1-1015">
-</span><span id="1-1016">            <span class="c1"># some time may have elapsed since the last time</span>
-</span><span id="1-1017">            <span class="c1"># we sampled, so we need to account for that and</span>
-</span><span id="1-1018">            <span class="c1"># not sleep for too long</span>
-</span><span id="1-1019">            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span>
-</span><span id="1-1020">            <span class="k">if</span> <span class="n">elapsed</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">:</span>
-</span><span id="1-1021">                <span class="n">thread_sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">-</span> <span class="n">elapsed</span><span class="p">)</span>
-</span><span id="1-1022">
-</span><span id="1-1023">            <span class="c1"># after sleeping, make sure to take the current</span>
-</span><span id="1-1024">            <span class="c1"># timestamp so we can use it next iteration</span>
-</span><span id="1-1025">            <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+</span><span id="1-1003">    <span class="k">def</span> <span class="nf">ensure_running</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-1004">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-1005">        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getpid</span><span class="p">()</span>
+</span><span id="1-1006">
+</span><span id="1-1007">        <span class="c1"># is running on the right process</span>
+</span><span id="1-1008">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
+</span><span id="1-1009">            <span class="k">return</span>
+</span><span id="1-1010">
+</span><span id="1-1011">        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
+</span><span id="1-1012">            <span class="c1"># another thread may have tried to acquire the lock</span>
+</span><span id="1-1013">            <span class="c1"># at the same time so it may start another thread</span>
+</span><span id="1-1014">            <span class="c1"># make sure to check again before proceeding</span>
+</span><span id="1-1015">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
+</span><span id="1-1016">                <span class="k">return</span>
+</span><span id="1-1017">
+</span><span id="1-1018">            <span class="bp">self</span><span class="o">.</span><span class="n">pid</span> <span class="o">=</span> <span class="n">pid</span>
+</span><span id="1-1019">            <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="1-1020">
+</span><span id="1-1021">            <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="n">ThreadPool</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="1-1022">            <span class="k">try</span><span class="p">:</span>
+</span><span id="1-1023">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span><span class="o">.</span><span class="n">spawn</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run</span><span class="p">)</span>
+</span><span id="1-1024">            <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+</span><span id="1-1025">                <span class="c1"># Unfortunately at this point the interpreter is in a state that no</span>
+</span><span id="1-1026">                <span class="c1"># longer allows us to spawn a thread and we have to bail.</span>
+</span><span id="1-1027">                <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-1028">                <span class="bp">self</span><span class="o">.</span><span class="n">thread</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-1029">                <span class="k">return</span>
+</span><span id="1-1030">
+</span><span id="1-1031">    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-1032">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-1033">        <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+</span><span id="1-1034">
+</span><span id="1-1035">        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
+</span><span id="1-1036">            <span class="bp">self</span><span class="o">.</span><span class="n">sampler</span><span class="p">()</span>
+</span><span id="1-1037">
+</span><span id="1-1038">            <span class="c1"># some time may have elapsed since the last time</span>
+</span><span id="1-1039">            <span class="c1"># we sampled, so we need to account for that and</span>
+</span><span id="1-1040">            <span class="c1"># not sleep for too long</span>
+</span><span id="1-1041">            <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span>
+</span><span id="1-1042">            <span class="k">if</span> <span class="n">elapsed</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">:</span>
+</span><span id="1-1043">                <span class="n">thread_sleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">-</span> <span class="n">elapsed</span><span class="p">)</span>
+</span><span id="1-1044">
+</span><span id="1-1045">            <span class="c1"># after sleeping, make sure to take the current</span>
+</span><span id="1-1046">            <span class="c1"># timestamp so we can use it next iteration</span>
+</span><span id="1-1047">            <span class="n">last</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 </span></pre></div>
         </article>
         
@@ -1200,7 +1222,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=0eaf931f"></script>
+      <script src="../../_static/documentation_options.js?v=248ce6c8"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3e5c8598"></script>

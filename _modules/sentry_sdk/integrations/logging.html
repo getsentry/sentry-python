@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.integrations.logging - sentry-python 1.33.1 documentation</title>
+      <title>sentry_sdk.integrations.logging - sentry-python 1.34.0 documentation</title>
     <link rel="index" title="Index" href="../../../genindex.html" /><link rel="search" title="Search" href="../../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -275,165 +275,166 @@ html.dark {
 </span><span id="1-130">            <span class="s2">&quot;relativeCreated&quot;</span><span class="p">,</span>
 </span><span id="1-131">            <span class="s2">&quot;stack&quot;</span><span class="p">,</span>
 </span><span id="1-132">            <span class="s2">&quot;tags&quot;</span><span class="p">,</span>
-</span><span id="1-133">            <span class="s2">&quot;thread&quot;</span><span class="p">,</span>
-</span><span id="1-134">            <span class="s2">&quot;threadName&quot;</span><span class="p">,</span>
-</span><span id="1-135">            <span class="s2">&quot;stack_info&quot;</span><span class="p">,</span>
-</span><span id="1-136">        <span class="p">)</span>
-</span><span id="1-137">    <span class="p">)</span>
-</span><span id="1-138">
-</span><span id="1-139">    <span class="k">def</span> <span class="nf">_can_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-140">        <span class="c1"># type: (LogRecord) -&gt; bool</span>
-</span><span id="1-141"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Prevents ignored loggers from recording&quot;&quot;&quot;</span>
-</span><span id="1-142">        <span class="k">for</span> <span class="n">logger</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
-</span><span id="1-143">            <span class="k">if</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
-</span><span id="1-144">                <span class="k">return</span> <span class="kc">False</span>
-</span><span id="1-145">        <span class="k">return</span> <span class="kc">True</span>
-</span><span id="1-146">
-</span><span id="1-147">    <span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-148">        <span class="c1"># type: (LogRecord) -&gt; str</span>
-</span><span id="1-149">        <span class="k">return</span> <span class="n">LOGGING_TO_EVENT_LEVEL</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-</span><span id="1-150">            <span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
-</span><span id="1-151">        <span class="p">)</span>
-</span><span id="1-152">
-</span><span id="1-153">    <span class="k">def</span> <span class="nf">_extra_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-154">        <span class="c1"># type: (LogRecord) -&gt; Dict[str, None]</span>
-</span><span id="1-155">        <span class="k">return</span> <span class="p">{</span>
-</span><span id="1-156">            <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
-</span><span id="1-157">            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="nb">vars</span><span class="p">(</span><span class="n">record</span><span class="p">))</span>
-</span><span id="1-158">            <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">COMMON_RECORD_ATTRS</span>
-</span><span id="1-159">            <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">))</span>
-</span><span id="1-160">        <span class="p">}</span>
-</span><span id="1-161">
+</span><span id="1-133">            <span class="s2">&quot;taskName&quot;</span><span class="p">,</span>
+</span><span id="1-134">            <span class="s2">&quot;thread&quot;</span><span class="p">,</span>
+</span><span id="1-135">            <span class="s2">&quot;threadName&quot;</span><span class="p">,</span>
+</span><span id="1-136">            <span class="s2">&quot;stack_info&quot;</span><span class="p">,</span>
+</span><span id="1-137">        <span class="p">)</span>
+</span><span id="1-138">    <span class="p">)</span>
+</span><span id="1-139">
+</span><span id="1-140">    <span class="k">def</span> <span class="nf">_can_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-141">        <span class="c1"># type: (LogRecord) -&gt; bool</span>
+</span><span id="1-142"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Prevents ignored loggers from recording&quot;&quot;&quot;</span>
+</span><span id="1-143">        <span class="k">for</span> <span class="n">logger</span> <span class="ow">in</span> <span class="n">_IGNORED_LOGGERS</span><span class="p">:</span>
+</span><span id="1-144">            <span class="k">if</span> <span class="n">fnmatch</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">logger</span><span class="p">):</span>
+</span><span id="1-145">                <span class="k">return</span> <span class="kc">False</span>
+</span><span id="1-146">        <span class="k">return</span> <span class="kc">True</span>
+</span><span id="1-147">
+</span><span id="1-148">    <span class="k">def</span> <span class="nf">_logging_to_event_level</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-149">        <span class="c1"># type: (LogRecord) -&gt; str</span>
+</span><span id="1-150">        <span class="k">return</span> <span class="n">LOGGING_TO_EVENT_LEVEL</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+</span><span id="1-151">            <span class="n">record</span><span class="o">.</span><span class="n">levelno</span><span class="p">,</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">levelname</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+</span><span id="1-152">        <span class="p">)</span>
+</span><span id="1-153">
+</span><span id="1-154">    <span class="k">def</span> <span class="nf">_extra_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-155">        <span class="c1"># type: (LogRecord) -&gt; Dict[str, None]</span>
+</span><span id="1-156">        <span class="k">return</span> <span class="p">{</span>
+</span><span id="1-157">            <span class="n">k</span><span class="p">:</span> <span class="n">v</span>
+</span><span id="1-158">            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="nb">vars</span><span class="p">(</span><span class="n">record</span><span class="p">))</span>
+</span><span id="1-159">            <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">COMMON_RECORD_ATTRS</span>
+</span><span id="1-160">            <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">))</span>
+</span><span id="1-161">        <span class="p">}</span>
 </span><span id="1-162">
+</span><span id="1-163">
 <div class="viewcode-block" id="EventHandler">
 <a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.EventHandler">[docs]</a>
-</span><span id="1-163"><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
-</span><span id="1-164"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-165"><span class="sd">    A logging handler that emits Sentry events for each log record</span>
-</span><span id="1-166">
-</span><span id="1-167"><span class="sd">    Note that you do not have to use this class if the logging integration is enabled, which it is by default.</span>
-</span><span id="1-168"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-169">
-</span><span id="1-170">    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-171">        <span class="c1"># type: (LogRecord) -&gt; Any</span>
-</span><span id="1-172">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-173">            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-</span><span id="1-174">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-</span><span id="1-175">
-</span><span id="1-176">    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-177">        <span class="c1"># type: (LogRecord) -&gt; None</span>
-</span><span id="1-178">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
-</span><span id="1-179">            <span class="k">return</span>
-</span><span id="1-180">
-</span><span id="1-181">        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-</span><span id="1-182">        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-183">            <span class="k">return</span>
-</span><span id="1-184">
-</span><span id="1-185">        <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
-</span><span id="1-186">
-</span><span id="1-187">        <span class="c1"># exc_info might be None or (None, None, None)</span>
-</span><span id="1-188">        <span class="c1">#</span>
-</span><span id="1-189">        <span class="c1"># exc_info may also be any falsy value due to Python stdlib being</span>
-</span><span id="1-190">        <span class="c1"># liberal with what it receives and Celery&#39;s billiard being &quot;liberal&quot;</span>
-</span><span id="1-191">        <span class="c1"># with what it sends. See</span>
-</span><span id="1-192">        <span class="c1"># https://github.com/getsentry/sentry-python/issues/904</span>
-</span><span id="1-193">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-194">            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
-</span><span id="1-195">                <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
-</span><span id="1-196">                <span class="n">client_options</span><span class="o">=</span><span class="n">client_options</span><span class="p">,</span>
-</span><span id="1-197">                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
-</span><span id="1-198">            <span class="p">)</span>
-</span><span id="1-199">        <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-200">            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="1-201">            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="1-202">            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-203">                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-204">                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
-</span><span id="1-205">                        <span class="p">{</span>
-</span><span id="1-206">                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
-</span><span id="1-207">                                <span class="n">include_local_variables</span><span class="o">=</span><span class="n">client_options</span><span class="p">[</span>
-</span><span id="1-208">                                    <span class="s2">&quot;include_local_variables&quot;</span>
-</span><span id="1-209">                                <span class="p">],</span>
-</span><span id="1-210">                                <span class="n">max_value_length</span><span class="o">=</span><span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;max_value_length&quot;</span><span class="p">],</span>
-</span><span id="1-211">                            <span class="p">),</span>
-</span><span id="1-212">                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="1-213">                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-</span><span id="1-214">                        <span class="p">}</span>
-</span><span id="1-215">                    <span class="p">]</span>
-</span><span id="1-216">                <span class="p">}</span>
-</span><span id="1-217">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-218">            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="1-219">            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="1-220">
-</span><span id="1-221">        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
-</span><span id="1-222">
-</span><span id="1-223">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-</span><span id="1-224">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
-</span><span id="1-225">
-</span><span id="1-226">        <span class="c1"># Log records from `warnings` module as separate issues</span>
-</span><span id="1-227">        <span class="n">record_caputured_from_warnings_module</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-228">            <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;py.warnings&quot;</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">msg</span> <span class="o">==</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span>
-</span><span id="1-229">        <span class="p">)</span>
-</span><span id="1-230">        <span class="k">if</span> <span class="n">record_caputured_from_warnings_module</span><span class="p">:</span>
-</span><span id="1-231">            <span class="c1"># use the actual message and not &quot;%s&quot; as the message</span>
-</span><span id="1-232">            <span class="c1"># this prevents grouping all warnings under one &quot;%s&quot; issue</span>
-</span><span id="1-233">            <span class="n">msg</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
-</span><span id="1-234">
-</span><span id="1-235">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-236">                <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span>
-</span><span id="1-237">                <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="p">(),</span>
-</span><span id="1-238">            <span class="p">}</span>
-</span><span id="1-239">
-</span><span id="1-240">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-241">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-242">                <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span>
-</span><span id="1-243">                <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
-</span><span id="1-244">            <span class="p">}</span>
-</span><span id="1-245">
-</span><span id="1-246">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-</span><span id="1-247">
-</span><span id="1-248">        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span></div>
+</span><span id="1-164"><span class="k">class</span> <span class="nc">EventHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
+</span><span id="1-165"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-166"><span class="sd">    A logging handler that emits Sentry events for each log record</span>
+</span><span id="1-167">
+</span><span id="1-168"><span class="sd">    Note that you do not have to use this class if the logging integration is enabled, which it is by default.</span>
+</span><span id="1-169"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-170">
+</span><span id="1-171">    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-172">        <span class="c1"># type: (LogRecord) -&gt; Any</span>
+</span><span id="1-173">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span id="1-174">            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</span><span id="1-175">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</span><span id="1-176">
+</span><span id="1-177">    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-178">        <span class="c1"># type: (LogRecord) -&gt; None</span>
+</span><span id="1-179">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+</span><span id="1-180">            <span class="k">return</span>
+</span><span id="1-181">
+</span><span id="1-182">        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+</span><span id="1-183">        <span class="k">if</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-184">            <span class="k">return</span>
+</span><span id="1-185">
+</span><span id="1-186">        <span class="n">client_options</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">options</span>
+</span><span id="1-187">
+</span><span id="1-188">        <span class="c1"># exc_info might be None or (None, None, None)</span>
+</span><span id="1-189">        <span class="c1">#</span>
+</span><span id="1-190">        <span class="c1"># exc_info may also be any falsy value due to Python stdlib being</span>
+</span><span id="1-191">        <span class="c1"># liberal with what it receives and Celery&#39;s billiard being &quot;liberal&quot;</span>
+</span><span id="1-192">        <span class="c1"># with what it sends. See</span>
+</span><span id="1-193">        <span class="c1"># https://github.com/getsentry/sentry-python/issues/904</span>
+</span><span id="1-194">        <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-195">            <span class="n">event</span><span class="p">,</span> <span class="n">hint</span> <span class="o">=</span> <span class="n">event_from_exception</span><span class="p">(</span>
+</span><span id="1-196">                <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">,</span>
+</span><span id="1-197">                <span class="n">client_options</span><span class="o">=</span><span class="n">client_options</span><span class="p">,</span>
+</span><span id="1-198">                <span class="n">mechanism</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;logging&quot;</span><span class="p">,</span> <span class="s2">&quot;handled&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+</span><span id="1-199">            <span class="p">)</span>
+</span><span id="1-200">        <span class="k">elif</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">exc_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-201">            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="1-202">            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="1-203">            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span id="1-204">                <span class="n">event</span><span class="p">[</span><span class="s2">&quot;threads&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-205">                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="1-206">                        <span class="p">{</span>
+</span><span id="1-207">                            <span class="s2">&quot;stacktrace&quot;</span><span class="p">:</span> <span class="n">current_stacktrace</span><span class="p">(</span>
+</span><span id="1-208">                                <span class="n">include_local_variables</span><span class="o">=</span><span class="n">client_options</span><span class="p">[</span>
+</span><span id="1-209">                                    <span class="s2">&quot;include_local_variables&quot;</span>
+</span><span id="1-210">                                <span class="p">],</span>
+</span><span id="1-211">                                <span class="n">max_value_length</span><span class="o">=</span><span class="n">client_options</span><span class="p">[</span><span class="s2">&quot;max_value_length&quot;</span><span class="p">],</span>
+</span><span id="1-212">                            <span class="p">),</span>
+</span><span id="1-213">                            <span class="s2">&quot;crashed&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="1-214">                            <span class="s2">&quot;current&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="1-215">                        <span class="p">}</span>
+</span><span id="1-216">                    <span class="p">]</span>
+</span><span id="1-217">                <span class="p">}</span>
+</span><span id="1-218">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-219">            <span class="n">event</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="1-220">            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="1-221">
+</span><span id="1-222">        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;log_record&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
+</span><span id="1-223">
+</span><span id="1-224">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;level&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</span><span id="1-225">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logger&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span>
+</span><span id="1-226">
+</span><span id="1-227">        <span class="c1"># Log records from `warnings` module as separate issues</span>
+</span><span id="1-228">        <span class="n">record_caputured_from_warnings_module</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-229">            <span class="n">record</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;py.warnings&quot;</span> <span class="ow">and</span> <span class="n">record</span><span class="o">.</span><span class="n">msg</span> <span class="o">==</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span>
+</span><span id="1-230">        <span class="p">)</span>
+</span><span id="1-231">        <span class="k">if</span> <span class="n">record_caputured_from_warnings_module</span><span class="p">:</span>
+</span><span id="1-232">            <span class="c1"># use the actual message and not &quot;%s&quot; as the message</span>
+</span><span id="1-233">            <span class="c1"># this prevents grouping all warnings under one &quot;%s&quot; issue</span>
+</span><span id="1-234">            <span class="n">msg</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
+</span><span id="1-235">
+</span><span id="1-236">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-237">                <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span>
+</span><span id="1-238">                <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="p">(),</span>
+</span><span id="1-239">            <span class="p">}</span>
+</span><span id="1-240">
+</span><span id="1-241">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-242">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;logentry&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-243">                <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">to_string</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="p">),</span>
+</span><span id="1-244">                <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">args</span><span class="p">,</span>
+</span><span id="1-245">            <span class="p">}</span>
+</span><span id="1-246">
+</span><span id="1-247">        <span class="n">event</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</span><span id="1-248">
+</span><span id="1-249">        <span class="n">hub</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="o">=</span><span class="n">hint</span><span class="p">)</span></div>
 
-</span><span id="1-249">
 </span><span id="1-250">
-</span><span id="1-251"><span class="c1"># Legacy name</span>
-</span><span id="1-252"><span class="n">SentryHandler</span> <span class="o">=</span> <span class="n">EventHandler</span>
-</span><span id="1-253">
+</span><span id="1-251">
+</span><span id="1-252"><span class="c1"># Legacy name</span>
+</span><span id="1-253"><span class="n">SentryHandler</span> <span class="o">=</span> <span class="n">EventHandler</span>
 </span><span id="1-254">
+</span><span id="1-255">
 <div class="viewcode-block" id="BreadcrumbHandler">
 <a class="viewcode-back" href="../../../integrations.html#sentry_sdk.integrations.logging.BreadcrumbHandler">[docs]</a>
-</span><span id="1-255"><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
-</span><span id="1-256"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-257"><span class="sd">    A logging handler that records breadcrumbs for each log record.</span>
-</span><span id="1-258">
-</span><span id="1-259"><span class="sd">    Note that you do not have to use this class if the logging integration is enabled, which it is by default.</span>
-</span><span id="1-260"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-261">
-</span><span id="1-262">    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-263">        <span class="c1"># type: (LogRecord) -&gt; Any</span>
-</span><span id="1-264">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-265">            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-</span><span id="1-266">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
-</span><span id="1-267">
-</span><span id="1-268">    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-269">        <span class="c1"># type: (LogRecord) -&gt; None</span>
-</span><span id="1-270">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
-</span><span id="1-271">            <span class="k">return</span>
-</span><span id="1-272">
-</span><span id="1-273">        <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
-</span><span id="1-274">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
-</span><span id="1-275">        <span class="p">)</span>
-</span><span id="1-276">
-</span><span id="1-277">    <span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
-</span><span id="1-278">        <span class="c1"># type: (LogRecord) -&gt; Dict[str, Any]</span>
-</span><span id="1-279">        <span class="k">return</span> <span class="p">{</span>
-</span><span id="1-280">            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
-</span><span id="1-281">            <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
-</span><span id="1-282">            <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-</span><span id="1-283">            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
-</span><span id="1-284">            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">utc_from_timestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
-</span><span id="1-285">            <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
-</span><span id="1-286">        <span class="p">}</span></div>
+</span><span id="1-256"><span class="k">class</span> <span class="nc">BreadcrumbHandler</span><span class="p">(</span><span class="n">_BaseHandler</span><span class="p">):</span>
+</span><span id="1-257"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-258"><span class="sd">    A logging handler that records breadcrumbs for each log record.</span>
+</span><span id="1-259">
+</span><span id="1-260"><span class="sd">    Note that you do not have to use this class if the logging integration is enabled, which it is by default.</span>
+</span><span id="1-261"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-262">
+</span><span id="1-263">    <span class="k">def</span> <span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-264">        <span class="c1"># type: (LogRecord) -&gt; Any</span>
+</span><span id="1-265">        <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span id="1-266">            <span class="bp">self</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</span><span id="1-267">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_emit</span><span class="p">(</span><span class="n">record</span><span class="p">)</span>
+</span><span id="1-268">
+</span><span id="1-269">    <span class="k">def</span> <span class="nf">_emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-270">        <span class="c1"># type: (LogRecord) -&gt; None</span>
+</span><span id="1-271">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_record</span><span class="p">(</span><span class="n">record</span><span class="p">):</span>
+</span><span id="1-272">            <span class="k">return</span>
+</span><span id="1-273">
+</span><span id="1-274">        <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">add_breadcrumb</span><span class="p">(</span>
+</span><span id="1-275">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumb_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span> <span class="n">hint</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;log_record&quot;</span><span class="p">:</span> <span class="n">record</span><span class="p">}</span>
+</span><span id="1-276">        <span class="p">)</span>
+</span><span id="1-277">
+</span><span id="1-278">    <span class="k">def</span> <span class="nf">_breadcrumb_from_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+</span><span id="1-279">        <span class="c1"># type: (LogRecord) -&gt; Dict[str, Any]</span>
+</span><span id="1-280">        <span class="k">return</span> <span class="p">{</span>
+</span><span id="1-281">            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;log&quot;</span><span class="p">,</span>
+</span><span id="1-282">            <span class="s2">&quot;level&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logging_to_event_level</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
+</span><span id="1-283">            <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+</span><span id="1-284">            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">record</span><span class="o">.</span><span class="n">message</span><span class="p">,</span>
+</span><span id="1-285">            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">utc_from_timestamp</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">created</span><span class="p">),</span>
+</span><span id="1-286">            <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extra_from_record</span><span class="p">(</span><span class="n">record</span><span class="p">),</span>
+</span><span id="1-287">        <span class="p">}</span></div>
 
 </span></pre></div>
         </article>
@@ -467,7 +468,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../../_static/documentation_options.js?v=0eaf931f"></script>
+      <script src="../../../_static/documentation_options.js?v=248ce6c8"></script>
       <script src="../../../_static/doctools.js?v=888ff710"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/shibuya.js?v=3e5c8598"></script>
