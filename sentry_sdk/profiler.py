@@ -932,6 +932,7 @@ class ThreadScheduler(Scheduler):
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
                 self.running = False
+                self.thread = None
                 return
 
     def run(self):
@@ -1024,6 +1025,7 @@ class GeventScheduler(Scheduler):
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
                 self.running = False
+                self.thread = None
                 return
 
     def run(self):
