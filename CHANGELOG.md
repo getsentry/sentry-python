@@ -2,12 +2,8 @@
 
 ## 1.34.0
 
-### Python 3.12 Support (ongoing)
-
-By: @sentrivana (#2483), @antonpirker (#2471)
-
 ### Various fixes & improvements
-
+- Added Python 3.12 support (#2471, #2483)
 - Handle missing `connection_kwargs` in `patch_redis_client` (#2482) by @szokeasaurusrex
 - Run common test suite on Python 3.12 (#2479) by @sentrivana
 
