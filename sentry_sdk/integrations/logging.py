@@ -130,6 +130,7 @@ class _BaseHandler(logging.Handler, object):
             "relativeCreated",
             "stack",
             "tags",
+            "taskName",
             "thread",
             "threadName",
             "stack_info",

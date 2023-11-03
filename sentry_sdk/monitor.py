@@ -37,6 +37,13 @@ class Monitor(object):
 
     def _ensure_running(self):
         # type: () -> None
+        """
+        Check that the monitor has an active thread to run in, or create one if not.
+
+        Note that this might fail (e.g. in Python 3.12 it's not possible to
+        spawn new threads at interpreter shutdown). In that case self._running
+        will be False after running this function.
+        """
         if self._thread_for_pid == os.getpid() and self._thread is not None:
             return None
 
@@ -53,7 +60,14 @@ class Monitor(object):
 
             thread = Thread(name=self.name, target=_thread)
             thread.daemon = True
-            thread.start()
+            try:
+                thread.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self._running = False
+                return None
+
             self._thread = thread
             self._thread_for_pid = os.getpid()
 

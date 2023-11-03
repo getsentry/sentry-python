@@ -189,7 +189,11 @@ def patch_redis_client(cls, is_cluster):
             description = description[: integration.max_data_size - len("...")] + "..."
 
         with hub.start_span(op=OP.DB_REDIS, description=description) as span:
-            _set_db_data(span, self.connection_pool.connection_kwargs)
+            try:
+                _set_db_data(span, self.connection_pool.connection_kwargs)
+            except AttributeError:
+                pass  # connections_kwargs may be missing in some cases
+
             _set_client_data(span, is_cluster, name, *args)
 
             return old_execute_command(self, name, *args, **kwargs)

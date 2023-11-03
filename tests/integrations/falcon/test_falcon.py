@@ -9,6 +9,7 @@ import falcon.testing
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.utils import parse_version
 
 
 try:
@@ -17,6 +18,9 @@ except ImportError:
     pass
 else:
     import falcon.inspect  # We only need this module for the ASGI test
+
+
+FALCON_VERSION = parse_version(falcon.__version__)
 
 
 @pytest.fixture
@@ -32,9 +36,22 @@ def make_app(sentry_init):
                 sentry_sdk.capture_message("hi")
                 resp.media = "hi"
 
+        class CustomError(Exception):
+            pass
+
+        class CustomErrorResource:
+            def on_get(self, req, resp):
+                raise CustomError()
+
+        def custom_error_handler(*args, **kwargs):
+            raise falcon.HTTPError(status=falcon.HTTP_400)
+
         app = falcon.API()
         app.add_route("/message", MessageResource())
         app.add_route("/message/{message_id:int}", MessageByIdResource())
+        app.add_route("/custom-error", CustomErrorResource())
+
+        app.add_error_handler(CustomError, custom_error_handler)
 
         return app
 
@@ -418,3 +435,23 @@ def test_falcon_not_breaking_asgi(sentry_init):
         falcon.inspect.inspect_app(asgi_app)
     except TypeError:
         pytest.fail("Falcon integration causing errors in ASGI apps.")
+
+
+@pytest.mark.skipif(
+    (FALCON_VERSION or ()) < (3,),
+    reason="The Sentry Falcon integration only supports custom error handlers on Falcon 3+",
+)
+def test_falcon_custom_error_handler(sentry_init, make_app, capture_events):
+    """
+    When a custom error handler handles what otherwise would have resulted in a 5xx error,
+    changing the HTTP status to a non-5xx status, no error event should be sent to Sentry.
+    """
+    sentry_init(integrations=[FalconIntegration()])
+    events = capture_events()
+
+    app = make_app()
+    client = falcon.testing.TestClient(app)
+
+    client.simulate_get("/custom-error")
+
+    assert len(events) == 0

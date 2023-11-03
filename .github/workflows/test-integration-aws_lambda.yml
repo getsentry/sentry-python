@@ -18,6 +18,8 @@ permissions:
   contents: read
 
 env:
+  SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
+  SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
@@ -31,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7"]
+        python-version: ["3.9"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6

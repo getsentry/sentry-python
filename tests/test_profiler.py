@@ -666,6 +666,51 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
     ("scheduler_class",),
     [
         pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(
+            GeventScheduler,
+            marks=[
+                requires_gevent,
+                pytest.mark.skip(
+                    reason="cannot find this thread via threading.enumerate()"
+                ),
+            ],
+            id="gevent scheduler",
+        ),
+    ],
+)
+def test_thread_scheduler_no_thread_on_shutdown(scheduler_class):
+    scheduler = scheduler_class(frequency=1000)
+
+    # not yet setup, no scheduler threads yet
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    scheduler.setup()
+
+    # setup but no profiles started so still no threads
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    # mock RuntimeError as if the 3.12 intepreter was shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        scheduler.ensure_running()
+
+    assert scheduler.running is False
+
+    # still no thread
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    scheduler.teardown()
+
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(ThreadScheduler, id="thread scheduler"),
         pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )

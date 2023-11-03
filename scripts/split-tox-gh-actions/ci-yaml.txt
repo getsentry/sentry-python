@@ -18,6 +18,7 @@ permissions:
   contents: read
 
 env:
+{{ aws_credentials }}
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
