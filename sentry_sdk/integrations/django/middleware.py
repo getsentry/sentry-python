@@ -127,9 +127,8 @@ def _wrap_middleware(middleware, middleware_name):
     class SentryWrappingMiddleware(
         _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
-        async_capable = (
-            django_supports_async_middleware
-            and getattr(middleware, "async_capable", False)
+        async_capable = django_supports_async_middleware and getattr(
+            middleware, "async_capable", False
         )
 
         def __init__(self, get_response=None, *args, **kwargs):
