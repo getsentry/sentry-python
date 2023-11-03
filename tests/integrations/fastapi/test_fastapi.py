@@ -393,7 +393,6 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
 
     app = fastapi_app_factory()
 
-
     for route in app.router.routes:
         if not hasattr(route, "dependant"):
             continue
