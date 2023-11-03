@@ -34,8 +34,8 @@ else:
     import_string_name = "import_string"
 
 
-django_supports_async_middleware = DJANGO_VERSION >= (3, 1)
-if django_supports_async_middleware:
+DJANGO_SUPPORTS_ASYNC_MIDDLEWARE = DJANGO_VERSION >= (3, 1)
+if DJANGO_SUPPORTS_ASYNC_MIDDLEWARE:
     from .asgi import _asgi_middleware_mixin_factory
 else:
     _asgi_middleware_mixin_factory = lambda _: object
@@ -127,7 +127,7 @@ def _wrap_middleware(middleware, middleware_name):
     class SentryWrappingMiddleware(
         _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
-        async_capable = django_supports_async_middleware and getattr(
+        async_capable = DJANGO_SUPPORTS_ASYNC_MIDDLEWARE and getattr(
             middleware, "async_capable", False
         )
 
