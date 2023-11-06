@@ -29,7 +29,7 @@ def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
 
     server = _set_up()
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         stub.TestServe(gRPCTestMessage(text="test"))
 
@@ -87,7 +87,7 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
 
     server = _set_up()
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction() as transaction:
