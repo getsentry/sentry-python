@@ -65,7 +65,7 @@ jobs:
       - name: Build Packages
         run: |
           echo "Creating directory containing Python SDK Lambda Layer"
-          pip install virtualenv
+          pip install virtualenv setuptools
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
       - name: Upload Python Packages
