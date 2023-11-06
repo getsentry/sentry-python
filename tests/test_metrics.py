@@ -2,7 +2,7 @@
 
 import time
 
-from sentry_sdk import Hub, metrics, push_scope, start_span
+from sentry_sdk import Hub, metrics, push_scope
 
 
 def parse_metrics(bytes):
