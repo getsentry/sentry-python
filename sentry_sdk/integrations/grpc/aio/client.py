@@ -13,7 +13,7 @@ from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 
 
-class SentryClientInterceptor:
+class ClientInterceptor:
     @staticmethod
     def _update_client_call_details_metadata_from_hub(
         client_call_details: ClientCallDetails, hub: Hub
@@ -35,7 +35,7 @@ class SentryClientInterceptor:
         return client_call_details
 
 
-class SentryUnaryUnaryClientInterceptor(SentryClientInterceptor, UnaryUnaryClientInterceptor):  # type: ignore
+class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInterceptor):  # type: ignore
     async def intercept_unary_unary(
         self,
         continuation: Callable[[ClientCallDetails, Message], UnaryUnaryCall],
@@ -63,7 +63,7 @@ class SentryUnaryUnaryClientInterceptor(SentryClientInterceptor, UnaryUnaryClien
 
 
 class SentryUnaryStreamClientInterceptor(
-    SentryClientInterceptor, UnaryStreamClientInterceptor  # type: ignore
+    ClientInterceptor, UnaryStreamClientInterceptor  # type: ignore
 ):
     async def intercept_unary_stream(
         self,
