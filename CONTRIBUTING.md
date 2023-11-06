@@ -33,7 +33,7 @@ Before you can contribute, you will need to [fork the `sentry-python` repository
 ### Create a Virtual Environment
 
 To keep your Python development environment and packages separate from the ones
-used by your operation system, create a virtual environment:
+used by your operation system, create a [virtual environment](https://docs.python.org/3/tutorial/venv.html):
 
 ```bash
 cd sentry-python
