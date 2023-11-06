@@ -102,7 +102,6 @@ class Span(object):
         "hub",
         "_context_manager_state",
         "_containing_transaction",
-        "metric",
     )
 
     def __new__(cls, **kwargs):
@@ -133,7 +132,6 @@ class Span(object):
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
-        metric=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -162,9 +160,6 @@ class Span(object):
 
         #: End timestamp of span
         self.timestamp = None  # type: Optional[datetime]
-
-        #: The name of the metric to emit if there is one.
-        self.metric = metric
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
 
@@ -482,17 +477,6 @@ class Span(object):
                 )
         except AttributeError:
             self.timestamp = datetime_utcnow()
-
-        # If we were asked to emit a metric, do so now.  We always record
-        # that timing in seconds.
-        if self.metric is not None:
-            metrics.timing(
-                self.metric,
-                timestamp=self.start_timestamp,
-                value=(self.timestamp - self.start_timestamp).total_seconds(),
-                unit="second",
-                tags=self._tags,
-            )
 
         maybe_create_breadcrumbs_from_span(hub, self)
         return None
@@ -1018,4 +1002,3 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
-from sentry_sdk import metrics

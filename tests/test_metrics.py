@@ -181,38 +181,6 @@ def test_timing_basic(sentry_init, capture_envelopes):
     }
 
 
-def test_timing_via_span(sentry_init, capture_envelopes):
-    sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
-        _experiments={"enable_metrics": True},
-    )
-    ts = time.time()
-    envelopes = capture_envelopes()
-
-    with start_span(op="whatever", start_timestamp=ts, metric="my.span") as span:
-        span.set_tag("blub", "blah")
-        time.sleep(0.1)
-    Hub.current.flush()
-
-    (envelope,) = envelopes
-
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
-
-    assert len(m) == 1
-    assert m[0][1] == "my.span@second"
-    assert m[0][2] == "d"
-    assert len(m[0][3]) == 1
-    assert float(m[0][3][0]) >= 0.1
-    assert m[0][4] == {
-        "blub": "blah",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
-
-
 def test_distribution(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
