@@ -7,6 +7,7 @@
 
     steps:
       - uses: actions/checkout@v4
+{{ checkout_with }}
 
       - name: Setup Test Env
         run: |

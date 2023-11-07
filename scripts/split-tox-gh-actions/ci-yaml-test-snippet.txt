@@ -7,6 +7,7 @@
 
     steps:
       - uses: actions/checkout@v4
+{{ checkout_with }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}

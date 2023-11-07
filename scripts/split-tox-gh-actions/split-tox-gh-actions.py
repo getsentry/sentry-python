@@ -81,6 +81,11 @@ CHECK_PY27 = """\
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
 """
 
+CHECKOUT_WITH = """\
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+"""
+
 
 def write_yaml_file(template, current_framework, python_versions):
     """Write the YAML configuration file for one framework to disk."""
@@ -101,32 +106,43 @@ def write_yaml_file(template, current_framework, python_versions):
     if current_framework in FRAMEWORKS_NEEDING_SECRETS:
         with open(TEMPLATE_SNIPPET_AUTHORIZE, "r") as f:
             authorize_snippet = f.readlines()
-            template = (
-                template[:authorize_loc]
-                + authorize_snippet
-                + template[authorize_loc + 1 :]
-            )
+        template = (
+            template[:authorize_loc] + authorize_snippet + template[authorize_loc + 1 :]
+        )
     else:
         template.pop(authorize_loc)
 
     test_loc = template.index("{{ test }}\n")
     with open(TEMPLATE_SNIPPET_TEST, "r") as f:
         test_snippet = f.readlines()
-        if current_framework in FRAMEWORKS_NEEDING_SECRETS:
-            test_snippet.insert(1, "    needs: authorize\n")
-        template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
+
+    if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+        test_snippet.insert(1, "    needs: authorize\n")
+
+    checkout_with_loc = test_snippet.index("{{ checkout_with }}\n")
+    if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+        test_snippet[checkout_with_loc] = CHECKOUT_WITH
+    else:
+        test_snippet.pop(checkout_with_loc)
+    template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
 
     test_py27_loc = template.index("{{ test_py27 }}\n")
     if py27_supported:
         with open(TEMPLATE_SNIPPET_TEST_PY27, "r") as f:
             test_py27_snippet = f.readlines()
-            if current_framework in FRAMEWORKS_NEEDING_SECRETS:
-                test_py27_snippet.insert(1, "    needs: authorize\n")
-            template = (
-                template[:test_py27_loc]
-                + test_py27_snippet
-                + template[test_py27_loc + 1 :]
-            )
+
+        if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+            test_py27_snippet.insert(1, "    needs: authorize\n")
+
+        checkout_with_loc = test_py27_snippet.index("{{ checkout_with }}\n")
+        if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+            test_py27_snippet[checkout_with_loc] = CHECKOUT_WITH
+        else:
+            test_py27_snippet.pop(checkout_with_loc)
+
+        template = (
+            template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
+        )
 
         py_versions.remove("2.7")
     else:
