@@ -6,7 +6,7 @@ on:
       - master
       - release/**
 
-  pull_request:
+  pull_request_target:
 
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
@@ -25,7 +25,18 @@ env:
     ${{ github.workspace }}/dist-serverless
 
 jobs:
+  authorize:
+    name: Require approval
+    environment:
+      ${{ github.event_name == 'pull_request_target' &&
+      github.event.pull_request.head.repo.full_name != github.repository &&
+      'external' || 'internal' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+
   test:
+    needs: authorize
     name: aws_lambda, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

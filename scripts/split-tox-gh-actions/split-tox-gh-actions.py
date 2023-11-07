@@ -29,6 +29,7 @@ TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
 TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
 TEMPLATE_FILE_SETUP_DB = TEMPLATE_DIR / "ci-yaml-setup-db.txt"
 TEMPLATE_FILE_AWS_CREDENTIALS = TEMPLATE_DIR / "ci-yaml-aws-credentials.txt"
+TEMPLATE_SNIPPET_AUTHORIZE = TEMPLATE_DIR / "ci-yaml-authorize-snippet.txt"
 TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
 TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
 
@@ -42,6 +43,10 @@ FRAMEWORKS_NEEDING_CLICKHOUSE = [
 ]
 
 FRAMEWORKS_NEEDING_AWS = [
+    "aws_lambda",
+]
+
+FRAMEWORKS_NEEDING_SECRETS = [
     "aws_lambda",
 ]
 
@@ -77,29 +82,51 @@ CHECK_PY27 = """\
 """
 
 
-def write_yaml_file(
-    template,
-    current_framework,
-    python_versions,
-):
+def write_yaml_file(template, current_framework, python_versions):
     """Write the YAML configuration file for one framework to disk."""
     py_versions = [py.replace("py", "") for py in python_versions]
     py27_supported = "2.7" in py_versions
 
+    template = [line for line in template]
+
+    on_pull_request_loc = template.index("{{ on_pull_request }}\n")
+    if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+        on_pull_request = "  pull_request_target:\n"
+    else:
+        on_pull_request = "  pull_request:\n"
+
+    template[on_pull_request_loc] = on_pull_request
+
+    authorize_loc = template.index("{{ authorize }}\n")
+    if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+        with open(TEMPLATE_SNIPPET_AUTHORIZE, "r") as f:
+            authorize_snippet = f.readlines()
+            template = (
+                template[:authorize_loc]
+                + authorize_snippet
+                + template[authorize_loc + 1 :]
+            )
+    else:
+        template.pop(authorize_loc)
+
     test_loc = template.index("{{ test }}\n")
-    f = open(TEMPLATE_SNIPPET_TEST, "r")
-    test_snippet = f.readlines()
-    template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
-    f.close()
+    with open(TEMPLATE_SNIPPET_TEST, "r") as f:
+        test_snippet = f.readlines()
+        if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+            test_snippet.insert(1, "    needs: authorize\n")
+        template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
 
     test_py27_loc = template.index("{{ test_py27 }}\n")
     if py27_supported:
-        f = open(TEMPLATE_SNIPPET_TEST_PY27, "r")
-        test_py27_snippet = f.readlines()
-        template = (
-            template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
-        )
-        f.close()
+        with open(TEMPLATE_SNIPPET_TEST_PY27, "r") as f:
+            test_py27_snippet = f.readlines()
+            if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+                test_py27_snippet.insert(1, "    needs: authorize\n")
+            template = (
+                template[:test_py27_loc]
+                + test_py27_snippet
+                + template[test_py27_loc + 1 :]
+            )
 
         py_versions.remove("2.7")
     else:
