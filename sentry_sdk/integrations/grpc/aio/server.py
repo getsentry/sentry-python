@@ -21,12 +21,13 @@ except ImportError:
 class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
     def __init__(self, find_name=None):
         # type: (ServerInterceptor, Callable[[ServicerContext], str] | None) -> None
-        self._find_method_name = find_name or ServerInterceptor._find_name
+        self._find_method_name = find_name or self._find_name
 
         super(ServerInterceptor, self).__init__()
 
     async def intercept_service(self, continuation, handler_call_details):
         # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Awaitable[RpcMethodHandler]
+        self._handler_call_details = handler_call_details
         handler = await continuation(handler_call_details)
 
         if not handler.request_streaming and not handler.response_streaming:
@@ -89,7 +90,5 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
             response_serializer=handler.response_serializer,
         )
 
-    @staticmethod
-    def _find_name(context):
-        # type: (ServicerContext) -> str
-        return context._rpc_event.call_details.method.decode()
+    def _find_name(self, context):
+        return self._handler_call_details.method

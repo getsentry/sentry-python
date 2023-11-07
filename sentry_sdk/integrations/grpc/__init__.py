@@ -127,9 +127,7 @@ def _wrap_async_server(func: Callable[P, AsyncServer]) -> Callable[P, AsyncServe
         interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
         **kwargs: P.kwargs,
     ) -> Server:
-        server_interceptor = AsyncServerInterceptor(
-            find_name=lambda request: request.__class__
-        )
+        server_interceptor = AsyncServerInterceptor()
         interceptors = [server_interceptor, *(interceptors or [])]
         return func(*args, interceptors=interceptors, **kwargs)  # type: ignore
 
