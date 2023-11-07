@@ -26,7 +26,7 @@ env:
 
 jobs:
   authorize:
-    name: Require approval
+    name: Determine environment
     environment:
       ${{ github.event_name == 'pull_request_target' &&
       github.event.pull_request.head.repo.full_name != github.repository &&
