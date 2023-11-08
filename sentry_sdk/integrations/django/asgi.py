@@ -89,6 +89,7 @@ def patch_django_asgi_handler_impl(cls):
         old_create_request = cls.create_request
 
         def sentry_patched_create_request(self, *args, **kwargs):
+            # type: (Any, *Any, **Any) -> Any
             hub = Hub.current
             integration = hub.get_integration(DjangoIntegration)
             if integration is None:
