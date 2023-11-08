@@ -91,4 +91,5 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         )
 
     def _find_name(self, context):
+        # type: (ServicerContext) -> str
         return self._handler_call_details.method
