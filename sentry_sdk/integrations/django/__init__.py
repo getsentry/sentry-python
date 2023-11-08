@@ -482,6 +482,7 @@ def _make_wsgi_request_event_processor(weak_request, integration):
 
         django_3 = ASGIRequest is not None
         if django_3 and type(request) == ASGIRequest:
+            # We have a `asgi_request_event_processor` for this.
             return event
 
         try:
