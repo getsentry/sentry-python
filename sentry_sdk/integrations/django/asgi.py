@@ -84,29 +84,31 @@ def patch_django_asgi_handler_impl(cls):
 
     cls.__call__ = sentry_patched_asgi_handler
 
-    old_create_request = cls.create_request
+    modern_django_asgi_support = hasattr(cls, "create_request")
+    if modern_django_asgi_support:
+        old_create_request = cls.create_request
 
-    def sentry_patched_create_request(self, *args, **kwargs):
-        hub = Hub.current
-        integration = hub.get_integration(DjangoIntegration)
-        if integration is None:
-            return old_create_request(self, *args, **kwargs)
+        def sentry_patched_create_request(self, *args, **kwargs):
+            hub = Hub.current
+            integration = hub.get_integration(DjangoIntegration)
+            if integration is None:
+                return old_create_request(self, *args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            request, error_response = old_create_request(self, *args, **kwargs)
+            with hub.configure_scope() as scope:
+                request, error_response = old_create_request(self, *args, **kwargs)
 
-            # read the body once, to signal Django to cache the body stream
-            # so we can read the body in our event processor
-            # (otherwise Django closes the body stream and makes it impossible to read it again)
-            _ = request.body
+                # read the body once, to signal Django to cache the body stream
+                # so we can read the body in our event processor
+                # (otherwise Django closes the body stream and makes it impossible to read it again)
+                _ = request.body
 
-            scope.add_event_processor(
-                _make_asgi_request_event_processor(request, integration)
-            )
+                scope.add_event_processor(
+                    _make_asgi_request_event_processor(request, integration)
+                )
 
-            return request, error_response
+                return request, error_response
 
-    cls.create_request = sentry_patched_create_request
+        cls.create_request = sentry_patched_create_request
 
 
 def patch_get_response_async(cls, _before_get_response):

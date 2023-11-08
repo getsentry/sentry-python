@@ -36,7 +36,6 @@ try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings as django_settings
     from django.core import signals
-    from django.core.handlers.asgi import ASGIRequest
     from django.conf import settings
 
     try:
@@ -48,6 +47,13 @@ try:
         from django.urls import Resolver404
     except ImportError:
         from django.core.urlresolvers import Resolver404
+
+    # Only available in Django 3.0+
+    try:
+        from django.core.handlers.asgi import ASGIRequest
+    except ModuleNotFoundError:
+        ASGIRequest = None
+
 except ImportError:
     raise DidNotEnable("Django not installed")
 
@@ -474,7 +480,8 @@ def _make_wsgi_request_event_processor(weak_request, integration):
         if request is None:
             return event
 
-        if type(request) == ASGIRequest:
+        django_3 = ASGIRequest is not None
+        if django_3 and type(request) == ASGIRequest:
             return event
 
         try:
