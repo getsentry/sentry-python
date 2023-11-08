@@ -5,13 +5,14 @@ import threading
 import random
 import time
 import zlib
+from datetime import datetime
 from functools import wraps, partial
 from threading import Event, Lock, Thread
 from contextlib import contextmanager
 
+import sentry_sdk
 from sentry_sdk._compat import text_type
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import now, nanosecond_time
+from sentry_sdk.utils import now, nanosecond_time, to_timestamp
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Generator
     from typing import Tuple
+    from typing import Union
 
     from sentry_sdk._types import BucketKey
     from sentry_sdk._types import DurationUnit
@@ -406,7 +408,7 @@ class MetricsAggregator(object):
         value,  # type: MetricValue
         unit,  # type: MeasurementUnit
         tags,  # type: Optional[MetricTags]
-        timestamp=None,  # type: Optional[float]
+        timestamp=None,  # type: Optional[Union[float, datetime]]
     ):
         # type: (...) -> None
         if not self._ensure_thread() or self._flusher is None:
@@ -414,6 +416,8 @@ class MetricsAggregator(object):
 
         if timestamp is None:
             timestamp = time.time()
+        elif isinstance(timestamp, datetime):
+            timestamp = to_timestamp(timestamp)
 
         bucket_timestamp = int(
             (timestamp // self.ROLLUP_IN_SECONDS) * self.ROLLUP_IN_SECONDS
@@ -500,7 +504,7 @@ class MetricsAggregator(object):
 def _get_aggregator_and_update_tags(key, tags):
     # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[MetricTags]]
     """Returns the current metrics aggregator if there is one."""
-    hub = Hub.current
+    hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
         return None, tags
@@ -531,7 +535,7 @@ def incr(
     value=1.0,  # type: float
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[float]
+    timestamp=None,  # type: Optional[Union[float, datetime]]
 ):
     # type: (...) -> None
     """Increments a counter."""
@@ -545,7 +549,7 @@ class _Timing(object):
         self,
         key,  # type: str
         tags,  # type: Optional[MetricTags]
-        timestamp,  # type: Optional[float]
+        timestamp,  # type: Optional[Union[float, datetime]]
         value,  # type: Optional[float]
         unit,  # type: DurationUnit
     ):
@@ -597,7 +601,7 @@ def timing(
     value=None,  # type: Optional[float]
     unit="second",  # type: DurationUnit
     tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[float]
+    timestamp=None,  # type: Optional[Union[float, datetime]]
 ):
     # type: (...) -> _Timing
     """Emits a distribution with the time it takes to run the given code block.
@@ -620,7 +624,7 @@ def distribution(
     value,  # type: float
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[float]
+    timestamp=None,  # type: Optional[Union[float, datetime]]
 ):
     # type: (...) -> None
     """Emits a distribution."""
@@ -634,7 +638,7 @@ def set(
     value,  # type: MetricValue
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[float]
+    timestamp=None,  # type: Optional[Union[float, datetime]]
 ):
     # type: (...) -> None
     """Emits a set."""
@@ -648,7 +652,7 @@ def gauge(
     value,  # type: float
     unit="none",  # type: MetricValue
     tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[float]
+    timestamp=None,  # type: Optional[Union[float, datetime]]
 ):
     # type: (...) -> None
     """Emits a gauge."""
