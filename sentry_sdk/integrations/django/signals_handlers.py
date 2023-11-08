@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
-from django import VERSION as DJANGO_VERSION
 from django.dispatch import Signal
 
 from sentry_sdk import Hub
@@ -11,9 +10,7 @@ from sentry_sdk.consts import OP
 
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import List
+    from typing import Any, Callable, List
 
 
 def _get_receiver_name(receiver):
@@ -43,7 +40,12 @@ def _get_receiver_name(receiver):
 
 def patch_signals():
     # type: () -> None
-    """Patch django signal receivers to create a span"""
+    """
+    Patch django signal receivers to create a span.
+
+    This is used for Django<5.0. Django>=5.0 introduced async receivers; see
+    patch_signals_async in asgi.py.
+    """
     from sentry_sdk.integrations.django import DjangoIntegration
 
     old_live_receivers = Signal._live_receivers
@@ -52,11 +54,7 @@ def patch_signals():
         # type: (Signal, Any) -> List[Callable[..., Any]]
         hub = Hub.current
 
-        if DJANGO_VERSION >= (5, 0):
-            sync_receivers, async_receivers = old_live_receivers(self, sender)
-        else:
-            sync_receivers = old_live_receivers(self, sender)
-            async_receivers = []
+        receivers = old_live_receivers(self, sender)
 
         def sentry_sync_receiver_wrapper(receiver):
             # type: (Callable[..., Any]) -> Callable[..., Any]
@@ -75,12 +73,9 @@ def patch_signals():
 
         integration = hub.get_integration(DjangoIntegration)
         if integration and integration.signals_spans:
-            for idx, receiver in enumerate(sync_receivers):
-                sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
+            for idx, receiver in enumerate(receivers):
+                receivers[idx] = sentry_sync_receiver_wrapper(receiver)
 
-        if DJANGO_VERSION >= (5, 0):
-            return sync_receivers, async_receivers
-        else:
-            return sync_receivers
+        return receivers
 
     Signal._live_receivers = _sentry_live_receivers

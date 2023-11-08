@@ -242,7 +242,13 @@ class DjangoIntegration(Integration):
         patch_django_middlewares()
         patch_views()
         patch_templates()
-        patch_signals()
+
+        if DJANGO_VERSION >= (5, 0):
+            from sentry_sdk.integrations.django.asgi import patch_signals_async
+
+            patch_signals_async()
+        else:
+            patch_signals()
 
         if patch_caching is not None:
             patch_caching()
