@@ -60,7 +60,7 @@ def test_grpc_server_other_interceptors(sentry_init, capture_events_forksafe):
 
     server = _set_up(interceptors=[mock_interceptor])
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         stub.TestServe(gRPCTestMessage(text="test"))
 
@@ -132,7 +132,7 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
 
     server = _set_up()
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
@@ -165,7 +165,7 @@ def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksa
 
     server = _set_up()
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
@@ -207,7 +207,7 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
 
     server = _set_up()
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         channel = grpc.intercept_channel(channel, MockClientInterceptor())
         stub = gRPCTestServiceStub(channel)
 
@@ -245,7 +245,7 @@ def test_grpc_client_and_servers_interceptors_integration(
 
     server = _set_up()
 
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
@@ -267,7 +267,7 @@ def test_grpc_client_and_servers_interceptors_integration(
 def test_stream_stream(sentry_init):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     _set_up()
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         response_iterator = stub.TestStreamStream(iter((gRPCTestMessage(text="test"),)))
         for response in response_iterator:
@@ -280,7 +280,7 @@ def test_stream_unary(sentry_init):
     """
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     _set_up()
-    with grpc.insecure_channel(f"localhost:{PORT}") as channel:
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         response = stub.TestStreamUnary(iter((gRPCTestMessage(text="test"),)))
         assert response.text == "test"
@@ -293,7 +293,7 @@ def _set_up(interceptors: Optional[List[grpc.ServerInterceptor]] = None):
     )
 
     add_gRPCTestServiceServicer_to_server(TestService(), server)
-    server.add_insecure_port(f"[::]:{PORT}")
+    server.add_insecure_port("[::]:{}".format(PORT))
     server.start()
 
     return server

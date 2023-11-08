@@ -34,7 +34,7 @@ def event_loop(request):
 async def grpc_server(sentry_init, event_loop):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     server = grpc.aio.server()
-    server.add_insecure_port(f"[::]:{AIO_PORT}")
+    server.add_insecure_port("[::]:{}".format(AIO_PORT))
     add_gRPCTestServiceServicer_to_server(TestService, server)
 
     await event_loop.create_task(server.start())
@@ -49,7 +49,7 @@ async def grpc_server(sentry_init, event_loop):
 async def test_grpc_server_starts_transaction(capture_events, grpc_server):
     events = capture_events()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         await stub.TestServe(gRPCTestMessage(text="test"))
 
@@ -68,7 +68,7 @@ async def test_grpc_server_starts_transaction(capture_events, grpc_server):
 async def test_grpc_server_continues_transaction(capture_events, grpc_server):
     events = capture_events()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
         with sentry_sdk.start_transaction() as transaction:
@@ -108,7 +108,7 @@ async def test_grpc_server_continues_transaction(capture_events, grpc_server):
 async def test_grpc_server_exception(capture_events, grpc_server):
     events = capture_events()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         try:
             await stub.TestServe(gRPCTestMessage(text="exception"))
@@ -130,7 +130,7 @@ async def test_grpc_client_starts_span(
 ):
     events = capture_events_forksafe()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         with start_transaction():
             await stub.TestServe(gRPCTestMessage(text="test"))
@@ -159,7 +159,7 @@ async def test_grpc_client_unary_stream_starts_span(
 ):
     events = capture_events_forksafe()
 
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         with start_transaction():
             response = stub.TestUnaryStream(gRPCTestMessage(text="test"))
@@ -186,7 +186,7 @@ async def test_stream_stream(grpc_server):
     """Test to verify stream-stream works.
     Tracing not supported for it yet.
     """
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         response = stub.TestStreamStream((gRPCTestMessage(text="test"),))
         async for r in response:
@@ -198,7 +198,7 @@ async def test_stream_unary(grpc_server):
     """Test to verify stream-stream works.
     Tracing not supported for it yet.
     """
-    async with grpc.aio.insecure_channel(f"localhost:{AIO_PORT}") as channel:
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         response = await stub.TestStreamUnary((gRPCTestMessage(text="test"),))
         assert response.text == "test"
