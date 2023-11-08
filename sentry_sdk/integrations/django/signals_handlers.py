@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
+from django import VERSION as DJANGO_VERSION
 from django.dispatch import Signal
 
 from sentry_sdk import Hub
@@ -50,9 +51,14 @@ def patch_signals():
     def _sentry_live_receivers(self, sender):
         # type: (Signal, Any) -> List[Callable[..., Any]]
         hub = Hub.current
-        receivers = old_live_receivers(self, sender)
 
-        def sentry_receiver_wrapper(receiver):
+        if DJANGO_VERSION >= (5, 0):
+            sync_receivers, async_receivers = old_live_receivers(self, sender)
+        else:
+            sync_receivers = old_live_receivers(self, sender)
+            async_receivers = []
+
+        def sentry_sync_receiver_wrapper(receiver):
             # type: (Callable[..., Any]) -> Callable[..., Any]
             @wraps(receiver)
             def wrapper(*args, **kwargs):
@@ -69,9 +75,12 @@ def patch_signals():
 
         integration = hub.get_integration(DjangoIntegration)
         if integration and integration.signals_spans:
-            for idx, receiver in enumerate(receivers):
-                receivers[idx] = sentry_receiver_wrapper(receiver)
+            for idx, receiver in enumerate(sync_receivers):
+                sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
 
-        return receivers
+        if DJANGO_VERSION >= (5, 0):
+            return sync_receivers, async_receivers
+        else:
+            return sync_receivers
 
     Signal._live_receivers = _sentry_live_receivers
