@@ -377,6 +377,28 @@ def test_transaction_name(
     )
 
 
+def test_route_endpoint_equal_dependant_call(sentry_init):
+    """
+    Tests that the route endpoint name is equal to the wrapped dependant call name.
+    """
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+        ],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    app = fastapi_app_factory()
+
+    for route in app.router.routes:
+        if not hasattr(route, "dependant"):
+            continue
+        assert route.endpoint.__qualname__ == route.dependant.call.__qualname__
+
+
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [

@@ -1,16 +1,16 @@
 from __future__ import absolute_import
 
 import os
-
+from typing import List, Optional
 from concurrent import futures
+from unittest.mock import Mock
 
 import grpc
 import pytest
 
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.grpc.client import ClientInterceptor
-from sentry_sdk.integrations.grpc.server import ServerInterceptor
+from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
@@ -24,7 +24,7 @@ PORT += os.getpid() % 100  # avoid port conflicts when running tests in parallel
 
 @pytest.mark.forked
 def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
 
     server = _set_up()
@@ -48,8 +48,41 @@ def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
 
 
 @pytest.mark.forked
+def test_grpc_server_other_interceptors(sentry_init, capture_events_forksafe):
+    """Ensure compatibility with additional server interceptors."""
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+    mock_intercept = lambda continuation, handler_call_details: continuation(
+        handler_call_details
+    )
+    mock_interceptor = Mock()
+    mock_interceptor.intercept_service.side_effect = mock_intercept
+
+    server = _set_up(interceptors=[mock_interceptor])
+
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        stub.TestServe(gRPCTestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    mock_interceptor.intercept_service.assert_called_once()
+
+    events.write_file.close()
+    event = events.read_event()
+    span = event["spans"][0]
+
+    assert event["type"] == "transaction"
+    assert event["transaction_info"] == {
+        "source": "custom",
+    }
+    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+    assert span["op"] == "test"
+
+
+@pytest.mark.forked
 def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
 
     server = _set_up()
@@ -94,14 +127,12 @@ def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe)
 
 @pytest.mark.forked
 def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
-    interceptors = [ClientInterceptor()]
 
     server = _set_up()
 
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
-        channel = grpc.intercept_channel(channel, *interceptors)
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
@@ -128,17 +159,93 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
 
 
 @pytest.mark.forked
-def test_grpc_client_and_servers_interceptors_integration(
-    sentry_init, capture_events_forksafe
-):
-    sentry_init(traces_sample_rate=1.0)
+def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksafe):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     events = capture_events_forksafe()
-    interceptors = [ClientInterceptor()]
 
     server = _set_up()
 
     with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
-        channel = grpc.intercept_channel(channel, *interceptors)
+        stub = gRPCTestServiceStub(channel)
+
+        with start_transaction():
+            [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
+
+    _tear_down(server=server)
+
+    events.write_file.close()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
+    )
+    assert span["data"] == {
+        "type": "unary stream",
+        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+    }
+
+
+# using unittest.mock.Mock not possible because grpc verifies
+# that the interceptor is of the correct type
+class MockClientInterceptor(grpc.UnaryUnaryClientInterceptor):
+    call_counter = 0
+
+    def intercept_unary_unary(self, continuation, client_call_details, request):
+        self.__class__.call_counter += 1
+        return continuation(client_call_details, request)
+
+
+@pytest.mark.forked
+def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
+    """Ensure compatibility with additional client interceptors."""
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server = _set_up()
+
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
+        channel = grpc.intercept_channel(channel, MockClientInterceptor())
+        stub = gRPCTestServiceStub(channel)
+
+        with start_transaction():
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    assert MockClientInterceptor.call_counter == 1
+
+    events.write_file.close()
+    events.read_event()
+    local_transaction = events.read_event()
+    span = local_transaction["spans"][0]
+
+    assert len(local_transaction["spans"]) == 1
+    assert span["op"] == OP.GRPC_CLIENT
+    assert (
+        span["description"]
+        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+    )
+    assert span["data"] == {
+        "type": "unary unary",
+        "method": "/grpc_test_server.gRPCTestService/TestServe",
+        "code": "OK",
+    }
+
+
+@pytest.mark.forked
+def test_grpc_client_and_servers_interceptors_integration(
+    sentry_init, capture_events_forksafe
+):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server = _set_up()
+
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
 
         with start_transaction():
@@ -156,13 +263,36 @@ def test_grpc_client_and_servers_interceptors_integration(
     )
 
 
-def _set_up():
+@pytest.mark.forked
+def test_stream_stream(sentry_init):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    _set_up()
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        response_iterator = stub.TestStreamStream(iter((gRPCTestMessage(text="test"),)))
+        for response in response_iterator:
+            assert response.text == "test"
+
+
+def test_stream_unary(sentry_init):
+    """Test to verify stream-stream works.
+    Tracing not supported for it yet.
+    """
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    _set_up()
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        response = stub.TestStreamUnary(iter((gRPCTestMessage(text="test"),)))
+        assert response.text == "test"
+
+
+def _set_up(interceptors: Optional[List[grpc.ServerInterceptor]] = None):
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=2),
-        interceptors=[ServerInterceptor(find_name=_find_name)],
+        interceptors=interceptors,
     )
 
-    add_gRPCTestServiceServicer_to_server(TestService, server)
+    add_gRPCTestServiceServicer_to_server(TestService(), server)
     server.add_insecure_port("[::]:{}".format(PORT))
     server.start()
 
@@ -187,3 +317,18 @@ class TestService(gRPCTestServiceServicer):
             pass
 
         return gRPCTestMessage(text=request.text)
+
+    @staticmethod
+    def TestUnaryStream(request, context):  # noqa: N802
+        for _ in range(3):
+            yield gRPCTestMessage(text=request.text)
+
+    @staticmethod
+    def TestStreamStream(request, context):  # noqa: N802
+        for r in request:
+            yield r
+
+    @staticmethod
+    def TestStreamUnary(request, context):  # noqa: N802
+        requests = [r for r in request]
+        return requests.pop()

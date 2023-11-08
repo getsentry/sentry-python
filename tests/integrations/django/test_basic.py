@@ -972,14 +972,7 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     assert not len(transaction["spans"])
 
 
-if DJANGO_VERSION >= (1, 10):
-    EXPECTED_SIGNALS_SPANS = """\
-- op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"\
-"""
-else:
-    EXPECTED_SIGNALS_SPANS = """\
+EXPECTED_SIGNALS_SPANS = """\
 - op="http.server": description=null
   - op="event.django": description="django.db.reset_queries"
   - op="event.django": description="django.db.close_old_connections"\
