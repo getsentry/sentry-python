@@ -36,6 +36,7 @@ try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings as django_settings
     from django.core import signals
+    from django.core.handlers.asgi import ASGIRequest
     from django.conf import settings
 
     try:
@@ -410,7 +411,7 @@ def _before_get_response(request):
         _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
         scope.add_event_processor(
-            _make_event_processor(weakref.ref(request), integration)
+            _make_wsgi_request_event_processor(weakref.ref(request), integration)
         )
 
 
@@ -462,15 +463,18 @@ def _patch_get_response():
         patch_get_response_async(BaseHandler, _before_get_response)
 
 
-def _make_event_processor(weak_request, integration):
+def _make_wsgi_request_event_processor(weak_request, integration):
     # type: (Callable[[], WSGIRequest], DjangoIntegration) -> EventProcessor
-    def event_processor(event, hint):
+    def wsgi_request_event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
         request = weak_request()
         if request is None:
+            return event
+
+        if type(request) == ASGIRequest:
             return event
 
         try:
@@ -489,7 +493,7 @@ def _make_event_processor(weak_request, integration):
 
         return event
 
-    return event_processor
+    return wsgi_request_event_processor
 
 
 def _got_request_exception(request=None, **kwargs):
