@@ -666,20 +666,29 @@ def _set_db_data(span, cursor_or_db):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
-    if (
+    # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
+    # actually has a `connection` and the `connection` has a `get_dsn_parameters`
+    # attribute, only to throw an error once you actually want to call it.
+    # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
+    # function.
+    is_psycopg2 = (
         hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
         and inspect.isfunction(cursor_or_db.connection.get_dsn_parameters)
-    ):
-        # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
-        # actually has a `connection` and the `connection` has a `get_dsn_parameters`
-        # attribute, only to throw an error once you actually want to call it.
-        # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
-        # function.
+    )
+    if is_psycopg2:
         connection_params = cursor_or_db.connection.get_dsn_parameters()
-
     else:
-        connection_params = db.get_connection_params()
+        is_psycopg3 = (
+            hasattr(cursor_or_db, "connection")
+            and hasattr(cursor_or_db.connection, "info")
+            and hasattr(cursor_or_db.connection.info, "get_parameters")
+            and inspect.isfunction(cursor_or_db.connection.info.get_parameters)
+        )
+        if is_psycopg3:
+            connection_params = cursor_or_db.connection.info.get_parameters()
+        else:
+            connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:
