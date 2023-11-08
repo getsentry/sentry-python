@@ -51,7 +51,7 @@ try:
     # Only available in Django 3.0+
     try:
         from django.core.handlers.asgi import ASGIRequest
-    except ModuleNotFoundError:
+    except Exception:
         ASGIRequest = None
 
 except ImportError:
