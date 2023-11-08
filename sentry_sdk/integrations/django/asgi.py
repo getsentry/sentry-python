@@ -186,10 +186,27 @@ def patch_signals_async():
 
             return wrapper
 
+        def sentry_async_receiver_wrapper(receiver):
+            # type: (Callable[..., Any]) -> Callable[..., Any]
+            @wraps(receiver)
+            async def wrapper(*args, **kwargs):
+                # type: (Any, Any) -> Any
+                signal_name = _get_receiver_name(receiver)
+                with hub.start_span(
+                    op=OP.EVENT_DJANGO,
+                    description=signal_name,
+                ) as span:
+                    span.set_data("signal", signal_name)
+                    return await receiver(*args, **kwargs)
+
+            return wrapper
+
         integration = hub.get_integration(DjangoIntegration)
         if integration and integration.signals_spans:
             for idx, receiver in enumerate(sync_receivers):
                 sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
+            for idx, receiver in enumerate(async_receivers):
+                async_receivers[idx] = sentry_async_receiver_wrapper(receiver)
 
         return sync_receivers, async_receivers
 
