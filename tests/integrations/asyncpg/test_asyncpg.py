@@ -31,7 +31,9 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 
 
-PG_CONNECTION_URI = f"postgresql://{PG_USER}:{PG_PASSWORD}@{PG_HOST}/{PG_NAME}"
+PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
+    PG_USER, PG_PASSWORD, PG_HOST, PG_NAME
+)
 CRUMBS_CONNECT = {
     "category": "query",
     "data": {
