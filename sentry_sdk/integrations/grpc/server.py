@@ -6,7 +6,7 @@ from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
 
 if MYPY:
     from typing import Callable, Optional
-    from google.protobuf.message import Message  # type: ignore
+    from google.protobuf.message import Message
 
 try:
     import grpc

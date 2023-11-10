@@ -1,7 +1,7 @@
 import uuid
 import random
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
@@ -14,13 +14,13 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
-    from datetime import datetime
     from typing import Any
     from typing import Dict
     from typing import Iterator
     from typing import List
     from typing import Optional
     from typing import Tuple
+    from typing import Union
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
@@ -131,7 +131,7 @@ class Span(object):
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
-        start_timestamp=None,  # type: Optional[datetime]
+        start_timestamp=None,  # type: Optional[Union[datetime, float]]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -146,7 +146,11 @@ class Span(object):
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
-        self.start_timestamp = start_timestamp or datetime_utcnow()
+        if start_timestamp is None:
+            start_timestamp = datetime.utcnow()
+        elif isinstance(start_timestamp, float):
+            start_timestamp = datetime.utcfromtimestamp(start_timestamp)
+        self.start_timestamp = start_timestamp
         try:
             # profiling depends on this value and requires that
             # it is measured in nanoseconds
@@ -439,7 +443,7 @@ class Span(object):
         return self.status == "ok"
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
         # Note: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
         """Sets the end timestamp of the span.
@@ -463,6 +467,8 @@ class Span(object):
 
         try:
             if end_timestamp:
+                if isinstance(end_timestamp, float):
+                    end_timestamp = datetime.utcfromtimestamp(end_timestamp)
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
@@ -627,7 +633,7 @@ class Transaction(Span):
         return self
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
 
@@ -935,7 +941,7 @@ class NoOpSpan(Span):
         return {}
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[datetime]) -> Optional[str]
+        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
         pass
 
     def set_measurement(self, name, value, unit=""):

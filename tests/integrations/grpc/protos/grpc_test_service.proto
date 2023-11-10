@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package grpc_test_server;
+
+service gRPCTestService{
+  rpc TestServe(gRPCTestMessage) returns (gRPCTestMessage);
+  rpc TestUnaryStream(gRPCTestMessage) returns (stream gRPCTestMessage);
+  rpc TestStreamStream(stream gRPCTestMessage) returns (stream gRPCTestMessage);
+  rpc TestStreamUnary(stream gRPCTestMessage) returns (gRPCTestMessage);
+}
+
+message gRPCTestMessage {
+  string text = 1;
+}

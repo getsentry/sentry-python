@@ -290,7 +290,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
                 if url:
                     parsed_url = urlparse(url)
-                    url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+                    url = "{}://{}{}".format(
+                        parsed_url.scheme, parsed_url.netloc, parsed_url.path
+                    )
                     description += " {}".format(url)
 
             status_code = otel_span.attributes.get(

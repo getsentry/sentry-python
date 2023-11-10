@@ -11,7 +11,7 @@ try:
     from grpc import ClientCallDetails, Call
     from grpc._interceptor import _UnaryOutcome
     from grpc.aio._interceptor import UnaryStreamCall
-    from google.protobuf.message import Message  # type: ignore
+    from google.protobuf.message import Message
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
@@ -19,6 +19,8 @@ except ImportError:
 class ClientInterceptor(
     grpc.UnaryUnaryClientInterceptor, grpc.UnaryStreamClientInterceptor  # type: ignore
 ):
+    _is_intercepted = False
+
     def intercept_unary_unary(self, continuation, client_call_details, request):
         # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], _UnaryOutcome], ClientCallDetails, Message) -> _UnaryOutcome
         hub = Hub.current
@@ -57,7 +59,8 @@ class ClientInterceptor(
             response = continuation(
                 client_call_details, request
             )  # type: UnaryStreamCall
-            span.set_data("code", response.code().name)
+            # Setting code on unary-stream leads to execution getting stuck
+            # span.set_data("code", response.code().name)
 
             return response
 
