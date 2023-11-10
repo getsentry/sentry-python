@@ -444,7 +444,15 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
     if schedule_unit is not None:
         monitor_config["schedule"]["unit"] = schedule_unit
 
-    monitor_config["timezone"] = app.conf.timezone or "UTC"
+    monitor_config["timezone"] = (
+        (
+            hasattr(celery_schedule, "tz")
+            and celery_schedule.tz is not None
+            and str(celery_schedule.tz)
+        )
+        or app.timezone
+        or "UTC"
+    )
 
     return monitor_config
 
