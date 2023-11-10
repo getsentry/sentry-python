@@ -662,25 +662,28 @@ class Scope(object):
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
 
+        def _drop(cause, ty):
+            # type: (Any, str) -> Optional[Any]
+            logger.info("%s (%s) dropped event", ty, cause)
+            return None
+
         # run error processors
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    logger.info("error processor (%s) dropped event", error_processor)
-                    return None
+                    return _drop(error_processor, "error processor")
 
                 event = new_event
 
         # run event processors
         for event_processor in chain(global_event_processors, self._event_processors):
-            new_event = event  # type: Optional[Event]
+            new_event = event
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
-                logger.info("event processor (%s) dropped event", event_processor)
-                return None
+                return _drop(event_processor, "event processor")
             event = new_event
 
         return event
