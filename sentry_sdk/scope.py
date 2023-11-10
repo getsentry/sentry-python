@@ -626,29 +626,6 @@ class Scope(object):
                 "replay_id": replay_id,
             }
 
-    def _run_error_processors(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        exc_info = hint.get("exc_info")
-        if exc_info is not None:
-            for error_processor in self._error_processors:
-                new_event = error_processor(event, exc_info)
-                if new_event is None:
-                    logger.info("error processor (%s) dropped event", error_processor)
-                    return None
-
-                event = new_event
-
-    def _run_event_processors(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
-        for event_processor in chain(global_event_processors, self._event_processors):
-            new_event = event  # type: Optional[Event]
-            with capture_internal_exceptions():
-                new_event = event_processor(event, hint)
-            if new_event is None:
-                logger.info("event processor (%s) dropped event", event_processor)
-                return None
-            event = new_event
-
     @_disable_capture
     def apply_to_event(
         self,
@@ -685,13 +662,26 @@ class Scope(object):
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
 
-        event = self._run_error_processors(event, hint, options)
-        if event is None:
-            return None
+        # run error processors
+        exc_info = hint.get("exc_info")
+        if exc_info is not None:
+            for error_processor in self._error_processors:
+                new_event = error_processor(event, exc_info)
+                if new_event is None:
+                    logger.info("error processor (%s) dropped event", error_processor)
+                    return None
 
-        event = self._run_event_processors(event, hint, options)
-        if event is None:
-            return None
+                event = new_event
+
+        # run event processors
+        for event_processor in chain(global_event_processors, self._event_processors):
+            new_event = event  # type: Optional[Event]
+            with capture_internal_exceptions():
+                new_event = event_processor(event, hint)
+            if new_event is None:
+                logger.info("event processor (%s) dropped event", event_processor)
+                return None
+            event = new_event
 
         return event
 
