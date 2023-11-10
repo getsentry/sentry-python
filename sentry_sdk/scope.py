@@ -685,9 +685,13 @@ class Scope(object):
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
 
-        self._run_error_processors(event, hint, options)
+        event = self._run_error_processors(event, hint, options)
+        if event is None:
+            return None
 
-        self._run_event_processors(event, hint, options)
+        event = self._run_event_processors(event, hint, options)
+        if event is None:
+            return None
 
         return event
 
