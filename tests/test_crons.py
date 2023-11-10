@@ -246,6 +246,7 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         "monitor_config",
         "contexts",
         # TODO: These fields need to be checked if valid for checkin:
+        "_meta",
         "level",
         "tags",
         "extra",
