@@ -8,6 +8,11 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
 
 try:
+    from django.urls import reverse
+except ImportError:
+    from django.core.urlresolvers import reverse
+
+try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
@@ -353,3 +358,47 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
 
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.parametrize(
+    "body,expected_return_data",
+    [
+        (
+            b'{"username":"xyz","password":"xyz"}',
+            {"username": "xyz", "password": "xyz"},
+        ),
+        (b"hello", ""),
+        (b"", None),
+    ],
+)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_asgi_request_body(
+    sentry_init, capture_envelopes, application, body, expected_return_data
+):
+    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+
+    envelopes = capture_envelopes()
+
+    comm = HttpCommunicator(
+        application,
+        method="POST",
+        path=reverse("post_echo_async"),
+        body=body,
+        headers=[(b"content-type", b"application/json")],
+    )
+    response = await comm.get_response()
+
+    assert response["status"] == 200
+    assert response["body"] == body
+
+    (envelope,) = envelopes
+    event = envelope.get_event()
+
+    if expected_return_data is not None:
+        assert event["request"]["data"] == expected_return_data
+    else:
+        assert "data" not in event["request"]

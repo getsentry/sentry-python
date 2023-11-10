@@ -11,15 +11,55 @@ import asyncio
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
+from sentry_sdk.hub import _should_send_default_pii
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.utils import capture_internal_exceptions
+
+from django.core.handlers.wsgi import WSGIRequest
+
 
 if TYPE_CHECKING:
     from typing import Any
+    from typing import Dict
     from typing import Union
     from typing import Callable
 
+    from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
+
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk._types import EventProcessor
+
+
+def _make_asgi_request_event_processor(request, integration):
+    # type: (ASGIRequest, DjangoIntegration) -> EventProcessor
+    def asgi_request_event_processor(event, hint):
+        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # if the request is gone we are fine not logging the data from
+        # it.  This might happen if the processor is pushed away to
+        # another thread.
+        from sentry_sdk.integrations.django import (
+            DjangoRequestExtractor,
+            _set_user_info,
+        )
+
+        if request is None:
+            return event
+
+        if type(request) == WSGIRequest:
+            return event
+
+        with capture_internal_exceptions():
+            DjangoRequestExtractor(request).extract_into_event(event)
+
+        if _should_send_default_pii():
+            with capture_internal_exceptions():
+                _set_user_info(request, event)
+
+        return event
+
+    return asgi_request_event_processor
 
 
 def patch_django_asgi_handler_impl(cls):
@@ -31,15 +71,45 @@ def patch_django_asgi_handler_impl(cls):
 
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
-        if Hub.current.get_integration(DjangoIntegration) is None:
+        hub = Hub.current
+        integration = hub.get_integration(DjangoIntegration)
+        if integration is None:
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls), unsafe_context_data=True
         )._run_asgi3
+
         return await middleware(scope, receive, send)
 
     cls.__call__ = sentry_patched_asgi_handler
+
+    modern_django_asgi_support = hasattr(cls, "create_request")
+    if modern_django_asgi_support:
+        old_create_request = cls.create_request
+
+        def sentry_patched_create_request(self, *args, **kwargs):
+            # type: (Any, *Any, **Any) -> Any
+            hub = Hub.current
+            integration = hub.get_integration(DjangoIntegration)
+            if integration is None:
+                return old_create_request(self, *args, **kwargs)
+
+            with hub.configure_scope() as scope:
+                request, error_response = old_create_request(self, *args, **kwargs)
+
+                # read the body once, to signal Django to cache the body stream
+                # so we can read the body in our event processor
+                # (otherwise Django closes the body stream and makes it impossible to read it again)
+                _ = request.body
+
+                scope.add_event_processor(
+                    _make_asgi_request_event_processor(request, integration)
+                )
+
+                return request, error_response
+
+        cls.create_request = sentry_patched_create_request
 
 
 def patch_get_response_async(cls, _before_get_response):
