@@ -244,12 +244,11 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         # Optional check-in specific keys
         "duration",
         "monitor_config",
-        "contexts",
+        "contexts",  # an event processor adds this
         # TODO: These fields need to be checked if valid for checkin:
         "_meta",
-        "level",
         "tags",
-        "extra",
+        "extra",  # an event processor adds this
         "modules",
         "server_name",
         "sdk",

@@ -648,15 +648,14 @@ class Scope(object):
                 attachments_to_send.append(attachment)
         hint["attachments"] = attachments_to_send
 
-        self._apply_level_to_event(event, hint, options)
-        self._apply_fingerprint_to_event(event, hint, options)
-        self._apply_user_to_event(event, hint, options)
-        self._apply_tags_to_event(event, hint, options)
-        self._apply_contexts_to_event(event, hint, options)
-        self._apply_transaction_name_to_event(event, hint, options)
-
         if not is_check_in:
+            self._apply_level_to_event(event, hint, options)
+            self._apply_fingerprint_to_event(event, hint, options)
+            self._apply_user_to_event(event, hint, options)
+            self._apply_transaction_name_to_event(event, hint, options)
             self._apply_transaction_info_to_event(event, hint, options)
+            self._apply_tags_to_event(event, hint, options)
+            self._apply_contexts_to_event(event, hint, options)
             self._apply_extra_to_event(event, hint, options)
 
         if not is_transaction and not is_check_in:
