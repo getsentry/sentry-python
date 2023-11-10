@@ -209,25 +209,65 @@ def test_crons_task_retry():
 
 def test_get_monitor_config_crontab():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = "Europe/Vienna"
+    app.timezone = "Europe/Vienna"
 
+    # schedule with the default timezone
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+
     monitor_config = _get_monitor_config(celery_schedule, app, "foo")
     assert monitor_config == {
         "schedule": {
             "type": "crontab",
             "value": "*/10 12 3 * *",
         },
-        "timezone": "Europe/Vienna",
+        "timezone": "UTC",  # the default because `crontab` does not know about the app
     }
     assert "unit" not in monitor_config["schedule"]
+
+    # schedule with the timezone from the app
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10", app=app)
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config == {
+        "schedule": {
+            "type": "crontab",
+            "value": "*/10 12 3 * *",
+        },
+        "timezone": "Europe/Vienna",  # the timezone from the app
+    }
+
+    # schedule without a timezone, the celery integration will read the config from the app
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    celery_schedule.tz = None
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config == {
+        "schedule": {
+            "type": "crontab",
+            "value": "*/10 12 3 * *",
+        },
+        "timezone": "Europe/Vienna",  # the timezone from the app
+    }
+
+    # schedule without a timezone, and an app without timezone, the celery integration will fall back to UTC
+    app = MagicMock()
+    app.timezone = None
+
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    celery_schedule.tz = None
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config == {
+        "schedule": {
+            "type": "crontab",
+            "value": "*/10 12 3 * *",
+        },
+        "timezone": "UTC",  # default timezone from celery integration
+    }
 
 
 def test_get_monitor_config_seconds():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = "Europe/Vienna"
+    app.timezone = "Europe/Vienna"
 
     celery_schedule = schedule(run_every=3)  # seconds
 
@@ -245,10 +285,11 @@ def test_get_monitor_config_seconds():
 
 def test_get_monitor_config_minutes():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = "Europe/Vienna"
+    app.timezone = "Europe/Vienna"
 
+    # schedule with the default timezone
     celery_schedule = schedule(run_every=60)  # seconds
+
     monitor_config = _get_monitor_config(celery_schedule, app, "foo")
     assert monitor_config == {
         "schedule": {
@@ -256,14 +297,57 @@ def test_get_monitor_config_minutes():
             "value": 1,
             "unit": "minute",
         },
-        "timezone": "Europe/Vienna",
+        "timezone": "UTC",
+    }
+
+    # schedule with the timezone from the app
+    celery_schedule = schedule(run_every=60, app=app)  # seconds
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config == {
+        "schedule": {
+            "type": "interval",
+            "value": 1,
+            "unit": "minute",
+        },
+        "timezone": "Europe/Vienna",  # the timezone from the app
+    }
+
+    # schedule without a timezone, the celery integration will read the config from the app
+    celery_schedule = schedule(run_every=60)  # seconds
+    celery_schedule.tz = None
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config == {
+        "schedule": {
+            "type": "interval",
+            "value": 1,
+            "unit": "minute",
+        },
+        "timezone": "Europe/Vienna",  # the timezone from the app
+    }
+
+    # schedule without a timezone, and an app without timezone, the celery integration will fall back to UTC
+    app = MagicMock()
+    app.timezone = None
+
+    celery_schedule = schedule(run_every=60)  # seconds
+    celery_schedule.tz = None
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    assert monitor_config == {
+        "schedule": {
+            "type": "interval",
+            "value": 1,
+            "unit": "minute",
+        },
+        "timezone": "UTC",  # default timezone from celery integration
     }
 
 
 def test_get_monitor_config_unknown():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = "Europe/Vienna"
+    app.timezone = "Europe/Vienna"
 
     unknown_celery_schedule = MagicMock()
     monitor_config = _get_monitor_config(unknown_celery_schedule, app, "foo")
@@ -272,8 +356,7 @@ def test_get_monitor_config_unknown():
 
 def test_get_monitor_config_default_timezone():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = None
+    app.timezone = None
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
 
@@ -284,8 +367,7 @@ def test_get_monitor_config_default_timezone():
 
 def test_get_monitor_config_timezone_in_app_conf():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = "Asia/Karachi"
+    app.timezone = "Asia/Karachi"
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
     celery_schedule.tz = None
@@ -297,8 +379,7 @@ def test_get_monitor_config_timezone_in_app_conf():
 
 def test_get_monitor_config_timezone_in_celery_schedule():
     app = MagicMock()
-    app.conf = MagicMock()
-    app.conf.timezone = "Asia/Karachi"
+    app.timezone = "Asia/Karachi"
 
     panama_tz = datetime.timezone(datetime.timedelta(hours=-5), name="America/Panama")
 

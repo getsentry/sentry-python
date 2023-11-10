@@ -450,7 +450,7 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
             and celery_schedule.tz is not None
             and str(celery_schedule.tz)
         )
-        or app.conf.timezone
+        or app.timezone
         or "UTC"
     )
 
