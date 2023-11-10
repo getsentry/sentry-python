@@ -245,6 +245,13 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         "duration",
         "monitor_config",
         "contexts",
+        # TODO: These fields need to be checked if valid for checkin:
+        "level",
+        "tags",
+        "extra",
+        "modules",
+        "server_name",
+        "sdk",
     ]
 
     hub = Hub.current
