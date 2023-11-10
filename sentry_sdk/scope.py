@@ -582,6 +582,7 @@ class Scope(object):
             event["transaction"] = self._transaction
 
     def _apply_transaction_info_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("transaction_info") is None and self._transaction_info is not None:
             event["transaction_info"] = self._transaction_info
 
@@ -640,7 +641,7 @@ class Scope(object):
     def _run_event_processors(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         for event_processor in chain(global_event_processors, self._event_processors):
-            new_event = event
+            new_event = event  # type: Optional[Event]
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
