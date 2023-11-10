@@ -560,58 +560,48 @@ class Scope(object):
 
         self._error_processors.append(func)
 
-    @_disable_capture
-    def apply_to_event(
-        self,
-        event,  # type: Event
-        hint,  # type: Hint
-        options=None,  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> Optional[Event]
-        """Applies the information contained on the scope to the given event."""
-
-        def _drop(cause, ty):
-            # type: (Any, str) -> Optional[Any]
-            logger.info("%s (%s) dropped event", ty, cause)
-            return None
-
-        is_transaction = event.get("type") == "transaction"
-
-        # put all attachments into the hint. This lets callbacks play around
-        # with attachments. We also later pull this out of the hint when we
-        # create the envelope.
-        attachments_to_send = hint.get("attachments") or []
-        for attachment in self._attachments:
-            if not is_transaction or attachment.add_to_transactions:
-                attachments_to_send.append(attachment)
-        hint["attachments"] = attachments_to_send
-
+    def apply_level_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._level is not None:
             event["level"] = self._level
 
-        if not is_transaction:
-            event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
-                self._breadcrumbs
-            )
+    def apply_breadcrumbs_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+        event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
+            self._breadcrumbs
+        )
 
+    def apply_user_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
+    def apply_transaction_name_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
+    def apply_transaction_info_to_event(self, event, hint, options):
         if event.get("transaction_info") is None and self._transaction_info is not None:
             event["transaction_info"] = self._transaction_info
 
+    def apply_fingerprint_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
+    def apply_extra_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._extras:
             event.setdefault("extra", {}).update(self._extras)
 
+    def apply_tags_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._tags:
             event.setdefault("tags", {}).update(self._tags)
 
+    def apply_contexts_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
@@ -633,21 +623,66 @@ class Scope(object):
                 "replay_id": replay_id,
             }
 
+    def run_error_processors(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
-                    return _drop(error_processor, "error processor")
+                    logger.info("error processor (%s) dropped event", error_processor)
+                    return None
+
                 event = new_event
 
+    def run_event_processors(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         for event_processor in chain(global_event_processors, self._event_processors):
             new_event = event
             with capture_internal_exceptions():
                 new_event = event_processor(event, hint)
             if new_event is None:
-                return _drop(event_processor, "event processor")
+                logger.info("event processor (%s) dropped event", event_processor)
+                return None
             event = new_event
+
+    @_disable_capture
+    def apply_to_event(
+        self,
+        event,  # type: Event
+        hint,  # type: Hint
+        options=None,  # type: Optional[Dict[str, Any]]
+    ):
+        # type: (...) -> Optional[Event]
+        """Applies the information contained on the scope to the given event."""
+        ty = event.get("type")
+        is_transaction = ty == "transaction"
+
+        # put all attachments into the hint. This lets callbacks play around
+        # with attachments. We also later pull this out of the hint when we
+        # create the envelope.
+        attachments_to_send = hint.get("attachments") or []
+        for attachment in self._attachments:
+            if not is_transaction or attachment.add_to_transactions:
+                attachments_to_send.append(attachment)
+        hint["attachments"] = attachments_to_send
+
+        self.apply_level_to_event(event, hint, options)
+
+        if not is_transaction:
+            self.apply_breadcrumbs_to_event(event, hint, options)
+
+        self.apply_user_to_event(event, hint, options)
+        self.apply_transaction_name_to_event(event, hint, options)
+        self.apply_transaction_info_to_event(event, hint, options)
+        self.apply_fingerprint_to_event(event, hint, options)
+        self.apply_extra_to_event(event, hint, options)
+        self.apply_tags_to_event(event, hint, options)
+        self.apply_contexts_to_event(event, hint, options)
+
+        self.run_error_processors(event, hint, options)
+
+        self.run_event_processors(event, hint, options)
 
         return event
 
