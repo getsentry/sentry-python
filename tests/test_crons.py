@@ -278,6 +278,6 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
             if key not in valid_keys:
                 invalid_keys.append(key)
 
-        assert (
-            len(invalid_keys) == 0
-        ), f"Unexpected keys found in checkin: {invalid_keys}"
+        assert len(invalid_keys) == 0, "Unexpected keys found in checkin: {}".format(
+            invalid_keys
+        )
