@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 def _make_asgi_request_event_processor(request, integration):
-    # type: (Callable[[], ASGIRequest], DjangoIntegration) -> EventProcessor
+    # type: (ASGIRequest, DjangoIntegration) -> EventProcessor
     def asgi_request_event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         # if the request is gone we are fine not logging the data from
