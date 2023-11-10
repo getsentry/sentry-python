@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 
 from sentry_sdk.integrations.celery import (
@@ -275,9 +277,37 @@ def test_get_monitor_config_default_timezone():
 
     celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
 
-    monitor_config = _get_monitor_config(celery_schedule, app, "foo")
+    monitor_config = _get_monitor_config(celery_schedule, app, "dummy_monitor_name")
 
     assert monitor_config["timezone"] == "UTC"
+
+
+def test_get_monitor_config_timezone_in_app_conf():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Asia/Karachi"
+
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    celery_schedule.tz = None
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "dummy_monitor_name")
+
+    assert monitor_config["timezone"] == "Asia/Karachi"
+
+
+def test_get_monitor_config_timezone_in_celery_schedule():
+    app = MagicMock()
+    app.conf = MagicMock()
+    app.conf.timezone = "Asia/Karachi"
+
+    panama_tz = datetime.timezone(datetime.timedelta(hours=-5), name="America/Panama")
+
+    celery_schedule = crontab(day_of_month="3", hour="12", minute="*/10")
+    celery_schedule.tz = panama_tz
+
+    monitor_config = _get_monitor_config(celery_schedule, app, "dummy_monitor_name")
+
+    assert monitor_config["timezone"] == str(panama_tz)
 
 
 @pytest.mark.parametrize(
