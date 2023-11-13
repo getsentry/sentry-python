@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.35.0
+
+### Python 3.12 Support (ongoing)
+
+By: @sentrivana (#2488)
+
+### Various fixes & improvements
+
+- Replace deprecated datetime functions (#2502) by @sentrivana
+- Set correct data in `check_in`s (#2500) by @antonpirker
+- Make reading the request body work in Django ASGI apps. (#2495) by @antonpirker
+- Read timezone for Crons monitors from `celery_schedule` if existing (#2497) by @antonpirker
+- feat(metrics): Unify datetime format (#2409) by @mitsuhiko
+- gRPC integration and aio interceptors (#2369) by @fdellekart
+- fix(integrations): Use wraps on fastapi request call wrapper (#2476) by @nkaras
+- Remove unnecessary TYPE_CHECKING alias (#2467) by @rafrafek
+- Removing redundant code in Django tests (#2491) by @vagi8
+- Probe for psycopg2 and psycopg3 parameters function. (#2492) by @antonpirker
+
 ## 1.34.0
 
 ### Various fixes & improvements
