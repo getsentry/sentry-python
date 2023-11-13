@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.35.0
+
+### Various fixes & improvements
+
+- **Updated gRPC integration:** Asyncio interceptors and easier setup (#2369) by @fdellekart
+
+  Our gRPC integration now instruments incoming unary-unary grpc requests and outgoing unary-unary, unary-stream grpc requests using grpcio channels. Everything works now for sync and async code.
+
+  Before this release you had to add Sentry interceptors by hand to your gRPC code, now the only thing you need to do is adding the `GRPCIntegration` to you `sentry_sdk_init()` call. (See [documentation](https://docs.sentry.io/platforms/python/integrations/grpc/) for more information):
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.grpc import GRPCIntegration
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      integrations=[
+          GRPCIntegration(),
+      ],
+  )
+  ```
+  The old way still works, but we strongly encourage you to update your code to the way described above.
+
+- Python 3.12: Replace deprecated datetime functions (#2502) by @sentrivana
+- Metrics: Unify datetime format (#2409) by @mitsuhiko
+- Celery: Set correct data in `check_in`s (#2500) by @antonpirker
+- Celery: Read timezone for Crons monitors from `celery_schedule` if existing (#2497) by @antonpirker
+- Django: Removing redundant code in Django tests (#2491) by @vagi8
+- Django: Make reading the request body work in Django ASGI apps. (#2495) by @antonpirker
+- FastAPI: Use wraps on fastapi request call wrapper (#2476) by @nkaras
+- Fix: Probe for psycopg2 and psycopg3 parameters function. (#2492) by @antonpirker
+- Fix: Remove unnecessary TYPE_CHECKING alias (#2467) by @rafrafek
+
 ## 1.34.0
 
 ### Various fixes & improvements
