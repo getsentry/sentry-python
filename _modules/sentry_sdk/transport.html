@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.transport - sentry-python 1.34.0 documentation</title>
+      <title>sentry_sdk.transport - sentry-python 1.35.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -764,7 +764,7 @@ html.dark {
 </span><span id="1-586">    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="n">Transport</span><span class="p">):</span>
 </span><span id="1-587">        <span class="n">transport_cls</span> <span class="o">=</span> <span class="n">ref_transport</span>
 </span><span id="1-588">    <span class="k">elif</span> <span class="nb">callable</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">):</span>
-</span><span id="1-589">        <span class="k">return</span> <span class="n">_FunctionTransport</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+</span><span id="1-589">        <span class="k">return</span> <span class="n">_FunctionTransport</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">)</span>
 </span><span id="1-590">
 </span><span id="1-591">    <span class="c1"># if a transport class is given only instantiate it if the dsn is not</span>
 </span><span id="1-592">    <span class="c1"># empty or None</span>
@@ -804,7 +804,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=248ce6c8"></script>
+      <script src="../../_static/documentation_options.js?v=5559ac91"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3e5c8598"></script>

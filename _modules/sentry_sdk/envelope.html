@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.envelope - sentry-python 1.34.0 documentation</title>
+      <title>sentry_sdk.envelope - sentry-python 1.35.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -409,78 +409,80 @@ html.dark {
 </span><span id="1-262">            <span class="k">return</span> <span class="s2">&quot;profile&quot;</span>
 </span><span id="1-263">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;statsd&quot;</span><span class="p">:</span>
 </span><span id="1-264">            <span class="k">return</span> <span class="s2">&quot;statsd&quot;</span>
-</span><span id="1-265">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-266">            <span class="k">return</span> <span class="s2">&quot;default&quot;</span>
-</span><span id="1-267">
-</span><span id="1-268">    <span class="k">def</span> <span class="nf">get_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-269">        <span class="c1"># type: (...) -&gt; bytes</span>
-</span><span id="1-270">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
-</span><span id="1-271">
+</span><span id="1-265">        <span class="k">elif</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span><span class="p">:</span>
+</span><span id="1-266">            <span class="k">return</span> <span class="s2">&quot;check_in&quot;</span>
+</span><span id="1-267">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-268">            <span class="k">return</span> <span class="s2">&quot;default&quot;</span>
+</span><span id="1-269">
+</span><span id="1-270">    <span class="k">def</span> <span class="nf">get_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-271">        <span class="c1"># type: (...) -&gt; bytes</span>
+</span><span id="1-272">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
+</span><span id="1-273">
 <div class="viewcode-block" id="Item.get_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.envelope.Item.get_event">[docs]</a>
-</span><span id="1-272">    <span class="k">def</span> <span class="nf">get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-273">        <span class="c1"># type: (...) -&gt; Optional[Event]</span>
-</span><span id="1-274"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-275"><span class="sd">        Returns an error event if there is one.</span>
-</span><span id="1-276"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-277">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;event&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-278">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
-</span><span id="1-279">        <span class="k">return</span> <span class="kc">None</span></div>
+</span><span id="1-274">    <span class="k">def</span> <span class="nf">get_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-275">        <span class="c1"># type: (...) -&gt; Optional[Event]</span>
+</span><span id="1-276"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-277"><span class="sd">        Returns an error event if there is one.</span>
+</span><span id="1-278"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-279">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;event&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-280">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
+</span><span id="1-281">        <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span id="1-280">
-</span><span id="1-281">    <span class="k">def</span> <span class="nf">get_transaction_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-282">        <span class="c1"># type: (...) -&gt; Optional[Event]</span>
-</span><span id="1-283">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-284">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
-</span><span id="1-285">        <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-286">
-</span><span id="1-287">    <span class="k">def</span> <span class="nf">serialize_into</span><span class="p">(</span>
-</span><span id="1-288">        <span class="bp">self</span><span class="p">,</span> <span class="n">f</span>  <span class="c1"># type: Any</span>
-</span><span id="1-289">    <span class="p">):</span>
-</span><span id="1-290">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-291">        <span class="n">headers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">)</span>
-</span><span id="1-292">        <span class="nb">bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
-</span><span id="1-293">        <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
-</span><span id="1-294">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">headers</span><span class="p">))</span>
-</span><span id="1-295">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="1-296">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+</span><span id="1-282">
+</span><span id="1-283">    <span class="k">def</span> <span class="nf">get_transaction_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-284">        <span class="c1"># type: (...) -&gt; Optional[Event]</span>
+</span><span id="1-285">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-286">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">json</span>
+</span><span id="1-287">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-288">
+</span><span id="1-289">    <span class="k">def</span> <span class="nf">serialize_into</span><span class="p">(</span>
+</span><span id="1-290">        <span class="bp">self</span><span class="p">,</span> <span class="n">f</span>  <span class="c1"># type: Any</span>
+</span><span id="1-291">    <span class="p">):</span>
+</span><span id="1-292">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-293">        <span class="n">headers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">headers</span><span class="p">)</span>
+</span><span id="1-294">        <span class="nb">bytes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">()</span>
+</span><span id="1-295">        <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;length&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+</span><span id="1-296">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">headers</span><span class="p">))</span>
 </span><span id="1-297">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="1-298">
-</span><span id="1-299">    <span class="k">def</span> <span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-300">        <span class="c1"># type: (...) -&gt; bytes</span>
-</span><span id="1-301">        <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
-</span><span id="1-302">        <span class="bp">self</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
-</span><span id="1-303">        <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
-</span><span id="1-304">
-</span><span id="1-305">    <span class="nd">@classmethod</span>
-</span><span id="1-306">    <span class="k">def</span> <span class="nf">deserialize_from</span><span class="p">(</span>
-</span><span id="1-307">        <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span>  <span class="c1"># type: Any</span>
-</span><span id="1-308">    <span class="p">):</span>
-</span><span id="1-309">        <span class="c1"># type: (...) -&gt; Optional[Item]</span>
-</span><span id="1-310">        <span class="n">line</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
-</span><span id="1-311">        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
-</span><span id="1-312">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-313">        <span class="n">headers</span> <span class="o">=</span> <span class="n">parse_json</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
-</span><span id="1-314">        <span class="n">length</span> <span class="o">=</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;length&quot;</span><span class="p">)</span>
-</span><span id="1-315">        <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-316">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
-</span><span id="1-317">            <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
-</span><span id="1-318">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-319">            <span class="c1"># if no length was specified we need to read up to the end of line</span>
-</span><span id="1-320">            <span class="c1"># and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)</span>
-</span><span id="1-321">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
-</span><span id="1-322">        <span class="k">if</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;event&quot;</span><span class="p">,</span> <span class="s2">&quot;transaction&quot;</span><span class="p">,</span> <span class="s2">&quot;metric_buckets&quot;</span><span class="p">):</span>
-</span><span id="1-323">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">parse_json</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
-</span><span id="1-324">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-325">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
-</span><span id="1-326">        <span class="k">return</span> <span class="n">rv</span>
-</span><span id="1-327">
-</span><span id="1-328">    <span class="nd">@classmethod</span>
-</span><span id="1-329">    <span class="k">def</span> <span class="nf">deserialize</span><span class="p">(</span>
-</span><span id="1-330">        <span class="bp">cls</span><span class="p">,</span> <span class="nb">bytes</span>  <span class="c1"># type: bytes</span>
-</span><span id="1-331">    <span class="p">):</span>
-</span><span id="1-332">        <span class="c1"># type: (...) -&gt; Optional[Item]</span>
-</span><span id="1-333">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="p">))</span></div>
+</span><span id="1-298">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="nb">bytes</span><span class="p">)</span>
+</span><span id="1-299">        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="1-300">
+</span><span id="1-301">    <span class="k">def</span> <span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-302">        <span class="c1"># type: (...) -&gt; bytes</span>
+</span><span id="1-303">        <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+</span><span id="1-304">        <span class="bp">self</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</span><span id="1-305">        <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+</span><span id="1-306">
+</span><span id="1-307">    <span class="nd">@classmethod</span>
+</span><span id="1-308">    <span class="k">def</span> <span class="nf">deserialize_from</span><span class="p">(</span>
+</span><span id="1-309">        <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span>  <span class="c1"># type: Any</span>
+</span><span id="1-310">    <span class="p">):</span>
+</span><span id="1-311">        <span class="c1"># type: (...) -&gt; Optional[Item]</span>
+</span><span id="1-312">        <span class="n">line</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span>
+</span><span id="1-313">        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+</span><span id="1-314">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-315">        <span class="n">headers</span> <span class="o">=</span> <span class="n">parse_json</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</span><span id="1-316">        <span class="n">length</span> <span class="o">=</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;length&quot;</span><span class="p">)</span>
+</span><span id="1-317">        <span class="k">if</span> <span class="n">length</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-318">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span><span class="p">)</span>
+</span><span id="1-319">            <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+</span><span id="1-320">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-321">            <span class="c1"># if no length was specified we need to read up to the end of line</span>
+</span><span id="1-322">            <span class="c1"># and remove it (if it is present, i.e. not the very last char in an eof terminated envelope)</span>
+</span><span id="1-323">            <span class="n">payload</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="1-324">        <span class="k">if</span> <span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;event&quot;</span><span class="p">,</span> <span class="s2">&quot;transaction&quot;</span><span class="p">,</span> <span class="s2">&quot;metric_buckets&quot;</span><span class="p">):</span>
+</span><span id="1-325">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">PayloadRef</span><span class="p">(</span><span class="n">json</span><span class="o">=</span><span class="n">parse_json</span><span class="p">(</span><span class="n">payload</span><span class="p">)))</span>
+</span><span id="1-326">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-327">            <span class="n">rv</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">payload</span><span class="o">=</span><span class="n">payload</span><span class="p">)</span>
+</span><span id="1-328">        <span class="k">return</span> <span class="n">rv</span>
+</span><span id="1-329">
+</span><span id="1-330">    <span class="nd">@classmethod</span>
+</span><span id="1-331">    <span class="k">def</span> <span class="nf">deserialize</span><span class="p">(</span>
+</span><span id="1-332">        <span class="bp">cls</span><span class="p">,</span> <span class="nb">bytes</span>  <span class="c1"># type: bytes</span>
+</span><span id="1-333">    <span class="p">):</span>
+</span><span id="1-334">        <span class="c1"># type: (...) -&gt; Optional[Item]</span>
+</span><span id="1-335">        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_from</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="p">))</span></div>
 
 </span></pre></div>
         </article>
@@ -514,7 +516,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=248ce6c8"></script>
+      <script src="../../_static/documentation_options.js?v=5559ac91"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3e5c8598"></script>
