@@ -9,21 +9,18 @@ Since this file contains `async def` it is conditionally imported in
 import asyncio
 
 from django.core.handlers.wsgi import WSGIRequest
-from django.dispatch import Signal
 
 from sentry_sdk import Hub, _functools
-from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.utils import capture_internal_exceptions
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Tuple, Union
+    from typing import Any, Callable, Dict, Union
 
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
@@ -220,58 +217,3 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
                 return await f(*args, **kwargs)
 
     return SentryASGIMixin
-
-
-def patch_signals_async():
-    # type: () -> None
-    """Patch django signal receivers to create a span."""
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    old_live_receivers = Signal._live_receivers
-
-    def _sentry_live_receivers(self, sender):
-        # type: (Signal, Any) -> Tuple[List[Callable[..., Any]], List[Callable[..., Any]]]
-        hub = Hub.current
-
-        sync_receivers, async_receivers = old_live_receivers(self, sender)
-
-        def sentry_sync_receiver_wrapper(receiver):
-            # type: (Callable[..., Any]) -> Callable[..., Any]
-            @wraps(receiver)
-            def wrapper(*args, **kwargs):
-                # type: (Any, Any) -> Any
-                signal_name = _get_receiver_name(receiver)
-                with hub.start_span(
-                    op=OP.EVENT_DJANGO,
-                    description=signal_name,
-                ) as span:
-                    span.set_data("signal", signal_name)
-                    return receiver(*args, **kwargs)
-
-            return wrapper
-
-        def sentry_async_receiver_wrapper(receiver):
-            # type: (Callable[..., Any]) -> Callable[..., Any]
-            @wraps(receiver)
-            async def wrapper(*args, **kwargs):
-                # type: (Any, Any) -> Any
-                signal_name = _get_receiver_name(receiver)
-                with hub.start_span(
-                    op=OP.EVENT_DJANGO,
-                    description=signal_name,
-                ) as span:
-                    span.set_data("signal", signal_name)
-                    return await receiver(*args, **kwargs)
-
-            return wrapper
-
-        integration = hub.get_integration(DjangoIntegration)
-        if integration and integration.signals_spans:
-            for idx, receiver in enumerate(sync_receivers):
-                sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
-            for idx, receiver in enumerate(async_receivers):
-                async_receivers[idx] = sentry_async_receiver_wrapper(receiver)
-
-        return sync_receivers, async_receivers
-
-    Signal._live_receivers = _sentry_live_receivers
