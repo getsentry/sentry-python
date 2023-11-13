@@ -28,12 +28,11 @@ if TYPE_CHECKING:
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
 
-    from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk._types import EventProcessor
 
 
-def _make_asgi_request_event_processor(request, integration):
-    # type: (ASGIRequest, DjangoIntegration) -> EventProcessor
+def _make_asgi_request_event_processor(request):
+    # type: (ASGIRequest) -> EventProcessor
     def asgi_request_event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         # if the request is gone we are fine not logging the data from
@@ -103,9 +102,7 @@ def patch_django_asgi_handler_impl(cls):
                 # (otherwise Django closes the body stream and makes it impossible to read it again)
                 _ = request.body
 
-                scope.add_event_processor(
-                    _make_asgi_request_event_processor(request, integration)
-                )
+                scope.add_event_processor(_make_asgi_request_event_processor(request))
 
                 return request, error_response
 
