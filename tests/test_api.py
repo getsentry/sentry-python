@@ -1,5 +1,3 @@
-import pytest
-
 from sentry_sdk import (
     configure_scope,
     continue_trace,
@@ -9,19 +7,11 @@ from sentry_sdk import (
     start_transaction,
 )
 from sentry_sdk.hub import Hub
-from sentry_sdk.integrations.redis import RedisIntegration
 
 try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
-
-try:
-    import redis  # noqa: F401
-except ImportError:
-    REDIS_INSTALLED = False
-else:
-    REDIS_INSTALLED = True
 
 
 def test_get_current_span():
@@ -123,10 +113,3 @@ def test_continue_trace(sentry_init):
         assert propagation_context["dynamic_sampling_context"] == {
             "trace_id": "566e3688a61d4bc888951642d6f14a19"
         }
-
-
-@pytest.mark.skipif(REDIS_INSTALLED, reason="skipping because redis is installed")
-def test_redis_disabled_when_not_installed(sentry_init):
-    sentry_init()
-
-    assert Hub.current.get_integration(RedisIntegration) is None

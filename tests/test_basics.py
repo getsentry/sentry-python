@@ -20,12 +20,25 @@ from sentry_sdk import (
 from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
 from sentry_sdk.utils import get_sdk_name
 from sentry_sdk.tracing_utils import has_tracing_enabled
+
+
+def _redis_installed():  # type: () -> bool
+    """
+    Determines whether Redis is installed.
+    """
+    try:
+        import redis  # noqa: F401
+    except ImportError:
+        return False
+
+    return True
 
 
 def test_processors(sentry_init, capture_events):
@@ -686,3 +699,10 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
     assert len(event["spans"]) == 2
     assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
     assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
+
+
+@pytest.mark.skipif(_redis_installed(), reason="skipping because redis is installed")
+def test_redis_disabled_when_not_installed(sentry_init):
+    sentry_init()
+
+    assert Hub.current.get_integration(RedisIntegration) is None
