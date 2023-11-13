@@ -560,69 +560,62 @@ class Scope(object):
 
         self._error_processors.append(func)
 
-    @_disable_capture
-    def apply_to_event(
-        self,
-        event,  # type: Event
-        hint,  # type: Hint
-        options=None,  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> Optional[Event]
-        """Applies the information contained on the scope to the given event."""
-
-        def _drop(cause, ty):
-            # type: (Any, str) -> Optional[Any]
-            logger.info("%s (%s) dropped event", ty, cause)
-            return None
-
-        is_transaction = event.get("type") == "transaction"
-
-        # put all attachments into the hint. This lets callbacks play around
-        # with attachments. We also later pull this out of the hint when we
-        # create the envelope.
-        attachments_to_send = hint.get("attachments") or []
-        for attachment in self._attachments:
-            if not is_transaction or attachment.add_to_transactions:
-                attachments_to_send.append(attachment)
-        hint["attachments"] = attachments_to_send
-
+    def _apply_level_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._level is not None:
             event["level"] = self._level
 
-        if not is_transaction:
-            event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
-                self._breadcrumbs
-            )
+    def _apply_breadcrumbs_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+        event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
+            self._breadcrumbs
+        )
 
+    def _apply_user_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
+    def _apply_transaction_name_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
+    def _apply_transaction_info_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("transaction_info") is None and self._transaction_info is not None:
             event["transaction_info"] = self._transaction_info
 
+    def _apply_fingerprint_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
+    def _apply_extra_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._extras:
             event.setdefault("extra", {}).update(self._extras)
 
+    def _apply_tags_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._tags:
             event.setdefault("tags", {}).update(self._tags)
 
+    def _apply_contexts_to_event(self, event, hint, options):
+        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
         contexts = event.setdefault("contexts", {})
 
+        # Add "trace" context
         if contexts.get("trace") is None:
             if has_tracing_enabled(options) and self._span is not None:
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
 
+        # Add "reply_id" context
         try:
             replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
         except (KeyError, TypeError):
@@ -633,14 +626,58 @@ class Scope(object):
                 "replay_id": replay_id,
             }
 
+    @_disable_capture
+    def apply_to_event(
+        self,
+        event,  # type: Event
+        hint,  # type: Hint
+        options=None,  # type: Optional[Dict[str, Any]]
+    ):
+        # type: (...) -> Optional[Event]
+        """Applies the information contained on the scope to the given event."""
+        ty = event.get("type")
+        is_transaction = ty == "transaction"
+        is_check_in = ty == "check_in"
+
+        # put all attachments into the hint. This lets callbacks play around
+        # with attachments. We also later pull this out of the hint when we
+        # create the envelope.
+        attachments_to_send = hint.get("attachments") or []
+        for attachment in self._attachments:
+            if not is_transaction or attachment.add_to_transactions:
+                attachments_to_send.append(attachment)
+        hint["attachments"] = attachments_to_send
+
+        self._apply_contexts_to_event(event, hint, options)
+
+        if not is_check_in:
+            self._apply_level_to_event(event, hint, options)
+            self._apply_fingerprint_to_event(event, hint, options)
+            self._apply_user_to_event(event, hint, options)
+            self._apply_transaction_name_to_event(event, hint, options)
+            self._apply_transaction_info_to_event(event, hint, options)
+            self._apply_tags_to_event(event, hint, options)
+            self._apply_extra_to_event(event, hint, options)
+
+        if not is_transaction and not is_check_in:
+            self._apply_breadcrumbs_to_event(event, hint, options)
+
+        def _drop(cause, ty):
+            # type: (Any, str) -> Optional[Any]
+            logger.info("%s (%s) dropped event", ty, cause)
+            return None
+
+        # run error processors
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             for error_processor in self._error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
                     return _drop(error_processor, "error processor")
+
                 event = new_event
 
+        # run event processors
         for event_processor in chain(global_event_processors, self._event_processors):
             new_event = event
             with capture_internal_exceptions():

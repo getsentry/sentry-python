@@ -47,6 +47,13 @@ try:
         from django.urls import Resolver404
     except ImportError:
         from django.core.urlresolvers import Resolver404
+
+    # Only available in Django 3.0+
+    try:
+        from django.core.handlers.asgi import ASGIRequest
+    except Exception:
+        ASGIRequest = None
+
 except ImportError:
     raise DidNotEnable("Django not installed")
 
@@ -410,7 +417,7 @@ def _before_get_response(request):
         _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
         scope.add_event_processor(
-            _make_event_processor(weakref.ref(request), integration)
+            _make_wsgi_request_event_processor(weakref.ref(request), integration)
         )
 
 
@@ -462,15 +469,20 @@ def _patch_get_response():
         patch_get_response_async(BaseHandler, _before_get_response)
 
 
-def _make_event_processor(weak_request, integration):
+def _make_wsgi_request_event_processor(weak_request, integration):
     # type: (Callable[[], WSGIRequest], DjangoIntegration) -> EventProcessor
-    def event_processor(event, hint):
+    def wsgi_request_event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
         request = weak_request()
         if request is None:
+            return event
+
+        django_3 = ASGIRequest is not None
+        if django_3 and type(request) == ASGIRequest:
+            # We have a `asgi_request_event_processor` for this.
             return event
 
         try:
@@ -489,7 +501,7 @@ def _make_event_processor(weak_request, integration):
 
         return event
 
-    return event_processor
+    return wsgi_request_event_processor
 
 
 def _got_request_exception(request=None, **kwargs):
@@ -666,20 +678,29 @@ def _set_db_data(span, cursor_or_db):
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
 
-    if (
+    # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
+    # actually has a `connection` and the `connection` has a `get_dsn_parameters`
+    # attribute, only to throw an error once you actually want to call it.
+    # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
+    # function.
+    is_psycopg2 = (
         hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
         and inspect.isfunction(cursor_or_db.connection.get_dsn_parameters)
-    ):
-        # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
-        # actually has a `connection` and the `connection` has a `get_dsn_parameters`
-        # attribute, only to throw an error once you actually want to call it.
-        # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
-        # function.
+    )
+    if is_psycopg2:
         connection_params = cursor_or_db.connection.get_dsn_parameters()
-
     else:
-        connection_params = db.get_connection_params()
+        is_psycopg3 = (
+            hasattr(cursor_or_db, "connection")
+            and hasattr(cursor_or_db.connection, "info")
+            and hasattr(cursor_or_db.connection.info, "get_parameters")
+            and inspect.isfunction(cursor_or_db.connection.info.get_parameters)
+        )
+        if is_psycopg3:
+            connection_params = cursor_or_db.connection.info.get_parameters()
+        else:
+            connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
     if db_name is not None:

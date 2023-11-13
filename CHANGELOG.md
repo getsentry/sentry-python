@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.35.0
+
+### Various fixes & improvements
+
+- **Updated gRPC integration:** Asyncio interceptors and easier setup (#2369) by @fdellekart
+
+  Our gRPC integration now instruments incoming unary-unary grpc requests and outgoing unary-unary, unary-stream grpc requests using grpcio channels. Everything works now for sync and async code.
+
+  Before this release you had to add Sentry interceptors by hand to your gRPC code, now the only thing you need to do is adding the `GRPCIntegration` to you `sentry_sdk_init()` call. (See [documentation](https://docs.sentry.io/platforms/python/integrations/grpc/) for more information):
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.grpc import GRPCIntegration
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      integrations=[
+          GRPCIntegration(),
+      ],
+  )
+  ```
+  The old way still works, but we strongly encourage you to update your code to the way described above.
+
+- Python 3.12: Replace deprecated datetime functions (#2502) by @sentrivana
+- Metrics: Unify datetime format (#2409) by @mitsuhiko
+- Celery: Set correct data in `check_in`s (#2500) by @antonpirker
+- Celery: Read timezone for Crons monitors from `celery_schedule` if existing (#2497) by @antonpirker
+- Django: Removing redundant code in Django tests (#2491) by @vagi8
+- Django: Make reading the request body work in Django ASGI apps. (#2495) by @antonpirker
+- FastAPI: Use wraps on fastapi request call wrapper (#2476) by @nkaras
+- Fix: Probe for psycopg2 and psycopg3 parameters function. (#2492) by @antonpirker
+- Fix: Remove unnecessary TYPE_CHECKING alias (#2467) by @rafrafek
+
+## 1.34.0
+
+### Various fixes & improvements
+- Added Python 3.12 support (#2471, #2483)
+- Handle missing `connection_kwargs` in `patch_redis_client` (#2482) by @szokeasaurusrex
+- Run common test suite on Python 3.12 (#2479) by @sentrivana
+
+## 1.33.1
+
+### Various fixes & improvements
+
+- Make parse_version work in utils.py itself. (#2474) by @antonpirker
+
+## 1.33.0
+
+### Various fixes & improvements
+
+- New: Added `error_sampler` option (#2456) by @szokeasaurusrex
+- Python 3.12: Detect interpreter in shutdown state on thread spawn (#2468) by @mitsuhiko
+- Patch eventlet under Sentry SDK (#2464) by @szokeasaurusrex
+- Mitigate CPU spikes when sending lots of events with lots of data (#2449) by @antonpirker
+- Make `debug` option also configurable via environment (#2450) by @antonpirker
+- Make sure `get_dsn_parameters` is an actual function (#2441) by @sentrivana
+- Bump pytest-localserver, add compat comment (#2448) by @sentrivana
+- AWS Lambda: Update compatible runtimes for AWS Lambda layer (#2453) by @antonpirker
+- AWS Lambda: Load AWS Lambda secrets in Github CI (#2153) by @antonpirker
+- Redis: Connection attributes in `redis` database spans (#2398) by @antonpirker
+- Falcon: Falcon integration checks response status before reporting error (#2465) by @szokeasaurusrex
+- Quart: Support Quart 0.19 onwards (#2403) by @pgjones
+- Sanic: Sanic integration initial version (#2419) by @szokeasaurusrex
+- Django: Fix parsing of Django `path` patterns (#2452) by @sentrivana
+- Django: Add Django 4.2 to test suite (#2462) by @sentrivana
+- Polish changelog (#2434) by @sentrivana
+- Update CONTRIBUTING.md (#2443) by @krishvsoni
+- Update README.md (#2435) by @sentrivana
+
 ## 1.32.0
 
 ### Various fixes & improvements

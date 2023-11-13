@@ -235,7 +235,15 @@ if VERSION >= (3, 1):
     })
     return HttpResponse(response)"""
     )
+
+    exec(
+        """@csrf_exempt
+def post_echo_async(request):
+    sentry_sdk.capture_message("hi")
+    return HttpResponse(request.body)"""
+    )
 else:
     async_message = None
     my_async_view = None
     thread_ids_async = None
+    post_echo_async = None

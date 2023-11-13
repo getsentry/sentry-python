@@ -82,6 +82,11 @@ if views.thread_ids_async is not None:
         path("async/thread_ids", views.thread_ids_async, name="thread_ids_async")
     )
 
+if views.post_echo_async is not None:
+    urlpatterns.append(
+        path("post_echo_async", views.post_echo_async, name="post_echo_async")
+    )
+
 # rest framework
 try:
     urlpatterns.append(
