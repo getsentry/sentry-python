@@ -144,8 +144,14 @@ def setup_integrations(
                     logger.debug(
                         "Did not enable default integration %s: %s", identifier, e
                     )
+                else:
+                    _installed_integrations.add(identifier)
 
-                _installed_integrations.add(identifier)
+    integrations = {
+        identifier: integration
+        for identifier, integration in iteritems(integrations)
+        if identifier in _installed_integrations
+    }
 
     for identifier in integrations:
         logger.debug("Enabling integration %s", identifier)

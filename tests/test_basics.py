@@ -59,8 +59,8 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
-        # Ignore redis in the test case, because it is installed as a
-        # dependency for running tests, and therefore always enabled.
+        # Ignore redis in the test case, because it does not raise a DidNotEnable
+        # exception on import; rather, it raises the exception upon enabling.
         if _AUTO_ENABLING_INTEGRATIONS[redis_index] == import_string:
             continue
 
