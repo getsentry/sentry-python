@@ -373,6 +373,7 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
     ],
 )
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
