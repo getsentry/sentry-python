@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk._compat import datetime_utcnow, PY2
+from sentry_sdk._compat import datetime_utcnow, utc_from_timestamp, PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -147,9 +147,9 @@ class Span(object):
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         if start_timestamp is None:
-            start_timestamp = datetime.utcnow()
+            start_timestamp = datetime_utcnow()
         elif isinstance(start_timestamp, float):
-            start_timestamp = datetime.utcfromtimestamp(start_timestamp)
+            start_timestamp = utc_from_timestamp(start_timestamp)
         self.start_timestamp = start_timestamp
         try:
             # profiling depends on this value and requires that
@@ -468,7 +468,7 @@ class Span(object):
         try:
             if end_timestamp:
                 if isinstance(end_timestamp, float):
-                    end_timestamp = datetime.utcfromtimestamp(end_timestamp)
+                    end_timestamp = utc_from_timestamp(end_timestamp)
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
