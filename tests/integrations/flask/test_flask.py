@@ -14,7 +14,11 @@ from flask import (
 )
 from flask.views import View
 from flask_login import LoginManager, login_user
-from werkzeug.wrappers.request import UnsupportedMediaType
+
+try:
+    from werkzeug.wrappers.request import UnsupportedMediaType
+except ImportError:
+    UnsupportedMediaType = None
 
 import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
@@ -560,9 +564,12 @@ def test_cli_commands_raise(app):
     def foo():
         1 / 0
 
+    def create_app(*_):
+        return app
+
     with pytest.raises(ZeroDivisionError):
         app.cli.main(
-            args=["foo"], prog_name="myapp", obj=ScriptInfo(create_app=lambda _: app)
+            args=["foo"], prog_name="myapp", obj=ScriptInfo(create_app=create_app)
         )
 
 
