@@ -11,7 +11,7 @@ from sentry_sdk.integrations.django import DJANGO_VERSION
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, List, Tuple, Union
+    from typing import Any, Callable, Union
 
 
 def _get_receiver_name(receiver):
@@ -52,7 +52,7 @@ def patch_signals():
     old_live_receivers = Signal._live_receivers
 
     def _sentry_live_receivers(self, sender):
-        # type: (Signal, Any) -> Union[Tuple[List[Callable[..., Any]], List[Callable[..., Any]]], List[Callable[..., Any]]]
+        # type: (Signal, Any) -> Union[tuple[list[Callable[..., Any]], list[Callable[..., Any]]], list[Callable[..., Any]]]
         hub = Hub.current
 
         if DJANGO_VERSION >= (5, 0):

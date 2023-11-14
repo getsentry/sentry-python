@@ -20,7 +20,8 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Union
+    from collections.abc import Callable
+    from typing import Any, Union
 
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 def _make_asgi_request_event_processor(request):
     # type: (ASGIRequest) -> EventProcessor
     def asgi_request_event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (dict[str, Any], dict[str, Any]) -> dict[str, Any]
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
