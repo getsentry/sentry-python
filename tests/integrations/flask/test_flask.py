@@ -1,10 +1,9 @@
 import json
 import re
-import pytest
 import logging
-
 from io import BytesIO
 
+import pytest
 from flask import (
     Flask,
     Response,
@@ -14,9 +13,10 @@ from flask import (
     render_template_string,
 )
 from flask.views import View
-
 from flask_login import LoginManager, login_user
+from werkzeug.wrappers.request import UnsupportedMediaType
 
+import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
     set_tag,
     configure_scope,
@@ -26,7 +26,6 @@ from sentry_sdk import (
     Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
@@ -340,7 +339,11 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     def index():
         assert request.form["foo"] == data["foo"]
         assert not request.get_data()
-        assert not request.get_json()
+        try:
+            assert not request.get_json()
+        except UnsupportedMediaType:
+            # flask/werkzeug 3
+            pass
         capture_message("hi")
         return "ok"
 
@@ -372,7 +375,11 @@ def test_flask_formdata_request_appear_transaction_body(
         assert request.form["username"] == data["username"]
         assert request.form["age"] == data["age"]
         assert not request.get_data()
-        assert not request.get_json()
+        try:
+            assert not request.get_json()
+        except UnsupportedMediaType:
+            # flask/werkzeug 3
+            pass
         set_tag("view", "yes")
         capture_message("hi")
         return "ok"
@@ -405,7 +412,11 @@ def test_flask_too_large_raw_request(sentry_init, input_char, capture_events, ap
             assert request.get_data() == data
         else:
             assert request.get_data() == data.encode("ascii")
-        assert not request.get_json()
+        try:
+            assert not request.get_json()
+        except UnsupportedMediaType:
+            # flask/werkzeug 3
+            pass
         capture_message("hi")
         return "ok"
 
@@ -431,7 +442,11 @@ def test_flask_files_and_form(sentry_init, capture_events, app):
     def index():
         assert list(request.form) == ["foo"]
         assert list(request.files) == ["file"]
-        assert not request.get_json()
+        try:
+            assert not request.get_json()
+        except UnsupportedMediaType:
+            # flask/werkzeug 3
+            pass
         capture_message("hi")
         return "ok"
 
