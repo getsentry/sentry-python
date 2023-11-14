@@ -11,7 +11,8 @@ from sentry_sdk.integrations.django import DJANGO_VERSION
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union
+    from collections.abc import Callable
+    from typing import Any, Union
 
 
 def _get_receiver_name(receiver):
