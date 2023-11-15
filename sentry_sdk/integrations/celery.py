@@ -133,6 +133,14 @@ def _now_seconds_since_epoch():
     return time.time()
 
 
+class _noop_mgr:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return None
+
+
 def _wrap_apply_async(f):
     # type: (F) -> F
     @wraps(f)
@@ -154,11 +162,22 @@ def _wrap_apply_async(f):
         if not propagate_traces:
             return f(*args, **kwargs)
 
+        try:
+            task_started_from_beat = args[1][0] == "BEAT"
+        except IndexError:
+            task_started_from_beat = False
+
+        task = args[0]
+
         with hub.start_span(
-            op=OP.QUEUE_SUBMIT_CELERY, description=args[0].name
-        ) as span:
+            op=OP.QUEUE_SUBMIT_CELERY, description=task.name
+        ) if not task_started_from_beat else _noop_mgr() as span:
             with capture_internal_exceptions():
-                headers = dict(hub.iter_trace_propagation_headers(span))
+                headers = (
+                    dict(hub.iter_trace_propagation_headers(span))
+                    if span is not None
+                    else {}
+                )
                 if integration.monitor_beat_tasks:
                     headers.update(
                         {
