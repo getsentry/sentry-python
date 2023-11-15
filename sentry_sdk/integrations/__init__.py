@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 _installer_lock = Lock()
-_installed_integrations = set()  # type: Set[str]
+_install_attempted_integrations = set()  # type: Set[str]
 
 
 def _generate_default_integrations_iterator(
@@ -119,9 +119,10 @@ def setup_integrations(
                 integrations[instance.identifier] = instance
                 used_as_default_integration.add(instance.identifier)
 
+    installed_integrations = set()  # type: set[str]
     for identifier, integration in iteritems(integrations):
         with _installer_lock:
-            if identifier not in _installed_integrations:
+            if identifier not in _install_attempted_integrations:
                 logger.debug(
                     "Setting up previously not enabled integration %s", identifier
                 )
@@ -145,12 +146,14 @@ def setup_integrations(
                         "Did not enable default integration %s: %s", identifier, e
                     )
                 else:
-                    _installed_integrations.add(identifier)
+                    installed_integrations.add(identifier)
+
+                _install_attempted_integrations.add(identifier)
 
     integrations = {
         identifier: integration
         for identifier, integration in iteritems(integrations)
-        if identifier in _installed_integrations
+        if identifier in installed_integrations
     }
 
     for identifier in integrations:
