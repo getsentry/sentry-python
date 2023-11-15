@@ -133,7 +133,7 @@ def _now_seconds_since_epoch():
     return time.time()
 
 
-class _noop_mgr:
+class NoOpMgr:
     def __enter__(self):
         return None
 
@@ -171,7 +171,7 @@ def _wrap_apply_async(f):
 
         with hub.start_span(
             op=OP.QUEUE_SUBMIT_CELERY, description=task.name
-        ) if not task_started_from_beat else _noop_mgr() as span:
+        ) if not task_started_from_beat else NoOpMgr() as span:
             with capture_internal_exceptions():
                 headers = (
                     dict(hub.iter_trace_propagation_headers(span))
