@@ -582,9 +582,6 @@ def test_apply_async_from_beat_no_span(sentry_init):
 
     def dummy_function(*args, **kwargs):
         headers = kwargs.get("headers")
-        import ipdb
-
-        ipdb.set_trace()
         assert "sentry-trace" not in headers
         assert "baggage" not in headers
 
