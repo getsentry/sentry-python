@@ -3,7 +3,7 @@
 # Helper script to clean up AWS Lambda functions created
 # by the test suite (tests/integrations/aws_lambda/test_aws.py).
 #
-# This will delete all Lambda functions named `test_*`.
+# This will delete all Lambda functions named `test_function_*`.
 #
 
 export AWS_DEFAULT_REGION="us-east-1"
