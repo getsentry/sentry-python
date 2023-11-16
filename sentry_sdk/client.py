@@ -459,11 +459,11 @@ class _Client(object):
         # type: (...) -> bool
         sampler = self.options.get("error_sampler", None)
 
+        sample_rate = self.options["sample_rate"]
+
         if callable(sampler):
             with capture_internal_exceptions():
                 sample_rate = sampler(event, hint)
-        else:
-            sample_rate = self.options["sample_rate"]
 
         try:
             not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
