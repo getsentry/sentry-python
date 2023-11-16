@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
 
+    from sentry_sdk.tracing import Span
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
@@ -171,9 +172,13 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        with hub.start_span(
-            op=OP.QUEUE_SUBMIT_CELERY, description=task.name
-        ) if not task_started_from_beat else NoOpMgr() as span:
+        span_mgr = (
+            hub.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            if not task_started_from_beat
+            else NoOpMgr()
+        )  # type: Union[Span, NoOpMgr]
+
+        with span_mgr as span:
             with capture_internal_exceptions():
                 headers = (
                     dict(hub.iter_trace_propagation_headers(span))
