@@ -135,9 +135,11 @@ def _now_seconds_since_epoch():
 
 class NoOpMgr:
     def __enter__(self):
+        # type: () -> None
         return None
 
     def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
         return None
 
 
