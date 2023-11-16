@@ -3,8 +3,9 @@ import time
 from chalice import Chalice, BadRequestError
 from chalice.local import LambdaContext, LocalGateway
 
-from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
 from sentry_sdk import capture_message
+from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
+from sentry_sdk.utils import parse_version
 
 from pytest_chalice.handlers import RequestHandler
 
@@ -108,7 +109,7 @@ def test_scheduled_event(app, lambda_context_args):
     assert str(exc_info.value) == "schedule event!"
 
 
-@pytest.mark.skipif(CHALICE_VERSION >= (1, 28))
+@pytest.mark.skipif(parse_version(CHALICE_VERSION) >= (1, 28))
 def test_bad_request_old(client: RequestHandler) -> None:
     response = client.get("/badrequest")
 
@@ -119,7 +120,7 @@ def test_bad_request_old(client: RequestHandler) -> None:
     }
 
 
-@pytest.mark.skipif(CHALICE_VERSION < (1, 28))
+@pytest.mark.skipif(parse_version(CHALICE_VERSION) < (1, 28))
 def test_bad_request(client: RequestHandler) -> None:
     response = client.get("/badrequest")
 
