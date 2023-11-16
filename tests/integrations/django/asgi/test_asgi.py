@@ -1,4 +1,6 @@
+import base64
 import json
+import os
 
 import django
 import pytest
@@ -370,36 +372,139 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
-@pytest.mark.parametrize("application", APPS)
+TEST_BODY_PATH = reverse("post_echo_async")
+PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image.png")
+BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
+    "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
+).encode(
+    "utf-8"
+)
+BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
+
+
 @pytest.mark.parametrize(
-    "body,expected_return_data",
+    "send_default_pii,method,headers,path,body,expected_data",
     [
         (
+            True,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            TEST_BODY_PATH,
+            b"",
+            None,
+        ),
+        (
+            True,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            TEST_BODY_PATH,
+            b"some raw text body",
+            "",
+        ),
+        (
+            True,
+            "POST",
+            [(b"content-type", b"application/json")],
+            TEST_BODY_PATH,
             b'{"username":"xyz","password":"xyz"}',
             {"username": "xyz", "password": "xyz"},
         ),
-        (b"hello", ""),
-        (b"", None),
+        (
+            True,
+            "POST",
+            [(b"content-type", b"application/xml")],
+            TEST_BODY_PATH,
+            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
+            "",
+        ),
+        (
+            True,
+            "POST",
+            [
+                (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
+                (b"content-length", BODY_FORM_CONTENT_LENGTH),
+            ],
+            TEST_BODY_PATH,
+            BODY_FORM,
+            None,
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            TEST_BODY_PATH,
+            b"",
+            None,
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            TEST_BODY_PATH,
+            b"some raw text body",
+            "",
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"application/json")],
+            TEST_BODY_PATH,
+            b'{"username":"xyz","password":"xyz"}',
+            {"username": "xyz", "password": "[Filtered]"},
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"application/xml")],
+            TEST_BODY_PATH,
+            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
+            "",
+        ),
+        (
+            False,
+            "POST",
+            [
+                (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
+                (b"content-length", BODY_FORM_CONTENT_LENGTH),
+            ],
+            TEST_BODY_PATH,
+            BODY_FORM,
+            None,
+        ),
     ],
 )
+@pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 @pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_asgi_request_body(
-    sentry_init, capture_envelopes, application, body, expected_return_data
+    sentry_init,
+    capture_envelopes,
+    application,
+    send_default_pii,
+    method,
+    headers,
+    path,
+    body,
+    expected_data,
 ):
-    sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
+    sentry_init(
+        send_default_pii=send_default_pii,
+        integrations=[
+            DjangoIntegration(),
+        ],
+    )
 
     envelopes = capture_envelopes()
 
     comm = HttpCommunicator(
         application,
-        method="POST",
+        method=method,
+        headers=headers,
         path=reverse("post_echo_async"),
         body=body,
-        headers=[(b"content-type", b"application/json")],
     )
     response = await comm.get_response()
 
@@ -409,7 +514,7 @@ async def test_asgi_request_body(
     (envelope,) = envelopes
     event = envelope.get_event()
 
-    if expected_return_data is not None:
-        assert event["request"]["data"] == expected_return_data
+    if expected_data is not None:
+        assert event["request"]["data"] == expected_data
     else:
         assert "data" not in event["request"]
