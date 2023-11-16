@@ -8,6 +8,8 @@ Since this file contains `async def` it is conditionally imported in
 
 import asyncio
 
+from django.core.handlers.wsgi import WSGIRequest
+
 from sentry_sdk import Hub, _functools
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
@@ -16,26 +18,21 @@ from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.utils import capture_internal_exceptions
 
-from django.core.handlers.wsgi import WSGIRequest
-
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Union
-    from typing import Callable
+    from collections.abc import Callable
+    from typing import Any, Union
 
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
 
-    from sentry_sdk.integrations.django import DjangoIntegration
     from sentry_sdk._types import EventProcessor
 
 
-def _make_asgi_request_event_processor(request, integration):
-    # type: (ASGIRequest, DjangoIntegration) -> EventProcessor
+def _make_asgi_request_event_processor(request):
+    # type: (ASGIRequest) -> EventProcessor
     def asgi_request_event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (dict[str, Any], dict[str, Any]) -> dict[str, Any]
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -103,9 +100,7 @@ def patch_django_asgi_handler_impl(cls):
                 # (otherwise Django closes the body stream and makes it impossible to read it again)
                 _ = request.body
 
-                scope.add_event_processor(
-                    _make_asgi_request_event_processor(request, integration)
-                )
+                scope.add_event_processor(_make_asgi_request_event_processor(request))
 
                 return request, error_response
 

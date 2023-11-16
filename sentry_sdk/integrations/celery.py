@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
 
+    from sentry_sdk.tracing import Span
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
@@ -133,6 +134,16 @@ def _now_seconds_since_epoch():
     return time.time()
 
 
+class NoOpMgr:
+    def __enter__(self):
+        # type: () -> None
+        return None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
+        return None
+
+
 def _wrap_apply_async(f):
     # type: (F) -> F
     @wraps(f)
@@ -154,11 +165,26 @@ def _wrap_apply_async(f):
         if not propagate_traces:
             return f(*args, **kwargs)
 
-        with hub.start_span(
-            op=OP.QUEUE_SUBMIT_CELERY, description=args[0].name
-        ) as span:
+        try:
+            task_started_from_beat = args[1][0] == "BEAT"
+        except IndexError:
+            task_started_from_beat = False
+
+        task = args[0]
+
+        span_mgr = (
+            hub.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            if not task_started_from_beat
+            else NoOpMgr()
+        )  # type: Union[Span, NoOpMgr]
+
+        with span_mgr as span:
             with capture_internal_exceptions():
-                headers = dict(hub.iter_trace_propagation_headers(span))
+                headers = (
+                    dict(hub.iter_trace_propagation_headers(span))
+                    if span is not None
+                    else {}
+                )
                 if integration.monitor_beat_tasks:
                     headers.update(
                         {
