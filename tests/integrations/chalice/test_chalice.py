@@ -108,7 +108,7 @@ def test_scheduled_event(app, lambda_context_args):
     assert str(exc_info.value) == "schedule event!"
 
 
-@pytest.skipif(CHALICE_VERSION >= (1, 28))
+@pytest.mark.skipif(CHALICE_VERSION >= (1, 28))
 def test_bad_request_old(client: RequestHandler) -> None:
     response = client.get("/badrequest")
 
@@ -119,7 +119,7 @@ def test_bad_request_old(client: RequestHandler) -> None:
     }
 
 
-@pytest.skipif(CHALICE_VERSION < (1, 28))
+@pytest.mark.skipif(CHALICE_VERSION < (1, 28))
 def test_bad_request(client: RequestHandler) -> None:
     response = client.get("/badrequest")
 
