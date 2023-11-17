@@ -68,9 +68,9 @@ class RequestExtractor(object):
             data = AnnotatedValue.removed_because_over_size_limit()
         else:
             # First read the raw body data
-            # It is important to check this first because if it is Django
-            # it will cache the body and then we can read it
-            # over and over again in parsed_body() (or json() or wherever) below.
+            # It is important to read this first because if it is Django
+            # it will cache the body and then we can read the cached version
+            # again in parsed_body() (or json() or wherever).
             raw_data = self.raw_data()
 
             parsed_body = self.parsed_body()
