@@ -7,7 +7,6 @@ Since this file contains `async def` it is conditionally imported in
 """
 
 import asyncio
-from copy import copy
 
 from django.core.handlers.wsgi import WSGIRequest
 
@@ -95,16 +94,6 @@ def patch_django_asgi_handler_impl(cls):
 
             with hub.configure_scope() as scope:
                 request, error_response = old_create_request(self, *args, **kwargs)
-
-                try:
-                    # Make a copy of the body, so we can read it leater
-                    # (Django since 4.1 closes the body stream after reading it)
-                    request._sentry_body = copy(request._stream._file)
-                except TypeError:
-                    # The body is a file, so we do not need it
-                    # because we never collect uploaded files anyway
-                    pass
-
                 scope.add_event_processor(_make_asgi_request_event_processor(request))
 
                 return request, error_response

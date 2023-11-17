@@ -548,22 +548,7 @@ class DjangoRequestExtractor(RequestExtractor):
     def raw_data(self):
         # type: () -> bytes
         """Read the request body. we are extra careful here to not break the users code"""
-        if hasattr(self.request, "_sentry_body"):
-            data = self.request._sentry_body.read()
-            self.request._sentry_body.seek(0)
-            # del self.request._sentry_body
-            return data
-
-        elif hasattr(self.request, "_body"):
-            # Try if we can the cached _body from Django
-            return self.request._body
-
-        else:
-            # Try to read the request body directly
-            try:
-                return self.request.body
-            except OSError:
-                return b""
+        return self.request.body
 
     def form(self):
         # type: () -> QueryDict

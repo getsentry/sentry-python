@@ -67,10 +67,16 @@ class RequestExtractor(object):
         if not request_body_within_bounds(client, content_length):
             data = AnnotatedValue.removed_because_over_size_limit()
         else:
+            # First read the raw body data
+            # It is important to check this first because if it is Django
+            # it will cache the body and then we can read it
+            # over and over again in parsed_body() (or json() or wherever) below.
+            raw_data = self.raw_data()
+
             parsed_body = self.parsed_body()
             if parsed_body is not None:
                 data = parsed_body
-            elif self.raw_data():
+            elif raw_data is not None:
                 data = AnnotatedValue.removed_because_raw_data()
             else:
                 data = None

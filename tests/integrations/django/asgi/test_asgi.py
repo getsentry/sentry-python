@@ -390,7 +390,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             [(b"content-type", b"text/plain")],
             "post_echo_async",
             b"",
-            None,
+            "",
         ),
         (
             True,
@@ -425,7 +425,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             ],
             "post_echo_async",
             BODY_FORM,
-            None,
+            {"password": "hello123", "photo": "", "username": "Jane"},
         ),
         (
             False,
@@ -433,7 +433,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             [(b"content-type", b"text/plain")],
             "post_echo_async",
             b"",
-            None,
+            "",
         ),
         (
             False,
@@ -468,7 +468,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             ],
             "post_echo_async",
             BODY_FORM,
-            None,
+            {"password": "[Filtered]", "photo": "", "username": "Jane"},
         ),
     ],
 )
