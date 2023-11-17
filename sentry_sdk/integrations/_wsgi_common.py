@@ -10,7 +10,7 @@ from sentry_sdk._types import TYPE_CHECKING
 try:
     from django.http.request import RawPostDataException  # type: ignore
 except ImportError:
-    RawPostDataException = Exception
+    RawPostDataException = None
 
 
 if TYPE_CHECKING:
