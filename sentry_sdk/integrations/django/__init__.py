@@ -547,7 +547,6 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def raw_data(self):
         # type: () -> bytes
-        """Read the request body. we are extra careful here to not break the users code"""
         return self.request.body
 
     def form(self):
