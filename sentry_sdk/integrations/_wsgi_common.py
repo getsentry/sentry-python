@@ -76,7 +76,7 @@ class RequestExtractor(object):
             parsed_body = self.parsed_body()
             if parsed_body is not None:
                 data = parsed_body
-            elif raw_data is not None:
+            elif raw_data:
                 data = AnnotatedValue.removed_because_raw_data()
             else:
                 data = None

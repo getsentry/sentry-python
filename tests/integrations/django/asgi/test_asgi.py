@@ -390,7 +390,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             [(b"content-type", b"text/plain")],
             "post_echo_async",
             b"",
-            "",
+            None,
         ),
         (
             True,
@@ -433,7 +433,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             [(b"content-type", b"text/plain")],
             "post_echo_async",
             b"",
-            "",
+            None,
         ),
         (
             False,
