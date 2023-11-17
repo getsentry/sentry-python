@@ -7,6 +7,11 @@ from sentry_sdk._compat import text_type, iteritems
 
 from sentry_sdk._types import TYPE_CHECKING
 
+try:
+    from django.http.request import RawPostDataException  # type: ignore
+except ImportError:
+    RawPostDataException = Exception
+
 
 if TYPE_CHECKING:
     import sentry_sdk
@@ -75,7 +80,7 @@ class RequestExtractor(object):
             raw_data = None
             try:
                 raw_data = self.raw_data()
-            except ValueError:
+            except (RawPostDataException, ValueError):
                 # If DjangoRestFramework is used it already read the body for us
                 # so reading it here will fail. We can ignore this.
                 pass
