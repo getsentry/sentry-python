@@ -372,7 +372,6 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
-TEST_BODY_PATH = reverse("post_echo_async")
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image.png")
 BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
@@ -383,13 +382,13 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 
 
 @pytest.mark.parametrize(
-    "send_default_pii,method,headers,path,body,expected_data",
+    "send_default_pii,method,headers,url_name,body,expected_data",
     [
         (
             True,
             "POST",
             [(b"content-type", b"text/plain")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b"",
             None,
         ),
@@ -397,7 +396,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             True,
             "POST",
             [(b"content-type", b"text/plain")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b"some raw text body",
             "",
         ),
@@ -405,7 +404,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             True,
             "POST",
             [(b"content-type", b"application/json")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b'{"username":"xyz","password":"xyz"}',
             {"username": "xyz", "password": "xyz"},
         ),
@@ -413,7 +412,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             True,
             "POST",
             [(b"content-type", b"application/xml")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
             "",
         ),
@@ -424,7 +423,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
                 (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
                 (b"content-length", BODY_FORM_CONTENT_LENGTH),
             ],
-            TEST_BODY_PATH,
+            "post_echo_async",
             BODY_FORM,
             None,
         ),
@@ -432,7 +431,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             False,
             "POST",
             [(b"content-type", b"text/plain")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b"",
             None,
         ),
@@ -440,7 +439,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             False,
             "POST",
             [(b"content-type", b"text/plain")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b"some raw text body",
             "",
         ),
@@ -448,7 +447,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             False,
             "POST",
             [(b"content-type", b"application/json")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b'{"username":"xyz","password":"xyz"}',
             {"username": "xyz", "password": "[Filtered]"},
         ),
@@ -456,7 +455,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             False,
             "POST",
             [(b"content-type", b"application/xml")],
-            TEST_BODY_PATH,
+            "post_echo_async",
             b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
             "",
         ),
@@ -467,7 +466,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
                 (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
                 (b"content-length", BODY_FORM_CONTENT_LENGTH),
             ],
-            TEST_BODY_PATH,
+            "post_echo_async",
             BODY_FORM,
             None,
         ),
@@ -486,7 +485,7 @@ async def test_asgi_request_body(
     send_default_pii,
     method,
     headers,
-    path,
+    url_name,
     body,
     expected_data,
 ):
@@ -503,7 +502,7 @@ async def test_asgi_request_body(
         application,
         method=method,
         headers=headers,
-        path=reverse("post_echo_async"),
+        path=reverse(url_name),
         body=body,
     )
     response = await comm.get_response()
