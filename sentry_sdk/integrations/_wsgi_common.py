@@ -7,6 +7,11 @@ from sentry_sdk._compat import text_type, iteritems
 
 from sentry_sdk._types import TYPE_CHECKING
 
+try:
+    from rest_framework.request import Request as RestFrameworkRequest
+except ImportError:
+    RestFrameworkRequest = None
+
 if TYPE_CHECKING:
     import sentry_sdk
 
@@ -71,7 +76,11 @@ class RequestExtractor(object):
             # It is important to read this first because if it is Django
             # it will cache the body and then we can read the cached version
             # again in parsed_body() (or json() or wherever).
-            raw_data = self.raw_data()
+            # If DjangoRestFramework is used we do not need to
+            # read it upfront, because it will do it for us.
+            raw_data = None
+            if type(self.request) != RestFrameworkRequest:
+                raw_data = self.raw_data()
 
             parsed_body = self.parsed_body()
             if parsed_body is not None:
