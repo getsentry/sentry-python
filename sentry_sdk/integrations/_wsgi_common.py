@@ -8,7 +8,7 @@ from sentry_sdk._compat import text_type, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    from rest_framework.request import Request as RestFrameworkRequest
+    from rest_framework.request import Request as RestFrameworkRequest  # type: ignore[import-not-found]
 except ImportError:
     RestFrameworkRequest = None
 
