@@ -833,19 +833,15 @@ def test_template_exception(
 
 
 @pytest.mark.parametrize(
-    "route",
-    [
-        # "rest_framework_exc",
-        "rest_framework_read_body_and_exc",
-    ],
+    "route", ["rest_framework_exc", "rest_framework_read_body_and_exc"]
 )
 @pytest.mark.parametrize(
     "ct,body",
     [
         ["application/json", {"foo": "bar"}],
-        # ["application/json", 1],
-        # ["application/json", "foo"],
-        # ["application/x-www-form-urlencoded", {"foo": "bar"}],
+        ["application/json", 1],
+        ["application/json", "foo"],
+        ["application/x-www-form-urlencoded", {"foo": "bar"}],
     ],
 )
 def test_rest_framework_basic(
