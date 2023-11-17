@@ -8,7 +8,7 @@ from sentry_sdk._compat import text_type, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    from django.http.request import RawPostDataException  # type: ignore[import-not-found]
+    from django.http.request import RawPostDataException
 except ImportError:
     RawPostDataException = None
 
