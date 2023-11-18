@@ -18,7 +18,11 @@ from sentry_sdk import (
     Hub,
 )
 from sentry_sdk._compat import reraise
-from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
+from sentry_sdk.integrations import (
+    _AUTO_ENABLING_INTEGRATIONS,
+    Integration,
+    setup_integrations,
+)
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.scope import (  # noqa: F401
@@ -39,6 +43,24 @@ def _redis_installed():  # type: () -> bool
         return False
 
     return True
+
+
+class NoOpIntegration(Integration):
+    """
+    A simple no-op integration for testing purposes.
+    """
+
+    identifier = "noop"
+
+    @staticmethod
+    def setup_once():  # type: () -> None
+        pass
+
+    def __eq__(self, __value):  # type: (object) -> bool
+        """
+        All instances of NoOpIntegration should be considered equal to each other.
+        """
+        return type(__value) == type(self)
 
 
 def test_processors(sentry_init, capture_events):
@@ -706,3 +728,11 @@ def test_redis_disabled_when_not_installed(sentry_init):
     sentry_init()
 
     assert Hub.current.get_integration(RedisIntegration) is None
+
+
+def test_multiple_setup_integrations_calls():
+    first_call_return = setup_integrations([NoOpIntegration()], with_defaults=False)
+    assert first_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
+
+    second_call_return = setup_integrations([NoOpIntegration()], with_defaults=False)
+    assert second_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
