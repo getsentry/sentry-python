@@ -8,6 +8,7 @@ class NoOpIntegration(Integration):
 
     identifier = "noop"
 
+    @staticmethod
     def setup_once():  # type: () -> None
         pass
 
