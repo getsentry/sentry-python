@@ -506,8 +506,9 @@ async def test_asgi_request_body(
         body=body,
     )
     response = await comm.get_response()
-
     assert response["status"] == 200
+
+    await comm.wait()
     assert response["body"] == body
 
     (envelope,) = envelopes
