@@ -102,6 +102,7 @@ class Span(object):
         "hub",
         "_context_manager_state",
         "_containing_transaction",
+        "_local_aggregator",
     )
 
     def __new__(cls, **kwargs):
@@ -162,6 +163,7 @@ class Span(object):
         self.timestamp = None  # type: Optional[datetime]
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
+        self._local_aggregator = None  # type: Optional[LocalAggregator]
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -169,6 +171,13 @@ class Span(object):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
+
+    def _get_local_aggregator(self):
+        # type: (...) -> LocalAggregator
+        rv = self._local_aggregator
+        if rv is None:
+            rv = self._local_aggregator = LocalAggregator()
+        return rv
 
     def __repr__(self):
         # type: () -> str
@@ -1002,3 +1011,4 @@ from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
+from sentry_sdk.metrics import LocalAggregator

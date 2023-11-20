@@ -303,6 +303,36 @@ TIMING_FUNCTIONS = {
 }
 
 
+class LocalAggregator(object):
+    __slots__ = ("_measurements",)
+
+    def __init__(self):
+        self._measurements = {}  # type: Dict[Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]]
+
+    def add(
+        self,
+        ty,  # type: MetricType
+        key,  # type: str
+        value,  # type: float
+        unit,  # type: MeasurementUnit
+        tags,  # type: Optional[MetricTags]
+    ):
+        export_key = "%s:%s@%s" % (ty, key, unit)
+        bucket_key = (export_key, _serialize_tags(tags))
+        
+        old = self._measurements.get(bucket_key)
+        if old is not None:
+            v_min, v_max, v_count, v_sum = old
+            v_min = min(v_min, value)
+            v_max = min(v_max, value)
+            v_count += 1
+            v_sum += value
+        else:
+            v_min = v_max = v_sum = value
+            v_count = 1
+        self._measurements[bucket_key] = (v_min, v_max, v_count, v_sum)
+
+
 class MetricsAggregator(object):
     ROLLUP_IN_SECONDS = 10.0
     MAX_WEIGHT = 100000
@@ -410,9 +440,9 @@ class MetricsAggregator(object):
         tags,  # type: Optional[MetricTags]
         timestamp=None,  # type: Optional[Union[float, datetime]]
     ):
-        # type: (...) -> None
+        # type: (...) -> int
         if not self._ensure_thread() or self._flusher is None:
-            return
+            return 0
 
         if timestamp is None:
             timestamp = time.time()
@@ -426,7 +456,7 @@ class MetricsAggregator(object):
             ty,
             key,
             unit,
-            self._serialize_tags(tags),
+            _serialize_tags(tags),
         )
 
         with self._lock:
@@ -439,10 +469,12 @@ class MetricsAggregator(object):
                 metric = local_buckets[bucket_key] = METRIC_TYPES[ty](value)
                 previous_weight = 0
 
-            self._buckets_total_weight += metric.weight - previous_weight
+            added = metric.weight - previous_weight
+            self._buckets_total_weight += added
 
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
+        return added
 
     def kill(self):
         # type: (...) -> None
@@ -479,35 +511,36 @@ class MetricsAggregator(object):
         self._capture_func(envelope)
         return envelope
 
-    def _serialize_tags(
-        self, tags  # type: Optional[MetricTags]
-    ):
-        # type: (...) -> MetricTagsInternal
-        if not tags:
-            return ()
 
-        rv = []
-        for key, value in tags.items():
-            # If the value is a collection, we want to flatten it.
-            if isinstance(value, (list, tuple)):
-                for inner_value in value:
-                    if inner_value is not None:
-                        rv.append((key, text_type(inner_value)))
-            elif value is not None:
-                rv.append((key, text_type(value)))
+def _serialize_tags(
+    tags  # type: Optional[MetricTags]
+):
+    # type: (...) -> MetricTagsInternal
+    if not tags:
+        return ()
 
-        # It's very important to sort the tags in order to obtain the
-        # same bucket key.
-        return tuple(sorted(rv))
+    rv = []
+    for key, value in tags.items():
+        # If the value is a collection, we want to flatten it.
+        if isinstance(value, (list, tuple)):
+            for inner_value in value:
+                if inner_value is not None:
+                    rv.append((key, text_type(inner_value)))
+        elif value is not None:
+            rv.append((key, text_type(value)))
+
+    # It's very important to sort the tags in order to obtain the
+    # same bucket key.
+    return tuple(sorted(rv))
 
 
 def _get_aggregator_and_update_tags(key, tags):
-    # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[MetricTags]]
+    # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
     """Returns the current metrics aggregator if there is one."""
     hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
-        return None, tags
+        return None, None, tags
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
@@ -515,19 +548,22 @@ def _get_aggregator_and_update_tags(key, tags):
 
     scope = hub.scope
     transaction_source = scope._transaction_info.get("source")
+    local_aggregator = None
     if transaction_source in GOOD_TRANSACTION_SOURCES:
         transaction = scope._transaction
         if transaction:
             updated_tags.setdefault("transaction", transaction)
+        if scope._span is not None:
+            local_aggregator = scope._span._get_local_aggregator()
 
     callback = client.options.get("_experiments", {}).get("before_emit_metric")
     if callback is not None:
         with recursion_protection() as in_metrics:
             if not in_metrics:
                 if not callback(key, updated_tags):
-                    return None, updated_tags
+                    return None, None, updated_tags
 
-    return client.metrics_aggregator, updated_tags
+    return client.metrics_aggregator, local_aggregator, updated_tags
 
 
 def incr(
@@ -539,9 +575,11 @@ def incr(
 ):
     # type: (...) -> None
     """Increments a counter."""
-    aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("c", key, value, unit, tags, timestamp)
+        if local_aggregator is not None:
+            local_aggregator.add("c", key, value, unit, tags)
 
 
 class _Timing(object):
@@ -576,10 +614,12 @@ class _Timing(object):
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
-        aggregator, tags = _get_aggregator_and_update_tags(self.key, self.tags)
+        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(self.key, self.tags)
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
             aggregator.add("d", self.key, elapsed, self.unit, tags, self.timestamp)
+            if local_aggregator is not None:
+                local_aggregator.add("d", self.key, elapsed, self.unit, tags)
 
     def __call__(self, f):
         # type: (Any) -> Any
@@ -613,9 +653,11 @@ def timing(
     - it can be used as a decorator
     """
     if value is not None:
-        aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
         if aggregator is not None:
             aggregator.add("d", key, value, unit, tags, timestamp)
+            if local_aggregator is not None:
+                local_aggregator.add("d", key, value, unit, tags)
     return _Timing(key, tags, timestamp, value, unit)
 
 
@@ -628,9 +670,11 @@ def distribution(
 ):
     # type: (...) -> None
     """Emits a distribution."""
-    aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("d", key, value, unit, tags, timestamp)
+        if local_aggregator is not None:
+            local_aggregator.add("d", key, value, unit, tags)
 
 
 def set(
@@ -642,9 +686,11 @@ def set(
 ):
     # type: (...) -> None
     """Emits a set."""
-    aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
-        aggregator.add("s", key, value, unit, tags, timestamp)
+        added = aggregator.add("s", key, value, unit, tags, timestamp)
+        if added > 0 and local_aggregator
+            local_aggregator.add("s", key, float(added), unit, tags)
 
 
 def gauge(
@@ -656,6 +702,8 @@ def gauge(
 ):
     # type: (...) -> None
     """Emits a gauge."""
-    aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         aggregator.add("g", key, value, unit, tags, timestamp)
+        if local_aggregator is not None:
+            local_aggregator.add("g", key, value, unit, tags)
