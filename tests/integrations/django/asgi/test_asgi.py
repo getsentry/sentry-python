@@ -381,6 +381,7 @@ BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="usern
 BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 
 
+@pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize(
     "send_default_pii,method,headers,url_name,body,expected_data",
     [
@@ -472,7 +473,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
         ),
     ],
 )
-@pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 # @pytest.mark.forked
 @pytest.mark.skipif(
