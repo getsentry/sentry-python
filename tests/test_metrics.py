@@ -97,6 +97,13 @@ def test_timing(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
+    loc = Hub.current.client.metrics_aggregator.code_locations
+    first_loc, = loc.values()
+    assert first_loc["filename"] == __file__
+    assert first_loc["line"] > 0
+    assert first_loc["module"] == "tests.test_metrics"
+    assert first_loc["function"] == "test_timing"
+
 
 def test_timing_decorator(sentry_init, capture_envelopes):
     sentry_init(
@@ -147,6 +154,18 @@ def test_timing_decorator(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
+    loc = Hub.current.client.metrics_aggregator.code_locations
+    assert len(loc) == 2
+    first_loc, second_loc = loc.values()
+    assert first_loc["filename"] == __file__
+    assert first_loc["line"] > 0
+    assert first_loc["module"] == "tests.test_metrics"
+    assert first_loc["function"] == "test_timing_decorator"
+    assert second_loc["filename"] == __file__
+    assert second_loc["line"] > 0
+    assert second_loc["module"] == "tests.test_metrics"
+    assert second_loc["function"] == "test_timing_decorator"
+
 
 def test_timing_basic(sentry_init, capture_envelopes):
     sentry_init(
@@ -179,6 +198,13 @@ def test_timing_basic(sentry_init, capture_envelopes):
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
+
+    loc = Hub.current.client.metrics_aggregator.code_locations
+    first_loc, = loc.values()
+    assert first_loc["filename"] == __file__
+    assert first_loc["line"] > 0
+    assert first_loc["module"] == "tests.test_metrics"
+    assert first_loc["function"] == "test_timing_basic"
 
 
 def test_distribution(sentry_init, capture_envelopes):
@@ -503,6 +529,13 @@ def test_tag_serialization(sentry_init, capture_envelopes):
         "release": "fun-release",
         "environment": "not-fun-env",
     }
+
+    loc = Hub.current.client.metrics_aggregator.code_locations
+    first_loc = next(iter(loc.values()))
+    assert first_loc["filename"] == __file__
+    assert first_loc["line"] > 0
+    assert first_loc["module"] == "tests.test_metrics"
+    assert first_loc["function"] == "test_tag_serialization"
 
 
 def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch):
