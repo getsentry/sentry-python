@@ -458,9 +458,6 @@ class _Client(object):
     ):
         # type: (...) -> bool
         error_sampler = self.options.get("error_sampler", None)
-        import ipdb
-
-        ipdb.set_trace()
 
         if callable(error_sampler):
             with capture_internal_exceptions():
