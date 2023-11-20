@@ -51,7 +51,7 @@ jobs:
       - name: Test fastapi
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 20
+          timeout_minutes: 15
           max_attempts: 2
           retry_wait_seconds: 5
           shell: bash

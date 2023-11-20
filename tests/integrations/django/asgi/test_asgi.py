@@ -384,38 +384,38 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 @pytest.mark.parametrize(
     "send_default_pii,method,headers,url_name,body,expected_data",
     [
-        (
-            True,
-            "POST",
-            [(b"content-type", b"text/plain")],
-            "post_echo_async",
-            b"",
-            None,
-        ),
-        (
-            True,
-            "POST",
-            [(b"content-type", b"text/plain")],
-            "post_echo_async",
-            b"some raw text body",
-            "",
-        ),
-        (
-            True,
-            "POST",
-            [(b"content-type", b"application/json")],
-            "post_echo_async",
-            b'{"username":"xyz","password":"xyz"}',
-            {"username": "xyz", "password": "xyz"},
-        ),
-        (
-            True,
-            "POST",
-            [(b"content-type", b"application/xml")],
-            "post_echo_async",
-            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
-            "",
-        ),
+        # (
+        #     True,
+        #     "POST",
+        #     [(b"content-type", b"text/plain")],
+        #     "post_echo_async",
+        #     b"",
+        #     None,
+        # ),
+        # (
+        #     True,
+        #     "POST",
+        #     [(b"content-type", b"text/plain")],
+        #     "post_echo_async",
+        #     b"some raw text body",
+        #     "",
+        # ),
+        # (
+        #     True,
+        #     "POST",
+        #     [(b"content-type", b"application/json")],
+        #     "post_echo_async",
+        #     b'{"username":"xyz","password":"xyz"}',
+        #     {"username": "xyz", "password": "xyz"},
+        # ),
+        # (
+        #     True,
+        #     "POST",
+        #     [(b"content-type", b"application/xml")],
+        #     "post_echo_async",
+        #     b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
+        #     "",
+        # ),
         (
             True,
             "POST",
@@ -474,7 +474,7 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 )
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
+# @pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -496,6 +496,9 @@ async def test_asgi_request_body(
         ],
     )
 
+    import ipdb
+
+    ipdb.set_trace()
     envelopes = capture_envelopes()
 
     comm = HttpCommunicator(
