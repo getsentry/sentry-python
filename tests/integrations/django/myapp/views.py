@@ -237,10 +237,10 @@ if VERSION >= (3, 1):
     )
 
     exec(
-        """@csrf_exempt
-def post_echo_async(request):
+        """async def post_echo_async(request):
     sentry_sdk.capture_message("hi")
-    return HttpResponse(request.body)"""
+    return HttpResponse(request.body)
+post_echo_async.csrf_exempt = True"""
     )
 else:
     async_message = None
