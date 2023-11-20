@@ -113,7 +113,7 @@ def patch_scaffold_route():
         def decorator(old_func):
             # type: (Any) -> Any
 
-            if inspect.isfunction(old_func) and not asyncio.is_coroutine_function(
+            if inspect.isfunction(old_func) and not asyncio.iscoroutinefunction(
                 old_func
             ):
 
