@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 import json
 from copy import deepcopy
 
@@ -6,6 +8,12 @@ from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._compat import text_type, iteritems
 
 from sentry_sdk._types import TYPE_CHECKING
+
+try:
+    from django.http.request import RawPostDataException
+except ImportError:
+    RawPostDataException = None
+
 
 if TYPE_CHECKING:
     import sentry_sdk
@@ -67,10 +75,22 @@ class RequestExtractor(object):
         if not request_body_within_bounds(client, content_length):
             data = AnnotatedValue.removed_because_over_size_limit()
         else:
+            # First read the raw body data
+            # It is important to read this first because if it is Django
+            # it will cache the body and then we can read the cached version
+            # again in parsed_body() (or json() or wherever).
+            raw_data = None
+            try:
+                raw_data = self.raw_data()
+            except (RawPostDataException, ValueError):
+                # If DjangoRestFramework is used it already read the body for us
+                # so reading it here will fail. We can ignore this.
+                pass
+
             parsed_body = self.parsed_body()
             if parsed_body is not None:
                 data = parsed_body
-            elif self.raw_data():
+            elif raw_data:
                 data = AnnotatedValue.removed_because_raw_data()
             else:
                 data = None
