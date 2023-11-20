@@ -496,9 +496,6 @@ async def test_asgi_request_body(
         ],
     )
 
-    import ipdb
-
-    ipdb.set_trace()
     envelopes = capture_envelopes()
 
     comm = HttpCommunicator(
