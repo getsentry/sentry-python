@@ -108,14 +108,15 @@ def write_yaml_file(
     out = ""
     py27_test_part = False
     for template_line in template:
-        if template_line.strip() == "{{ strategy_matrix }}":
+        template_line = template_line.strip()
+        if template_line == "{{ strategy_matrix }}":
             m = MATRIX_DEFINITION
             m = m.replace("{{ framework }}", current_framework).replace(
                 "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions])
             )
             out += m
 
-        elif template_line.strip() == "{{ services }}":
+        elif template_line == "{{ services }}":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
                 lines = [
@@ -128,32 +129,32 @@ def write_yaml_file(
                 out += "".join(lines)
                 f.close()
 
-        elif template_line.strip() == "{{ setup_postgres }}":
+        elif template_line == "{{ setup_postgres }}":
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SETUP_DB, "r")
                 out += "".join(f.readlines())
 
-        elif template_line.strip() == "{{ aws_credentials }}":
+        elif template_line == "{{ aws_credentials }}":
             if current_framework in FRAMEWORKS_NEEDING_AWS:
                 f = open(TEMPLATE_FILE_AWS_CREDENTIALS, "r")
                 out += "".join(f.readlines())
 
-        elif template_line.strip() == "{{ additional_uses }}":
+        elif template_line == "{{ additional_uses }}":
             if current_framework in FRAMEWORKS_NEEDING_CLICKHOUSE:
                 out += ADDITIONAL_USES_CLICKHOUSE
 
-        elif template_line.strip() == "{{ check_needs }}":
+        elif template_line == "{{ check_needs }}":
             if py27_supported:
                 out += CHECK_NEEDS_PY27
             else:
                 out += CHECK_NEEDS
 
-        elif template_line.strip() == "{{ check_py27 }}":
+        elif template_line == "{{ check_py27 }}":
             if py27_supported:
                 out += CHECK_PY27
 
         else:
-            if template_line.strip() == "test-py27:":
+            if template_line == "test-py27:":
                 py27_test_part = True
 
             out += template_line.replace("{{ framework }}", current_framework)
