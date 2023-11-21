@@ -658,6 +658,10 @@ class _Timing(object):
         self.entered = TIMING_FUNCTIONS[self.unit]()
         self._validate_invocation("context-manager")
         self._span = sentry_sdk.start_span(op="metric.timing", description=self.key)
+        for key, value in self.tags.items():
+            if isinstance(value, (tuple, list)):
+                value = ",".join(sorted(map(str, value)))
+            self._span.set_tag(key, value)
         self._span.__enter__()
         return self
 

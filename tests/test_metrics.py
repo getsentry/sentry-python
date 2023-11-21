@@ -455,6 +455,7 @@ def test_measurements_timer(sentry_init, capture_envelopes):
         },
     }
 
+    assert t["spans"][0]["tags"] == {"a": "b"}
     timer = t["spans"][0]["_metrics_summary"]["d:my-timer-metric@second"]
     assert timer["count"] == 1
     assert timer["max"] == timer["min"] == timer["sum"]
