@@ -137,6 +137,35 @@ def record_sql_queries(
         data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
+        if "SELECT 1;" in query:
+            import sys
+            from sentry_sdk.utils import _is_external_source
+
+            project_root = hub.client.options["project_root"]
+
+            frame = sys._getframe()
+            while frame is not None:
+                abs_path = frame.f_code.co_filename
+                is_sentry_sdk_frame = frame.f_globals["__name__"].startswith(
+                    "sentry_sdk."
+                )
+                if (
+                    abs_path.startswith(project_root)
+                    and not _is_external_source(abs_path)
+                    and not is_sentry_sdk_frame
+                ):
+                    break
+                frame = frame.f_back
+
+            # code_filepath = frame.f_code.co_filename
+            # code_lineno = frame.f_lineno
+            # code_function = frame.f_code.co_name
+            # code_namespance = frame.f_globals["__name__"]
+
+            import ipdb
+
+            ipdb.set_trace()
+
         hub.add_breadcrumb(message=query, category="query", data=data)
 
     with hub.start_span(op=OP.DB, description=query) as span:

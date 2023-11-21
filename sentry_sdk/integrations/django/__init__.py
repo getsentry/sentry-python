@@ -683,6 +683,10 @@ def _set_db_data(span, cursor_or_db):
     # attribute, only to throw an error once you actually want to call it.
     # Hence the `inspect` check whether `get_dsn_parameters` is an actual callable
     # function.
+    import traceback
+
+    traceback.print_stack()
+
     is_psycopg2 = (
         hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
