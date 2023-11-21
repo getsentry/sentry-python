@@ -1,7 +1,5 @@
 from __future__ import absolute_import
 
-import os
-
 import pytest
 
 try:
@@ -11,10 +9,18 @@ except ImportError:
 
 from django.db import connections
 
-from tests.integrations.django.utils import pytest_mark_django_db_decorator
+from werkzeug.test import Client
 
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
+
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
+from tests.integrations.django.myapp.wsgi import application
+
+
+@pytest.fixture
+def client():
+    return Client(application)
 
 
 @pytest.mark.forked
@@ -34,22 +40,27 @@ def test_query_source(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    url = reverse("postgres_select")
-    content, status, headers = client.get(url)
+    _, status, _ = client.get(reverse("postgres_select_slow"))
     assert status == "200 OK"
 
     (event,) = events
-
     for span in event["spans"]:
-        if span.get("op") == "db":
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT pg_sleep("
+        ):
             data = span.get("data")
-            assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
-            conn_params = connections["postgres"].get_connection_params()
-            assert data.get(SPANDATA.DB_NAME) is not None
-            assert data.get(SPANDATA.DB_NAME) == conn_params.get(
-                "database"
-            ) or conn_params.get("dbname")
-            assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
-                "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
+            assert data.get(SPANDATA.CODE_LINENO) == 201
+            assert (
+                data.get(SPANDATA.CODE_NAMESPACE)
+                == "tests.integrations.django.myapp.views"
             )
-            assert data.get(SPANDATA.SERVER_PORT) == "5432"
+            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                "tests/integrations/django/myapp/views.py"
+            )
+            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_slow"
