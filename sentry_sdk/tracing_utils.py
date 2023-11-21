@@ -244,6 +244,14 @@ def add_additional_span_data(hub, span):
         if span.timestamp is None or span.start_timestamp is None:
             return
 
+        client = hub.client
+        if client is None:
+            return
+
+        show_add_source = client.options.get("enable_db_query_source", False)
+        if not show_add_source:
+            return
+
         duration = span.timestamp - span.start_timestamp
         slow_query = duration.microseconds > DB_SPAN_DURATION_THRESHOLD_MS * 1000
 

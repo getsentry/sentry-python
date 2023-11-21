@@ -25,11 +25,52 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
+@pytest.mark.parametrize("enable_db_query_source", [None, False])
+def test_query_source_disabled(
+    sentry_init, client, capture_events, enable_db_query_source
+):
+    sentry_options = {
+        "integrations": [DjangoIntegration()],
+        "send_default_pii": True,
+        "traces_sample_rate": 1.0,
+    }
+    if enable_db_query_source is not None:
+        sentry_options["enable_db_query_source"] = enable_db_query_source
+
+    sentry_init(**sentry_options)
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    _, status, _ = client.get(reverse("postgres_select_slow"))
+    assert status == "200 OK"
+
+    (event,) = events
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT pg_sleep("
+        ):
+            data = span.get("data")
+
+            assert SPANDATA.CODE_LINENO not in data
+            assert SPANDATA.CODE_NAMESPACE not in data
+            assert SPANDATA.CODE_FILEPATH not in data
+            assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
+        enable_db_query_source=True,
     )
 
     if "postgres" not in connections:
