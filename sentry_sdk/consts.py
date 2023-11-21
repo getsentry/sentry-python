@@ -55,6 +55,8 @@ DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 MATCH_ALL = r".*"
 
+DB_SPAN_DURATION_THRESHOLD_MS = 100
+
 FALSE_VALUES = [
     "false",
     "no",
@@ -161,6 +163,30 @@ class SPANDATA:
     Physical server port.
     Recommended: If different than server.port.
     Example: 16456
+    """
+
+    CODE_FILEPATH = "code.filepath"
+    """
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
+    """
+
+    CODE_LINENO = "code.lineno"
+    """
+    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_FUNCTION = "code.function"
+    """
+    The method or function name, or equivalent (usually rightmost part of the code unit’s name).
+    Example: "server_request"
+    """
+
+    CODE_NAMESPACE = "code.namespace"
+    """
+    The “namespace” within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
+    Example: "http.handler"
     """
 
 

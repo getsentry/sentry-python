@@ -1,14 +1,16 @@
-import re
 import contextlib
+import re
+import sys
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import DB_SPAN_DURATION_THRESHOLD_MS, OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
     match_regex_list,
     to_string,
     is_sentry_url,
+    _is_external_source,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -137,35 +139,6 @@ def record_sql_queries(
         data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
-        if "SELECT 1;" in query:
-            import sys
-            from sentry_sdk.utils import _is_external_source
-
-            project_root = hub.client.options["project_root"]
-
-            frame = sys._getframe()
-            while frame is not None:
-                abs_path = frame.f_code.co_filename
-                is_sentry_sdk_frame = frame.f_globals["__name__"].startswith(
-                    "sentry_sdk."
-                )
-                if (
-                    abs_path.startswith(project_root)
-                    and not _is_external_source(abs_path)
-                    and not is_sentry_sdk_frame
-                ):
-                    break
-                frame = frame.f_back
-
-            # code_filepath = frame.f_code.co_filename
-            # code_lineno = frame.f_lineno
-            # code_function = frame.f_code.co_name
-            # code_namespance = frame.f_globals["__name__"]
-
-            import ipdb
-
-            ipdb.set_trace()
-
         hub.add_breadcrumb(message=query, category="query", data=data)
 
     with hub.start_span(op=OP.DB, description=query) as span:
@@ -189,6 +162,74 @@ def maybe_create_breadcrumbs_from_span(hub, span):
             message=span.description,
             data=span._data,
         )
+
+
+def add_additional_span_data(hub, span):
+    if span.op == OP.DB:
+        duration = span.timestamp - span.start_timestamp
+        slow_query = duration.microseconds > DB_SPAN_DURATION_THRESHOLD_MS * 1000
+
+        if not slow_query:
+            return
+
+        project_root = hub.client.options["project_root"]
+
+        # Find the frame
+        frame = sys._getframe()
+        while frame is not None:
+            try:
+                abs_path = frame.f_code.co_filename
+            except Exception:
+                abs_path = ""
+
+            try:
+                namespace = frame.f_globals.get("__name__")
+            except Exception:
+                namespace = None
+
+            is_sentry_sdk_frame = namespace is not None and namespace.startswith(
+                "sentry_sdk."
+            )
+            if (
+                abs_path.startswith(project_root)
+                and not _is_external_source(abs_path)
+                and not is_sentry_sdk_frame
+            ):
+                break
+            frame = frame.f_back
+        else:
+            frame = None
+
+        # Set the data
+        if frame is not None:
+            try:
+                lineno = frame.f_lineno
+            except Exception:
+                lineno = None
+            if lineno is not None:
+                span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+
+            try:
+                namespace = frame.f_globals.get("__name__")
+            except Exception:
+                namespace = None
+            if namespace is not None:
+                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+
+            try:
+                filepath = frame.f_code.co_filename
+            except Exception:
+                filepath = None
+            if filepath is not None:
+                span.set_data(SPANDATA.CODE_FILEPATH, frame.f_code.co_filename)
+
+            try:
+                code_function = frame.f_code.co_name
+            except Exception:
+                code_function = None
+
+            if code_function is not None:
+                span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def extract_sentrytrace_data(header):

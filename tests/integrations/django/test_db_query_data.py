@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 import os
 
-# import pytest
+import pytest
 
 try:
     from django.urls import reverse
@@ -17,7 +17,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source(sentry_init, client, capture_events):
     sentry_init(
@@ -26,18 +26,15 @@ def test_query_source(sentry_init, client, capture_events):
         traces_sample_rate=1.0,
     )
 
-    # if "postgres" not in connections:
-    #     pytest.skip("postgres tests disabled")
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
 
     # trigger Django to open a new connection by marking the existing one as None.
-    # connections["postgres"].connection = None
+    connections["postgres"].connection = None
 
     events = capture_events()
 
     url = reverse("postgres_select")
-    # import ipdb
-
-    # ipdb.set_trace()
     content, status, headers = client.get(url)
     assert status == "200 OK"
 
