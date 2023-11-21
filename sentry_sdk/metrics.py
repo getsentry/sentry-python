@@ -328,7 +328,7 @@ class LocalAggregator(object):
         if old is not None:
             v_min, v_max, v_count, v_sum = old
             v_min = min(v_min, value)
-            v_max = min(v_max, value)
+            v_max = max(v_max, value)
             v_count += 1
             v_sum += value
         else:

@@ -445,8 +445,8 @@ def test_measurements_timer(sentry_init, capture_envelopes):
 
     assert t["spans"][0]["_metrics_summary"]["d:my-dist@none"] == {
         "count": 10,
-        "max": 0.0,
         "min": 0.0,
+        "max": 9.0,
         "sum": 45.0,
         "tags": {
             "environment": "not-fun-env",
