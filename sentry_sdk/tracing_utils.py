@@ -164,72 +164,80 @@ def maybe_create_breadcrumbs_from_span(hub, span):
         )
 
 
+def add_query_source(hub, span):
+    """
+    Adds OTel compatible source code information to the span
+    """
+    project_root = hub.client.options["project_root"]
+
+    # Find the correct frame
+    frame = sys._getframe()
+    while frame is not None:
+        try:
+            abs_path = frame.f_code.co_filename
+        except Exception:
+            abs_path = ""
+
+        try:
+            namespace = frame.f_globals.get("__name__")
+        except Exception:
+            namespace = None
+
+        is_sentry_sdk_frame = namespace is not None and namespace.startswith(
+            "sentry_sdk."
+        )
+        if (
+            abs_path.startswith(project_root)
+            and not _is_external_source(abs_path)
+            and not is_sentry_sdk_frame
+        ):
+            break
+        frame = frame.f_back
+    else:
+        frame = None
+
+    # Set the data
+    if frame is not None:
+        try:
+            lineno = frame.f_lineno
+        except Exception:
+            lineno = None
+        if lineno is not None:
+            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+
+        try:
+            namespace = frame.f_globals.get("__name__")
+        except Exception:
+            namespace = None
+        if namespace is not None:
+            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+
+        try:
+            filepath = frame.f_code.co_filename
+        except Exception:
+            filepath = None
+        if filepath is not None:
+            span.set_data(SPANDATA.CODE_FILEPATH, frame.f_code.co_filename)
+
+        try:
+            code_function = frame.f_code.co_name
+        except Exception:
+            code_function = None
+
+        if code_function is not None:
+            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+
+
 def add_additional_span_data(hub, span):
+    """
+    Adds additional data to the span
+    """
     if span.op == OP.DB:
         duration = span.timestamp - span.start_timestamp
         slow_query = duration.microseconds > DB_SPAN_DURATION_THRESHOLD_MS * 1000
 
-        if not slow_query:
-            return
-
-        project_root = hub.client.options["project_root"]
-
-        # Find the frame
-        frame = sys._getframe()
-        while frame is not None:
-            try:
-                abs_path = frame.f_code.co_filename
-            except Exception:
-                abs_path = ""
-
-            try:
-                namespace = frame.f_globals.get("__name__")
-            except Exception:
-                namespace = None
-
-            is_sentry_sdk_frame = namespace is not None and namespace.startswith(
-                "sentry_sdk."
-            )
-            if (
-                abs_path.startswith(project_root)
-                and not _is_external_source(abs_path)
-                and not is_sentry_sdk_frame
-            ):
-                break
-            frame = frame.f_back
-        else:
-            frame = None
-
-        # Set the data
-        if frame is not None:
-            try:
-                lineno = frame.f_lineno
-            except Exception:
-                lineno = None
-            if lineno is not None:
-                span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
-
-            try:
-                namespace = frame.f_globals.get("__name__")
-            except Exception:
-                namespace = None
-            if namespace is not None:
-                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
-
-            try:
-                filepath = frame.f_code.co_filename
-            except Exception:
-                filepath = None
-            if filepath is not None:
-                span.set_data(SPANDATA.CODE_FILEPATH, frame.f_code.co_filename)
-
-            try:
-                code_function = frame.f_code.co_name
-            except Exception:
-                code_function = None
-
-            if code_function is not None:
-                span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+        if slow_query:
+            add_query_source(hub, span)
 
 
 def extract_sentrytrace_data(header):
