@@ -40,6 +40,8 @@ def app():
 
         Sanic.test_client = property(new_test_client)
 
+    Sanic.test_mode = True
+
     if SANIC_VERSION >= (20, 12) and SANIC_VERSION < (22, 6):
         # Some builds (20.12.0 intruduced and 22.6.0 removed again) have a feature where the instance is stored in an internal class
         # registry for later retrieval, and so add register=False to disable that
