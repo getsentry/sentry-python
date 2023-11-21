@@ -307,7 +307,10 @@ class LocalAggregator(object):
     __slots__ = ("_measurements",)
 
     def __init__(self):
-        self._measurements = {}  # type: Dict[Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]]
+        # type: (...) -> None
+        self._measurements = (
+            {}
+        )  # type: Dict[Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]]
 
     def add(
         self,
@@ -317,9 +320,10 @@ class LocalAggregator(object):
         unit,  # type: MeasurementUnit
         tags,  # type: Optional[MetricTags]
     ):
+        # type: (...) -> None
         export_key = "%s:%s@%s" % (ty, key, unit)
         bucket_key = (export_key, _serialize_tags(tags))
-        
+
         old = self._measurements.get(bucket_key)
         if old is not None:
             v_min, v_max, v_count, v_sum = old
@@ -331,6 +335,24 @@ class LocalAggregator(object):
             v_min = v_max = v_sum = value
             v_count = 1
         self._measurements[bucket_key] = (v_min, v_max, v_count, v_sum)
+
+    def to_json(self):
+        # type: (...) -> Dict[str, Any]
+        rv = {}
+        for (export_key, tags), (
+            v_min,
+            v_max,
+            v_count,
+            v_sum,
+        ) in self._measurements.items():
+            rv[export_key] = {
+                "tags": _tags_to_dict(tags),
+                "min": v_min,
+                "max": v_max,
+                "count": v_count,
+                "sum": v_sum,
+            }
+        return rv
 
 
 class MetricsAggregator(object):
@@ -513,7 +535,7 @@ class MetricsAggregator(object):
 
 
 def _serialize_tags(
-    tags  # type: Optional[MetricTags]
+    tags,  # type: Optional[MetricTags]
 ):
     # type: (...) -> MetricTagsInternal
     if not tags:
@@ -534,6 +556,21 @@ def _serialize_tags(
     return tuple(sorted(rv))
 
 
+def _tags_to_dict(tags):
+    # type: (MetricTagsInternal) -> Dict[str, Any]
+    rv = {}  # type: Dict[str, Any]
+    for tag_name, tag_value in tags:
+        old_value = rv.get(tag_name)
+        if old_value is not None:
+            if isinstance(old_value, list):
+                old_value.append(tag_value)
+            else:
+                rv[tag_name] = [old_value, tag_value]
+        else:
+            rv[tag_name] = tag_value
+    return rv
+
+
 def _get_aggregator_and_update_tags(key, tags):
     # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
     """Returns the current metrics aggregator if there is one."""
@@ -547,12 +584,21 @@ def _get_aggregator_and_update_tags(key, tags):
     updated_tags.setdefault("environment", client.options["environment"])
 
     scope = hub.scope
-    transaction_source = scope._transaction_info.get("source")
+
+    # This workaround is needed as `scope._transaction_info` does not
+    # always appear to hold the information.
+    transaction = scope.transaction
+    if transaction:
+        transaction_name = transaction.name
+        transaction_source = transaction.source
+    else:
+        transaction_name = scope._transaction
+        transaction_source = scope._transaction_info.get("source")
+
     local_aggregator = None
     if transaction_source in GOOD_TRANSACTION_SOURCES:
-        transaction = scope._transaction
-        if transaction:
-            updated_tags.setdefault("transaction", transaction)
+        if transaction_name:
+            updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
             local_aggregator = scope._span._get_local_aggregator()
 
@@ -598,6 +644,7 @@ class _Timing(object):
         self.value = value
         self.unit = unit
         self.entered = None  # type: Optional[float]
+        self._span = None  # type: Optional[sentry_sdk.tracing.Span]
 
     def _validate_invocation(self, context):
         # type: (str) -> None
@@ -610,16 +657,24 @@ class _Timing(object):
         # type: (...) -> _Timing
         self.entered = TIMING_FUNCTIONS[self.unit]()
         self._validate_invocation("context-manager")
+        self._span = sentry_sdk.start_span(op="metric.timing", description=self.key)
+        self._span.__enter__()
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
-        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(self.key, self.tags)
+        assert self._span, "did not enter"
+        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+            self.key, self.tags
+        )
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
             aggregator.add("d", self.key, elapsed, self.unit, tags, self.timestamp)
             if local_aggregator is not None:
                 local_aggregator.add("d", self.key, elapsed, self.unit, tags)
+
+        self._span.__exit__(exc_type, exc_value, tb)
+        self._span = None
 
     def __call__(self, f):
         # type: (Any) -> Any
@@ -689,14 +744,14 @@ def set(
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
         added = aggregator.add("s", key, value, unit, tags, timestamp)
-        if added > 0 and local_aggregator
+        if added > 0 and local_aggregator:
             local_aggregator.add("s", key, float(added), unit, tags)
 
 
 def gauge(
     key,  # type: str
     value,  # type: float
-    unit="none",  # type: MetricValue
+    unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
 ):

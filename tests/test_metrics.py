@@ -2,7 +2,8 @@
 
 import time
 
-from sentry_sdk import Hub, metrics, push_scope
+from sentry_sdk import Hub, metrics, push_scope, start_transaction
+from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 
 
 def parse_metrics(bytes):
@@ -365,6 +366,104 @@ def test_transaction_name(sentry_init, capture_envelopes):
         "transaction": "/user/{user_id}",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
+    }
+
+
+def test_measurements_timer(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        enable_tracing=True,
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_transaction(
+        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
+    ) as transaction:
+        metrics.incr("root-counter", timestamp=ts)
+        with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
+            for x in range(10):
+                metrics.distribution("my-dist", float(x), timestamp=ts)
+
+    Hub.current.flush()
+
+    (transaction, envelope) = envelopes
+
+    # Metrics Emission
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 3
+
+    assert m[0][1] == "my-dist@none"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 10
+    assert sorted(m[0][3]) == list(map(str, map(float, range(10))))
+    assert m[0][4] == {
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[1][1] == "my-timer-metric@second"
+    assert m[1][2] == "d"
+    assert len(m[1][3]) == 1
+    assert m[1][4] == {
+        "a": "b",
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[2][1] == "root-counter@none"
+    assert m[2][2] == "c"
+    assert m[2][3] == ["1.0"]
+    assert m[2][4] == {
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    # Measurement Attachment
+    t = transaction.items[0].get_transaction_event()
+
+    assert t["_metrics_summary"] == {
+        "c:root-counter@none": {
+            "count": 1,
+            "min": 1.0,
+            "max": 1.0,
+            "sum": 1.0,
+            "tags": {
+                "transaction": "/foo",
+                "release": "fun-release@1.0.0",
+                "environment": "not-fun-env",
+            },
+        }
+    }
+
+    assert t["spans"][0]["_metrics_summary"]["d:my-dist@none"] == {
+        "count": 10,
+        "max": 0.0,
+        "min": 0.0,
+        "sum": 45.0,
+        "tags": {
+            "environment": "not-fun-env",
+            "release": "fun-release@1.0.0",
+            "transaction": "/foo",
+        },
+    }
+
+    timer = t["spans"][0]["_metrics_summary"]["d:my-timer-metric@second"]
+    assert timer["count"] == 1
+    assert timer["max"] == timer["min"] == timer["sum"]
+    assert timer["sum"] > 0
+    assert timer["tags"] == {
+        "a": "b",
+        "environment": "not-fun-env",
+        "release": "fun-release@1.0.0",
+        "transaction": "/foo",
     }
 
 

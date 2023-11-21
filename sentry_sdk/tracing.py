@@ -508,6 +508,11 @@ class Span(object):
         if self.status:
             self._tags["status"] = self.status
 
+        if self._local_aggregator is not None:
+            metrics_summary = self._local_aggregator.to_json()
+            if metrics_summary:
+                rv["_metrics_summary"] = metrics_summary
+
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -730,6 +735,13 @@ class Transaction(Span):
             self._profile = None
 
         event["measurements"] = self._measurements
+
+        # This is here since `to_json` is not invoked.  This really should
+        # be gone when we switch to onlyspans.
+        if self._local_aggregator is not None:
+            metrics_summary = self._local_aggregator.to_json()
+            if metrics_summary:
+                event["_metrics_summary"] = metrics_summary
 
         return hub.capture_event(event)
 
