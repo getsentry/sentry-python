@@ -318,11 +318,11 @@ class LocalAggregator(object):
         key,  # type: str
         value,  # type: float
         unit,  # type: MeasurementUnit
-        tags,  # type: Optional[MetricTags]
+        tags,  # type: MetricTagsInternal
     ):
         # type: (...) -> None
         export_key = "%s:%s@%s" % (ty, key, unit)
-        bucket_key = (export_key, _serialize_tags(tags))
+        bucket_key = (export_key, tags)
 
         old = self._measurements.get(bucket_key)
         if old is not None:
@@ -461,6 +461,7 @@ class MetricsAggregator(object):
         unit,  # type: MeasurementUnit
         tags,  # type: Optional[MetricTags]
         timestamp=None,  # type: Optional[Union[float, datetime]]
+        local_aggregator=None,  # type: Optional[LocalAggregator]
     ):
         # type: (...) -> int
         if not self._ensure_thread() or self._flusher is None:
@@ -474,11 +475,12 @@ class MetricsAggregator(object):
         bucket_timestamp = int(
             (timestamp // self.ROLLUP_IN_SECONDS) * self.ROLLUP_IN_SECONDS
         )
+        serialized_tags = _serialize_tags(tags)
         bucket_key = (
             ty,
             key,
             unit,
-            _serialize_tags(tags),
+            serialized_tags,
         )
 
         with self._lock:
@@ -496,6 +498,14 @@ class MetricsAggregator(object):
 
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
+
+        if local_aggregator is not None:
+            if ty == "s":
+                local_value = float(added)
+            else:
+                local_value = float(value)
+            local_aggregator.add(ty, key, local_value, unit, serialized_tags)
+
         return added
 
     def kill(self):
@@ -623,9 +633,7 @@ def incr(
     """Increments a counter."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
-        aggregator.add("c", key, value, unit, tags, timestamp)
-        if local_aggregator is not None:
-            local_aggregator.add("c", key, value, unit, tags)
+        aggregator.add("c", key, value, unit, tags, timestamp, local_aggregator)
 
 
 class _Timing(object):
@@ -674,9 +682,15 @@ class _Timing(object):
         )
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
-            aggregator.add("d", self.key, elapsed, self.unit, tags, self.timestamp)
-            if local_aggregator is not None:
-                local_aggregator.add("d", self.key, elapsed, self.unit, tags)
+            aggregator.add(
+                "d",
+                self.key,
+                elapsed,
+                self.unit,
+                tags,
+                self.timestamp,
+                local_aggregator,
+            )
 
         self._span.__exit__(exc_type, exc_value, tb)
         self._span = None
@@ -715,9 +729,7 @@ def timing(
     if value is not None:
         aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
         if aggregator is not None:
-            aggregator.add("d", key, value, unit, tags, timestamp)
-            if local_aggregator is not None:
-                local_aggregator.add("d", key, value, unit, tags)
+            aggregator.add("d", key, value, unit, tags, timestamp, local_aggregator)
     return _Timing(key, tags, timestamp, value, unit)
 
 
@@ -732,9 +744,7 @@ def distribution(
     """Emits a distribution."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
-        aggregator.add("d", key, value, unit, tags, timestamp)
-        if local_aggregator is not None:
-            local_aggregator.add("d", key, value, unit, tags)
+        aggregator.add("d", key, value, unit, tags, timestamp, local_aggregator)
 
 
 def set(
@@ -748,9 +758,7 @@ def set(
     """Emits a set."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
-        added = aggregator.add("s", key, value, unit, tags, timestamp)
-        if added > 0 and local_aggregator:
-            local_aggregator.add("s", key, float(added), unit, tags)
+        aggregator.add("s", key, value, unit, tags, timestamp, local_aggregator)
 
 
 def gauge(
@@ -764,6 +772,4 @@ def gauge(
     """Emits a gauge."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
-        aggregator.add("g", key, value, unit, tags, timestamp)
-        if local_aggregator is not None:
-            local_aggregator.add("g", key, value, unit, tags)
+        aggregator.add("g", key, value, unit, tags, timestamp, local_aggregator)
