@@ -463,9 +463,9 @@ class MetricsAggregator(object):
         timestamp=None,  # type: Optional[Union[float, datetime]]
         local_aggregator=None,  # type: Optional[LocalAggregator]
     ):
-        # type: (...) -> int
+        # type: (...) -> None
         if not self._ensure_thread() or self._flusher is None:
-            return 0
+            return None
 
         if timestamp is None:
             timestamp = time.time()
@@ -500,13 +500,8 @@ class MetricsAggregator(object):
         self._consider_force_flush()
 
         if local_aggregator is not None:
-            if ty == "s":
-                local_value = float(added)
-            else:
-                local_value = float(value)
+            local_value = float(added if ty == "s" else value)
             local_aggregator.add(ty, key, local_value, unit, serialized_tags)
-
-        return added
 
     def kill(self):
         # type: (...) -> None
