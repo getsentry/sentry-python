@@ -179,7 +179,7 @@ class SPANDATA:
 
     CODE_FUNCTION = "code.function"
     """
-    The method or function name, or equivalent (usually rightmost part of the code unit’s name).
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
     Example: "server_request"
     """
 
