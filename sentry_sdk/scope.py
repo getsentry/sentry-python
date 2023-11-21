@@ -430,6 +430,8 @@ class Scope(object):
             transaction = span
             if transaction.name:
                 self._transaction = transaction.name
+                if transaction.source:
+                    self._transaction_info["source"] = transaction.source
 
     @property
     def profile(self):
