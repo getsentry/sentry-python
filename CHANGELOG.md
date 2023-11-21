@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.36.0
+
+### Various fixes & improvements
+
+- Handling asgi body in the right way. For real (#2513) by @antonpirker
+- Fix Quart integration for Quart 0.19.4  (#2516) by @antonpirker
+- Ensure `RedisIntegration` is disabled, unless `redis` is installed (#2504) by @szokeasaurusrex
+- Make async gRPC less noisy (#2507) by @jyggen
+- Do not create a span when task is triggered by Celery Beat (#2510) by @antonpirker
+- Test with Flask 3.0 (#2506) by @sentrivana
+- feat(integrations): Support Django 5.0 (#2490) by @sentrivana
+
 ## 1.35.0
 
 ### Various fixes & improvements
