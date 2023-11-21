@@ -31,6 +31,8 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Union
 
+    from types import FrameType
+
 
 SENTRY_TRACE_REGEX = re.compile(
     "^[ \t]*"  # whitespace
@@ -165,13 +167,18 @@ def maybe_create_breadcrumbs_from_span(hub, span):
 
 
 def add_query_source(hub, span):
+    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
     """
     Adds OTel compatible source code information to the span
     """
-    project_root = hub.client.options["project_root"]
+    client = hub.client
+    if client is None:
+        return
+
+    project_root = client.options["project_root"]
 
     # Find the correct frame
-    frame = sys._getframe()
+    frame = sys._getframe()  # type: Union[FrameType, None]
     while frame is not None:
         try:
             abs_path = frame.f_code.co_filename
@@ -229,10 +236,14 @@ def add_query_source(hub, span):
 
 
 def add_additional_span_data(hub, span):
+    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
     """
     Adds additional data to the span
     """
     if span.op == OP.DB:
+        if span.timestamp is None or span.start_timestamp is None:
+            return
+
         duration = span.timestamp - span.start_timestamp
         slow_query = duration.microseconds > DB_SPAN_DURATION_THRESHOLD_MS * 1000
 
