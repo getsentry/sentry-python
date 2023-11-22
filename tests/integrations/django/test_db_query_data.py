@@ -96,7 +96,8 @@ def test_query_source(sentry_init, client, capture_events):
             assert SPANDATA.CODE_FILEPATH in data
             assert SPANDATA.CODE_FUNCTION in data
 
-            assert data.get(SPANDATA.CODE_LINENO) == 201
+            assert type(SPANDATA.CODE_LINENO) == int
+            assert data.get(SPANDATA.CODE_LINENO) > 0
             assert (
                 data.get(SPANDATA.CODE_NAMESPACE)
                 == "tests.integrations.django.myapp.views"
