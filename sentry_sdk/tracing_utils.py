@@ -248,8 +248,8 @@ def add_additional_span_data(hub, span):
         if client is None:
             return
 
-        show_add_source = client.options.get("enable_db_query_source", False)
-        if not show_add_source:
+        should_add_query_source = client.options.get("enable_db_query_source", False)
+        if not should_add_query_source:
             return
 
         duration = span.timestamp - span.start_timestamp

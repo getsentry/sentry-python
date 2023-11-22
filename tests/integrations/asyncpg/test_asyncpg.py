@@ -508,46 +508,44 @@ async def test_query_source_disabled(
 
 
 @pytest.mark.asyncio
-@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
-async def test_query_source(
-    sentry_init,
-    capture_events,
-):
-    sentry_init(
-        integrations=[AsyncPGIntegration()],
-        enable_tracing=True,
-        enable_db_query_source=True,
-    )
-
-    events = capture_events()
-
-    with start_transaction(name="test_transaction", sampled=True):
-        conn: Connection = await connect(PG_CONNECTION_URI)
-
-        await conn.execute(
-            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+async def test_query_source(sentry_init, capture_events):
+    with patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0):
+        sentry_init(
+            integrations=[AsyncPGIntegration()],
+            enable_tracing=True,
+            enable_db_query_source=True,
         )
 
-        await conn.close()
+        events = capture_events()
 
-    (event,) = events
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("INSERT INTO")
+            await conn.execute(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+            )
 
-    data = span.get("data", {})
+            await conn.close()
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+        (event,) = events
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
-    )
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/asyncpg/test_asyncpg.py"
-    )
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+        span = event["spans"][-1]
+        assert span["description"].startswith("INSERT INTO")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO in data
+        assert SPANDATA.CODE_NAMESPACE in data
+        assert SPANDATA.CODE_FILEPATH in data
+        assert SPANDATA.CODE_FUNCTION in data
+
+        assert type(data.get(SPANDATA.CODE_LINENO)) == int
+        assert data.get(SPANDATA.CODE_LINENO) > 0
+        assert (
+            data.get(SPANDATA.CODE_NAMESPACE)
+            == "tests.integrations.asyncpg.test_asyncpg"
+        )
+        assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            "tests/integrations/asyncpg/test_asyncpg.py"
+        )
+        assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
