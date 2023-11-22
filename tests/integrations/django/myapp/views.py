@@ -194,12 +194,9 @@ def postgres_select(request, *args, **kwargs):
 
 
 @csrf_exempt
-def postgres_select_slow(request, *args, **kwargs):
-    from django.db import connections
-
-    cursor = connections["postgres"].cursor()
-    cursor.execute("SELECT pg_sleep(0.12);")
-    return HttpResponse("ok")
+def postgres_select_orm(request, *args, **kwargs):
+    user = User.objects.using("postgres").all().first()
+    return HttpResponse("ok {}".format(user))
 
 
 @csrf_exempt
