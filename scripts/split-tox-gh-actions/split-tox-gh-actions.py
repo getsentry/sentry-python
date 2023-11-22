@@ -84,7 +84,6 @@ def write_yaml_file(
     python_versions,
     python_versions_latest,
 ):
-    print(current_framework, "SHOULD TEST LATEST", python_versions_latest)
     """Write the YAML configuration file for one framework to disk."""
     py_versions = sorted(
         [py.replace("py", "") for py in python_versions],

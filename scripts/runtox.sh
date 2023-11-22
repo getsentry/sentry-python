@@ -13,9 +13,28 @@ else
     TOXPATH=./.venv/bin/tox
 fi
 
+excludelatest=false
+for arg in "$@"
+do
+    if [ "$arg" = "--exclude-latest" ]; then
+        excludelatest=true
+        shift
+        break
+    fi
+done
+
 searchstring="$1"
 
 export TOX_PARALLEL_NO_SPINNER=1
-ENV="$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')"
+
+if $excludelatest; then
+    echo "Excluding latest"
+    ENV="$($TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest' | tr $'\n' ',')"
+else
+    echo "Including latest"
+    ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
+fi
+
+echo $ENV
 
 exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
