@@ -30,6 +30,7 @@ def _patch_rq_get_server_version(monkeypatch):
             try:
                 monkeypatch.setattr(k, lambda _: StrictVersion("4.0.0"))
             except AttributeError:
+                # old RQ Job/Worker doesn't have a get_redis_server_version attr
                 pass
 
 
@@ -79,6 +80,7 @@ def test_basic(sentry_init, capture_events):
 
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
     sentry_init(integrations=[RqIntegration()])
+    assert False
 
     events = capture_events_forksafe()
 
