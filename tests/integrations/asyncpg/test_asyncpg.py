@@ -27,8 +27,14 @@ import pytest_asyncio
 
 from asyncpg import connect, Connection
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
+from sentry_sdk.consts import SPANDATA
+
+try:
+    from unittest.mock import patch
+except ImportError:
+    from mock import patch
 
 
 PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
@@ -460,3 +466,88 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
             "type": "default",
         },
     ]
+
+
+@pytest.mark.asyncio
+@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
+@pytest.mark.parametrize("enable_db_query_source", [None, False])
+async def test_query_source_disabled(
+    sentry_init, capture_events, enable_db_query_source
+):
+    sentry_options = {
+        "integrations": [AsyncPGIntegration()],
+        "enable_tracing": True,
+    }
+    if enable_db_query_source is not None:
+        sentry_options["enable_db_query_source"] = enable_db_query_source
+
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+
+        await conn.execute(
+            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+        )
+
+        await conn.close()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("INSERT INTO")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.asyncio
+@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
+async def test_query_source(
+    sentry_init,
+    capture_events,
+):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        enable_tracing=True,
+        enable_db_query_source=True,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+
+        await conn.execute(
+            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+        )
+
+        await conn.close()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("INSERT INTO")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(SPANDATA.CODE_LINENO)) == int
+    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert (
+        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
+    )
+    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+        "tests/integrations/asyncpg/test_asyncpg.py"
+    )
+    assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"

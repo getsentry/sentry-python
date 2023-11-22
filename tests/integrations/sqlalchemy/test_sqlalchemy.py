@@ -271,7 +271,7 @@ def test_query_source_disabled(sentry_init, capture_events, enable_db_query_sour
         if span.get("op") == "db" and span.get("description").startswith(
             "SELECT person"
         ):
-            data = span.get("data")
+            data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO not in data
             assert SPANDATA.CODE_NAMESPACE not in data
@@ -316,7 +316,7 @@ def test_query_source(sentry_init, capture_events):
         if span.get("op") == "db" and span.get("description").startswith(
             "SELECT person"
         ):
-            data = span.get("data")
+            data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
             assert SPANDATA.CODE_NAMESPACE in data

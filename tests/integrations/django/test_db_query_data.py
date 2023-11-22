@@ -60,7 +60,7 @@ def test_query_source_disabled(
     (event,) = events
     for span in event["spans"]:
         if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data")
+            data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO not in data
             assert SPANDATA.CODE_NAMESPACE not in data
@@ -96,7 +96,7 @@ def test_query_source(sentry_init, client, capture_events):
     (event,) = events
     for span in event["spans"]:
         if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data")
+            data = span.get("data", {})
 
             assert SPANDATA.CODE_LINENO in data
             assert SPANDATA.CODE_NAMESPACE in data
