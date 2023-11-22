@@ -80,7 +80,6 @@ def test_basic(sentry_init, capture_events):
 
 def test_transport_shutdown(sentry_init, capture_events_forksafe):
     sentry_init(integrations=[RqIntegration()])
-    assert False
 
     events = capture_events_forksafe()
 
