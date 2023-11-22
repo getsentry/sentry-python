@@ -31,6 +31,7 @@ TEMPLATE_FILE_SETUP_DB = TEMPLATE_DIR / "ci-yaml-setup-db.txt"
 TEMPLATE_FILE_AWS_CREDENTIALS = TEMPLATE_DIR / "ci-yaml-aws-credentials.txt"
 TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
 TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
+TEMPLATE_SNIPPET_TEST_LATEST = TEMPLATE_DIR / "ci-yaml-test-latest-snippet.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = [
     "django",
@@ -81,6 +82,7 @@ def write_yaml_file(
     template,
     current_framework,
     python_versions,
+    should_test_latest,
 ):
     """Write the YAML configuration file for one framework to disk."""
     py_versions = [py.replace("py", "") for py in python_versions]
@@ -104,6 +106,19 @@ def write_yaml_file(
         py_versions.remove("2.7")
     else:
         template.pop(test_py27_loc)
+
+    test_latest_loc = template.index("{{ test_latest }}\n")
+    if should_test_latest:
+        f = open(TEMPLATE_SNIPPET_TEST_LATEST, "r")
+        test_latest_snippet = f.readlines()
+        template = (
+            template[:test_latest_loc]
+            + test_latest_snippet
+            + template[test_latest_loc + 1 :]
+        )
+        f.close()
+    else:
+        template.pop(test_latest_loc)
 
     out = ""
     py27_test_part = False
@@ -199,6 +214,7 @@ def main(fail_on_changes):
     lines = [x for x in config["tox"]["envlist"].split("\n") if len(x) > 0]
 
     python_versions = defaultdict(list)
+    should_test_latest = defaultdict(lambda: False)
 
     print("Parse tox.ini envlist")
 
@@ -213,9 +229,10 @@ def main(fail_on_changes):
         try:
             # parse tox environment definition
             try:
-                (raw_python_versions, framework, _) = line.split("-")
+                (raw_python_versions, framework, framework_versions) = line.split("-")
             except ValueError:
                 (raw_python_versions, framework) = line.split("-")
+                framework_versions = []
 
             # collect python versions to test the framework in
             for python_version in (
@@ -224,11 +241,19 @@ def main(fail_on_changes):
                 if python_version not in python_versions[framework]:
                     python_versions[framework].append(python_version)
 
+            if "latest" in framework_versions:
+                should_test_latest[framework] = True
+
         except ValueError:
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
-        write_yaml_file(template, framework, python_versions[framework])
+        write_yaml_file(
+            template,
+            framework,
+            python_versions[framework],
+            should_test_latest[framework],
+        )
 
     if fail_on_changes:
         new_hash = get_yaml_files_hash()

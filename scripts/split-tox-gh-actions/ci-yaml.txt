@@ -28,6 +28,8 @@ jobs:
 
 {{ test_py27 }}
 
+{{ test_latest }}
+
   check_required_tests:
     name: All {{ framework }} tests passed or skipped
 {{ check_needs }}

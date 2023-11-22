@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Usage: sh scripts/runtox.sh py3.7 <pytest-args>
-# Runs all environments with substring py3.7 and the given arguments for pytest
+# Usage: sh scripts/runtox.sh py3.12 <pytest-args>
+# Runs all environments with substring py3.12 and the given arguments for pytest
 
 set -ex
 

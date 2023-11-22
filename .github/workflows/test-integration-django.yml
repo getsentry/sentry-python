@@ -138,6 +138,7 @@ jobs:
             coverage combine .coverage* &&
             coverage xml -i
 
+
   check_required_tests:
     name: All django tests passed or skipped
     needs: [test, test-py27]
