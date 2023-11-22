@@ -1,5 +1,5 @@
   test-latest:
-    name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: {{ framework }} latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 {{ strategy_matrix_latest }}

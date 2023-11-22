@@ -99,7 +99,7 @@ jobs:
             coverage xml -i
 
   test-latest:
-    name: sqlalchemy, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: sqlalchemy latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

@@ -73,7 +73,7 @@ jobs:
 
 
   test-latest:
-    name: clickhouse_driver, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: clickhouse_driver latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

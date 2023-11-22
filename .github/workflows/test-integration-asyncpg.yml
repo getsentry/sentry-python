@@ -92,7 +92,7 @@ jobs:
 
 
   test-latest:
-    name: asyncpg, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: asyncpg latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

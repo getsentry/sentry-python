@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: loguru, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: loguru latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

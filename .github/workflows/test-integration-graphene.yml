@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: graphene, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: graphene latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: grpc, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: grpc latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

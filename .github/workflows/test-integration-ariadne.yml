@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: ariadne, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: ariadne latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

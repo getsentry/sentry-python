@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: sanic, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: sanic latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

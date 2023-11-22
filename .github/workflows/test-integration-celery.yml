@@ -99,7 +99,7 @@ jobs:
             coverage xml -i
 
   test-latest:
-    name: celery, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: celery latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

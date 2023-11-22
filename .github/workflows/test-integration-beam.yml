@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: beam, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: beam latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

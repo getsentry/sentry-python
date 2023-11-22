@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: gql, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: gql latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

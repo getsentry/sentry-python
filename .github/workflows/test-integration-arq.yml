@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: arq, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: arq latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

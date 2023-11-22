@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: fastapi, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: fastapi latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: quart, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: quart latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

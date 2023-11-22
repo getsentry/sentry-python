@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: tornado, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: tornado latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

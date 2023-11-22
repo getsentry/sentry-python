@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: chalice, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: chalice latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

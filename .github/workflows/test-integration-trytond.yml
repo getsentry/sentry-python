@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: trytond, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: trytond latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

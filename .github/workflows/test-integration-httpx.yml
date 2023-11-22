@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: httpx, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: httpx latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

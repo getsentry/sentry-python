@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: strawberry, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: strawberry latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 

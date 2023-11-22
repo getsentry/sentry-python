@@ -71,7 +71,7 @@ jobs:
 
 
   test-latest:
-    name: aiohttp, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    name: aiohttp latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 
