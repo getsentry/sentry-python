@@ -27,7 +27,10 @@ def _patch_rq_get_server_version(monkeypatch):
             "rq.job.Job.get_redis_server_version",
             "rq.worker.Worker.get_redis_server_version",
         ):
-            monkeypatch.setattr(k, lambda _: StrictVersion("4.0.0"))
+            try:
+                monkeypatch.setattr(k, lambda _: StrictVersion("4.0.0"))
+            except AttributeError:
+                pass
 
 
 def crashing_job(foo):
