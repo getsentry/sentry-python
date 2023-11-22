@@ -46,6 +46,7 @@ if TYPE_CHECKING:
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
+            "metrics_summary_sample_rate": Optional[float],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
         },
         total=False,

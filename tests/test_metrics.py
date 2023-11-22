@@ -369,12 +369,12 @@ def test_transaction_name(sentry_init, capture_envelopes):
     }
 
 
-def test_measurements_timer(sentry_init, capture_envelopes):
+def test_metric_summaries(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 1.0},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -466,6 +466,47 @@ def test_measurements_timer(sentry_init, capture_envelopes):
         "release": "fun-release@1.0.0",
         "transaction": "/foo",
     }
+
+
+def test_metrics_summary_disabled(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        enable_tracing=True,
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_transaction(
+        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
+    ) as transaction:
+        with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
+            pass
+
+    Hub.current.flush()
+
+    (transaction, envelope) = envelopes
+
+    # Metrics Emission
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][1] == "my-timer-metric@second"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 1
+    assert m[0][4] == {
+        "a": "b",
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    # Measurement Attachment
+    t = transaction.items[0].get_transaction_event()
+    assert "_metrics_summary" not in t
+    assert "_metrics_summary" not in t["spans"][0]
 
 
 def test_tag_normalization(sentry_init, capture_envelopes):
