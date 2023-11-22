@@ -14,7 +14,11 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
 from sanic.exceptions import SanicException
-from sanic_testing import TestManager
+
+try:
+    from sanic_testing import TestManager
+except ImportError:
+    TestManager = None
 
 try:
     from sanic_testing.reusable import ReusableClient
@@ -54,7 +58,8 @@ def app():
     else:
         sanic_app = Sanic("Test")
 
-    TestManager(sanic_app)
+    if TestManager is not None:
+        TestManager(sanic_app)
 
     @sanic_app.route("/message")
     def hi(request):
@@ -88,8 +93,8 @@ def test_request_data(sentry_init, app, capture_events):
     sentry_init(integrations=[SanicIntegration()])
     events = capture_events()
 
-    client = get_client(app)
-    with client:
+    c = get_client(app)
+    with c as client:
         _, response = client.get("/message?foo=bar")
         assert response.status == 200
 
@@ -128,8 +133,8 @@ def test_transaction_name(
     sentry_init(integrations=[SanicIntegration()])
     events = capture_events()
 
-    client = get_client(app)
-    with client:
+    c = get_client(app)
+    with c as client:
         _, response = client.get(url)
         assert response.status == 200
 
@@ -146,8 +151,8 @@ def test_errors(sentry_init, app, capture_events):
     def myerror(request):
         raise ValueError("oh no")
 
-    client = get_client(app)
-    with client:
+    c = get_client(app)
+    with c as client:
         _, response = client.get("/error")
         assert response.status == 500
 
@@ -171,8 +176,8 @@ def test_bad_request_not_captured(sentry_init, app, capture_events):
     def index(request):
         raise SanicException("...", status_code=400)
 
-    client = get_client(app)
-    with client:
+    c = get_client(app)
+    with c as client:
         _, response = client.get("/")
         assert response.status == 400
 
@@ -191,8 +196,8 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
     def myhandler(request, exception):
         1 / 0
 
-    client = get_client(app)
-    with client:
+    c = get_client(app)
+    with c as client:
         _, response = client.get("/error")
         assert response.status == 500
 
@@ -409,8 +414,8 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     events = capture_events()
 
     # Make request to the desired URL
-    client = get_client(app)
-    with client:
+    c = get_client(app)
+    with c as client:
         _, response = client.get(test_config.url)
         assert response.status == test_config.expected_status
 
