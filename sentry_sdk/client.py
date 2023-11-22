@@ -269,7 +269,8 @@ class _Client(object):
                 ],
             )
 
-            self.spotlight = setup_spotlight(self.options)
+            if self.options["spotlight"]:
+                self.spotlight = setup_spotlight(self.options)
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name

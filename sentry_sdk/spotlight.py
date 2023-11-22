@@ -1,12 +1,20 @@
 import io
-from urllib import request
+import urllib3
+
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from urllib3.poolmanager import PoolManager
 
 from sentry_sdk.utils import logger
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.envelope import Envelope
 
 class SpotlightSidecar(object):
     def __init__(self, port):
         self.port = port
+
+    def ensure(self):
+        pass
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -14,19 +22,20 @@ class SpotlightSidecar(object):
         body = io.BytesIO()
         envelope.serialize_into(body)
 
-        req = request.Request(
-            f"http://localhost:{self.port}/stream",
-            data=body
-            headers={
-                'Content-Type': 'application/json',
-            },
-        )
-        
+        http = urllib3.PoolManager()
+
         try:
-            request.urlopen(req)
+            req = http.request(
+                url=f"http://localhost:{self.port}/stream",
+                body=body.getvalue(),
+                method='POST',
+                headers={
+                    'Content-Type': 'application/x-sentry-envelope',
+                },
+            )
+            req.close()
         except Exception as e:
             logger.exception(str(e))
-
 
 instance = None
 
