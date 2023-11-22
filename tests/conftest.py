@@ -602,3 +602,18 @@ def create_mock_http_server():
     mock_server_thread.start()
 
     return mock_server_port
+
+
+def get_werkzeug_response(response):
+    try:
+        content, status, headers = response
+        return b"".join(content), status, headers
+    except TypeError:
+        return response.get_data(), response.status, response.headers
+
+
+def werkzeug_set_cookie(client, servername, key, value):
+    try:
+        client.set_cookie(servername, key, value)
+    except TypeError:
+        client.set_cookie(key, value)
