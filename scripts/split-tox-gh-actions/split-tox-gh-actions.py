@@ -82,11 +82,19 @@ def write_yaml_file(
     template,
     current_framework,
     python_versions,
-    should_test_latest,
+    python_versions_latest,
 ):
+    print(current_framework, "SHOULD TEST LATEST", python_versions_latest)
     """Write the YAML configuration file for one framework to disk."""
-    py_versions = [py.replace("py", "") for py in python_versions]
+    py_versions = sorted(
+        [py.replace("py", "") for py in python_versions],
+        key=lambda v: tuple(map(int, v.split("."))),
+    )
     py27_supported = "2.7" in py_versions
+    py_versions_latest = sorted(
+        [py.replace("py", "") for py in python_versions_latest],
+        key=lambda v: tuple(map(int, v.split("."))),
+    )
 
     test_loc = template.index("{{ test }}\n")
     f = open(TEMPLATE_SNIPPET_TEST, "r")
@@ -108,7 +116,7 @@ def write_yaml_file(
         template.pop(test_py27_loc)
 
     test_latest_loc = template.index("{{ test_latest }}\n")
-    if should_test_latest:
+    if python_versions_latest:
         f = open(TEMPLATE_SNIPPET_TEST_LATEST, "r")
         test_latest_snippet = f.readlines()
         template = (
@@ -127,6 +135,13 @@ def write_yaml_file(
             m = MATRIX_DEFINITION
             m = m.replace("{{ framework }}", current_framework).replace(
                 "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions])
+            )
+            out += m
+
+        elif template_line.strip() == "{{ strategy_matrix_latest }}":
+            m = MATRIX_DEFINITION
+            m = m.replace("{{ framework }}", current_framework).replace(
+                "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions_latest])
             )
             out += m
 
@@ -213,8 +228,8 @@ def main(fail_on_changes):
     config.read(TOX_FILE)
     lines = [x for x in config["tox"]["envlist"].split("\n") if len(x) > 0]
 
-    python_versions = defaultdict(list)
-    should_test_latest = defaultdict(lambda: False)
+    python_versions = defaultdict(set)
+    python_versions_latest = defaultdict(set)
 
     print("Parse tox.ini envlist")
 
@@ -235,14 +250,13 @@ def main(fail_on_changes):
                 framework_versions = []
 
             # collect python versions to test the framework in
-            for python_version in (
+            raw_python_versions = set(
                 raw_python_versions.replace("{", "").replace("}", "").split(",")
-            ):
-                if python_version not in python_versions[framework]:
-                    python_versions[framework].append(python_version)
-
+            )
             if "latest" in framework_versions:
-                should_test_latest[framework] = True
+                python_versions_latest[framework] |= raw_python_versions
+            else:
+                python_versions[framework] |= raw_python_versions
 
         except ValueError:
             print(f"ERROR reading line {line}")
@@ -252,7 +266,7 @@ def main(fail_on_changes):
             template,
             framework,
             python_versions[framework],
-            should_test_latest[framework],
+            python_versions_latest[framework],
         )
 
     if fail_on_changes:

@@ -2,7 +2,7 @@
     name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-{{ strategy_matrix }}
+{{ strategy_matrix_latest }}
 {{ services }}
 
     steps:
