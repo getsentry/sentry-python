@@ -67,6 +67,9 @@ def test_query_source_disabled(
             assert SPANDATA.CODE_NAMESPACE not in data
             assert SPANDATA.CODE_FILEPATH not in data
             assert SPANDATA.CODE_FUNCTION not in data
+            break
+    else:
+        assert False, "No db span found"
 
 
 @pytest.mark.forked
