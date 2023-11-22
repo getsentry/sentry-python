@@ -33,6 +33,7 @@ from sentry_sdk.envelope import Envelope
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
+from sentry_sdk.spotlight import setup_spotlight
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -267,6 +268,8 @@ class _Client(object):
                     "auto_enabling_integrations"
                 ],
             )
+
+            self.spotlight = setup_spotlight(self.options)
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
             SDK_INFO["name"] = sdk_name
@@ -548,8 +551,6 @@ class _Client(object):
         if disable_capture_event.get(False):
             return None
 
-        if self.transport is None:
-            return None
         if hint is None:
             hint = {}
         event_id = event.get("event_id")
@@ -616,9 +617,18 @@ class _Client(object):
             for attachment in attachments or ():
                 envelope.add_item(attachment.to_envelope_item())
 
+            if self.spotlight:
+                self.spotlight.capture_envelope(envelope)
+            
+            if self.transport is None:
+                return None
+            
             self.transport.capture_envelope(envelope)
 
         else:
+            if self.transport is None:
+                return None
+            
             # All other events go to the legacy /store/ endpoint (will be removed in the future).
             self.transport.capture_event(event_opt)
 
