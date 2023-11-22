@@ -58,9 +58,7 @@ def test_query_source_disabled(
 
     (event,) = events
     for span in event["spans"]:
-        if span.get("op") == "db" and span.get("description").startswith(
-            "SELECT pg_sleep("
-        ):
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
             data = span.get("data")
 
             assert SPANDATA.CODE_LINENO not in data
@@ -69,7 +67,7 @@ def test_query_source_disabled(
             assert SPANDATA.CODE_FUNCTION not in data
             break
     else:
-        assert False, "No db span found"
+        raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
@@ -116,4 +114,4 @@ def test_query_source(sentry_init, client, capture_events):
             assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
             break
     else:
-        assert False, "No db span found"
+        raise AssertionError("No db span found")

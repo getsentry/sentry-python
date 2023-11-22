@@ -279,7 +279,7 @@ def test_query_source_disabled(sentry_init, capture_events, enable_db_query_sour
             assert SPANDATA.CODE_FUNCTION not in data
             break
     else:
-        assert False, "No db span found"
+        raise AssertionError("No db span found")
 
 
 @patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
@@ -335,4 +335,4 @@ def test_query_source(sentry_init, capture_events):
             assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
             break
     else:
-        assert False, "No db span found"
+        raise AssertionError("No db span found")
