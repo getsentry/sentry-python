@@ -10,11 +10,8 @@ from sentry_sdk.utils import logger
 from sentry_sdk.envelope import Envelope
 
 class SpotlightSidecar(object):
-    def __init__(self, port):
-        self.port = port
-
-    def ensure(self):
-        pass
+    def __init__(self, url):
+        self.url = url
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -26,7 +23,7 @@ class SpotlightSidecar(object):
 
         try:
             req = http.request(
-                url=f"http://localhost:{self.port}/stream",
+                url=self.url,
                 body=body.getvalue(),
                 method='POST',
                 headers={
@@ -43,9 +40,15 @@ def setup_spotlight(options):
     global instance
 
     if instance is None:
-        instance = SpotlightSidecar(port=8969)
-    
-    instance.ensure()
+        url = options["spotlight"]
+        if isinstance(url, str):
+            pass
+        elif url is True:
+            url = "http://localhost:8969/stream"
+        else:
+            return None
+        
+        instance = SpotlightSidecar(url)
     
     return instance
 
