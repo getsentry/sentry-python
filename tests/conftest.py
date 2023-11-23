@@ -609,7 +609,7 @@ def unpack_werkzeug_response(response):
     # an object
     try:
         return response.get_data(), response.status, response.headers
-    except TypeError:
+    except AttributeError:
         content, status, headers = response
         return b"".join(content), status, headers
 
