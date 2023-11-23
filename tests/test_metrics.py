@@ -1,6 +1,9 @@
 # coding: utf-8
 
+import json
+import sys
 import time
+from unittest import mock
 
 from sentry_sdk import Hub, metrics, push_scope
 
@@ -40,7 +43,7 @@ def test_incr(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -50,10 +53,10 @@ def test_incr(sentry_init, capture_envelopes):
     Hub.current.flush()
 
     (envelope,) = envelopes
+    statsd_item, meta_item = envelope.items
 
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert statsd_item.headers["type"] == "statsd"
+    m = parse_metrics(statsd_item.payload.get_bytes())
 
     assert len(m) == 1
     assert m[0][1] == "foobar@none"
@@ -66,12 +69,29 @@ def test_incr(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
+    assert meta_item.headers["type"] == "metric_meta"
+    assert json.loads(meta_item.payload.get_bytes()) == {
+        "timestamp": mock.ANY,
+        "mapping": {
+            "c:foobar@none": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ]
+        },
+    }
+
 
 def test_timing(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -81,10 +101,10 @@ def test_timing(sentry_init, capture_envelopes):
     Hub.current.flush()
 
     (envelope,) = envelopes
+    statsd_item, meta_item = envelope.items
 
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert statsd_item.headers["type"] == "statsd"
+    m = parse_metrics(statsd_item.payload.get_bytes())
 
     assert len(m) == 1
     assert m[0][1] == "whatever@second"
@@ -97,19 +117,29 @@ def test_timing(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
-    loc = Hub.current.client.metrics_aggregator.code_locations
-    first_loc, = loc.values()
-    assert first_loc["filename"] == __file__
-    assert first_loc["line"] > 0
-    assert first_loc["module"] == "tests.test_metrics"
-    assert first_loc["function"] == "test_timing"
+    assert meta_item.headers["type"] == "metric_meta"
+    assert json.loads(meta_item.payload.get_bytes()) == {
+        "timestamp": mock.ANY,
+        "mapping": {
+            "d:whatever@second": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ]
+        },
+    }
 
 
 def test_timing_decorator(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "code_locations": True},
     )
     envelopes = capture_envelopes()
 
@@ -128,10 +158,10 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     Hub.current.flush()
 
     (envelope,) = envelopes
+    statsd_item, meta_item = envelope.items
 
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert statsd_item.headers["type"] == "statsd"
+    m = parse_metrics(statsd_item.payload.get_bytes())
 
     assert len(m) == 2
     assert m[0][1] == "whatever-1@second"
@@ -154,24 +184,39 @@ def test_timing_decorator(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
-    loc = Hub.current.client.metrics_aggregator.code_locations
-    assert len(loc) == 2
-    first_loc, second_loc = loc.values()
-    assert first_loc["filename"] == __file__
-    assert first_loc["line"] > 0
-    assert first_loc["module"] == "tests.test_metrics"
-    assert first_loc["function"] == "test_timing_decorator"
-    assert second_loc["filename"] == __file__
-    assert second_loc["line"] > 0
-    assert second_loc["module"] == "tests.test_metrics"
-    assert second_loc["function"] == "test_timing_decorator"
+    assert meta_item.headers["type"] == "metric_meta"
+    assert json.loads(meta_item.payload.get_bytes()) == {
+        "timestamp": mock.ANY,
+        "mapping": {
+            "d:whatever-1@second": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ],
+            "d:whatever-2@nanosecond": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ],
+        },
+    }
 
 
 def test_timing_basic(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -183,10 +228,11 @@ def test_timing_basic(sentry_init, capture_envelopes):
     Hub.current.flush()
 
     (envelope,) = envelopes
+    (envelope,) = envelopes
+    statsd_item, meta_item = envelope.items
 
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert statsd_item.headers["type"] == "statsd"
+    m = parse_metrics(statsd_item.payload.get_bytes())
 
     assert len(m) == 1
     assert m[0][1] == "timing@second"
@@ -199,19 +245,29 @@ def test_timing_basic(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
-    loc = Hub.current.client.metrics_aggregator.code_locations
-    first_loc, = loc.values()
-    assert first_loc["filename"] == __file__
-    assert first_loc["line"] > 0
-    assert first_loc["module"] == "tests.test_metrics"
-    assert first_loc["function"] == "test_timing_basic"
+    assert meta_item.headers["type"] == "metric_meta"
+    assert json.loads(meta_item.payload.get_bytes()) == {
+        "timestamp": mock.ANY,
+        "mapping": {
+            "d:timing@second": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ]
+        },
+    }
 
 
 def test_distribution(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -223,10 +279,10 @@ def test_distribution(sentry_init, capture_envelopes):
     Hub.current.flush()
 
     (envelope,) = envelopes
+    statsd_item, meta_item = envelope.items
 
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert statsd_item.headers["type"] == "statsd"
+    m = parse_metrics(statsd_item.payload.get_bytes())
 
     assert len(m) == 1
     assert m[0][1] == "dist@none"
@@ -239,12 +295,29 @@ def test_distribution(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
+    assert meta_item.headers["type"] == "metric_meta"
+    assert json.loads(meta_item.payload.get_bytes()) == {
+        "timestamp": mock.ANY,
+        "mapping": {
+            "d:dist@none": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ]
+        },
+    }
+
 
 def test_set(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -255,10 +328,10 @@ def test_set(sentry_init, capture_envelopes):
     Hub.current.flush()
 
     (envelope,) = envelopes
+    statsd_item, meta_item = envelope.items
 
-    assert len(envelope.items) == 1
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert statsd_item.headers["type"] == "statsd"
+    m = parse_metrics(statsd_item.payload.get_bytes())
 
     assert len(m) == 1
     assert m[0][1] == "my-set@none"
@@ -269,6 +342,23 @@ def test_set(sentry_init, capture_envelopes):
         "magic": "puff",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
+    }
+
+    assert meta_item.headers["type"] == "metric_meta"
+    assert json.loads(meta_item.payload.get_bytes()) == {
+        "timestamp": mock.ANY,
+        "mapping": {
+            "s:my-set@none": [
+                {
+                    "type": "location",
+                    "filename": "tests/test_metrics.py",
+                    "abs_path": __file__,
+                    "function": sys._getframe().f_code.co_name,
+                    "module": __name__,
+                    "lineno": mock.ANY,
+                }
+            ]
+        },
     }
 
 
@@ -529,13 +619,6 @@ def test_tag_serialization(sentry_init, capture_envelopes):
         "release": "fun-release",
         "environment": "not-fun-env",
     }
-
-    loc = Hub.current.client.metrics_aggregator.code_locations
-    first_loc = next(iter(loc.values()))
-    assert first_loc["filename"] == __file__
-    assert first_loc["line"] > 0
-    assert first_loc["module"] == "tests.test_metrics"
-    assert first_loc["function"] == "test_tag_serialization"
 
 
 def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch):

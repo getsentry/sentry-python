@@ -12,8 +12,14 @@ from threading import Event, Lock, Thread
 from contextlib import contextmanager
 
 import sentry_sdk
-from sentry_sdk._compat import text_type
-from sentry_sdk.utils import now, nanosecond_time, to_timestamp
+from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
+from sentry_sdk.utils import (
+    now,
+    nanosecond_time,
+    to_timestamp,
+    serialize_frame,
+    json_dumps,
+)
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
     TRANSACTION_SOURCE_ROUTE,
@@ -25,11 +31,13 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
-    from typing import Iterable
     from typing import Callable
-    from typing import Optional
+    from typing import Dict
     from typing import Generator
+    from typing import Iterable
+    from typing import List
+    from typing import Optional
+    from typing import Set
     from typing import Tuple
     from typing import Union
 
@@ -37,6 +45,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import DurationUnit
     from sentry_sdk._types import FlushedMetricValue
     from sentry_sdk._types import MeasurementUnit
+    from sentry_sdk._types import MetricMetaKey
     from sentry_sdk._types import MetricTagValue
     from sentry_sdk._types import MetricTags
     from sentry_sdk._types import MetricTagsInternal
@@ -47,6 +56,7 @@ if TYPE_CHECKING:
 _thread_local = threading.local()
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
+_set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
     [
@@ -59,16 +69,15 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 
 
 def get_code_location(stacklevel):
+    # type: (int) -> Optional[Dict[str, Any]]
     try:
         frm = sys._getframe(stacklevel + 3)
     except Exception:
         return None
-    return {
-        "line": frm.f_lineno,
-        "module": frm.f_globals.get("__name__"),
-        "filename": frm.f_code.co_filename,
-        "function": frm.f_code.co_name,
-    }
+
+    return serialize_frame(
+        frm, include_local_variables=False, include_source_context=False
+    )
 
 
 @contextmanager
@@ -261,7 +270,7 @@ def _encode_metrics(flushable_buckets):
     # relay side emission and should not happen commonly.
 
     for timestamp, buckets in flushable_buckets:
-        for bucket_key, metric in buckets.items():
+        for bucket_key, metric in iteritems(buckets):
             metric_type, metric_name, metric_unit, metric_tags = bucket_key
             metric_name = _sanitize_key(metric_name)
             _write(metric_name.encode("utf-8"))
@@ -297,6 +306,18 @@ def _encode_metrics(flushable_buckets):
     return out.getvalue()
 
 
+def _encode_locations(timestamp, code_locations):
+    # type: (int, Iterable[Tuple[MetricMetaKey, Dict[str, Any]]]) -> bytes
+    mapping = {}  # type: Dict[str, List[Any]]
+
+    for key, loc in code_locations:
+        metric_type, name, unit = key
+        mri = "{}:{}@{}".format(metric_type, _sanitize_key(name), unit)
+        mapping.setdefault(mri, []).append({"type": "location", **loc})
+
+    return json_dumps({"timestamp": timestamp, "mapping": mapping})
+
+
 METRIC_TYPES = {
     "c": CounterMetric,
     "g": GaugeMetric,
@@ -325,10 +346,13 @@ class MetricsAggregator(object):
     def __init__(
         self,
         capture_func,  # type: Callable[[Envelope], None]
+        enable_code_locations=False,  # type: bool
     ):
         # type: (...) -> None
         self.buckets = {}  # type: Dict[int, Any]
-        self.code_locations = {}  # type: Dict[BucketKey, Any]
+        self._enable_code_locations = enable_code_locations
+        self._seen_locations = _set()  # type: Set[Tuple[int, MetricMetaKey]]
+        self._pending_locations = {}  # type: Dict[int, List[Tuple[MetricMetaKey, Any]]]
         self._buckets_total_weight = 0
         self._capture_func = capture_func
         self._lock = Lock()
@@ -381,9 +405,7 @@ class MetricsAggregator(object):
 
     def _flush(self):
         # type: (...) -> None
-        flushable_buckets = self._flushable_buckets()
-        if flushable_buckets:
-            self._emit(flushable_buckets)
+        self._emit(self._flushable_buckets(), self._flushable_locations())
 
     def _flushable_buckets(self):
         # type: (...) -> (Iterable[Tuple[int, Dict[BucketKey, Metric]]])
@@ -400,20 +422,27 @@ class MetricsAggregator(object):
                 self._force_flush = False
             else:
                 flushable_buckets = []
-                for buckets_timestamp, buckets in self.buckets.items():
+                for buckets_timestamp, buckets in iteritems(self.buckets):
                     # If the timestamp of the bucket is newer that the rollup we want to skip it.
                     if buckets_timestamp <= cutoff:
                         flushable_buckets.append((buckets_timestamp, buckets))
 
                 # We will clear the elements while holding the lock, in order to avoid requesting it downstream again.
                 for buckets_timestamp, buckets in flushable_buckets:
-                    for _, metric in buckets.items():
+                    for _, metric in iteritems(buckets):
                         weight_to_remove += metric.weight
                     del self.buckets[buckets_timestamp]
 
                 self._buckets_total_weight -= weight_to_remove
 
         return flushable_buckets
+
+    def _flushable_locations(self):
+        # type: (...) -> Dict[int, List[Tuple[MetricMetaKey, Dict[str, Any]]]]
+        with self._lock:
+            locations = self._pending_locations
+            self._pending_locations = {}
+        return locations
 
     @metrics_noop
     def add(
@@ -457,11 +486,24 @@ class MetricsAggregator(object):
 
             self._buckets_total_weight += metric.weight - previous_weight
 
-            # Store code location once per bucket
-            if bucket_key not in self.code_locations:
-                loc = get_code_location(stacklevel)
-                if loc is not None:
-                    self.code_locations[bucket_key] = loc
+            # Store code location once per metric and per day (of bucket timestamp)
+            if self._enable_code_locations:
+                meta_key = (ty, key, unit)
+                start_of_day = int(
+                    utc_from_timestamp(timestamp)
+                    .replace(hour=0, minute=0, second=0, microsecond=0)
+                    .timestamp()
+                )
+
+                if (start_of_day, meta_key) not in self._seen_locations:
+                    self._seen_locations.add((start_of_day, meta_key))
+                    loc = get_code_location(stacklevel)
+                    if loc is not None:
+                        # Group metadata by day to make flushing more efficient.
+                        # There needs to be one envelope item per timestamp.
+                        self._pending_locations.setdefault(start_of_day, []).append(
+                            (meta_key, loc)
+                        )
 
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
@@ -493,13 +535,23 @@ class MetricsAggregator(object):
     def _emit(
         self,
         flushable_buckets,  # type: (Iterable[Tuple[int, Dict[BucketKey, Metric]]])
+        code_locations,  # type: Dict[int, List[Tuple[MetricMetaKey, Dict[str, Any]]]]
     ):
-        # type: (...) -> Envelope
-        encoded_metrics = _encode_metrics(flushable_buckets)
-        metric_item = Item(payload=encoded_metrics, type="statsd")
-        envelope = Envelope(items=[metric_item])
-        self._capture_func(envelope)
-        return envelope
+        # type: (...) -> Optional[Envelope]
+        envelope = Envelope()
+
+        if flushable_buckets:
+            encoded_metrics = _encode_metrics(flushable_buckets)
+            envelope.add_item(Item(payload=encoded_metrics, type="statsd"))
+
+        for timestamp, locations in iteritems(code_locations):
+            encoded_locations = _encode_locations(timestamp, locations)
+            envelope.add_item(Item(payload=encoded_locations, type="metric_meta"))
+
+        if envelope.items:
+            self._capture_func(envelope)
+            return envelope
+        return None
 
     def _serialize_tags(
         self, tags  # type: Optional[MetricTags]
@@ -509,7 +561,7 @@ class MetricsAggregator(object):
             return ()
 
         rv = []
-        for key, value in tags.items():
+        for key, value in iteritems(tags):
             # If the value is a collection, we want to flatten it.
             if isinstance(value, (list, tuple)):
                 for inner_value in value:
@@ -564,7 +616,7 @@ def incr(
     """Increments a counter."""
     aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
-        aggregator.add("c", key, value, unit, tags, timestamp)
+        aggregator.add("c", key, value, unit, tags, timestamp, stacklevel)
 
 
 class _Timing(object):
@@ -575,7 +627,7 @@ class _Timing(object):
         timestamp,  # type: Optional[Union[float, datetime]]
         value,  # type: Optional[float]
         unit,  # type: DurationUnit
-        stacklevel  # type: int
+        stacklevel,  # type: int
     ):
         # type: (...) -> None
         self.key = key
@@ -604,7 +656,9 @@ class _Timing(object):
         aggregator, tags = _get_aggregator_and_update_tags(self.key, self.tags)
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
-            aggregator.add("d", self.key, elapsed, self.unit, tags, self.timestamp, self.stacklevel)
+            aggregator.add(
+                "d", self.key, elapsed, self.unit, tags, self.timestamp, self.stacklevel
+            )
 
     def __call__(self, f):
         # type: (Any) -> Any
@@ -614,8 +668,11 @@ class _Timing(object):
         def timed_func(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             with timing(
-                key=self.key, tags=self.tags, timestamp=self.timestamp, unit=self.unit,
-                stacklevel=self.stacklevel + 1
+                key=self.key,
+                tags=self.tags,
+                timestamp=self.timestamp,
+                unit=self.unit,
+                stacklevel=self.stacklevel + 1,
             ):
                 return f(*args, **kwargs)
 
