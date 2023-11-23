@@ -35,6 +35,4 @@ else
     ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
 fi
 
-echo $ENV
-
 exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
