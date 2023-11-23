@@ -175,6 +175,20 @@ def add_query_source(hub, span):
     if client is None:
         return
 
+    if span.timestamp is None or span.start_timestamp is None:
+        return
+
+    should_add_query_source = client.options.get("enable_db_query_source", False)
+    if not should_add_query_source:
+        return
+
+    duration = span.timestamp - span.start_timestamp
+    threshold = client.options.get("db_query_source_threshold_ms", 0)
+    slow_query = duration.microseconds > threshold * 1000
+
+    if not slow_query:
+        return
+
     project_root = client.options["project_root"]
 
     # Find the correct frame
@@ -241,23 +255,7 @@ def add_additional_span_data(hub, span):
     Adds additional data to the span
     """
     if span.op == OP.DB:
-        if span.timestamp is None or span.start_timestamp is None:
-            return
-
-        client = hub.client
-        if client is None:
-            return
-
-        should_add_query_source = client.options.get("enable_db_query_source", False)
-        if not should_add_query_source:
-            return
-
-        duration = span.timestamp - span.start_timestamp
-        threshold = client.options.get("db_query_source_threshold_ms", 0)
-        slow_query = duration.microseconds > threshold * 1000
-
-        if slow_query:
-            add_query_source(hub, span)
+        add_query_source(hub, span)
 
 
 def extract_sentrytrace_data(header):
