@@ -3,7 +3,7 @@ import re
 import sys
 
 import sentry_sdk
-from sentry_sdk.consts import DB_SPAN_DURATION_THRESHOLD_MS, OP, SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
@@ -253,7 +253,8 @@ def add_additional_span_data(hub, span):
             return
 
         duration = span.timestamp - span.start_timestamp
-        slow_query = duration.microseconds > DB_SPAN_DURATION_THRESHOLD_MS * 1000
+        threshold = client.options.get("query_source_threshold_ms", 0)
+        slow_query = duration.microseconds > threshold * 1000
 
         if slow_query:
             add_query_source(hub, span)

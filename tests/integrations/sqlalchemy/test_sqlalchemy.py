@@ -13,11 +13,6 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.utils import json_dumps
 
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
-
 
 def test_orm_queries(sentry_init, capture_events):
     sentry_init(
@@ -232,12 +227,12 @@ def test_engine_name_not_string(sentry_init):
         con.execute(text("SELECT 0"))
 
 
-@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
 @pytest.mark.parametrize("enable_db_query_source", [None, False])
 def test_query_source_disabled(sentry_init, capture_events, enable_db_query_source):
     sentry_options = {
         "integrations": [SqlalchemyIntegration()],
         "enable_tracing": True,
+        "query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
@@ -282,12 +277,12 @@ def test_query_source_disabled(sentry_init, capture_events, enable_db_query_sour
         raise AssertionError("No db span found")
 
 
-@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
 def test_query_source(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         enable_tracing=True,
         enable_db_query_source=True,
+        query_source_threshold_ms=0,
     )
     events = capture_events()
 

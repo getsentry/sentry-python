@@ -18,11 +18,6 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
 
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
-
 
 @pytest.fixture
 def client():
@@ -30,7 +25,6 @@ def client():
 
 
 @pytest.mark.forked
-@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
 @pytest_mark_django_db_decorator(transaction=True)
 @pytest.mark.parametrize("enable_db_query_source", [None, False])
 def test_query_source_disabled(
@@ -40,6 +34,7 @@ def test_query_source_disabled(
         "integrations": [DjangoIntegration()],
         "send_default_pii": True,
         "traces_sample_rate": 1.0,
+        "query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
@@ -72,7 +67,6 @@ def test_query_source_disabled(
 
 
 @pytest.mark.forked
-@patch("sentry_sdk.tracing_utils.DB_SPAN_DURATION_THRESHOLD_MS", 0)
 @pytest_mark_django_db_decorator(transaction=True)
 def test_query_source(sentry_init, client, capture_events):
     sentry_init(
@@ -80,6 +74,7 @@ def test_query_source(sentry_init, client, capture_events):
         send_default_pii=True,
         traces_sample_rate=1.0,
         enable_db_query_source=True,
+        query_source_threshold_ms=0,
     )
 
     if "postgres" not in connections:
