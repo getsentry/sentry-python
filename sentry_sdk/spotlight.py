@@ -36,22 +36,16 @@ class SpotlightSidecar(object):
             logger.exception(str(e))
 
 
-instance = None
-
-
 def setup_spotlight(options):
     # type: (Dict[str, Any]) -> Optional[SpotlightSidecar]
-    global instance
 
-    if instance is None:
-        url = options["spotlight"]
-        if isinstance(url, str):
-            pass
-        elif url is True:
-            url = "http://localhost:8969/stream"
-        else:
-            return None
+    url = options["spotlight"]
 
-        instance = SpotlightSidecar(url)
+    if isinstance(url, str):
+        pass
+    elif url is True:
+        url = "http://localhost:8969/stream"
+    else:
+        return None
 
-    return instance
+    return SpotlightSidecar(url)

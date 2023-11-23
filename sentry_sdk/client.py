@@ -269,6 +269,7 @@ class _Client(object):
                 ],
             )
 
+            self.spotlight = None
             if self.options["spotlight"]:
                 self.spotlight = setup_spotlight(self.options)
 
