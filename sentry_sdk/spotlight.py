@@ -12,7 +12,7 @@ from sentry_sdk.utils import logger
 from sentry_sdk.envelope import Envelope
 
 
-class SpotlightSidecar(object):
+class SpotlightClient(object):
     def __init__(self, url):
         # type: (str) -> None
         self.url = url
@@ -37,7 +37,7 @@ class SpotlightSidecar(object):
 
 
 def setup_spotlight(options):
-    # type: (Dict[str, Any]) -> Optional[SpotlightSidecar]
+    # type: (Dict[str, Any]) -> Optional[SpotlightClient]
 
     url = options.get("spotlight")
 
@@ -48,4 +48,4 @@ def setup_spotlight(options):
     else:
         return None
 
-    return SpotlightSidecar(url)
+    return SpotlightClient(url)
