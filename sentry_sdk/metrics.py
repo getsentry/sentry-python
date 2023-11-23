@@ -453,7 +453,7 @@ class MetricsAggregator(object):
         unit,  # type: MeasurementUnit
         tags,  # type: Optional[MetricTags]
         timestamp=None,  # type: Optional[Union[float, datetime]]
-        stacklevel=1,  # type: int
+        stacklevel=0,  # type: int
     ):
         # type: (...) -> None
         if not self._ensure_thread() or self._flusher is None:
