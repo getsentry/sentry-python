@@ -14,7 +14,11 @@ from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_URL,
+    TRANSACTION_SOURCE_COMPONENT,
+)
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -394,11 +398,14 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         if hasattr(urlconf, "handler404"):
             handler = urlconf.handler404
             if isinstance(handler, string_types):
-                scope.transaction = handler
+                transaction_name = handler
             else:
-                scope.transaction = transaction_from_function(
+                transaction_name = transaction_from_function(
                     getattr(handler, "view_class", handler)
                 )
+            scope.set_transaction_name(
+                transaction_name, source=TRANSACTION_SOURCE_COMPONENT
+            )
     except Exception:
         pass
 
