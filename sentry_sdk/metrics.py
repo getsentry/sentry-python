@@ -71,7 +71,7 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 def get_code_location(stacklevel):
     # type: (int) -> Optional[Dict[str, Any]]
     try:
-        frm = sys._getframe(stacklevel + 3)
+        frm = sys._getframe(stacklevel + 4)
     except Exception:
         return None
 
@@ -610,7 +610,7 @@ def incr(
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=1,  # type: int
+    stacklevel=0,  # type: int
 ):
     # type: (...) -> None
     """Increments a counter."""
@@ -685,7 +685,7 @@ def timing(
     unit="second",  # type: DurationUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=1,  # type: int
+    stacklevel=0,  # type: int
 ):
     # type: (...) -> _Timing
     """Emits a distribution with the time it takes to run the given code block.
@@ -709,7 +709,7 @@ def distribution(
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=1,  # type: int
+    stacklevel=0,  # type: int
 ):
     # type: (...) -> None
     """Emits a distribution."""
@@ -724,7 +724,7 @@ def set(
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=1,  # type: int
+    stacklevel=0,  # type: int
 ):
     # type: (...) -> None
     """Emits a set."""
@@ -739,7 +739,7 @@ def gauge(
     unit="none",  # type: MetricValue
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=1,  # type: int
+    stacklevel=0,  # type: int
 ):
     # type: (...) -> None
     """Emits a gauge."""
