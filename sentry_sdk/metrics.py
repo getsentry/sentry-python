@@ -492,7 +492,7 @@ class MetricsAggregator(object):
             if self._enable_code_locations:
                 meta_key = (ty, key, unit)
                 start_of_day = utc_from_timestamp(timestamp).replace(
-                    hour=0, minute=0, second=0, microsecond=0
+                    hour=0, minute=0, second=0, microsecond=0, tzinfo=None
                 )
                 start_of_day = int(to_timestamp(start_of_day))
 
