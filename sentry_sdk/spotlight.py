@@ -39,7 +39,7 @@ class SpotlightSidecar(object):
 def setup_spotlight(options):
     # type: (Dict[str, Any]) -> Optional[SpotlightSidecar]
 
-    url = options["spotlight"]
+    url = options.get("spotlight")
 
     if isinstance(url, str):
         pass

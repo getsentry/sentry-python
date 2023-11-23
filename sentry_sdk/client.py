@@ -270,7 +270,7 @@ class _Client(object):
             )
 
             self.spotlight = None
-            if self.options["spotlight"]:
+            if self.options.get("spotlight"):
                 self.spotlight = setup_spotlight(self.options)
 
             sdk_name = get_sdk_name(list(self.integrations.keys()))
