@@ -604,15 +604,18 @@ def create_mock_http_server():
     return mock_server_port
 
 
-def get_werkzeug_response(response):
+def unpack_werkzeug_response(response):
+    # werkzeug < 2.1 returns a tuple as client response, newer versions return
+    # an object
     try:
+        return response.get_data(), response.status, response.headers
+    except TypeError:
         content, status, headers = response
         return b"".join(content), status, headers
-    except TypeError:
-        return response.get_data(), response.status, response.headers
 
 
 def werkzeug_set_cookie(client, servername, key, value):
+    # client.set_cookie has a different signature in different werkzeug versions
     try:
         client.set_cookie(servername, key, value)
     except TypeError:
