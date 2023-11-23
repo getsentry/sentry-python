@@ -3,7 +3,7 @@
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
 {{ strategy_matrix_latest }}
-{{ services }}
+{{ services_latest }}
 
     steps:
       - uses: actions/checkout@v4

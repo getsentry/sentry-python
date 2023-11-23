@@ -144,13 +144,15 @@ def write_yaml_file(
             )
             out += m
 
-        elif template_line.strip() == "{{ services }}":
+        elif template_line.strip() in ("{{ services }}", "{{ services_latest }}"):
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
                 lines = [
                     line.replace(
                         "{{ postgres_host }}",
-                        "postgres" if py27_test_part else "localhost",
+                        "postgres"
+                        if py27_test_part and "_latest" not in template_line
+                        else "localhost",
                     )
                     for line in f.readlines()
                 ]
