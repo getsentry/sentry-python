@@ -1,6 +1,5 @@
 # coding: utf-8
 
-import json
 import sys
 import time
 
@@ -10,6 +9,7 @@ except ImportError:
     import mock  # python < 3.3
 
 from sentry_sdk import Hub, metrics, push_scope
+from sentry_sdk.envelope import parse_json
 
 
 def parse_metrics(bytes):
@@ -74,7 +74,7 @@ def test_incr(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert json.loads(meta_item.payload.get_bytes()) == {
+    assert parse_json(meta_item.payload.get_bytes()) == {
         "timestamp": mock.ANY,
         "mapping": {
             "c:foobar@none": [
@@ -122,7 +122,7 @@ def test_timing(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert json.loads(meta_item.payload.get_bytes()) == {
+    assert parse_json(meta_item.payload.get_bytes()) == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:whatever@second": [
@@ -189,7 +189,7 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert json.loads(meta_item.payload.get_bytes()) == {
+    assert parse_json(meta_item.payload.get_bytes()) == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:whatever-1@second": [
@@ -250,7 +250,7 @@ def test_timing_basic(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert json.loads(meta_item.payload.get_bytes()) == {
+    assert parse_json(meta_item.payload.get_bytes()) == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:timing@second": [
@@ -300,7 +300,7 @@ def test_distribution(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert json.loads(meta_item.payload.get_bytes()) == {
+    assert parse_json(meta_item.payload.get_bytes()) == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:dist@none": [
@@ -349,7 +349,7 @@ def test_set(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert json.loads(meta_item.payload.get_bytes()) == {
+    assert parse_json(meta_item.payload.get_bytes()) == {
         "timestamp": mock.ANY,
         "mapping": {
             "s:my-set@none": [
