@@ -313,7 +313,9 @@ def _encode_locations(timestamp, code_locations):
     for key, loc in code_locations:
         metric_type, name, unit = key
         mri = "{}:{}@{}".format(metric_type, _sanitize_key(name), unit)
-        mapping.setdefault(mri, []).append({"type": "location", **loc})
+
+        loc["type"] = "location"
+        mapping.setdefault(mri, []).append(loc)
 
     return json_dumps({"timestamp": timestamp, "mapping": mapping})
 
