@@ -242,7 +242,9 @@ class _Client(object):
 
                 self.metrics_aggregator = MetricsAggregator(
                     capture_func=_capture_envelope,
-                    enable_code_locations=bool(experiments.get("code_locations")),
+                    enable_code_locations=bool(
+                        experiments.get("metric_code_locations")
+                    ),
                 )
 
             max_request_body_size = ("always", "never", "small", "medium")

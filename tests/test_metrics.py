@@ -3,7 +3,11 @@
 import json
 import sys
 import time
-from unittest import mock
+
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 from sentry_sdk import Hub, metrics, push_scope
 
@@ -43,7 +47,7 @@ def test_incr(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True, "code_locations": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -91,7 +95,7 @@ def test_timing(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True, "code_locations": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -139,7 +143,7 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True, "code_locations": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
     )
     envelopes = capture_envelopes()
 
@@ -216,7 +220,7 @@ def test_timing_basic(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True, "code_locations": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -267,7 +271,7 @@ def test_distribution(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True, "code_locations": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -317,7 +321,7 @@ def test_set(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True, "code_locations": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
     )
     ts = time.time()
     envelopes = capture_envelopes()
