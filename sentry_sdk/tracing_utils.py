@@ -253,7 +253,7 @@ def add_additional_span_data(hub, span):
             return
 
         duration = span.timestamp - span.start_timestamp
-        threshold = client.options.get("query_source_threshold_ms", 0)
+        threshold = client.options.get("db_query_source_threshold_ms", 0)
         slow_query = duration.microseconds > threshold * 1000
 
         if slow_query:

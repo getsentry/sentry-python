@@ -232,7 +232,6 @@ def test_query_source_disabled(sentry_init, capture_events, enable_db_query_sour
     sentry_options = {
         "integrations": [SqlalchemyIntegration()],
         "enable_tracing": True,
-        "query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
@@ -282,7 +281,7 @@ def test_query_source(sentry_init, capture_events):
         integrations=[SqlalchemyIntegration()],
         enable_tracing=True,
         enable_db_query_source=True,
-        query_source_threshold_ms=0,
+        db_query_source_threshold_ms=0,
     )
     events = capture_events()
 

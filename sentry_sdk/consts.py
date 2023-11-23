@@ -55,7 +55,6 @@ DEFAULT_QUEUE_SIZE = 100
 DEFAULT_MAX_BREADCRUMBS = 100
 MATCH_ALL = r".*"
 
-
 FALSE_VALUES = [
     "false",
     "no",
@@ -289,7 +288,7 @@ class ClientConstructor(object):
         enable_backpressure_handling=True,  # type: bool
         error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
         enable_db_query_source=False,  # type: bool
-        query_source_threshold_ms=100,  # type: int
+        db_query_source_threshold_ms=100,  # type: int
     ):
         # type: (...) -> None
         pass
