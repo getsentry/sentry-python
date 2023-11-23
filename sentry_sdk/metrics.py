@@ -491,11 +491,10 @@ class MetricsAggregator(object):
             # Store code location once per metric and per day (of bucket timestamp)
             if self._enable_code_locations:
                 meta_key = (ty, key, unit)
-                start_of_day = int(
-                    utc_from_timestamp(timestamp)
-                    .replace(hour=0, minute=0, second=0, microsecond=0)
-                    .timestamp()
+                start_of_day = utc_from_timestamp(timestamp).replace(
+                    hour=0, minute=0, second=0, microsecond=0
                 )
+                start_of_day = int(to_timestamp(start_of_day))
 
                 if (start_of_day, meta_key) not in self._seen_locations:
                     self._seen_locations.add((start_of_day, meta_key))
