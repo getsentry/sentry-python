@@ -94,12 +94,6 @@ def patch_django_asgi_handler_impl(cls):
 
             with hub.configure_scope() as scope:
                 request, error_response = old_create_request(self, *args, **kwargs)
-
-                # read the body once, to signal Django to cache the body stream
-                # so we can read the body in our event processor
-                # (otherwise Django closes the body stream and makes it impossible to read it again)
-                _ = request.body
-
                 scope.add_event_processor(_make_asgi_request_event_processor(request))
 
                 return request, error_response
