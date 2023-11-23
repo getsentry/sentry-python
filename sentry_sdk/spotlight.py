@@ -12,6 +12,7 @@ from sentry_sdk.envelope import Envelope
 class SpotlightSidecar(object):
     def __init__(self, url):
         self.url = url
+        self.http = urllib3.PoolManager()
 
     def capture_envelope(
         self, envelope  # type: Envelope
@@ -19,10 +20,8 @@ class SpotlightSidecar(object):
         body = io.BytesIO()
         envelope.serialize_into(body)
 
-        http = urllib3.PoolManager()
-
         try:
-            req = http.request(
+            req = self.http.request(
                 url=self.url,
                 body=body.getvalue(),
                 method='POST',
