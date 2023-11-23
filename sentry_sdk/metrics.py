@@ -608,14 +608,20 @@ def _get_aggregator_and_update_tags(key, tags):
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
             sample_rate = experiments.get("metrics_summary_sample_rate") or 0.0
-            if random.random() < sample_rate:
+            should_summarize_metric_callback = experiments.get(
+                "should_summarize_metric"
+            )
+            if random.random() < sample_rate and (
+                should_summarize_metric_callback is None
+                or should_summarize_metric_callback(key, updated_tags)
+            ):
                 local_aggregator = scope._span._get_local_aggregator()
 
-    callback = experiments.get("before_emit_metric")
-    if callback is not None:
+    before_emit_callback = experiments.get("before_emit_metric")
+    if before_emit_callback is not None:
         with recursion_protection() as in_metrics:
             if not in_metrics:
-                if not callback(key, updated_tags):
+                if not before_emit_callback(key, updated_tags):
                     return None, None, updated_tags
 
     return client.metrics_aggregator, local_aggregator, updated_tags

@@ -509,6 +509,60 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
     assert "_metrics_summary" not in t["spans"][0]
 
 
+def test_metrics_summary_filtered(sentry_init, capture_envelopes):
+    def should_summarize_metric(key, tags):
+        print(key, tags)
+        return key == "foo"
+
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        enable_tracing=True,
+        _experiments={
+            "enable_metrics": True,
+            "metrics_summary_sample_rate": 1.0,
+            "should_summarize_metric": should_summarize_metric,
+        },
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_transaction(
+        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
+    ) as transaction:
+        metrics.timing("foo", value=1.0, tags={"a": "b"}, timestamp=ts)
+        metrics.timing("bar", value=1.0, tags={"a": "b"}, timestamp=ts)
+
+    Hub.current.flush()
+
+    (transaction, envelope) = envelopes
+
+    # Metrics Emission
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 2
+    assert m[0][1] == "bar@second"
+    assert m[1][1] == "foo@second"
+
+    # Measurement Attachment
+    t = transaction.items[0].get_transaction_event()["_metrics_summary"]
+    assert t == {
+        "d:foo@second": {
+            "tags": {
+                "a": "b",
+                "environment": "not-fun-env",
+                "release": "fun-release@1.0.0",
+                "transaction": "/foo",
+            },
+            "min": 1.0,
+            "max": 1.0,
+            "count": 1,
+            "sum": 1.0,
+        }
+    }
+
+
 def test_tag_normalization(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
