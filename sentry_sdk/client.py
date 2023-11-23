@@ -587,14 +587,17 @@ class _Client(object):
         tracing_enabled = has_tracing_enabled(self.options)
         attachments = hint.get("attachments")
 
-
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
         dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
         should_use_envelope_endpoint = (
-            tracing_enabled or is_transaction or is_checkin or bool(attachments) or bool(self.spotlight)
+            tracing_enabled
+            or is_transaction
+            or is_checkin
+            or bool(attachments)
+            or bool(self.spotlight)
         )
         if should_use_envelope_endpoint:
             headers = {
@@ -621,16 +624,16 @@ class _Client(object):
 
             if self.spotlight:
                 self.spotlight.capture_envelope(envelope)
-            
+
             if self.transport is None:
                 return None
-            
+
             self.transport.capture_envelope(envelope)
 
         else:
             if self.transport is None:
                 return None
-            
+
             # All other events go to the legacy /store/ endpoint (will be removed in the future).
             self.transport.capture_event(event_opt)
 

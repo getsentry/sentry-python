@@ -4,38 +4,43 @@ import urllib3
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from urllib3.poolmanager import PoolManager
+    from typing import Any
+    from typing import Dict
+    from typing import Optional
 
 from sentry_sdk.utils import logger
 from sentry_sdk.envelope import Envelope
 
+
 class SpotlightSidecar(object):
     def __init__(self, url):
+        # type: (str) -> None
         self.url = url
         self.http = urllib3.PoolManager()
 
-    def capture_envelope(
-        self, envelope  # type: Envelope
-    ):
+    def capture_envelope(self, envelope):
+        # type: (Envelope) -> None
         body = io.BytesIO()
         envelope.serialize_into(body)
-
         try:
             req = self.http.request(
                 url=self.url,
                 body=body.getvalue(),
-                method='POST',
+                method="POST",
                 headers={
-                    'Content-Type': 'application/x-sentry-envelope',
+                    "Content-Type": "application/x-sentry-envelope",
                 },
             )
             req.close()
         except Exception as e:
             logger.exception(str(e))
 
+
 instance = None
 
+
 def setup_spotlight(options):
+    # type: (Dict[str, Any]) -> Optional[SpotlightSidecar]
     global instance
 
     if instance is None:
@@ -46,15 +51,7 @@ def setup_spotlight(options):
             url = "http://localhost:8969/stream"
         else:
             return None
-        
+
         instance = SpotlightSidecar(url)
-    
+
     return instance
-
-
-if __name__ == '__main__':
-    from sentry_sdk.debug import configure_logger
-    configure_logger()
-
-    spotlight = setup_spotlight({})
-    spotlight.wait()
