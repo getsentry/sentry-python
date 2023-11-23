@@ -6,7 +6,7 @@ on:
       - master
       - release/**
 
-  pull_request:
+{{ on_pull_request }}
 
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
@@ -15,7 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  # needed for `actions/checkout` to clone the code
   contents: read
+  # needed to remove the pull-request label
+  pull-requests: write
 
 env:
 {{ aws_credentials }}
@@ -24,6 +27,8 @@ env:
     ${{ github.workspace }}/dist-serverless
 
 jobs:
+{{ authorize }}
+
 {{ test }}
 
 {{ test_py27 }}
