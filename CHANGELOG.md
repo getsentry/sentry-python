@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.37.0
+
+### Various fixes & improvements
+
+- Move installed modules code to utils (#2429) by @sentrivana
+- Add query source to DB spans (#2521) by @antonpirker
+- Bring tests up to date (#2512) by @sentrivana
+- Prevent global var from being discarded at shutdown (#2530) by @antonpirker
+- feat: Code locations for metrics (#2526) by @jan-auer
+- feat: Send to Spotlight sidecar (#2524) by @HazAT
+- Fix scope transaction source not being updated in scope.span setter (#2519) by @sl0thentr0py
+- Run integration tests with newest `pytest` (#2518) by @sentrivana
+
 ## 1.36.0
 
 
