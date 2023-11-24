@@ -32,6 +32,11 @@ TEMPLATE_FILE_AWS_CREDENTIALS = TEMPLATE_DIR / "ci-yaml-aws-credentials.txt"
 TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
 TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
 TEMPLATE_SNIPPET_TEST_LATEST = TEMPLATE_DIR / "ci-yaml-test-latest-snippet.txt"
+TEMPLATE_SNIPPET_PERMISSIONS = TEMPLATE_DIR / "ci-yaml-permissions-snippet.txt"
+
+FRAMEWORKS_NEEDING_SECRETS = [
+    "aws_lambda",
+]
 
 FRAMEWORKS_NEEDING_POSTGRES = [
     "django",
@@ -77,6 +82,34 @@ CHECK_PY27 = """\
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
 """
 
+ON_PULL_REQUEST = """\
+  pull_request:
+"""
+
+ON_PULL_REQUEST_TARGET = """\
+  # XXX: We are using `pull_request_target` instead of `pull_request` because we want
+  # this to run on forks. Only do this for workflows that need access to secrets.
+  # Prefer to use `pull_request` everywhere else.
+  pull_request_target:
+    types: [labeled, opened, reopened, synchronize]
+"""
+
+CHECKOUT_WITH = """\
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+"""
+
+
+def _extract_python_versions(versions):
+    return sorted(
+        [version.replace("py", "") for version in versions],
+        key=lambda v: tuple(map(int, v.split("."))),
+    )
+
+
+def _insert_snippet(template, index, snippet):
+    return template[:index] + snippet + template[index + 1 :]
+
 
 def write_yaml_file(
     template,
@@ -85,48 +118,52 @@ def write_yaml_file(
     python_versions_latest,
 ):
     """Write the YAML configuration file for one framework to disk."""
-    py_versions = sorted(
-        [py.replace("py", "") for py in python_versions],
-        key=lambda v: tuple(map(int, v.split("."))),
-    )
+    py_versions = _extract_python_versions(python_versions)
     py27_supported = "2.7" in py_versions
-    py_versions_latest = sorted(
-        [py.replace("py", "") for py in python_versions_latest],
-        key=lambda v: tuple(map(int, v.split("."))),
-    )
+    py_versions_latest = _extract_python_versions(python_versions_latest)
 
-    test_loc = template.index("{{ test }}\n")
-    f = open(TEMPLATE_SNIPPET_TEST, "r")
-    test_snippet = f.readlines()
-    template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
-    f.close()
+    template = [line for line in template]
 
-    test_py27_loc = template.index("{{ test_py27 }}\n")
+    # fill in pull_request / pull_request_target
+    on_pull_request_loc = template.index("{{ on_pull_request }}\n")
+    if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+        on_pull_request = "  pull_request_target:\n"
+    else:
+        on_pull_request = "  pull_request:\n"
+
+    template[on_pull_request_loc] = on_pull_request
+
+    # fill in permissions step, if applicable
+    loc = template.index("{{ permissions }}\n")
+    if current_framework in FRAMEWORKS_NEEDING_SECRETS:
+        with open(TEMPLATE_SNIPPET_PERMISSIONS, "r") as file:
+            template = _insert_snippet(template, loc, file.readlines())
+    else:
+        template.pop(loc)
+
+    # fill in main test job
+    loc = template.index("{{ test }}\n")
+    with open(TEMPLATE_SNIPPET_TEST, "r") as file:
+        template = _insert_snippet(template, loc, file.readlines())
+
+    # fill in py2.7 test job
+    loc = template.index("{{ test_py27 }}\n")
     if py27_supported:
-        f = open(TEMPLATE_SNIPPET_TEST_PY27, "r")
-        test_py27_snippet = f.readlines()
-        template = (
-            template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
-        )
-        f.close()
-
+        with open(TEMPLATE_SNIPPET_TEST_PY27, "r") as file:
+            template = _insert_snippet(template, loc, file.readlines())
         py_versions.remove("2.7")
     else:
-        template.pop(test_py27_loc)
+        template.pop(loc)
 
-    test_latest_loc = template.index("{{ test_latest }}\n")
+    # fill in latest test job
+    loc = template.index("{{ test_latest }}\n")
     if python_versions_latest:
-        f = open(TEMPLATE_SNIPPET_TEST_LATEST, "r")
-        test_latest_snippet = f.readlines()
-        template = (
-            template[:test_latest_loc]
-            + test_latest_snippet
-            + template[test_latest_loc + 1 :]
-        )
-        f.close()
+        with open(TEMPLATE_SNIPPET_TEST_LATEST, "r") as file:
+            template = _insert_snippet(template, loc, file.readlines())
     else:
-        template.pop(test_latest_loc)
+        template.pop(loc)
 
+    # write the file
     out = ""
     py27_test_part = False
     for template_line in template:

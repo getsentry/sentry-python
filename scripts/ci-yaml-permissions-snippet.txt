@@ -1,0 +1,21 @@
+    if: "github.event.action != 'labeled' || github.event.label.name == 'Trigger: getsentry tests'"
+    name: getsentry dispatch
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+        with:
+          persist-credentials: false
+
+      - name: permissions
+        run: |
+          python3 -uS .github/workflows/scripts/getsentry-dispatch-setup \
+              --repo-id ${{ github.event.repository.id }} \
+              --pr ${{ github.event.number }} \
+              --event ${{ github.event.action }} \
+              --username "$ARG_USERNAME" \
+              --label-names "$ARG_LABEL_NAMES"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # these can contain special characters
+          ARG_USERNAME: ${{ github.event.pull_request.user.login }}
+          ARG_LABEL_NAMES: ${{ toJSON(github.event.pull_request.labels.*.name) }}
