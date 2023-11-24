@@ -586,7 +586,7 @@ def make_transport(options):
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
-        return _FunctionTransport(ref_transport)  # type: ignore
+        return _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None

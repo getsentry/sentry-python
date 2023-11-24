@@ -31,6 +31,7 @@ TEMPLATE_FILE_SETUP_DB = TEMPLATE_DIR / "ci-yaml-setup-db.txt"
 TEMPLATE_FILE_AWS_CREDENTIALS = TEMPLATE_DIR / "ci-yaml-aws-credentials.txt"
 TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
 TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
+TEMPLATE_SNIPPET_TEST_LATEST = TEMPLATE_DIR / "ci-yaml-test-latest-snippet.txt"
 
 FRAMEWORKS_NEEDING_POSTGRES = [
     "django",
@@ -81,10 +82,18 @@ def write_yaml_file(
     template,
     current_framework,
     python_versions,
+    python_versions_latest,
 ):
     """Write the YAML configuration file for one framework to disk."""
-    py_versions = [py.replace("py", "") for py in python_versions]
+    py_versions = sorted(
+        [py.replace("py", "") for py in python_versions],
+        key=lambda v: tuple(map(int, v.split("."))),
+    )
     py27_supported = "2.7" in py_versions
+    py_versions_latest = sorted(
+        [py.replace("py", "") for py in python_versions_latest],
+        key=lambda v: tuple(map(int, v.split("."))),
+    )
 
     test_loc = template.index("{{ test }}\n")
     f = open(TEMPLATE_SNIPPET_TEST, "r")
@@ -105,6 +114,19 @@ def write_yaml_file(
     else:
         template.pop(test_py27_loc)
 
+    test_latest_loc = template.index("{{ test_latest }}\n")
+    if python_versions_latest:
+        f = open(TEMPLATE_SNIPPET_TEST_LATEST, "r")
+        test_latest_snippet = f.readlines()
+        template = (
+            template[:test_latest_loc]
+            + test_latest_snippet
+            + template[test_latest_loc + 1 :]
+        )
+        f.close()
+    else:
+        template.pop(test_latest_loc)
+
     out = ""
     py27_test_part = False
     for template_line in template:
@@ -115,13 +137,22 @@ def write_yaml_file(
             )
             out += m
 
-        elif template_line.strip() == "{{ services }}":
+        elif template_line.strip() == "{{ strategy_matrix_latest }}":
+            m = MATRIX_DEFINITION
+            m = m.replace("{{ framework }}", current_framework).replace(
+                "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions_latest])
+            )
+            out += m
+
+        elif template_line.strip() in ("{{ services }}", "{{ services_latest }}"):
             if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
                 f = open(TEMPLATE_FILE_SERVICES, "r")
                 lines = [
                     line.replace(
                         "{{ postgres_host }}",
-                        "postgres" if py27_test_part else "localhost",
+                        "postgres"
+                        if py27_test_part and "_latest" not in template_line
+                        else "localhost",
                     )
                     for line in f.readlines()
                 ]
@@ -198,7 +229,8 @@ def main(fail_on_changes):
     config.read(TOX_FILE)
     lines = [x for x in config["tox"]["envlist"].split("\n") if len(x) > 0]
 
-    python_versions = defaultdict(list)
+    python_versions = defaultdict(set)
+    python_versions_latest = defaultdict(set)
 
     print("Parse tox.ini envlist")
 
@@ -213,22 +245,30 @@ def main(fail_on_changes):
         try:
             # parse tox environment definition
             try:
-                (raw_python_versions, framework, _) = line.split("-")
+                (raw_python_versions, framework, framework_versions) = line.split("-")
             except ValueError:
                 (raw_python_versions, framework) = line.split("-")
+                framework_versions = []
 
             # collect python versions to test the framework in
-            for python_version in (
+            raw_python_versions = set(
                 raw_python_versions.replace("{", "").replace("}", "").split(",")
-            ):
-                if python_version not in python_versions[framework]:
-                    python_versions[framework].append(python_version)
+            )
+            if "latest" in framework_versions:
+                python_versions_latest[framework] |= raw_python_versions
+            else:
+                python_versions[framework] |= raw_python_versions
 
         except ValueError:
             print(f"ERROR reading line {line}")
 
     for framework in python_versions:
-        write_yaml_file(template, framework, python_versions[framework])
+        write_yaml_file(
+            template,
+            framework,
+            python_versions[framework],
+            python_versions_latest[framework],
+        )
 
     if fail_on_changes:
         new_hash = get_yaml_files_hash()
