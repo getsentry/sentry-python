@@ -5,16 +5,21 @@
 ### Various fixes & improvements
 
 - Move installed modules code to utils (#2429) by @sentrivana
+
+    Note: We moved the internal function `_get_installed_modules` from `sentry_sdk.integrations.modules` to `sentry_sdk.utils`.
+    So if you use this function you have to update your imports
+
+- Add code locations for metrics (#2526) by @jan-auer
 - Add query source to DB spans (#2521) by @antonpirker
-- Bring tests up to date (#2512) by @sentrivana
-- Prevent global var from being discarded at shutdown (#2530) by @antonpirker
-- feat: Code locations for metrics (#2526) by @jan-auer
-- feat: Send to Spotlight sidecar (#2524) by @HazAT
-- Fix scope transaction source not being updated in scope.span setter (#2519) by @sl0thentr0py
+- Send events to Spotlight sidecar (#2524) by @HazAT
 - Run integration tests with newest `pytest` (#2518) by @sentrivana
+- Bring tests up to date (#2512) by @sentrivana
+- Fix: Prevent global var from being discarded at shutdown (#2530) by @antonpirker
+- Fix: Scope transaction source not being updated in scope.span setter (#2519) by @sl0thentr0py
 
 ## 1.36.0
 
+### Various fixes & improvements
 
 - Django: Support Django 5.0 (#2490) by @sentrivana
 - Django: Handling ASGI body in the right way. (#2513) by @antonpirker
