@@ -237,11 +237,15 @@ class _Client(object):
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
-            if self.options.get("_experiments", {}).get("enable_metrics"):
+            experiments = self.options.get("_experiments", {})
+            if experiments.get("enable_metrics"):
                 from sentry_sdk.metrics import MetricsAggregator
 
                 self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope
+                    capture_func=_capture_envelope,
+                    enable_code_locations=bool(
+                        experiments.get("metric_code_locations")
+                    ),
                 )
 
             max_request_body_size = ("always", "never", "small", "medium")
