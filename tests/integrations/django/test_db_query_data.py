@@ -15,6 +15,7 @@ from sentry_sdk._compat import PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 
+from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
 
@@ -49,7 +50,7 @@ def test_query_source_disabled(
 
     events = capture_events()
 
-    _, status, _ = client.get(reverse("postgres_select_orm"))
+    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
     assert status == "200 OK"
 
     (event,) = events
@@ -85,7 +86,7 @@ def test_query_source(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    _, status, _ = client.get(reverse("postgres_select_orm"))
+    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
     assert status == "200 OK"
 
     (event,) = events
