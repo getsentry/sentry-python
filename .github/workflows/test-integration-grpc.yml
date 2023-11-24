@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.8","3.9","3.10","3.11","3.12"]
+        python-version: ["3.7","3.8","3.9","3.10","3.11"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -60,7 +60,7 @@ jobs:
             coverage erase
 
             # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
 
@@ -69,6 +69,52 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
 
+
+  test-latest:
+    name: grpc latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8","3.9","3.10","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+
+      - name: Test grpc
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          max_attempts: 2
+          retry_wait_seconds: 5
+          shell: bash
+          command: |
+            set -x # print commands that are executed
+            coverage erase
+
+            # Run tests
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            coverage combine .coverage* &&
+            coverage xml -i
+
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
 
   check_required_tests:
     name: All grpc tests passed or skipped

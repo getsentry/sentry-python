@@ -13,7 +13,7 @@ if MYPY:
 try:
     import grpc
     from grpc import HandlerCallDetails, RpcMethodHandler
-    from grpc.aio import ServicerContext
+    from grpc.aio import AbortError, ServicerContext
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
@@ -52,6 +52,8 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                 with hub.start_transaction(transaction=transaction):
                     try:
                         return await handler.unary_unary(request, context)
+                    except AbortError:
+                        raise
                     except Exception as exc:
                         event, hint = event_from_exception(
                             exc,

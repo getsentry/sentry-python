@@ -1,9 +1,9 @@
-  test:
-    name: {{ framework }}, python ${{ matrix.python-version }}, ${{ matrix.os }}
+  test-latest:
+    name: {{ framework }} latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-{{ strategy_matrix }}
-{{ services }}
+{{ strategy_matrix_latest }}
+{{ services_latest }}
 
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +29,7 @@
             coverage erase
 
             # Run tests
-            ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+            ./scripts/runtox.sh "py${{ matrix.python-version }}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
 

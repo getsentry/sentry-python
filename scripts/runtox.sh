@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Usage: sh scripts/runtox.sh py3.7 <pytest-args>
-# Runs all environments with substring py3.7 and the given arguments for pytest
+# Usage: sh scripts/runtox.sh py3.12 <pytest-args>
+# Runs all environments with substring py3.12 and the given arguments for pytest
 
 set -ex
 
@@ -13,15 +13,26 @@ else
     TOXPATH=./.venv/bin/tox
 fi
 
+excludelatest=false
+for arg in "$@"
+do
+    if [ "$arg" = "--exclude-latest" ]; then
+        excludelatest=true
+        shift
+        break
+    fi
+done
+
 searchstring="$1"
 
 export TOX_PARALLEL_NO_SPINNER=1
-ENV="$($TOXPATH -l | grep "$searchstring" | tr $'\n' ',')"
 
-# Run the common 2.7 suite without the -p flag, otherwise we hit an encoding
-# issue in tox.
-if [ "$ENV" = py2.7-common, ] || [ "$ENV" = py2.7-gevent, ]; then
-    exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
+if $excludelatest; then
+    echo "Excluding latest"
+    ENV="$($TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest' | tr $'\n' ',')"
 else
-    exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
+    echo "Including latest"
+    ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
 fi
+
+exec $TOXPATH -vv -e "$ENV" -- "${@:2}"

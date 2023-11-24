@@ -4,7 +4,7 @@ import uuid
 import os
 
 import sentry_sdk
-from sentry_sdk import Hub, start_span, start_transaction, set_measurement
+from sentry_sdk import Hub, start_span, start_transaction, set_measurement, push_scope
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
@@ -357,3 +357,12 @@ def test_should_propagate_trace_to_sentry(
     Hub.current.client.transport.parsed_dsn = Dsn(dsn)
 
     assert should_propagate_trace(Hub.current, url) == expected_propagation_decision
+
+
+def test_start_transaction_updates_scope_name_source(sentry_init):
+    sentry_init(traces_sample_rate=1.0)
+
+    with push_scope() as scope:
+        with start_transaction(name="foobar", source="route"):
+            assert scope._transaction == "foobar"
+            assert scope._transaction_info == {"source": "route"}

@@ -47,13 +47,13 @@ def patch_views():
 
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
-
         if integration is not None and integration.middleware_spans:
-            if (
+            is_async_view = (
                 iscoroutinefunction is not None
                 and wrap_async_view is not None
                 and iscoroutinefunction(callback)
-            ):
+            )
+            if is_async_view:
                 sentry_wrapped_callback = wrap_async_view(hub, callback)
             else:
                 sentry_wrapped_callback = _wrap_sync_view(hub, callback)

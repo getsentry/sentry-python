@@ -12,8 +12,13 @@ from sentry_sdk.integrations.beam import (
 from apache_beam.typehints.trivial_inference import instance_to_type
 from apache_beam.typehints.decorators import getcallargs_forhints
 from apache_beam.transforms.core import DoFn, ParDo, _DoFnParam, CallableWrapperDoFn
-from apache_beam.runners.common import DoFnInvoker, OutputProcessor, DoFnContext
+from apache_beam.runners.common import DoFnInvoker, DoFnContext
 from apache_beam.utils.windowed_value import WindowedValue
+
+try:
+    from apache_beam.runners.common import OutputHandler
+except ImportError:
+    from apache_beam.runners.common import OutputProcessor as OutputHandler
 
 
 def foo():
@@ -149,8 +154,15 @@ def test_monkey_patch_signature(f, args, kwargs):
         pass
 
 
-class _OutputProcessor(OutputProcessor):
+class _OutputHandler(OutputHandler):
     def process_outputs(
+        self, windowed_input_element, results, watermark_estimator=None
+    ):
+        self.handle_process_outputs(
+            windowed_input_element, results, watermark_estimator
+        )
+
+    def handle_process_outputs(
         self, windowed_input_element, results, watermark_estimator=None
     ):
         print(windowed_input_element)
@@ -168,7 +180,7 @@ def init_beam(sentry_init):
         # Little hack to avoid having to run the whole pipeline.
         pardo = ParDo(fn)
         signature = pardo._signature
-        output_processor = _OutputProcessor()
+        output_processor = _OutputHandler()
         return DoFnInvoker.create_invoker(
             signature, output_processor, DoFnContext("test")
         )

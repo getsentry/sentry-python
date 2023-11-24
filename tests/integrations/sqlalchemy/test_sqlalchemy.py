@@ -225,3 +225,109 @@ def test_engine_name_not_string(sentry_init):
 
     with engine.connect() as con:
         con.execute(text("SELECT 0"))
+
+
+@pytest.mark.parametrize("enable_db_query_source", [None, False])
+def test_query_source_disabled(sentry_init, capture_events, enable_db_query_source):
+    sentry_options = {
+        "integrations": [SqlalchemyIntegration()],
+        "enable_tracing": True,
+    }
+    if enable_db_query_source is not None:
+        sentry_options["enable_db_query_source"] = enable_db_query_source
+        sentry_options["db_query_source_threshold_ms"] = 0
+
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+        session.add(bob)
+
+        assert session.query(Person).first() == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO not in data
+            assert SPANDATA.CODE_NAMESPACE not in data
+            assert SPANDATA.CODE_FILEPATH not in data
+            assert SPANDATA.CODE_FUNCTION not in data
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+def test_query_source(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        enable_tracing=True,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+        session.add(bob)
+
+        assert session.query(Person).first() == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
+            assert type(data.get(SPANDATA.CODE_LINENO)) == int
+            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert (
+                data.get(SPANDATA.CODE_NAMESPACE)
+                == "tests.integrations.sqlalchemy.test_sqlalchemy"
+            )
+            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                "tests/integrations/sqlalchemy/test_sqlalchemy.py"
+            )
+            assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+            break
+    else:
+        raise AssertionError("No db span found")

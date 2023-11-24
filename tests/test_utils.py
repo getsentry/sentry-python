@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     sanitize_url,
     serialize_frame,
     is_sentry_url,
+    _get_installed_modules,
 )
 
 import sentry_sdk
@@ -23,6 +24,17 @@ try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
+
+
+def _normalize_distribution_name(name):
+    # type: (str) -> str
+    """Normalize distribution name according to PEP-0503.
+
+    See:
+    https://peps.python.org/pep-0503/#normalized-names
+    for more details.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 @pytest.mark.parametrize(
@@ -488,3 +500,60 @@ def test_get_error_message(error, expected_result):
         exc_value.detail = error
         raise Exception
     assert get_error_message(exc_value) == expected_result(exc_value)
+
+
+def test_installed_modules():
+    try:
+        from importlib.metadata import distributions, version
+
+        importlib_available = True
+    except ImportError:
+        importlib_available = False
+
+    try:
+        import pkg_resources
+
+        pkg_resources_available = True
+    except ImportError:
+        pkg_resources_available = False
+
+    installed_distributions = {
+        _normalize_distribution_name(dist): version
+        for dist, version in _get_installed_modules().items()
+    }
+
+    if importlib_available:
+        importlib_distributions = {
+            _normalize_distribution_name(dist.metadata["Name"]): version(
+                dist.metadata["Name"]
+            )
+            for dist in distributions()
+            if dist.metadata["Name"] is not None
+            and version(dist.metadata["Name"]) is not None
+        }
+        assert installed_distributions == importlib_distributions
+
+    elif pkg_resources_available:
+        pkg_resources_distributions = {
+            _normalize_distribution_name(dist.key): dist.version
+            for dist in pkg_resources.working_set
+        }
+        assert installed_distributions == pkg_resources_distributions
+    else:
+        pytest.fail("Neither importlib nor pkg_resources is available")
+
+
+def test_installed_modules_caching():
+    mock_generate_installed_modules = mock.Mock()
+    mock_generate_installed_modules.return_value = {"package": "1.0.0"}
+    with mock.patch("sentry_sdk.utils._installed_modules", None):
+        with mock.patch(
+            "sentry_sdk.utils._generate_installed_modules",
+            mock_generate_installed_modules,
+        ):
+            _get_installed_modules()
+            assert mock_generate_installed_modules.called
+            mock_generate_installed_modules.reset_mock()
+
+            _get_installed_modules()
+            mock_generate_installed_modules.assert_not_called()

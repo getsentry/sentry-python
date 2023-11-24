@@ -1,14 +1,16 @@
-import re
 import contextlib
+import re
+import sys
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
     match_regex_list,
     to_string,
     is_sentry_url,
+    _is_external_source,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -28,6 +30,8 @@ if TYPE_CHECKING:
     from typing import Generator
     from typing import Optional
     from typing import Union
+
+    from types import FrameType
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -160,6 +164,98 @@ def maybe_create_breadcrumbs_from_span(hub, span):
             message=span.description,
             data=span._data,
         )
+
+
+def add_query_source(hub, span):
+    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+    """
+    Adds OTel compatible source code information to the span
+    """
+    client = hub.client
+    if client is None:
+        return
+
+    if span.timestamp is None or span.start_timestamp is None:
+        return
+
+    should_add_query_source = client.options.get("enable_db_query_source", False)
+    if not should_add_query_source:
+        return
+
+    duration = span.timestamp - span.start_timestamp
+    threshold = client.options.get("db_query_source_threshold_ms", 0)
+    slow_query = duration.microseconds > threshold * 1000
+
+    if not slow_query:
+        return
+
+    project_root = client.options["project_root"]
+
+    # Find the correct frame
+    frame = sys._getframe()  # type: Union[FrameType, None]
+    while frame is not None:
+        try:
+            abs_path = frame.f_code.co_filename
+        except Exception:
+            abs_path = ""
+
+        try:
+            namespace = frame.f_globals.get("__name__")
+        except Exception:
+            namespace = None
+
+        is_sentry_sdk_frame = namespace is not None and namespace.startswith(
+            "sentry_sdk."
+        )
+        if (
+            abs_path.startswith(project_root)
+            and not _is_external_source(abs_path)
+            and not is_sentry_sdk_frame
+        ):
+            break
+        frame = frame.f_back
+    else:
+        frame = None
+
+    # Set the data
+    if frame is not None:
+        try:
+            lineno = frame.f_lineno
+        except Exception:
+            lineno = None
+        if lineno is not None:
+            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+
+        try:
+            namespace = frame.f_globals.get("__name__")
+        except Exception:
+            namespace = None
+        if namespace is not None:
+            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+
+        try:
+            filepath = frame.f_code.co_filename
+        except Exception:
+            filepath = None
+        if filepath is not None:
+            span.set_data(SPANDATA.CODE_FILEPATH, frame.f_code.co_filename)
+
+        try:
+            code_function = frame.f_code.co_name
+        except Exception:
+            code_function = None
+
+        if code_function is not None:
+            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+
+
+def add_additional_span_data(hub, span):
+    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+    """
+    Adds additional data to the span
+    """
+    if span.op == OP.DB:
+        add_query_source(hub, span)
 
 
 def extract_sentrytrace_data(header):

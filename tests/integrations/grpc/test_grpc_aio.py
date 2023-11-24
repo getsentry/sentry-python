@@ -125,6 +125,21 @@ async def test_grpc_server_exception(capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
+async def test_grpc_server_abort(capture_events, grpc_server):
+    events = capture_events()
+
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        try:
+            await stub.TestServe(gRPCTestMessage(text="abort"))
+            raise AssertionError()
+        except Exception:
+            pass
+
+    assert len(events) == 1
+
+
+@pytest.mark.asyncio
 async def test_grpc_client_starts_span(
     grpc_server, sentry_init, capture_events_forksafe
 ):
@@ -217,6 +232,9 @@ class TestService(gRPCTestServiceServicer):
 
         if request.text == "exception":
             raise cls.TestException()
+
+        if request.text == "abort":
+            await context.abort(grpc.StatusCode.ABORTED)
 
         return gRPCTestMessage(text=request.text)
 

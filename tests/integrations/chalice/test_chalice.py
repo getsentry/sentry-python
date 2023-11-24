@@ -3,8 +3,9 @@ import time
 from chalice import Chalice, BadRequestError
 from chalice.local import LambdaContext, LocalGateway
 
-from sentry_sdk.integrations.chalice import ChaliceIntegration
 from sentry_sdk import capture_message
+from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
+from sentry_sdk.utils import parse_version
 
 from pytest_chalice.handlers import RequestHandler
 
@@ -65,12 +66,10 @@ def lambda_context_args():
 def test_exception_boom(app, client: RequestHandler) -> None:
     response = client.get("/boom")
     assert response.status_code == 500
-    assert response.json == dict(
-        [
-            ("Code", "InternalServerError"),
-            ("Message", "An internal server error occurred."),
-        ]
-    )
+    assert response.json == {
+        "Code": "InternalServerError",
+        "Message": "An internal server error occurred.",
+    }
 
 
 def test_has_request(app, capture_events, client: RequestHandler):
@@ -110,16 +109,32 @@ def test_scheduled_event(app, lambda_context_args):
     assert str(exc_info.value) == "schedule event!"
 
 
-def test_bad_reques(client: RequestHandler) -> None:
+@pytest.mark.skipif(
+    parse_version(CHALICE_VERSION) >= (1, 28),
+    reason="different behavior based on chalice version",
+)
+def test_bad_request_old(client: RequestHandler) -> None:
     response = client.get("/badrequest")
 
     assert response.status_code == 400
-    assert response.json == dict(
-        [
-            ("Code", "BadRequestError"),
-            ("Message", "BadRequestError: bad-request"),
-        ]
-    )
+    assert response.json == {
+        "Code": "BadRequestError",
+        "Message": "BadRequestError: bad-request",
+    }
+
+
+@pytest.mark.skipif(
+    parse_version(CHALICE_VERSION) < (1, 28),
+    reason="different behavior based on chalice version",
+)
+def test_bad_request(client: RequestHandler) -> None:
+    response = client.get("/badrequest")
+
+    assert response.status_code == 400
+    assert response.json == {
+        "Code": "BadRequestError",
+        "Message": "bad-request",
+    }
 
 
 @pytest.mark.parametrize(
