@@ -47,6 +47,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "metric_code_locations": Optional[bool],
         },
         total=False,
     )
@@ -289,6 +290,7 @@ class ClientConstructor(object):
         error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
         enable_db_query_source=False,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
+        spotlight=None,  # type: Optional[Union[bool, str]]
     ):
         # type: (...) -> None
         pass
