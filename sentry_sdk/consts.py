@@ -47,6 +47,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "metric_code_locations": Optional[bool],
         },
         total=False,
     )
