@@ -7,7 +7,7 @@ pytest-localserver==0.5.1  # TODO(py3): 0.6.0 drops 2.7 support: https://github.
 pytest-watch==4.2.0
 tox==3.7.0
 jsonschema==3.2.0
-pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
+pyrsistent==0.20.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
 executing<2.0.0  # TODO(py3): 2.0.0 requires python3
 asttokens
 responses
