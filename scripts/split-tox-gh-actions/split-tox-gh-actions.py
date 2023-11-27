@@ -166,13 +166,7 @@ def render_template(framework, py_versions_pinned, py_versions_latest):
 
 
 def postprocess_template(rendered):
-    lines = rendered.split("\n")
-    out = []
-    for i in range(len(lines)):
-        if i > 0 and not lines[i].strip() and not lines[-1].strip():
-            continue
-        out.append(lines[i])
-    return "\n".join(out) + "\n"
+    return "\n".join([line for line in rendered.split("\n") if line.strip()]) + "\n"
 
 
 def write_file(contents, framework):
