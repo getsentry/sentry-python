@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 env:
-{% if aws_credentials %}
+{% if needs_aws_credentials %}
 {% raw %}
   SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
   SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
