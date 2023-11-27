@@ -19,7 +19,7 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-pinned:
+  test:
     timeout-minutes: 30
     name: aws_lambda pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -60,7 +60,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All aws_lambda tests passed or skipped
-    needs: test-pinned
+    needs: test
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
