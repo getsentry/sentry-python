@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 
 
 _thread_local = threading.local()
-_sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
+_sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 _set = set  # set is shadowed below
 
