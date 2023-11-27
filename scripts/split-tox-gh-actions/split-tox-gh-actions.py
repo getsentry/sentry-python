@@ -24,14 +24,9 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 
-ENV = Environment(
-    loader=FileSystemLoader("templates"),
-)
-
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
-TEMPLATE_DIR = Path(__file__).resolve().parent
-
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 FRAMEWORKS_NEEDING_POSTGRES = [
     "django",
@@ -45,6 +40,10 @@ FRAMEWORKS_NEEDING_CLICKHOUSE = [
 FRAMEWORKS_NEEDING_AWS = [
     "aws_lambda",
 ]
+
+ENV = Environment(
+    loader=FileSystemLoader(TEMPLATE_DIR),
+)
 
 
 def main(fail_on_changes):
