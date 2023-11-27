@@ -17,7 +17,7 @@
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     {% endif %}
-{% if needs_postgres %}
+    {% if needs_postgres %}
     services:
       postgres:
         image: postgres
@@ -37,7 +37,7 @@
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: {% if category == py27 %}postgres{% else %}localhost{% endif %}
-{% endif %}
+    {% endif %}
 
     steps:
       - uses: actions/checkout@v4
