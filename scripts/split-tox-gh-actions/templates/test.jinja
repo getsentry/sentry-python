@@ -36,7 +36,7 @@
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% if category == py27 %}postgres{% else %}localhost{% endif %}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% if category == "py27" %}postgres{% else %}localhost{% endif %}
     {% endif %}
 
     steps:
