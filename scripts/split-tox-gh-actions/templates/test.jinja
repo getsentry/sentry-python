@@ -54,8 +54,13 @@
         run: |
           pip install coverage "tox>=3,<4"
           {% if needs_postgres %}
+          {% if category == "py27" %}
+          psql postgresql://postgres:sentry@postgres:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@postgres:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          {% else %}
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          {% endif %}
           {% endif %}
 
       - name: Test {{ framework }}
