@@ -8,6 +8,7 @@
     name: {{ framework }} {{ category }}, {% raw %}python ${{ matrix.python-version }}, ${{ matrix.os }}{% endraw %}
     runs-on: {% raw %}${{ matrix.os }}{% endraw %}
     strategy:
+      # test if ci fails
       fail-fast: false
       matrix:
         python-version: [{{ versions|join(",") }}]
