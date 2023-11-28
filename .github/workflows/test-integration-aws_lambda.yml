@@ -15,9 +15,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 permissions:
-  # needed for `actions/checkout` to clone the code
   contents: read
-  # needed to remove the `Trigger: tests` label
+  # `write` is needed to remove the `Trigger: tests` label
   pull-requests: write
 env:
   SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}

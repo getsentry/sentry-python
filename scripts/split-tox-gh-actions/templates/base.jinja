@@ -23,10 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  # needed for `actions/checkout` to clone the code
   contents: read
   {% if needs_github_secrets %}
-  # needed to remove the `Trigger: tests` label
+  # `write` is needed to remove the `Trigger: tests` label
   pull-requests: write
   {% endif %}
 
