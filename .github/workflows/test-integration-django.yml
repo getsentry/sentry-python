@@ -1,33 +1,26 @@
 name: Test django
-
 on:
   push:
     branches:
       - master
       - release/**
-
   pull_request:
-
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 env:
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
-
 jobs:
-  test:
-    name: django, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  test-pinned:
     timeout-minutes: 30
-
+    name: django pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -56,19 +49,16 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
-
       - name: Test django
         uses: nick-fields/retry@v2
         with:
@@ -79,22 +69,19 @@ jobs:
           command: |
             set -x # print commands that are executed
             coverage erase
-
             # Run tests
             ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
-
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-
   test-py27:
-    name: django, python 2.7, ubuntu-20.04
+    timeout-minutes: 30
+    name: django py27, python 2.7
     runs-on: ubuntu-20.04
     container: python:2.7
-    timeout-minutes: 30
     services:
       postgres:
         image: postgres
@@ -114,14 +101,13 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: postgres
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-
+          psql postgresql://postgres:sentry@postgres:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@postgres:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
       - name: Test django
         uses: nick-fields/retry@v2
         with:
@@ -132,17 +118,18 @@ jobs:
           command: |
             set -x # print commands that are executed
             coverage erase
-
             # Run tests
             ./scripts/runtox.sh --exclude-latest "py2.7-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
-
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
   test-latest:
+    timeout-minutes: 30
     name: django latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-
     strategy:
       fail-fast: false
       matrix:
@@ -171,19 +158,16 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
-
       - name: Test django
         uses: nick-fields/retry@v2
         with:
@@ -194,26 +178,23 @@ jobs:
           command: |
             set -x # print commands that are executed
             coverage erase
-
             # Run tests
             ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
             coverage combine .coverage* &&
             coverage xml -i
-
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-
   check_required_tests:
     name: All django tests passed or skipped
-    needs: [test, test-py27]
+    needs: [test-pinned, test-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test.result, 'failure')
+        if: contains(needs.test-pinned.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
       - name: Check for 2.7 failures
