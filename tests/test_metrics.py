@@ -511,7 +511,6 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
 
 def test_metrics_summary_filtered(sentry_init, capture_envelopes):
     def should_summarize_metric(key, tags):
-        print(key, tags)
         return key == "foo"
 
     sentry_init(
