@@ -1,0 +1,50 @@
+name: Test {{ framework }}
+
+on:
+  push:
+    branches:
+      - master
+      - release/**
+
+  pull_request:
+
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: {% raw %}${{ github.workflow }}-${{ github.head_ref || github.run_id }}{% endraw %}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+{% if needs_aws_credentials %}
+{% raw %}
+  SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
+  SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
+{% endraw %}
+{% endif %}
+  BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
+  CACHED_BUILD_PATHS: |
+    {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
+
+jobs:
+{% if py_versions.pinned %}
+{% with category="pinned", versions=py_versions.pinned %}
+{% include "test.jinja" %}
+{% endwith %}
+{% endif %}
+
+{% if py_versions.py27 %}
+{% with category="py27", versions=py_versions.py27 %}
+{% include "test.jinja" %}
+{% endwith %}
+{% endif %}
+
+{% if py_versions.latest %}
+{% with category="latest", versions=py_versions.latest %}
+{% include "test.jinja" %}
+{% endwith %}
+{% endif %}
+
+{% include "check_required.jinja" %}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.37.1
+
+### Various fixes & improvements
+
+- Fix `NameError` on `parse_version` with eventlet (#2532) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `68def1e` to `e9f7d58` (#2501) by @dependabot
+
 ## 1.37.0
 
 ### Various fixes & improvements
