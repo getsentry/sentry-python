@@ -17,7 +17,7 @@ concurrency:
 permissions:
   # needed for `actions/checkout` to clone the code
   contents: read
-  # needed to remove the Trigger: tests label
+  # needed to remove the `Trigger: tests` label
   pull-requests: write
 env:
   SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
