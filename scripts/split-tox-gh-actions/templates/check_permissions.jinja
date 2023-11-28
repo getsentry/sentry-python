@@ -1,5 +1,4 @@
   check-permissions:
-    if: "github.event.action != 'labeled' || github.event.label.name == 'Trigger: tests'"
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
