@@ -11,6 +11,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 permissions:
+  # needed for `actions/checkout` to clone the code
   contents: read
 env:
   BUILD_CACHE_KEY: ${{ github.sha }}
