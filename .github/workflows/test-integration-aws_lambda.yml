@@ -5,7 +5,8 @@ on:
       - master
       - release/**
   # XXX: We are using `pull_request_target` instead of `pull_request` because we want
-  # this to run on forks. Prefer to use `pull_request` when possible.
+  # this to run on forks with access to the secrets necessary to run the test suite.
+  # Prefer to use `pull_request` when possible.
   pull_request_target:
     types: [labeled, opened, reopened, synchronize]
 # Cancel in progress workflows on pull_requests.
