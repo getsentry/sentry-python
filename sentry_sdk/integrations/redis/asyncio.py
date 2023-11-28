@@ -13,13 +13,14 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from collections.abc import Callable
+    from typing import Any
 
 
 def patch_redis_async_pipeline(
     pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn
 ):
-    # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
+    # type: (type, bool, Any, Callable[[Span, Any], None]) -> None
     old_execute = pipeline_cls.execute
 
     async def _sentry_execute(self, *args, **kwargs):
@@ -48,7 +49,7 @@ def patch_redis_async_pipeline(
 
 
 def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None]) -> None
+    # type: (type, bool, Callable[[Span, Any], None]) -> None
     old_execute_command = cls.execute_command
 
     async def _sentry_execute_command(self, name, *args, **kwargs):

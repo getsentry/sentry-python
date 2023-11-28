@@ -9,11 +9,7 @@ from fakeredis.aioredis import FakeRedis
 
 @pytest.mark.asyncio
 async def test_async_basic(sentry_init, capture_events):
-    sentry_init(
-        integrations=[RedisIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
+    sentry_init(integrations=[RedisIntegration()])
     events = capture_events()
 
     connection = FakeRedis()

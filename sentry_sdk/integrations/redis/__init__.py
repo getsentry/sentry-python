@@ -13,7 +13,13 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Sequence, Callable
+    from collections.abc import Callable
+    from typing import Any, Dict, Sequence
+    from redis import Redis, RedisCluster
+    from redis.asyncio.cluster import (
+        RedisCluster as AsyncRedisCluster,
+        ClusterPipeline as AsyncClusterPipeline,
+    )
     from sentry_sdk.tracing import Span
 
 _SINGLE_KEY_COMMANDS = frozenset(
@@ -135,12 +141,12 @@ def _set_db_data_on_span(span, connection_params):
 
 
 def _set_db_data(span, redis_instance):
-    # type: (Span, Any) -> None
+    # type: (Span, Redis) -> None
     _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
 
 
 def _set_cluster_db_data(span, redis_cluster_instance):
-    # type: (Span, Any) -> None
+    # type: (Span, RedisCluster) -> None
     default_node = redis_cluster_instance.get_default_node()
     if default_node:
         _set_db_data_on_span(
@@ -149,14 +155,14 @@ def _set_cluster_db_data(span, redis_cluster_instance):
 
 
 def _set_async_cluster_db_data(span, async_redis_cluster_instance):
-    # type: (Span, Any) -> None
+    # type: (Span, AsyncRedisCluster) -> None
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node and default_node.connection_kwargs:
         _set_db_data_on_span(span, default_node.connection_kwargs)
 
 
 def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, Any) -> None
+    # type: (Span, AsyncClusterPipeline) -> None
     _set_async_cluster_db_data(span, async_redis_cluster_pipeline_instance._client)
 
 
