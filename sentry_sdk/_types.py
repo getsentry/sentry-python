@@ -117,3 +117,4 @@ if TYPE_CHECKING:
     FlushedMetricValue = Union[int, float]
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
+    MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]

@@ -1,7 +1,32 @@
 # Changelog
 
+## 1.37.1
+
+### Various fixes & improvements
+
+- Fix `NameError` on `parse_version` with eventlet (#2532) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `68def1e` to `e9f7d58` (#2501) by @dependabot
+
+## 1.37.0
+
+### Various fixes & improvements
+
+- Move installed modules code to utils (#2429) by @sentrivana
+
+    Note: We moved the internal function `_get_installed_modules` from `sentry_sdk.integrations.modules` to `sentry_sdk.utils`.
+    So if you use this function you have to update your imports
+
+- Add code locations for metrics (#2526) by @jan-auer
+- Add query source to DB spans (#2521) by @antonpirker
+- Send events to Spotlight sidecar (#2524) by @HazAT
+- Run integration tests with newest `pytest` (#2518) by @sentrivana
+- Bring tests up to date (#2512) by @sentrivana
+- Fix: Prevent global var from being discarded at shutdown (#2530) by @antonpirker
+- Fix: Scope transaction source not being updated in scope.span setter (#2519) by @sl0thentr0py
+
 ## 1.36.0
 
+### Various fixes & improvements
 
 - Django: Support Django 5.0 (#2490) by @sentrivana
 - Django: Handling ASGI body in the right way. (#2513) by @antonpirker
