@@ -86,6 +86,9 @@ def test_incr(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -134,6 +137,9 @@ def test_timing(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -201,6 +207,9 @@ def test_timing_decorator(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ],
             "d:whatever-2@nanosecond": [
@@ -211,6 +220,9 @@ def test_timing_decorator(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ],
         },
@@ -262,6 +274,9 @@ def test_timing_basic(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -312,6 +327,9 @@ def test_distribution(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -361,6 +379,9 @@ def test_set(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },

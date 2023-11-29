@@ -76,7 +76,7 @@ def get_code_location(stacklevel):
         return None
 
     return serialize_frame(
-        frm, include_local_variables=False, include_source_context=False
+        frm, include_local_variables=False, include_source_context=True
     )
 
 
