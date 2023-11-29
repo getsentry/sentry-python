@@ -15,7 +15,6 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
-from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     normalize_incoming_data,
@@ -682,12 +681,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> None
         """Starts a new session."""
-        self.end_session()
         client, scope = self._stack[-1]
-        scope._session = Session(
-            release=client.options["release"] if client else None,
-            environment=client.options["environment"] if client else None,
-            user=scope._user,
+        scope.start_session(
+            client=client,
             session_mode=session_mode,
         )
 
@@ -695,13 +691,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (...) -> None
         """Ends the current session if there is one."""
         client, scope = self._stack[-1]
-        session = scope._session
-        self.scope._session = None
-
-        if session is not None:
-            session.close()
-            if client is not None:
-                client.capture_session(session)
+        scope.end_session(client=client)
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
@@ -710,9 +700,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
         """
-        self.end_session()
         client, scope = self._stack[-1]
-        scope._force_auto_session_tracking = False
+        scope.stop_auto_session_tracking(client=client)
 
     def resume_auto_session_tracking(self):
         # type: (...) -> None
@@ -720,8 +709,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
-        client, scope = self._stack[-1]
-        scope._force_auto_session_tracking = None
+        scope = self._stack[-1][1]
+        scope.resume_auto_session_tracking()
 
     def flush(
         self,
