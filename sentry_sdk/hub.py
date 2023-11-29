@@ -3,7 +3,7 @@ import sys
 
 from contextlib import contextmanager
 
-from sentry_sdk._compat import datetime_utcnow, with_metaclass
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
@@ -421,31 +421,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        crumb = dict(crumb or ())  # type: Breadcrumb
-        crumb.update(kwargs)
-        if not crumb:
-            return
+        kwargs["before_breadcrumb"] = client.options.get("before_breadcrumb")
+        kwargs["max_breadcrumbs"] = client.options.get("max_breadcrumbs")
 
-        hint = dict(hint or ())  # type: Hint
-
-        if crumb.get("timestamp") is None:
-            crumb["timestamp"] = datetime_utcnow()
-        if crumb.get("type") is None:
-            crumb["type"] = "default"
-
-        if client.options["before_breadcrumb"] is not None:
-            new_crumb = client.options["before_breadcrumb"](crumb, hint)
-        else:
-            new_crumb = crumb
-
-        if new_crumb is not None:
-            scope._breadcrumbs.append(new_crumb)
-        else:
-            logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
-
-        max_breadcrumbs = client.options["max_breadcrumbs"]  # type: int
-        while len(scope._breadcrumbs) > max_breadcrumbs:
-            scope._breadcrumbs.popleft()
+        scope.add_breadcrumb(crumb, hint, **kwargs)
 
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (Optional[Span], str, Any) -> Span

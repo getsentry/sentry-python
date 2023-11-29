@@ -5,6 +5,7 @@ import os
 import uuid
 
 from sentry_sdk.attachments import Attachment
+from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._functools import wraps
 from sentry_sdk.tracing_utils import (
     Baggage,
@@ -20,7 +21,7 @@ from sentry_sdk.tracing import (
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
-from sentry_sdk.consts import FALSE_VALUES
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
 
 
 if TYPE_CHECKING:
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         Breadcrumb,
+        BreadcrumbHint,
         Event,
         EventProcessor,
         ErrorProcessor,
@@ -516,6 +518,44 @@ class Scope(object):
                 add_to_transactions=add_to_transactions,
             )
         )
+
+    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
+        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
+        """
+        Adds a breadcrumb.
+
+        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
+
+        :param hint: An optional value that can be used by `before_breadcrumb`
+            to customize the breadcrumbs that are emitted.
+        """
+        before_breadcrumb = kwargs.pop("before_breadcrumb")
+        max_breadcrumbs = kwargs.pop("max_breadcrumbs", DEFAULT_MAX_BREADCRUMBS)
+
+        crumb = dict(crumb or ())  # type: Breadcrumb
+        crumb.update(kwargs)
+        if not crumb:
+            return
+
+        hint = dict(hint or ())  # type: Hint
+
+        if crumb.get("timestamp") is None:
+            crumb["timestamp"] = datetime_utcnow()
+        if crumb.get("type") is None:
+            crumb["type"] = "default"
+
+        if before_breadcrumb is not None:
+            new_crumb = before_breadcrumb(crumb, hint)
+        else:
+            new_crumb = crumb
+
+        if new_crumb is not None:
+            self._breadcrumbs.append(new_crumb)
+        else:
+            logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
+
+        while len(self._breadcrumbs) > max_breadcrumbs:
+            self._breadcrumbs.popleft()
 
     def add_event_processor(
         self, func  # type: EventProcessor
