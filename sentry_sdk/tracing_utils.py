@@ -238,7 +238,8 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            span.set_data(SPANDATA.CODE_FILEPATH, frame.f_code.co_filename)
+            in_app_path = filepath.replace(project_root, "")
+            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
             code_function = frame.f_code.co_name
