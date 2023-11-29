@@ -25,7 +25,7 @@ concurrency:
 permissions:
   contents: read
   {% if needs_github_secrets %}
-  # `write` is needed to remove the `Trigger: tests` label
+  # `write` is needed to remove the `Trigger: tests using secrets` label
   pull-requests: write
   {% endif %}
 
