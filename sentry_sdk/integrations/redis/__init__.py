@@ -148,7 +148,7 @@ def _set_db_data(span, redis_instance):
 def _set_cluster_db_data(span, redis_cluster_instance):
     # type: (Span, RedisCluster) -> None
     default_node = redis_cluster_instance.get_default_node()
-    if default_node:
+    if default_node is not None:
         _set_db_data_on_span(
             span, {"host": default_node.host, "port": default_node.port}
         )
@@ -157,7 +157,7 @@ def _set_cluster_db_data(span, redis_cluster_instance):
 def _set_async_cluster_db_data(span, async_redis_cluster_instance):
     # type: (Span, AsyncRedisCluster) -> None
     default_node = async_redis_cluster_instance.get_default_node()
-    if default_node and default_node.connection_kwargs:
+    if default_node is not None and default_node.connection_kwargs:
         _set_db_data_on_span(span, default_node.connection_kwargs)
 
 
