@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
-  # `write` is needed to remove the `Trigger: tests` label
+  # `write` is needed to remove the `Trigger: tests using secrets` label
   pull-requests: write
 env:
   SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
