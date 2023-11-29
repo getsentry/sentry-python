@@ -3,13 +3,14 @@
 import sys
 import time
 
+from sentry_sdk import Hub, metrics, push_scope, start_transaction
+from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
+from sentry_sdk.envelope import parse_json
+
 try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
-
-from sentry_sdk import Hub, metrics, push_scope
-from sentry_sdk.envelope import parse_json
 
 
 def parse_metrics(bytes):
@@ -85,6 +86,9 @@ def test_incr(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -133,6 +137,9 @@ def test_timing(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -200,6 +207,9 @@ def test_timing_decorator(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ],
             "d:whatever-2@nanosecond": [
@@ -210,6 +220,9 @@ def test_timing_decorator(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ],
         },
@@ -261,6 +274,9 @@ def test_timing_basic(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -311,6 +327,9 @@ def test_distribution(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -360,6 +379,9 @@ def test_set(sentry_init, capture_envelopes):
                     "function": sys._getframe().f_code.co_name,
                     "module": __name__,
                     "lineno": mock.ANY,
+                    "pre_context": mock.ANY,
+                    "context_line": mock.ANY,
+                    "post_context": mock.ANY,
                 }
             ]
         },
@@ -485,6 +507,199 @@ def test_transaction_name(sentry_init, capture_envelopes):
         "transaction": "/user/{user_id}",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
+    }
+
+
+def test_metric_summaries(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        enable_tracing=True,
+        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 1.0},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_transaction(
+        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
+    ) as transaction:
+        metrics.incr("root-counter", timestamp=ts)
+        with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
+            for x in range(10):
+                metrics.distribution("my-dist", float(x), timestamp=ts)
+
+    Hub.current.flush()
+
+    (transaction, envelope) = envelopes
+
+    # Metrics Emission
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 3
+
+    assert m[0][1] == "my-dist@none"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 10
+    assert sorted(m[0][3]) == list(map(str, map(float, range(10))))
+    assert m[0][4] == {
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[1][1] == "my-timer-metric@second"
+    assert m[1][2] == "d"
+    assert len(m[1][3]) == 1
+    assert m[1][4] == {
+        "a": "b",
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    assert m[2][1] == "root-counter@none"
+    assert m[2][2] == "c"
+    assert m[2][3] == ["1.0"]
+    assert m[2][4] == {
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    # Measurement Attachment
+    t = transaction.items[0].get_transaction_event()
+
+    assert t["_metrics_summary"] == {
+        "c:root-counter@none": {
+            "count": 1,
+            "min": 1.0,
+            "max": 1.0,
+            "sum": 1.0,
+            "tags": {
+                "transaction": "/foo",
+                "release": "fun-release@1.0.0",
+                "environment": "not-fun-env",
+            },
+        }
+    }
+
+    assert t["spans"][0]["_metrics_summary"]["d:my-dist@none"] == {
+        "count": 10,
+        "min": 0.0,
+        "max": 9.0,
+        "sum": 45.0,
+        "tags": {
+            "environment": "not-fun-env",
+            "release": "fun-release@1.0.0",
+            "transaction": "/foo",
+        },
+    }
+
+    assert t["spans"][0]["tags"] == {"a": "b"}
+    timer = t["spans"][0]["_metrics_summary"]["d:my-timer-metric@second"]
+    assert timer["count"] == 1
+    assert timer["max"] == timer["min"] == timer["sum"]
+    assert timer["sum"] > 0
+    assert timer["tags"] == {
+        "a": "b",
+        "environment": "not-fun-env",
+        "release": "fun-release@1.0.0",
+        "transaction": "/foo",
+    }
+
+
+def test_metrics_summary_disabled(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        enable_tracing=True,
+        _experiments={"enable_metrics": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_transaction(
+        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
+    ) as transaction:
+        with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
+            pass
+
+    Hub.current.flush()
+
+    (transaction, envelope) = envelopes
+
+    # Metrics Emission
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 1
+    assert m[0][1] == "my-timer-metric@second"
+    assert m[0][2] == "d"
+    assert len(m[0][3]) == 1
+    assert m[0][4] == {
+        "a": "b",
+        "transaction": "/foo",
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+    }
+
+    # Measurement Attachment
+    t = transaction.items[0].get_transaction_event()
+    assert "_metrics_summary" not in t
+    assert "_metrics_summary" not in t["spans"][0]
+
+
+def test_metrics_summary_filtered(sentry_init, capture_envelopes):
+    def should_summarize_metric(key, tags):
+        return key == "foo"
+
+    sentry_init(
+        release="fun-release@1.0.0",
+        environment="not-fun-env",
+        enable_tracing=True,
+        _experiments={
+            "enable_metrics": True,
+            "metrics_summary_sample_rate": 1.0,
+            "should_summarize_metric": should_summarize_metric,
+        },
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    with start_transaction(
+        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
+    ) as transaction:
+        metrics.timing("foo", value=1.0, tags={"a": "b"}, timestamp=ts)
+        metrics.timing("bar", value=1.0, tags={"a": "b"}, timestamp=ts)
+
+    Hub.current.flush()
+
+    (transaction, envelope) = envelopes
+
+    # Metrics Emission
+    assert envelope.items[0].headers["type"] == "statsd"
+    m = parse_metrics(envelope.items[0].payload.get_bytes())
+
+    assert len(m) == 2
+    assert m[0][1] == "bar@second"
+    assert m[1][1] == "foo@second"
+
+    # Measurement Attachment
+    t = transaction.items[0].get_transaction_event()["_metrics_summary"]
+    assert t == {
+        "d:foo@second": {
+            "tags": {
+                "a": "b",
+                "environment": "not-fun-env",
+                "release": "fun-release@1.0.0",
+                "transaction": "/foo",
+            },
+            "min": 1.0,
+            "max": 1.0,
+            "count": 1,
+            "sum": 1.0,
+        }
     }
 
 
