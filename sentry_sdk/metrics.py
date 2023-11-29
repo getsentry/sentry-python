@@ -666,19 +666,13 @@ def _get_aggregator_and_update_tags(key, tags):
     updated_tags.setdefault("environment", client.options["environment"])
 
     scope = hub.scope
-
-    # This workaround is needed as `scope._transaction_info` does not
-    # always appear to hold the information.
-    transaction = scope.transaction
-    if transaction:
-        transaction_name = transaction.name
-        transaction_source = transaction.source
-    else:
-        transaction_name = scope._transaction
-        transaction_source = scope._transaction_info.get("source")
-
     local_aggregator = None
+
+    # We go with the low-level API here to access transaction information as
+    # this one is the same between just errors and errors + performance
+    transaction_source = scope._transaction_info.get("source")
     if transaction_source in GOOD_TRANSACTION_SOURCES:
+        transaction_name = scope._transaction
         if transaction_name:
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
