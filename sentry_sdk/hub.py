@@ -294,18 +294,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
-        if isinstance(name_or_class, str):
-            integration_name = name_or_class
-        elif name_or_class.identifier is not None:
-            integration_name = name_or_class.identifier
-        else:
-            raise ValueError("Integration has no name")
-
         client = self.client
         if client is not None:
-            rv = client.integrations.get(integration_name)
-            if rv is not None:
-                return rv
+            return client.get_integration(name_or_class)
 
     @property
     def client(self):
