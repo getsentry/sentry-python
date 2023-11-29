@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.scope - sentry-python 1.37.1 documentation</title>
+      <title>sentry_sdk.scope - sentry-python 1.38.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -858,142 +858,151 @@ html.dark {
 </span><span id="1-652">
 </span><span id="1-653">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_contexts_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
 </span><span id="1-654">
-</span><span id="1-655">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
-</span><span id="1-656">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_level_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-657">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_fingerprint_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-658">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_user_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-659">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_name_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-660">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_info_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-661">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_tags_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-662">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_extra_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-663">
-</span><span id="1-664">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
-</span><span id="1-665">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_breadcrumbs_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-666">
-</span><span id="1-667">        <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
-</span><span id="1-668">            <span class="c1"># type: (Any, str) -&gt; Optional[Any]</span>
-</span><span id="1-669">            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">)</span>
-</span><span id="1-670">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-671">
-</span><span id="1-672">        <span class="c1"># run error processors</span>
-</span><span id="1-673">        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span>
-</span><span id="1-674">        <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-675">            <span class="k">for</span> <span class="n">error_processor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">:</span>
-</span><span id="1-676">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">error_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
-</span><span id="1-677">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-678">                    <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">error_processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
-</span><span id="1-679">
-</span><span id="1-680">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-</span><span id="1-681">
-</span><span id="1-682">        <span class="c1"># run event processors</span>
-</span><span id="1-683">        <span class="k">for</span> <span class="n">event_processor</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="n">global_event_processors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">):</span>
-</span><span id="1-684">            <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
-</span><span id="1-685">            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-686">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-</span><span id="1-687">            <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-688">                <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">event_processor</span><span class="p">,</span> <span class="s2">&quot;event processor&quot;</span><span class="p">)</span>
-</span><span id="1-689">            <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-</span><span id="1-690">
-</span><span id="1-691">        <span class="k">return</span> <span class="n">event</span></div>
+</span><span id="1-655">        <span class="k">if</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span id="1-656">            <span class="c1"># Check-ins only support the trace context, strip all others</span>
+</span><span id="1-657">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;contexts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-658">                <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="1-659">            <span class="p">}</span>
+</span><span id="1-660">
+</span><span id="1-661">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span id="1-662">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_level_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-663">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_fingerprint_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-664">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_user_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-665">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_name_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-666">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_info_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-667">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_tags_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-668">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_extra_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-669">
+</span><span id="1-670">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span id="1-671">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_breadcrumbs_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-672">
+</span><span id="1-673">        <span class="k">def</span> <span class="nf">_drop</span><span class="p">(</span><span class="n">cause</span><span class="p">,</span> <span class="n">ty</span><span class="p">):</span>
+</span><span id="1-674">            <span class="c1"># type: (Any, str) -&gt; Optional[Any]</span>
+</span><span id="1-675">            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">)</span>
+</span><span id="1-676">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-677">
+</span><span id="1-678">        <span class="c1"># run error processors</span>
+</span><span id="1-679">        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span>
+</span><span id="1-680">        <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-681">            <span class="k">for</span> <span class="n">error_processor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">:</span>
+</span><span id="1-682">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">error_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+</span><span id="1-683">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-684">                    <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">error_processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
+</span><span id="1-685">
+</span><span id="1-686">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
+</span><span id="1-687">
+</span><span id="1-688">        <span class="c1"># run event processors</span>
+</span><span id="1-689">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span id="1-690">            <span class="k">for</span> <span class="n">event_processor</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span>
+</span><span id="1-691">                <span class="n">global_event_processors</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span>
+</span><span id="1-692">            <span class="p">):</span>
+</span><span id="1-693">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
+</span><span id="1-694">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span id="1-695">                    <span class="n">new_event</span> <span class="o">=</span> <span class="n">event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</span><span id="1-696">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-697">                    <span class="k">return</span> <span class="n">_drop</span><span class="p">(</span><span class="n">event_processor</span><span class="p">,</span> <span class="s2">&quot;event processor&quot;</span><span class="p">)</span>
+</span><span id="1-698">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
+</span><span id="1-699">
+</span><span id="1-700">        <span class="k">return</span> <span class="n">event</span></div>
 
-</span><span id="1-692">
+</span><span id="1-701">
 <div class="viewcode-block" id="Scope.update_from_scope">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.update_from_scope">[docs]</a>
-</span><span id="1-693">    <span class="k">def</span> <span class="nf">update_from_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
-</span><span id="1-694">        <span class="c1"># type: (Scope) -&gt; None</span>
-</span><span id="1-695"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope with another scope&#39;s data.&quot;&quot;&quot;</span>
-</span><span id="1-696">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-697">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span>
-</span><span id="1-698">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-699">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span>
-</span><span id="1-700">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-701">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span>
-</span><span id="1-702">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-703">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
-</span><span id="1-704">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-705">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span>
-</span><span id="1-706">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
-</span><span id="1-707">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
-</span><span id="1-708">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
-</span><span id="1-709">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
-</span><span id="1-710">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
-</span><span id="1-711">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
-</span><span id="1-712">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">:</span>
-</span><span id="1-713">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
-</span><span id="1-714">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
-</span><span id="1-715">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span>
-</span><span id="1-716">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
-</span><span id="1-717">            <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
-</span><span id="1-718">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span><span class="p">:</span>
-</span><span id="1-719">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span>
-</span><span id="1-720">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">:</span>
-</span><span id="1-721">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span></div>
+</span><span id="1-702">    <span class="k">def</span> <span class="nf">update_from_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+</span><span id="1-703">        <span class="c1"># type: (Scope) -&gt; None</span>
+</span><span id="1-704"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope with another scope&#39;s data.&quot;&quot;&quot;</span>
+</span><span id="1-705">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-706">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span>
+</span><span id="1-707">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-708">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span>
+</span><span id="1-709">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-710">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span>
+</span><span id="1-711">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-712">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
+</span><span id="1-713">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-714">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span>
+</span><span id="1-715">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
+</span><span id="1-716">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
+</span><span id="1-717">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
+</span><span id="1-718">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
+</span><span id="1-719">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
+</span><span id="1-720">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
+</span><span id="1-721">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">:</span>
+</span><span id="1-722">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
+</span><span id="1-723">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
+</span><span id="1-724">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span>
+</span><span id="1-725">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
+</span><span id="1-726">            <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
+</span><span id="1-727">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span><span class="p">:</span>
+</span><span id="1-728">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span>
+</span><span id="1-729">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">:</span>
+</span><span id="1-730">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span></div>
 
-</span><span id="1-722">
+</span><span id="1-731">
 <div class="viewcode-block" id="Scope.update_from_kwargs">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Scope.update_from_kwargs">[docs]</a>
-</span><span id="1-723">    <span class="k">def</span> <span class="nf">update_from_kwargs</span><span class="p">(</span>
-</span><span id="1-724">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-725">        <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-726">        <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span id="1-727">        <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
-</span><span id="1-728">        <span class="n">contexts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
-</span><span id="1-729">        <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
-</span><span id="1-730">        <span class="n">fingerprint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[str]]</span>
-</span><span id="1-731">    <span class="p">):</span>
-</span><span id="1-732">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-733"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope&#39;s attributes.&quot;&quot;&quot;</span>
-</span><span id="1-734">        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-735">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">level</span>
-</span><span id="1-736">        <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-737">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">user</span>
-</span><span id="1-738">        <span class="k">if</span> <span class="n">extras</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-739">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span>
-</span><span id="1-740">        <span class="k">if</span> <span class="n">contexts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-741">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">contexts</span><span class="p">)</span>
-</span><span id="1-742">        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-743">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
-</span><span id="1-744">        <span class="k">if</span> <span class="n">fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-745">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">fingerprint</span></div>
+</span><span id="1-732">    <span class="k">def</span> <span class="nf">update_from_kwargs</span><span class="p">(</span>
+</span><span id="1-733">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-734">        <span class="n">user</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+</span><span id="1-735">        <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span id="1-736">        <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+</span><span id="1-737">        <span class="n">contexts</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+</span><span id="1-738">        <span class="n">tags</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
+</span><span id="1-739">        <span class="n">fingerprint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[List[str]]</span>
+</span><span id="1-740">    <span class="p">):</span>
+</span><span id="1-741">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-742"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope&#39;s attributes.&quot;&quot;&quot;</span>
+</span><span id="1-743">        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-744">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">level</span>
+</span><span id="1-745">        <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-746">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">user</span>
+</span><span id="1-747">        <span class="k">if</span> <span class="n">extras</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-748">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span>
+</span><span id="1-749">        <span class="k">if</span> <span class="n">contexts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-750">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">contexts</span><span class="p">)</span>
+</span><span id="1-751">        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-752">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
+</span><span id="1-753">        <span class="k">if</span> <span class="n">fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-754">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">fingerprint</span></div>
 
-</span><span id="1-746">
-</span><span id="1-747">    <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-748">        <span class="c1"># type: () -&gt; Scope</span>
-</span><span id="1-749">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>  <span class="c1"># type: Scope</span>
-</span><span id="1-750">
-</span><span id="1-751">        <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
-</span><span id="1-752">        <span class="n">rv</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
-</span><span id="1-753">        <span class="n">rv</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
-</span><span id="1-754">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
-</span><span id="1-755">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
-</span><span id="1-756">        <span class="n">rv</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
-</span><span id="1-757">
-</span><span id="1-758">        <span class="n">rv</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
-</span><span id="1-759">        <span class="n">rv</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
-</span><span id="1-760">        <span class="n">rv</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
-</span><span id="1-761">
-</span><span id="1-762">        <span class="n">rv</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
-</span><span id="1-763">        <span class="n">rv</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">)</span>
-</span><span id="1-764">        <span class="n">rv</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">)</span>
-</span><span id="1-765">        <span class="n">rv</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span>
+</span><span id="1-755">
+</span><span id="1-756">    <span class="k">def</span> <span class="nf">__copy__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-757">        <span class="c1"># type: () -&gt; Scope</span>
+</span><span id="1-758">        <span class="n">rv</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>  <span class="c1"># type: Scope</span>
+</span><span id="1-759">
+</span><span id="1-760">        <span class="n">rv</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_level</span>
+</span><span id="1-761">        <span class="n">rv</span><span class="o">.</span><span class="n">_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_name</span>
+</span><span id="1-762">        <span class="n">rv</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span>
+</span><span id="1-763">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span>
+</span><span id="1-764">        <span class="n">rv</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
+</span><span id="1-765">        <span class="n">rv</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span>
 </span><span id="1-766">
-</span><span id="1-767">        <span class="n">rv</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span>
-</span><span id="1-768">        <span class="n">rv</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
-</span><span id="1-769">        <span class="n">rv</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span>
-</span><span id="1-770">        <span class="n">rv</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span>
-</span><span id="1-771">        <span class="n">rv</span><span class="o">.</span><span class="n">_attachments</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
-</span><span id="1-772">
-</span><span id="1-773">        <span class="n">rv</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span>
-</span><span id="1-774">
-</span><span id="1-775">        <span class="k">return</span> <span class="n">rv</span>
-</span><span id="1-776">
-</span><span id="1-777">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-778">        <span class="c1"># type: () -&gt; str</span>
-</span><span id="1-779">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
-</span><span id="1-780">            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-</span><span id="1-781">            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
-</span><span id="1-782">            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
-</span><span id="1-783">        <span class="p">)</span></div>
+</span><span id="1-767">        <span class="n">rv</span><span class="o">.</span><span class="n">_tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
+</span><span id="1-768">        <span class="n">rv</span><span class="o">.</span><span class="n">_contexts</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
+</span><span id="1-769">        <span class="n">rv</span><span class="o">.</span><span class="n">_extras</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
+</span><span id="1-770">
+</span><span id="1-771">        <span class="n">rv</span><span class="o">.</span><span class="n">_breadcrumbs</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
+</span><span id="1-772">        <span class="n">rv</span><span class="o">.</span><span class="n">_event_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_event_processors</span><span class="p">)</span>
+</span><span id="1-773">        <span class="n">rv</span><span class="o">.</span><span class="n">_error_processors</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">)</span>
+</span><span id="1-774">        <span class="n">rv</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span>
+</span><span id="1-775">
+</span><span id="1-776">        <span class="n">rv</span><span class="o">.</span><span class="n">_should_capture</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span>
+</span><span id="1-777">        <span class="n">rv</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span>
+</span><span id="1-778">        <span class="n">rv</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span>
+</span><span id="1-779">        <span class="n">rv</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_force_auto_session_tracking</span>
+</span><span id="1-780">        <span class="n">rv</span><span class="o">.</span><span class="n">_attachments</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
+</span><span id="1-781">
+</span><span id="1-782">        <span class="n">rv</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span>
+</span><span id="1-783">
+</span><span id="1-784">        <span class="k">return</span> <span class="n">rv</span>
+</span><span id="1-785">
+</span><span id="1-786">    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-787">        <span class="c1"># type: () -&gt; str</span>
+</span><span id="1-788">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+</span><span id="1-789">            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+</span><span id="1-790">            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
+</span><span id="1-791">            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+</span><span id="1-792">        <span class="p">)</span></div>
 
 </span></pre></div>
         </article>
@@ -1027,7 +1036,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=128bbc3a"></script>
+      <script src="../../_static/documentation_options.js?v=00e097a7"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3e5c8598"></script>
