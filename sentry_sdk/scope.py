@@ -555,11 +555,7 @@ class Scope(object):
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
 
-    def start_session(
-        self,
-        *args,
-        **kwargs,
-    ):
+    def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         """Starts a new session."""
         client = kwargs.pop("client", None)
