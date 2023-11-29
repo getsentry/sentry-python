@@ -5,7 +5,7 @@ import os
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-LABEL = "Trigger: tests"
+LABEL = "Trigger: tests using secrets"
 
 
 def _has_write(repo_id: int, username: str, *, token: str) -> bool:
