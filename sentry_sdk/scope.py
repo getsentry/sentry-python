@@ -6,7 +6,9 @@ import uuid
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
 from sentry_sdk._functools import wraps
+from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
@@ -20,9 +22,6 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
-
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
-
 
 if TYPE_CHECKING:
     from typing import Any
@@ -48,7 +47,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
-    from sentry_sdk.session import Session
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
