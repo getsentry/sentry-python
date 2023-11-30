@@ -41,6 +41,10 @@ FRAMEWORKS_NEEDING_AWS = [
     "aws_lambda",
 ]
 
+FRAMEWORKS_NEEDING_GITHUB_SECRETS = [
+    "aws_lambda",
+]
+
 ENV = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
 )
@@ -152,6 +156,7 @@ def render_template(framework, py_versions_pinned, py_versions_latest):
         "needs_aws_credentials": framework in FRAMEWORKS_NEEDING_AWS,
         "needs_clickhouse": framework in FRAMEWORKS_NEEDING_CLICKHOUSE,
         "needs_postgres": framework in FRAMEWORKS_NEEDING_POSTGRES,
+        "needs_github_secrets": framework in FRAMEWORKS_NEEDING_GITHUB_SECRETS,
         "py_versions": {
             # formatted for including in the matrix
             "pinned": [f'"{v}"' for v in py_versions_pinned if v != "2.7"],
