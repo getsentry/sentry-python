@@ -142,7 +142,10 @@ def _set_db_data_on_span(span, connection_params):
 
 def _set_db_data(span, redis_instance):
     # type: (Span, Redis) -> None
-    _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
+    try:
+        _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
+    except AttributeError:
+        pass  # connections_kwargs may be missing in some cases
 
 
 def _set_cluster_db_data(span, redis_cluster_instance):
