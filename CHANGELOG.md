@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.38.0
+
+### Various fixes & improvements
+
+- Only add trace context to checkins and do not run `event_processors` for checkins (#2536) by @antonpirker
+- Metric span summaries (#2522) by @mitsuhiko
+- Add source context to code locations (#2539) by @jan-auer
+- Use in-app filepath instead of absolute path (#2541) by @antonpirker
+- Switch to `jinja2` for generating CI yamls (#2534) by @sentrivana
+
 ## 1.37.1
 
 ### Various fixes & improvements
