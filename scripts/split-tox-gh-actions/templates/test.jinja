@@ -1,4 +1,7 @@
   test-{{ category }}:
+    {% if needs_github_secrets %}
+    needs: check-permissions
+    {% endif %}
     timeout-minutes: 30
     {% if category == "py27" %}
     name: {{ framework }} {{ category }}, python 2.7
@@ -41,6 +44,12 @@
 
     steps:
       - uses: actions/checkout@v4
+      {% if needs_github_secrets %}
+      {% raw %}
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+      {% endraw %}
+      {% endif %}
       {% if category != "py27" %}
       - uses: actions/setup-python@v4
         with:
