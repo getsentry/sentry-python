@@ -140,7 +140,7 @@ def _wrap_handler(handler):
             headers = request_data.get("headers", {})
             # Some AWS Services (ie. EventBridge) set headers as a list
             # or None, so we must ensure it is a dict
-            if type(headers) is not dict:
+            if not isinstance(headers, dict):
                 headers = {}
 
             transaction = continue_trace(
