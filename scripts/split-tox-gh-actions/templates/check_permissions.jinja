@@ -6,7 +6,8 @@
         with:
           persist-credentials: false
 
-      - name: permissions
+      - name: Check permissions on PR
+        if: github.event_name == 'pull_request_target'
         run: |
           {% raw %}
           python3 -uS .github/workflows/scripts/trigger_tests_on_label.py \
@@ -23,3 +24,7 @@
           ARG_USERNAME: ${{ github.event.pull_request.user.login }}
           ARG_LABEL_NAMES: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           {% endraw %}
+
+      - name: Check permissions on repo branch
+        if: github.event_name == 'push'
+        run: true
