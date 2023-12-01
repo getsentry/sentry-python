@@ -204,7 +204,7 @@ class _Client(object):
                     traced_function = trace(function_obj)
 
                     if function_type in (staticmethod, classmethod):
-                        traced_function = function_type(traced_function)
+                        traced_function = staticmethod(traced_function)
 
                     setattr(class_obj, function_name, traced_function)
                     setattr(module_obj, class_name, class_obj)

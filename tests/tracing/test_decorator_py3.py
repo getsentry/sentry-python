@@ -1,4 +1,5 @@
 from unittest import mock
+from contextlib import contextmanager
 import pytest
 import sys
 
@@ -11,6 +12,16 @@ if sys.version_info < (3, 6):
     pytest.skip("Async decorator only works on Python 3.6+", allow_module_level=True)
 
 
+class TestClass:
+    @staticmethod
+    def static(arg):
+        return arg
+
+    @classmethod
+    def class_(cls, arg):
+        return cls, arg
+
+
 def my_example_function():
     return "return_of_sync_function"
 
@@ -19,7 +30,8 @@ async def my_async_example_function():
     return "return_of_async_function"
 
 
-def test_trace_decorator_sync_py3():
+@contextmanager
+def patch_start_child():
     fake_start_child = mock.MagicMock()
     fake_transaction = mock.MagicMock()
     fake_transaction.start_child = fake_start_child
@@ -28,6 +40,11 @@ def test_trace_decorator_sync_py3():
         "sentry_sdk.tracing_utils_py3.get_current_span",
         return_value=fake_transaction,
     ):
+        yield fake_start_child
+
+
+def test_trace_decorator_sync_py3():
+    with patch_start_child() as fake_start_child:
         result = my_example_function()
         fake_start_child.assert_not_called()
         assert result == "return_of_sync_function"
@@ -101,3 +118,33 @@ async def test_trace_decorator_async_py3_no_trx():
                 "test_decorator_py3.my_async_example_function",
             )
             assert result2 == "return_of_async_function"
+
+
+def test_staticmethod_patching(sentry_init):
+    test_staticmethod_name = "test_decorator_py3.TestClass.static"
+    assert (
+        ".".join([TestClass.static.__module__, TestClass.static.__qualname__])
+        == test_staticmethod_name
+    ), "The test static method was moved or renamed. Please update the name accordingly"
+
+    sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
+
+    for instance_or_class in (TestClass, TestClass()):
+        with patch_start_child() as fake_start_child:
+            assert instance_or_class.static(1) == 1
+            fake_start_child.assert_called_once()
+
+
+def test_classmethod_patching(sentry_init):
+    test_classmethod_name = "test_decorator_py3.TestClass.class_"
+    assert (
+        ".".join([TestClass.class_.__module__, TestClass.class_.__qualname__])
+        == test_classmethod_name
+    ), "The test class method was moved or renamed. Please update the name accordingly"
+
+    sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
+
+    for instance_or_class in (TestClass, TestClass()):
+        with patch_start_child() as fake_start_child:
+            assert instance_or_class.class_(1) == (TestClass, 1)
+            fake_start_child.assert_called_once()
