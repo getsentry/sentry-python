@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import asyncio
 import inspect
 import threading
 
@@ -45,7 +46,6 @@ try:
         request_started,
         websocket_started,
     )
-    from quart.utils import is_coroutine_function  # type: ignore
 except ImportError:
     raise DidNotEnable("Quart is not installed")
 else:
@@ -113,7 +113,9 @@ def patch_scaffold_route():
         def decorator(old_func):
             # type: (Any) -> Any
 
-            if inspect.isfunction(old_func) and not is_coroutine_function(old_func):
+            if inspect.isfunction(old_func) and not asyncio.iscoroutinefunction(
+                old_func
+            ):
 
                 @wraps(old_func)
                 def _sentry_func(*args, **kwargs):

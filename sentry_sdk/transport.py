@@ -157,6 +157,14 @@ class HttpTransport(Transport):
         )  # type: DefaultDict[Tuple[str, str], int]
         self._last_client_report_sent = time.time()
 
+        compresslevel = options.get("_experiments", {}).get(
+            "transport_zlib_compression_level"
+        )
+        self._compresslevel = 9 if compresslevel is None else int(compresslevel)
+
+        num_pools = options.get("_experiments", {}).get("transport_num_pools")
+        self._num_pools = 2 if num_pools is None else int(num_pools)
+
         self._pool = self._make_pool(
             self.parsed_dsn,
             http_proxy=options["http_proxy"],
@@ -164,11 +172,6 @@ class HttpTransport(Transport):
             ca_certs=options["ca_certs"],
             proxy_headers=options["proxy_headers"],
         )
-
-        compresslevel = options.get("_experiments", {}).get(
-            "transport_zlib_compression_level"
-        )
-        self._compresslevel = 9 if compresslevel is None else int(compresslevel)
 
         from sentry_sdk import Hub
 
@@ -439,7 +442,7 @@ class HttpTransport(Transport):
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
         return {
-            "num_pools": 2,
+            "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
             "ca_certs": ca_certs or certifi.where(),
         }
@@ -583,7 +586,7 @@ def make_transport(options):
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
-        return _FunctionTransport(ref_transport)  # type: ignore
+        return _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None

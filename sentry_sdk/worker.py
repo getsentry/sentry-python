@@ -67,8 +67,14 @@ class BackgroundWorker(object):
                     target=self._target, name="raven-sentry.BackgroundWorker"
                 )
                 self._thread.daemon = True
-                self._thread.start()
-                self._thread_for_pid = os.getpid()
+                try:
+                    self._thread.start()
+                    self._thread_for_pid = os.getpid()
+                except RuntimeError:
+                    # At this point we can no longer start because the interpreter
+                    # is already shutting down.  Sadly at this point we can no longer
+                    # send out events.
+                    self._thread = None
 
     def kill(self):
         # type: () -> None

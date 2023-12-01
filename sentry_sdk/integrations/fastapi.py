@@ -1,6 +1,7 @@
 import asyncio
 from copy import deepcopy
 
+from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable
@@ -79,6 +80,7 @@ def patch_get_request_handler():
         ):
             old_call = dependant.call
 
+            @wraps(old_call)
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 hub = Hub.current

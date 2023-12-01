@@ -1,7 +1,8 @@
-import os
-import sys
-import random
 import asyncio
+import contextlib
+import os
+import random
+import sys
 from unittest.mock import Mock
 
 import pytest
@@ -13,6 +14,16 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
 from sanic.response import HTTPResponse
 from sanic.exceptions import SanicException
+
+try:
+    from sanic_testing import TestManager
+except ImportError:
+    TestManager = None
+
+try:
+    from sanic_testing.reusable import ReusableClient
+except ImportError:
+    ReusableClient = None
 
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -43,33 +54,49 @@ def app():
     if SANIC_VERSION >= (20, 12) and SANIC_VERSION < (22, 6):
         # Some builds (20.12.0 intruduced and 22.6.0 removed again) have a feature where the instance is stored in an internal class
         # registry for later retrieval, and so add register=False to disable that
-        app = Sanic("Test", register=False)
+        sanic_app = Sanic("Test", register=False)
     else:
-        app = Sanic("Test")
+        sanic_app = Sanic("Test")
 
-    @app.route("/message")
+    if TestManager is not None:
+        TestManager(sanic_app)
+
+    @sanic_app.route("/message")
     def hi(request):
         capture_message("hi")
         return response.text("ok")
 
-    @app.route("/message/<message_id>")
+    @sanic_app.route("/message/<message_id>")
     def hi_with_id(request, message_id):
         capture_message("hi with id")
         return response.text("ok with id")
 
-    @app.route("/500")
+    @sanic_app.route("/500")
     def fivehundred(_):
         1 / 0
 
-    return app
+    return sanic_app
+
+
+def get_client(app):
+    @contextlib.contextmanager
+    def simple_client(app):
+        yield app.test_client
+
+    if ReusableClient is not None:
+        return ReusableClient(app)
+    else:
+        return simple_client(app)
 
 
 def test_request_data(sentry_init, app, capture_events):
     sentry_init(integrations=[SanicIntegration()])
     events = capture_events()
 
-    request, response = app.test_client.get("/message?foo=bar")
-    assert response.status == 200
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/message?foo=bar")
+        assert response.status == 200
 
     (event,) = events
     assert event["transaction"] == "hi"
@@ -106,8 +133,10 @@ def test_transaction_name(
     sentry_init(integrations=[SanicIntegration()])
     events = capture_events()
 
-    request, response = app.test_client.get(url)
-    assert response.status == 200
+    c = get_client(app)
+    with c as client:
+        _, response = client.get(url)
+        assert response.status == 200
 
     (event,) = events
     assert event["transaction"] == expected_transaction
@@ -122,8 +151,10 @@ def test_errors(sentry_init, app, capture_events):
     def myerror(request):
         raise ValueError("oh no")
 
-    request, response = app.test_client.get("/error")
-    assert response.status == 500
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/error")
+        assert response.status == 500
 
     (event,) = events
     assert event["transaction"] == "myerror"
@@ -145,8 +176,10 @@ def test_bad_request_not_captured(sentry_init, app, capture_events):
     def index(request):
         raise SanicException("...", status_code=400)
 
-    request, response = app.test_client.get("/")
-    assert response.status == 400
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/")
+        assert response.status == 400
 
     assert not events
 
@@ -163,8 +196,10 @@ def test_error_in_errorhandler(sentry_init, app, capture_events):
     def myhandler(request, exception):
         1 / 0
 
-    request, response = app.test_client.get("/error")
-    assert response.status == 500
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/error")
+        assert response.status == 500
 
     event1, event2 = events
 
@@ -194,7 +229,6 @@ def test_concurrency(sentry_init, app):
     because that's the only way we could reproduce leakage with such a low
     amount of concurrent tasks.
     """
-
     sentry_init(integrations=[SanicIntegration()])
 
     @app.route("/context-check/<i>")
@@ -380,8 +414,10 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     events = capture_events()
 
     # Make request to the desired URL
-    _, response = app.test_client.get(test_config.url)
-    assert response.status == test_config.expected_status
+    c = get_client(app)
+    with c as client:
+        _, response = client.get(test_config.url)
+        assert response.status == test_config.expected_status
 
     # Extract the transaction events by inspecting the event types. We should at most have 1 transaction event.
     transaction_events = [

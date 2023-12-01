@@ -22,10 +22,12 @@ except ImportError:
 from sentry_sdk._compat import PY2, PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.tracing import Span
+from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
@@ -132,8 +134,9 @@ def test_middleware_exceptions(sentry_init, client, capture_exceptions):
 def test_request_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
-    content, status, headers = client.get(reverse("message"))
-    assert b"".join(content) == b"ok"
+    content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
+
+    assert content == b"ok"
 
     (event,) = events
     assert event["transaction"] == "/message"
@@ -153,7 +156,9 @@ def test_transaction_with_class_view(sentry_init, client, capture_events):
         send_default_pii=True,
     )
     events = capture_events()
-    content, status, headers = client.head(reverse("classbased"))
+    content, status, headers = unpack_werkzeug_response(
+        client.head(reverse("classbased"))
+    )
     assert status.lower() == "200 ok"
 
     (event,) = events
@@ -275,13 +280,13 @@ def test_trace_from_headers_if_performance_disabled(
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
-    content, status, headers = client.get(reverse("mylogin"))
-    assert b"".join(content) == b"ok"
+    content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
+    assert content == b"ok"
 
     assert not events
 
-    content, status, headers = client.get(reverse("message"))
-    assert b"".join(content) == b"ok"
+    content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
+    assert content == b"ok"
 
     (event,) = events
 
@@ -318,7 +323,7 @@ def test_queryset_repr(sentry_init, capture_events):
 def test_custom_error_handler_request_context(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
-    content, status, headers = client.post("/404")
+    content, status, headers = unpack_werkzeug_response(client.post("/404"))
     assert status.lower() == "404 not found"
 
     (event,) = events
@@ -338,9 +343,9 @@ def test_500(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
 
-    content, status, headers = client.get("/view-exc")
+    content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
-    content = b"".join(content).decode("utf-8")
+    content = content.decode("utf-8")
 
     (event,) = events
     event_id = event["event_id"]
@@ -436,7 +441,9 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
     )
 
     events = capture_events()
-    content, status, headers = client.get(reverse("rest_json_response"))
+    content, status, headers = unpack_werkzeug_response(
+        client.get(reverse("rest_json_response"))
+    )
     assert status == "200 OK"
 
     assert (
@@ -570,7 +577,9 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
 
     events = capture_events()
 
-    content, status, headers = client.get(reverse("postgres_select"))
+    content, status, headers = unpack_werkzeug_response(
+        client.get(reverse("postgres_select"))
+    )
     assert status == "200 OK"
 
     (event,) = events
@@ -637,7 +646,9 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
 
     events = capture_events()
 
-    content, status, headers = client.get(reverse("postgres_select"))
+    content, status, headers = unpack_werkzeug_response(
+        client.get(reverse("postgres_select"))
+    )
     assert status == "200 OK"
 
     (event,) = events
@@ -646,14 +657,33 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
         if span.get("op") == "db":
             data = span.get("data")
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
-            assert (
-                data.get(SPANDATA.DB_NAME)
-                == connections["postgres"].get_connection_params()["database"]
-            )
+            conn_params = connections["postgres"].get_connection_params()
+            assert data.get(SPANDATA.DB_NAME) is not None
+            assert data.get(SPANDATA.DB_NAME) == conn_params.get(
+                "database"
+            ) or conn_params.get("dbname")
             assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
             )
             assert data.get(SPANDATA.SERVER_PORT) == "5432"
+
+
+def test_set_db_data_custom_backend():
+    class DummyBackend(object):
+        # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
+        def __getattr__(self, attr):
+            return self
+
+        def __call__(self):
+            raise TypeError
+
+        def get_connection_params(self):
+            return {}
+
+    try:
+        _set_db_data(Span(), DummyBackend())
+    except TypeError:
+        pytest.fail("A TypeError was raised")
 
 
 @pytest.mark.parametrize(
@@ -685,8 +715,8 @@ def test_transaction_style(
         send_default_pii=True,
     )
     events = capture_events()
-    content, status, headers = client.get(client_url)
-    assert b"".join(content) == expected_response
+    content, status, headers = unpack_werkzeug_response(client.get(client_url))
+    assert content == expected_response
 
     (event,) = events
     assert event["transaction"] == expected_transaction
@@ -696,11 +726,11 @@ def test_transaction_style(
 def test_request_body(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
-    content, status, headers = client.post(
-        reverse("post_echo"), data=b"heyooo", content_type="text/plain"
+    content, status, headers = unpack_werkzeug_response(
+        client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
     )
     assert status.lower() == "200 ok"
-    assert b"".join(content) == b"heyooo"
+    assert content == b"heyooo"
 
     (event,) = events
 
@@ -712,11 +742,13 @@ def test_request_body(sentry_init, client, capture_events):
 
     del events[:]
 
-    content, status, headers = client.post(
-        reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"), data=b'{"hey": 42}', content_type="application/json"
+        )
     )
     assert status.lower() == "200 ok"
-    assert b"".join(content) == b'{"hey": 42}'
+    assert content == b'{"hey": 42}'
 
     (event,) = events
 
@@ -730,10 +762,12 @@ def test_read_request(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
-    content, status, headers = client.post(
-        reverse("read_body_and_view_exc"),
-        data=b'{"hey": 42}',
-        content_type="application/json",
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("read_body_and_view_exc"),
+            data=b'{"hey": 42}',
+            content_type="application/json",
+        )
     )
 
     assert status.lower() == "500 internal server error"
@@ -747,8 +781,8 @@ def test_template_tracing_meta(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
-    content, _, _ = client.get(reverse("template_test3"))
-    rendered_meta = b"".join(content).decode("utf-8")
+    content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
+    rendered_meta = content.decode("utf-8")
 
     traceparent, baggage = events[0]["message"].split("\n")
     assert traceparent != ""
@@ -773,7 +807,9 @@ def test_template_exception(
     sentry_init(integrations=[DjangoIntegration()] + with_executing_integration)
     events = capture_events()
 
-    content, status, headers = client.get(reverse("template_exc"))
+    content, status, headers = unpack_werkzeug_response(
+        client.get(reverse("template_exc"))
+    )
     assert status.lower() == "500 internal server error"
 
     (event,) = events
@@ -861,7 +897,7 @@ def test_does_not_capture_403(sentry_init, client, capture_events, endpoint):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
 
-    _, status, _ = client.get(reverse(endpoint))
+    _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
     assert status.lower() == "403 forbidden"
 
     assert not events
@@ -952,14 +988,7 @@ def test_middleware_spans_disabled(sentry_init, client, capture_events):
     assert not len(transaction["spans"])
 
 
-if DJANGO_VERSION >= (1, 10):
-    EXPECTED_SIGNALS_SPANS = """\
-- op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"\
-"""
-else:
-    EXPECTED_SIGNALS_SPANS = """\
+EXPECTED_SIGNALS_SPANS = """\
 - op="http.server": description=null
   - op="event.django": description="django.db.reset_queries"
   - op="event.django": description="django.db.close_old_connections"\
@@ -1014,23 +1043,33 @@ def test_csrf(sentry_init, client):
 
     sentry_init(integrations=[DjangoIntegration()])
 
-    content, status, _headers = client.post(reverse("csrf_hello_not_exempt"))
+    content, status, _headers = unpack_werkzeug_response(
+        client.post(reverse("csrf_hello_not_exempt"))
+    )
     assert status.lower() == "403 forbidden"
 
-    content, status, _headers = client.post(reverse("sentryclass_csrf"))
+    content, status, _headers = unpack_werkzeug_response(
+        client.post(reverse("sentryclass_csrf"))
+    )
     assert status.lower() == "403 forbidden"
 
-    content, status, _headers = client.post(reverse("sentryclass"))
+    content, status, _headers = unpack_werkzeug_response(
+        client.post(reverse("sentryclass"))
+    )
     assert status.lower() == "200 ok"
-    assert b"".join(content) == b"ok"
+    assert content == b"ok"
 
-    content, status, _headers = client.post(reverse("classbased"))
+    content, status, _headers = unpack_werkzeug_response(
+        client.post(reverse("classbased"))
+    )
     assert status.lower() == "200 ok"
-    assert b"".join(content) == b"ok"
+    assert content == b"ok"
 
-    content, status, _headers = client.post(reverse("message"))
+    content, status, _headers = unpack_werkzeug_response(
+        client.post(reverse("message"))
+    )
     assert status.lower() == "200 ok"
-    assert b"".join(content) == b"ok"
+    assert content == b"ok"
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
@@ -1049,15 +1088,15 @@ def test_custom_urlconf_middleware(
     sentry_init(integrations=[DjangoIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
-    content, status, _headers = client.get("/custom/ok")
+    content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
     assert status.lower() == "200 ok"
-    assert b"".join(content) == b"custom ok"
+    assert content == b"custom ok"
 
     event = events.pop(0)
     assert event["transaction"] == "/custom/ok"
     assert "custom_urlconf_middleware" in render_span_tree(event)
 
-    _content, status, _headers = client.get("/custom/exc")
+    _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
     assert status.lower() == "500 internal server error"
 
     error_event, transaction_event = events

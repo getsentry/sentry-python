@@ -30,7 +30,7 @@ except Exception:
 import sentry_sdk
 from sentry_sdk._compat import iteritems, reraise, string_types
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.integrations import _installed_integrations  # noqa: F401
+from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import capture_internal_exceptions
@@ -187,8 +187,8 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _installed_integrations
-    _installed_integrations.clear()
+    global _processed_integrations
+    _processed_integrations.clear()
 
 
 @pytest.fixture
@@ -602,3 +602,21 @@ def create_mock_http_server():
     mock_server_thread.start()
 
     return mock_server_port
+
+
+def unpack_werkzeug_response(response):
+    # werkzeug < 2.1 returns a tuple as client response, newer versions return
+    # an object
+    try:
+        return response.get_data(), response.status, response.headers
+    except AttributeError:
+        content, status, headers = response
+        return b"".join(content), status, headers
+
+
+def werkzeug_set_cookie(client, servername, key, value):
+    # client.set_cookie has a different signature in different werkzeug versions
+    try:
+        client.set_cookie(servername, key, value)
+    except TypeError:
+        client.set_cookie(key, value)

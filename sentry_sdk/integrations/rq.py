@@ -99,7 +99,7 @@ class RqIntegration(Integration):
             # Note, the order of the `or` here is important,
             # because calling `job.is_failed` will change `_status`.
             if job._status == JobStatus.FAILED or job.is_failed:
-                _capture_exception(exc_info)  # type: ignore
+                _capture_exception(exc_info)
 
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
