@@ -586,8 +586,9 @@ class _Client(object):
         if disable_capture_event.get(False):
             return None
 
-        top_scope = scope_kwargs.pop("top_scope")
-        scope = _update_scope(top_scope, scope, scope_kwargs)
+        if scope_kwargs is not None and "top_scope" in scope_kwargs:
+            top_scope = scope_kwargs.pop("top_scope")
+            scope = _update_scope(top_scope, scope, scope_kwargs)
 
         if hint is None:
             hint = {}
