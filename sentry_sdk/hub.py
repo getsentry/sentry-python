@@ -420,8 +420,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        kwargs["before_breadcrumb"] = client.options.get("before_breadcrumb")
-        kwargs["max_breadcrumbs"] = client.options.get("max_breadcrumbs")
+        kwargs["client"] = client
 
         scope.add_breadcrumb(crumb, hint, **kwargs)
 

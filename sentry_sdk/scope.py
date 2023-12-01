@@ -6,7 +6,7 @@ import uuid
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
+from sentry_sdk.consts import FALSE_VALUES
 from sentry_sdk._functools import wraps
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -527,8 +527,12 @@ class Scope(object):
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        before_breadcrumb = kwargs.pop("before_breadcrumb")
-        max_breadcrumbs = kwargs.pop("max_breadcrumbs", DEFAULT_MAX_BREADCRUMBS)
+        client = kwargs.pop("client", None)
+        if client is None:
+            return
+
+        before_breadcrumb = client.options.get("before_breadcrumb")
+        max_breadcrumbs = client.options.get("max_breadcrumbs")
 
         crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
