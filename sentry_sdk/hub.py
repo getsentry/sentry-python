@@ -21,8 +21,6 @@ from sentry_sdk.tracing_utils import (
 )
 
 from sentry_sdk.utils import (
-    exc_info_from_error,
-    event_from_exception,
     logger,
     ContextVar,
 )
@@ -63,24 +61,6 @@ else:
 
 
 _local = ContextVar("sentry_current_hub")
-
-
-def _update_scope(base, scope_change, scope_kwargs):
-    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
-    if scope_change and scope_kwargs:
-        raise TypeError("cannot provide scope and kwargs")
-    if scope_change is not None:
-        final_scope = copy.copy(base)
-        if callable(scope_change):
-            scope_change(final_scope)
-        else:
-            final_scope.update_from_scope(scope_change)
-    elif scope_kwargs:
-        final_scope = copy.copy(base)
-        final_scope.update_from_kwargs(**scope_kwargs)
-    else:
-        final_scope = base
-    return final_scope
 
 
 def _should_send_default_pii():
@@ -333,19 +313,25 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
         """
         client, top_scope = self._stack[-1]
-        scope = _update_scope(top_scope, scope, scope_args)
-        if client is not None:
-            is_transaction = event.get("type") == "transaction"
-            rv = client.capture_event(event, hint, scope)
-            if rv is not None and not is_transaction:
-                self._last_event_id = rv
-            return rv
-        return None
+        if client is None:
+            return None
+
+        scope_args["top_scope"] = top_scope
+
+        last_event_id = client.capture_event(event, hint, scope, **scope_args)
+
+        is_transaction = event.get("type") == "transaction"
+        if last_event_id is not None and not is_transaction:
+            self._last_event_id = last_event_id
+
+        return last_event_id
 
     def capture_message(self, message, level=None, scope=None, **scope_args):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_message`.
 
         :param message: The string to send as the message.
 
@@ -358,17 +344,26 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        if self.client is None:
+        client, top_scope = self._stack[-1]
+        if client is None:
             return None
-        if level is None:
-            level = "info"
-        return self.capture_event(
-            {"message": message, "level": level}, scope=scope, **scope_args
+
+        scope_args["top_scope"] = top_scope
+
+        last_event_id = client.capture_message(
+            message, level=level, scope=scope, **scope_args
         )
+
+        if last_event_id is not None:
+            self._last_event_id = last_event_id
+
+        return last_event_id
 
     def capture_exception(self, error=None, scope=None, **scope_args):
         # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_exception`.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
 
@@ -377,21 +372,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        client = self.client
+        client, top_scope = self._stack[-1]
         if client is None:
             return None
-        if error is not None:
-            exc_info = exc_info_from_error(error)
-        else:
-            exc_info = sys.exc_info()
 
-        event, hint = event_from_exception(exc_info, client_options=client.options)
-        try:
-            return self.capture_event(event, hint=hint, scope=scope, **scope_args)
-        except Exception:
-            self._capture_internal_exception(sys.exc_info())
+        scope_args["top_scope"] = top_scope
 
-        return None
+        last_event_id = client.capture_exception(error, scope=scope, **scope_args)
+
+        if last_event_id is not None:
+            self._last_event_id = last_event_id
+
+        return last_event_id
 
     def _capture_internal_exception(
         self, exc_info  # type: Any
@@ -400,6 +392,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.
+
+        Duplicated in :py:meth:`sentry_sdk.Client._capture_internal_exception`.
 
         These exceptions do not end up in Sentry and are just logged instead.
         """
