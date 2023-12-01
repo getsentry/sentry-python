@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.39.0
+
+### Various fixes & improvements
+
+- Improve location reporting for timer metrics (#2552) by @mitsuhiko
+
 ## 1.38.0
 
 ### Various fixes & improvements
