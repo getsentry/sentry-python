@@ -560,6 +560,7 @@ class MetricsAggregator(object):
         stacklevel,  # type: int
         timestamp=None,  # type: Optional[float]
     ):
+        # type: (...) -> None
         if not self._enable_code_locations:
             return
         if timestamp is None:
@@ -586,7 +587,7 @@ class MetricsAggregator(object):
         ty,  # type: MetricType
         key,  # type: str
         unit,  # type: MeasurementUnit
-        timestamp,  # type: Union[float, datetime]
+        timestamp,  # type: float
     ):
         # type: (...) -> bool
         if self._enable_code_locations:
@@ -685,8 +686,11 @@ def _get_aggregator():
     # type: () -> Optional[MetricsAggregator]
     hub = sentry_sdk.Hub.current
     client = hub.client
-    if client is not None and client.metrics_aggregator is not None:
-        return client.metrics_aggregator
+    return (
+        client.metrics_aggregator
+        if client is not None and client.metrics_aggregator is not None
+        else None
+    )
 
 
 def _get_aggregator_and_update_tags(key, tags):
