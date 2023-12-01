@@ -302,23 +302,23 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(self, event, hint=None, scope=None, **scope_wkargs):
+    def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
         """
         Captures an event.
 
         Alias of :py:meth:`sentry_sdk.Client.capture_event`.
 
-        :param scope_wkargs: For supported `**scope_wkargs` see
+        :param scope_kwargs: For supported `**scope_kwargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
         """
         client, top_scope = self._stack[-1]
         if client is None:
             return None
 
-        scope_wkargs["top_scope"] = top_scope
+        scope_kwargs["top_scope"] = top_scope
 
-        last_event_id = client.capture_event(event, hint, scope, **scope_wkargs)
+        last_event_id = client.capture_event(event, hint, scope, **scope_kwargs)
 
         is_transaction = event.get("type") == "transaction"
         if last_event_id is not None and not is_transaction:
@@ -326,7 +326,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def capture_message(self, message, level=None, scope=None, **scope_wkargs):
+    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
@@ -339,7 +339,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
 
-        :param scope_wkargs: For supported `**scope_wkargs` see
+        :param scope_kwargs: For supported `**scope_kwargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
@@ -348,10 +348,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is None:
             return None
 
-        scope_wkargs["top_scope"] = top_scope
+        scope_kwargs["top_scope"] = top_scope
 
         last_event_id = client.capture_message(
-            message, level=level, scope=scope, **scope_wkargs
+            message, level=level, scope=scope, **scope_kwargs
         )
 
         if last_event_id is not None:
@@ -359,7 +359,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def capture_exception(self, error=None, scope=None, **scope_wkargs):
+    def capture_exception(self, error=None, scope=None, **scope_kwargs):
         # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
@@ -367,7 +367,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
 
-        :param scope_wkargs: For supported `**scope_wkargs` see
+        :param scope_kwargs: For supported `**scope_kwargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
@@ -376,9 +376,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is None:
             return None
 
-        scope_wkargs["top_scope"] = top_scope
+        scope_kwargs["top_scope"] = top_scope
 
-        last_event_id = client.capture_exception(error, scope=scope, **scope_wkargs)
+        last_event_id = client.capture_exception(error, scope=scope, **scope_kwargs)
 
         if last_event_id is not None:
             self._last_event_id = last_event_id
