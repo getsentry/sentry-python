@@ -566,7 +566,7 @@ class _Client(object):
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
         scope=None,  # type: Optional[Scope]
-        **scope_args  # type: Any
+        **scope_wkargs  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an event.
@@ -578,7 +578,7 @@ class _Client(object):
         :param scope: An optional scope to use for determining whether this event
             should be captured.
 
-        :param scope_args: For supported `**scope_args` see
+        :param scope_wkargs: For supported `**scope_wkargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
@@ -586,8 +586,8 @@ class _Client(object):
         if disable_capture_event.get(False):
             return None
 
-        top_scope = scope_args.pop("top_scope")
-        scope = _update_scope(top_scope, scope, scope_args)
+        top_scope = scope_wkargs.pop("top_scope")
+        scope = _update_scope(top_scope, scope, scope_wkargs)
 
         if hint is None:
             hint = {}
@@ -676,7 +676,7 @@ class _Client(object):
 
         return event_id
 
-    def capture_message(self, message, level=None, scope=None, **scope_args):
+    def capture_message(self, message, level=None, scope=None, **scope_wkargs):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
@@ -687,7 +687,7 @@ class _Client(object):
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
 
-        :param scope_args: For supported `**scope_args` see
+        :param scope_wkargs: For supported `**scope_wkargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
@@ -696,16 +696,16 @@ class _Client(object):
             level = "info"
 
         return self.capture_event(
-            {"message": message, "level": level}, scope=scope, **scope_args
+            {"message": message, "level": level}, scope=scope, **scope_wkargs
         )
 
-    def capture_exception(self, error=None, scope=None, **scope_args):
+    def capture_exception(self, error=None, scope=None, **scope_wkargs):
         # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
 
-        :param scope_args: For supported `**scope_args` see
+        :param scope_wkargs: For supported `**scope_wkargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
@@ -718,7 +718,7 @@ class _Client(object):
         event, hint = event_from_exception(exc_info, client_options=self.options)
 
         try:
-            return self.capture_event(event, hint=hint, scope=scope, **scope_args)
+            return self.capture_event(event, hint=hint, scope=scope, **scope_wkargs)
         except Exception:
             self._capture_internal_exception(sys.exc_info())
 
