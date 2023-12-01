@@ -3,7 +3,6 @@ import os
 import uuid
 import random
 import socket
-import inspect
 
 from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
 from sentry_sdk.utils import (
@@ -199,9 +198,7 @@ class _Client(object):
                     module_obj = import_module(module_name)
                     class_obj = getattr(module_obj, class_name)
                     function_obj = getattr(class_obj, function_name)
-                    function_type = type(
-                        inspect.getattr_static(class_obj, function_name)
-                    )
+                    function_type = type(class_obj.__dict__[function_name])
                     traced_function = trace(function_obj)
 
                     if function_type in (staticmethod, classmethod):
