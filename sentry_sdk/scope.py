@@ -25,12 +25,13 @@ from sentry_sdk.utils import logger, capture_internal_exceptions
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import Optional
-    from typing import Deque
-    from typing import List
     from typing import Callable
+    from typing import Deque
+    from typing import Dict
+    from typing import Generator
+    from typing import Iterator
+    from typing import List
+    from typing import Optional
     from typing import Tuple
     from typing import TypeVar
 
@@ -244,11 +245,22 @@ class Scope(object):
 
         return self._propagation_context["dynamic_sampling_context"]
 
-    def get_traceparent(self):
-        # type: () -> Optional[str]
+    def get_traceparent(self, *args, **kwargs):
+        # type: (Any, Any) -> Optional[str]
         """
-        Returns the Sentry "sentry-trace" header (aka the traceparent) from the Propagation Context.
+        Returns the Sentry "sentry-trace" header (aka the traceparent) from the
+        currently active span or the scopes Propagation Context.
         """
+        client = kwargs.pop("client", None)
+
+        # If we have an active span, return trashparent from there
+        if (
+            client is not None
+            and has_tracing_enabled(client.options)
+            and self.span is not None
+        ):
+            return self.span.to_traceparent()
+
         if self._propagation_context is None:
             return None
 
@@ -258,8 +270,18 @@ class Scope(object):
         )
         return traceparent
 
-    def get_baggage(self):
-        # type: () -> Optional[Baggage]
+    def get_baggage(self, *args, **kwargs):
+        # type: (Any, Any) -> Optional[Baggage]
+        client = kwargs.pop("client", None)
+
+        # If we have an active span, return baggage from there
+        if (
+            client is not None
+            and has_tracing_enabled(client.options)
+            and self.span is not None
+        ):
+            return self.span.to_baggage()
+
         if self._propagation_context is None:
             return None
 
@@ -288,6 +310,35 @@ class Scope(object):
 
         return trace_context
 
+    def trace_propagation_meta(self, span=None):
+        # type: (Optional[Span]) -> str
+        """
+        Return meta tags which should be injected into HTML templates
+        to allow propagation of trace information.
+        """
+        if span is not None:
+            logger.warning(
+                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
+            )
+
+        meta = ""
+
+        sentry_trace = self.get_traceparent()
+        if sentry_trace is not None:
+            meta += '<meta name="%s" content="%s">' % (
+                SENTRY_TRACE_HEADER_NAME,
+                sentry_trace,
+            )
+
+        baggage = self.get_baggage()
+        if baggage is not None:
+            meta += '<meta name="%s" content="%s">' % (
+                BAGGAGE_HEADER_NAME,
+                baggage,
+            )
+
+        return meta
+
     def iter_headers(self):
         # type: () -> Iterator[Tuple[str, str]]
         """
@@ -302,6 +353,29 @@ class Scope(object):
             if dsc is not None:
                 baggage = Baggage(dsc).serialize()
                 yield BAGGAGE_HEADER_NAME, baggage
+
+    def iter_trace_propagation_headers(self, *args, **kwargs):
+        # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
+        """
+        Return HTTP headers which allow propagation of trace data. Data taken
+        from the span representing the request, if available, or the current
+        span on the scope if not.
+        """
+        span = kwargs.pop("span", None)
+        client = kwargs.pop("client", None)
+
+        propagate_traces = client and client.options["propagate_traces"]
+        if not propagate_traces:
+            return
+
+        span = span or self.span
+
+        if client and has_tracing_enabled(client.options) and span is not None:
+            for header in span.iter_headers():
+                yield header
+        else:
+            for header in self.iter_headers():
+                yield header
 
     def clear(self):
         # type: () -> None
