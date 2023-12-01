@@ -357,7 +357,8 @@ def test_distribution(sentry_init, capture_envelopes):
     loc = json["mapping"]["d:dist@none"][0]
     line = linecache.getline(loc["abs_path"], loc["lineno"])
     assert (
-        line.strip() == 'metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)'
+        line.strip()
+        == 'metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)'
     )
 
 
