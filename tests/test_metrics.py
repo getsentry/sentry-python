@@ -148,9 +148,9 @@ def test_timing(sentry_init, capture_envelopes):
     }
 
     loc = json["mapping"]["d:whatever@second"][0]
-    l = linecache.getline(loc["abs_path"], loc["lineno"])
+    line = linecache.getline(loc["abs_path"], loc["lineno"])
     assert (
-        l.strip()
+        line.strip()
         == 'with metrics.timing("whatever", tags={"blub": "blah"}, timestamp=ts):'
     )
 
@@ -243,8 +243,8 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     # tricker to do since we report from outside the function so we really
     # only see the callsite.
     loc = json["mapping"]["d:whatever-1@second"][0]
-    l = linecache.getline(loc["abs_path"], loc["lineno"])
-    assert l.strip() == "assert amazing() == 42"
+    line = linecache.getline(loc["abs_path"], loc["lineno"])
+    assert line.strip() == "assert amazing() == 42"
 
 
 def test_timing_basic(sentry_init, capture_envelopes):
@@ -355,9 +355,9 @@ def test_distribution(sentry_init, capture_envelopes):
     }
 
     loc = json["mapping"]["d:dist@none"][0]
-    l = linecache.getline(loc["abs_path"], loc["lineno"])
+    line = linecache.getline(loc["abs_path"], loc["lineno"])
     assert (
-        l.strip() == 'metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)'
+        line.strip() == 'metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)'
     )
 
 
