@@ -92,10 +92,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-pinned.result, 'failure')
+        if: contains(needs.test-pinned.result, 'failure') || contains(needs.test-pinned.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
       - name: Check for 2.7 failures
-        if: contains(needs.test-py27.result, 'failure')
+        if: contains(needs.test-py27.result, 'failure') || contains(needs.test-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
