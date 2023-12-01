@@ -124,7 +124,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   check_required_tests:
-    name: All celery tests passed or skipped
+    name: All celery tests passed
     needs: [test-pinned, test-py27]
     # Always run this, even if a dependent job failed
     if: always()

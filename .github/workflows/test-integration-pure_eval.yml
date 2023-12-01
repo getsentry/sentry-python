@@ -57,7 +57,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   check_required_tests:
-    name: All pure_eval tests passed or skipped
+    name: All pure_eval tests passed
     needs: test-pinned
     # Always run this, even if a dependent job failed
     if: always()

@@ -1,5 +1,5 @@
   check_required_tests:
-    name: All {{ framework }} tests passed or skipped
+    name: All {{ framework }} tests passed
     {% if py_versions.pinned and py_versions.py27 %}
     needs: [test-pinned, test-py27]
     {% elif py_versions.pinned %}
