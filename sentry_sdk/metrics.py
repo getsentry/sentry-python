@@ -71,7 +71,7 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 def get_code_location(stacklevel):
     # type: (int) -> Optional[Dict[str, Any]]
     try:
-        frm = sys._getframe(stacklevel + 4)
+        frm = sys._getframe(stacklevel)
     except Exception:
         return None
 
@@ -508,7 +508,7 @@ class MetricsAggregator(object):
         tags,  # type: Optional[MetricTags]
         timestamp=None,  # type: Optional[Union[float, datetime]]
         local_aggregator=None,  # type: Optional[LocalAggregator]
-        stacklevel=0,  # type: int
+        stacklevel=0,  # type: Optional[int]
     ):
         # type: (...) -> None
         if not self._ensure_thread() or self._flusher is None:
@@ -541,25 +541,9 @@ class MetricsAggregator(object):
                 previous_weight = 0
 
             added = metric.weight - previous_weight
-            self._buckets_total_weight += added
 
-            # Store code location once per metric and per day (of bucket timestamp)
-            if self._enable_code_locations:
-                meta_key = (ty, key, unit)
-                start_of_day = utc_from_timestamp(timestamp).replace(
-                    hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-                )
-                start_of_day = int(to_timestamp(start_of_day))
-
-                if (start_of_day, meta_key) not in self._seen_locations:
-                    self._seen_locations.add((start_of_day, meta_key))
-                    loc = get_code_location(stacklevel)
-                    if loc is not None:
-                        # Group metadata by day to make flushing more efficient.
-                        # There needs to be one envelope item per timestamp.
-                        self._pending_locations.setdefault(start_of_day, []).append(
-                            (meta_key, loc)
-                        )
+            if stacklevel is not None:
+                self.record_code_location(ty, key, unit, stacklevel + 2, timestamp)
 
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
@@ -567,6 +551,53 @@ class MetricsAggregator(object):
         if local_aggregator is not None:
             local_value = float(added if ty == "s" else value)
             local_aggregator.add(ty, key, local_value, unit, serialized_tags)
+
+    def record_code_location(
+        self,
+        ty,  # type: MetricType
+        key,  # type: str
+        unit,  # type: MeasurementUnit
+        stacklevel,  # type: int
+        timestamp=None,  # type: Optional[float]
+    ):
+        # type: (...) -> None
+        if not self._enable_code_locations:
+            return
+        if timestamp is None:
+            timestamp = time.time()
+        meta_key = (ty, key, unit)
+        start_of_day = utc_from_timestamp(timestamp).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+        )
+        start_of_day = int(to_timestamp(start_of_day))
+
+        if (start_of_day, meta_key) not in self._seen_locations:
+            self._seen_locations.add((start_of_day, meta_key))
+            loc = get_code_location(stacklevel + 3)
+            if loc is not None:
+                # Group metadata by day to make flushing more efficient.
+                # There needs to be one envelope item per timestamp.
+                self._pending_locations.setdefault(start_of_day, []).append(
+                    (meta_key, loc)
+                )
+
+    @metrics_noop
+    def need_code_loation(
+        self,
+        ty,  # type: MetricType
+        key,  # type: str
+        unit,  # type: MeasurementUnit
+        timestamp,  # type: float
+    ):
+        # type: (...) -> bool
+        if self._enable_code_locations:
+            return False
+        meta_key = (ty, key, unit)
+        start_of_day = utc_from_timestamp(timestamp).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+        )
+        start_of_day = int(to_timestamp(start_of_day))
+        return (start_of_day, meta_key) not in self._seen_locations
 
     def kill(self):
         # type: (...) -> None
@@ -651,9 +682,19 @@ def _tags_to_dict(tags):
     return rv
 
 
+def _get_aggregator():
+    # type: () -> Optional[MetricsAggregator]
+    hub = sentry_sdk.Hub.current
+    client = hub.client
+    return (
+        client.metrics_aggregator
+        if client is not None and client.metrics_aggregator is not None
+        else None
+    )
+
+
 def _get_aggregator_and_update_tags(key, tags):
     # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
-    """Returns the current metrics aggregator if there is one."""
     hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
@@ -751,6 +792,12 @@ class _Timing(object):
                     value = ",".join(sorted(map(str, value)))
                 self._span.set_tag(key, value)
         self._span.__enter__()
+
+        # report code locations here for better accuracy
+        aggregator = _get_aggregator()
+        if aggregator is not None:
+            aggregator.record_code_location("d", self.key, self.unit, self.stacklevel)
+
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -769,7 +816,7 @@ class _Timing(object):
                 tags,
                 self.timestamp,
                 local_aggregator,
-                self.stacklevel,
+                None,  # code locations are reported in __enter__
             )
 
         self._span.__exit__(exc_type, exc_value, tb)
