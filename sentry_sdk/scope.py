@@ -6,7 +6,7 @@ import uuid
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.consts import FALSE_VALUES
+from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
 from sentry_sdk._functools import wraps
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -18,6 +18,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
+    NoOpSpan,
     Transaction,
 )
 from sentry_sdk._types import TYPE_CHECKING
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
     from typing import TypeVar
+    from typing import Union
 
     from sentry_sdk._types import (
         Breadcrumb,
@@ -635,6 +637,156 @@ class Scope(object):
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+
+    def start_transaction(
+        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
+    ):
+        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
+        """
+        Start and return a transaction.
+
+        Start an existing transaction if given, otherwise create and start a new
+        transaction with kwargs.
+
+        This is the entry point to manual tracing instrumentation.
+
+        A tree structure can be built by adding child spans to the transaction,
+        and child spans to other spans. To start a new child span within the
+        transaction or any span, call the respective `.start_child()` method.
+
+        Every child span must be finished before the transaction is finished,
+        otherwise the unfinished spans are discarded.
+
+        When used as context managers, spans and transactions are automatically
+        finished at the end of the `with` block. If not using context managers,
+        call the `.finish()` method.
+
+        When the transaction is finished, it will be sent to Sentry with all its
+        finished child spans.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
+        """
+        hub = kwargs.pop("hub", None)
+        client = kwargs.pop("client", None)
+
+        configuration_instrumenter = client and client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
+        custom_sampling_context = kwargs.pop("custom_sampling_context", {})
+
+        # if we haven't been given a transaction, make one
+        if transaction is None:
+            kwargs.setdefault("hub", hub)
+            transaction = Transaction(**kwargs)
+
+        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
+        # sampling decision
+        sampling_context = {
+            "transaction_context": transaction.to_json(),
+            "parent_sampled": transaction.parent_sampled,
+        }
+        sampling_context.update(custom_sampling_context)
+        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
+
+        profile = Profile(transaction, hub=hub)
+        profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
+        # we don't bother to keep spans if we already know we're not going to
+        # send the transaction
+        if transaction.sampled:
+            max_spans = (
+                client and client.options["_experiments"].get("max_spans")
+            ) or 1000
+            transaction.init_span_recorder(maxlen=max_spans)
+
+        return transaction
+
+    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (Optional[Span], str, Any) -> Span
+        """
+        Start a span whose parent is the currently active span or transaction, if any.
+
+        The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
+        typically used as a context manager to start and stop timing in a `with`
+        block.
+
+        Only spans contained in a transaction are sent to Sentry. Most
+        integrations start a transaction at the appropriate time, for example
+        for every incoming HTTP request. Use
+        :py:meth:`sentry_sdk.start_transaction` to start a new transaction when
+        one is not already in progress.
+
+        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
+        """
+        hub = kwargs.pop("hub", None)
+        client = kwargs.pop("client", None)
+
+        configuration_instrumenter = client and client.options["instrumenter"]
+
+        if instrumenter != configuration_instrumenter:
+            return NoOpSpan()
+
+        # THIS BLOCK IS DEPRECATED
+        # TODO: consider removing this in a future release.
+        # This is for backwards compatibility with releases before
+        # start_transaction existed, to allow for a smoother transition.
+        if isinstance(span, Transaction) or "transaction" in kwargs:
+            deprecation_msg = (
+                "Deprecated: use start_transaction to start transactions and "
+                "Transaction.start_child to start spans."
+            )
+
+            if isinstance(span, Transaction):
+                logger.warning(deprecation_msg)
+                return self.start_transaction(span)
+
+            if "transaction" in kwargs:
+                logger.warning(deprecation_msg)
+                name = kwargs.pop("transaction")
+                return self.start_transaction(name=name, **kwargs)
+
+        # THIS BLOCK IS DEPRECATED
+        # We do not pass a span into start_span in our code base, so I deprecate this.
+        if span is not None:
+            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future."
+            logger.warning(deprecation_msg)
+            return span
+
+        kwargs.setdefault("hub", hub)
+
+        active_span = self.scope.span
+        if active_span is not None:
+            new_child_span = active_span.start_child(**kwargs)
+            return new_child_span
+
+        # If there is already a trace_id in the propagation context, use it.
+        # This does not need to be done for `start_child` above because it takes
+        # the trace_id from the parent span.
+        if "trace_id" not in kwargs:
+            traceparent = self.get_traceparent()
+            trace_id = traceparent.split("-")[0] if traceparent else None
+            if trace_id is not None:
+                kwargs["trace_id"] = trace_id
+
+        return Span(**kwargs)
+
+    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+        """
+        Sets the propagation context from environment or headers and returns a transaction.
+        """
+        self.generate_propagation_context(environ_or_headers)
+
+        transaction = Transaction.continue_from_headers(
+            normalize_incoming_data(environ_or_headers),
+            op=op,
+            name=name,
+            source=source,
+        )
+
+        return transaction
 
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
