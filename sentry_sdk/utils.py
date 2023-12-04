@@ -95,16 +95,11 @@ def _get_debug_hub():
     pass
 
 
-def get_default_release():
+def get_git_revision():
     # type: () -> Optional[str]
-    """Try to guess a default release."""
-    release = os.environ.get("SENTRY_RELEASE")
-    if release:
-        return release
-
     with open(os.path.devnull, "w+") as null:
         try:
-            release = (
+            revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
                     stdout=subprocess.PIPE,
@@ -116,10 +111,21 @@ def get_default_release():
                 .decode("utf-8")
             )
         except (OSError, IOError):
-            pass
+            return None
 
-        if release:
-            return release
+    return revision
+
+
+def get_default_release():
+    # type: () -> Optional[str]
+    """Try to guess a default release."""
+    release = os.environ.get("SENTRY_RELEASE")
+    if release:
+        return release
+
+    release = get_git_revision()
+    if release is not None:
+        return release
 
     for var in (
         "HEROKU_SLUG_COMMIT",
