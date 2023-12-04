@@ -17,7 +17,7 @@ def monkeypatch_rediscluster_class(reset_integrations):
         "localhost", 6379
     )
     pipeline_cls.execute = lambda *_, **__: None
-    redis.RedisCluster.execute_command = lambda *_, **__: None
+    redis.RedisCluster.execute_command = lambda *_, **__: []
 
 
 def test_rediscluster_breadcrumb(sentry_init, capture_events):
@@ -29,7 +29,15 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
     capture_message("hi")
 
     (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
+    crumbs = event["breadcrumbs"]["values"]
+
+    # on initializing a RedisCluster, a COMMAND call is made - this is not important for the test
+    # but must be accounted for
+    assert len(crumbs) <= 2
+    if len(crumbs) == 2:
+        assert event["breadcrumbs"]["values"][0]["message"] == "COMMAND"
+
+    crumb = event["breadcrumbs"]["values"][-1]
 
     assert crumb == {
         "category": "redis",
@@ -65,7 +73,15 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
         rc.set("bar", 1)
 
     (event,) = events
-    (span,) = event["spans"]
+    spans = event["spans"]
+
+    # on initializing a RedisCluster, a COMMAND call is made - this is not important for the test
+    # but must be accounted for
+    assert len(spans) <= 2
+    if len(spans) == 2:
+        assert event["spans"][0]["description"] == "COMMAND"
+
+    span = event["spans"][-1]
     assert span["op"] == "db.redis"
     assert span["description"] == description
     assert span["data"] == {
