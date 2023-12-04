@@ -375,7 +375,7 @@ class LocalAggregator(object):
 
     def to_json(self):
         # type: (...) -> Dict[str, Any]
-        rv = {}
+        rv = {}  # type: Any
         for (export_key, tags), (
             v_min,
             v_max,
