@@ -14,13 +14,15 @@ from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
+    from typing import Any, Union
+    from redis.asyncio.client import Pipeline, StrictRedis
+    from redis.asyncio.cluster import ClusterPipeline, RedisCluster
 
 
 def patch_redis_async_pipeline(
     pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn
 ):
-    # type: (type, bool, Any, Callable[[Span, Any], None]) -> None
+    # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Span, Any], None]) -> None
     old_execute = pipeline_cls.execute
 
     async def _sentry_execute(self, *args, **kwargs):
@@ -45,11 +47,11 @@ def patch_redis_async_pipeline(
 
             return await old_execute(self, *args, **kwargs)
 
-    pipeline_cls.execute = _sentry_execute
+    pipeline_cls.execute = _sentry_execute  # type: ignore[method-assign]
 
 
 def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
-    # type: (type, bool, Callable[[Span, Any], None]) -> None
+    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
     old_execute_command = cls.execute_command
 
     async def _sentry_execute_command(self, name, *args, **kwargs):
@@ -67,4 +69,4 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
 
             return await old_execute_command(self, name, *args, **kwargs)
 
-    cls.execute_command = _sentry_execute_command
+    cls.execute_command = _sentry_execute_command  # type: ignore[method-assign]

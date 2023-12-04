@@ -141,7 +141,7 @@ def _set_db_data_on_span(span, connection_params):
 
 
 def _set_db_data(span, redis_instance):
-    # type: (Span, Redis) -> None
+    # type: (Span, Redis[Any]) -> None
     try:
         _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
     except AttributeError:
@@ -149,7 +149,7 @@ def _set_db_data(span, redis_instance):
 
 
 def _set_cluster_db_data(span, redis_cluster_instance):
-    # type: (Span, RedisCluster) -> None
+    # type: (Span, RedisCluster[Any]) -> None
     default_node = redis_cluster_instance.get_default_node()
     if default_node is not None:
         _set_db_data_on_span(
@@ -158,15 +158,20 @@ def _set_cluster_db_data(span, redis_cluster_instance):
 
 
 def _set_async_cluster_db_data(span, async_redis_cluster_instance):
-    # type: (Span, AsyncRedisCluster) -> None
+    # type: (Span, AsyncRedisCluster[Any]) -> None
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
         _set_db_data_on_span(span, default_node.connection_kwargs)
 
 
 def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, AsyncClusterPipeline) -> None
-    _set_async_cluster_db_data(span, async_redis_cluster_pipeline_instance._client)
+    # type: (Span, AsyncClusterPipeline[Any]) -> None
+    _set_async_cluster_db_data(
+        span,
+        # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
+        # does not recognize it - see https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
+        async_redis_cluster_pipeline_instance._client,  # type: ignore[attr-defined]
+    )
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn):
