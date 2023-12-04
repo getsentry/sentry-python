@@ -310,27 +310,30 @@ class Scope(object):
 
         return trace_context
 
-    def trace_propagation_meta(self, span=None):
-        # type: (Optional[Span]) -> str
+    def trace_propagation_meta(self, *args, **kwargs):
+        # type: (*Any, **Any) -> str
         """
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
+        span = kwargs.pop("span", None)
         if span is not None:
             logger.warning(
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
 
+        client = kwargs.pop("client", None)
+
         meta = ""
 
-        sentry_trace = self.get_traceparent()
+        sentry_trace = self.get_traceparent(client=client)
         if sentry_trace is not None:
             meta += '<meta name="%s" content="%s">' % (
                 SENTRY_TRACE_HEADER_NAME,
                 sentry_trace,
             )
 
-        baggage = self.get_baggage()
+        baggage = self.get_baggage(client=client).serialize()
         if baggage is not None:
             meta += '<meta name="%s" content="%s">' % (
                 BAGGAGE_HEADER_NAME,

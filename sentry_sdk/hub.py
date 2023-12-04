@@ -718,14 +718,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Returns the traceparent either from the active span or from the scope.
         """
-        return self.scope.get_traceparent(client=self.client)
+        client, scope = self._stack[-1]
+        return scope.get_traceparent(client=client)
 
     def get_baggage(self):
         # type: () -> Optional[str]
         """
         Returns Baggage either from the active span or from the scope.
         """
-        baggage = self.scope.get_baggage(client=self.client)
+        client, scope = self._stack[-1]
+        baggage = scope.get_baggage(client=client)
 
         if baggage is not None:
             return baggage.serialize()
@@ -739,9 +741,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        client = self._stack[-1][0]
+        client, scope = self._stack[-1]
 
-        return self.scope.iter_trace_propagation_headers(span=span, client=client)
+        return scope.iter_trace_propagation_headers(span=span, client=client)
 
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str
@@ -754,7 +756,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
 
-        return self.scope.trace_propagation_meta(span=span)
+        client, scope = self._stack[-1]
+        return scope.trace_propagation_meta(span=span, client=client)
 
 
 GLOBAL_HUB = Hub()
