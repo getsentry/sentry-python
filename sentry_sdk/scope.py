@@ -333,11 +333,11 @@ class Scope(object):
                 sentry_trace,
             )
 
-        baggage = self.get_baggage(client=client).serialize()
+        baggage = self.get_baggage(client=client)
         if baggage is not None:
             meta += '<meta name="%s" content="%s">' % (
                 BAGGAGE_HEADER_NAME,
-                baggage,
+                baggage.serialize(),
             )
 
         return meta
