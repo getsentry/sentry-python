@@ -2,6 +2,7 @@
 
 import sys
 import time
+import linecache
 
 from sentry_sdk import Hub, metrics, push_scope, start_transaction
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
@@ -126,7 +127,8 @@ def test_timing(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert parse_json(meta_item.payload.get_bytes()) == {
+    json = parse_json(meta_item.payload.get_bytes())
+    assert json == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:whatever@second": [
@@ -144,6 +146,13 @@ def test_timing(sentry_init, capture_envelopes):
             ]
         },
     }
+
+    loc = json["mapping"]["d:whatever@second"][0]
+    line = linecache.getline(loc["abs_path"], loc["lineno"])
+    assert (
+        line.strip()
+        == 'with metrics.timing("whatever", tags={"blub": "blah"}, timestamp=ts):'
+    )
 
 
 def test_timing_decorator(sentry_init, capture_envelopes):
@@ -196,7 +205,8 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert parse_json(meta_item.payload.get_bytes()) == {
+    json = parse_json(meta_item.payload.get_bytes())
+    assert json == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:whatever-1@second": [
@@ -227,6 +237,14 @@ def test_timing_decorator(sentry_init, capture_envelopes):
             ],
         },
     }
+
+    # XXX: this is not the best location.  It would probably be better to
+    # report the location in the function, however that is quite a bit
+    # tricker to do since we report from outside the function so we really
+    # only see the callsite.
+    loc = json["mapping"]["d:whatever-1@second"][0]
+    line = linecache.getline(loc["abs_path"], loc["lineno"])
+    assert line.strip() == "assert amazing() == 42"
 
 
 def test_timing_basic(sentry_init, capture_envelopes):
@@ -316,7 +334,8 @@ def test_distribution(sentry_init, capture_envelopes):
     }
 
     assert meta_item.headers["type"] == "metric_meta"
-    assert parse_json(meta_item.payload.get_bytes()) == {
+    json = parse_json(meta_item.payload.get_bytes())
+    assert json == {
         "timestamp": mock.ANY,
         "mapping": {
             "d:dist@none": [
@@ -334,6 +353,13 @@ def test_distribution(sentry_init, capture_envelopes):
             ]
         },
     }
+
+    loc = json["mapping"]["d:dist@none"][0]
+    line = linecache.getline(loc["abs_path"], loc["lineno"])
+    assert (
+        line.strip()
+        == 'metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)'
+    )
 
 
 def test_set(sentry_init, capture_envelopes):
