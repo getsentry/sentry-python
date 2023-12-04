@@ -8,6 +8,7 @@ from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
 from sentry_sdk._functools import wraps
+from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
@@ -48,7 +49,6 @@ if TYPE_CHECKING:
         Type,
     )
 
-    from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
