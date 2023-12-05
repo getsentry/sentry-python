@@ -279,17 +279,6 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "all_versions": [
             f'"{version}"' for version in _normalize_py_versions(matrix_py_versions)
         ],
-        "py_versions": {
-            framework: {
-                # already formatted for including in the matrix
-                "pinned": [
-                    f'"{v}"' for v in py_versions_pinned[framework] if v != "2.7"
-                ],
-                "py27": ['"2.7"'] if "2.7" in py_versions_pinned[framework] else [],
-                "latest": [f'"{v}"' for v in py_versions_latest[framework]],
-            }
-            for framework in frameworks
-        },
     }
     rendered = template.render(context)
     rendered = postprocess_template(rendered)

@@ -197,3 +197,7 @@ jobs:
         if: contains(needs.test-data_processing-pinned.result, 'failure') || contains(needs.test-data_processing-pinned.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+      - name: Check for 2.7 failures
+        if: contains(needs.test-data_processing-py27.result, 'failure') || contains(needs.test-data_processing-py27.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
