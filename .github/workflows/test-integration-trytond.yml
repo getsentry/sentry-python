@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        python-version: ["3.5","3.6","3.8","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -39,19 +39,13 @@ jobs:
         run: |
           pip install coverage "tox>=3,<4"
       - name: Test trytond
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 15
-          max_attempts: 2
-          retry_wait_seconds: 5
-          shell: bash
-          command: |
-            set -x # print commands that are executed
-            coverage erase
-            # Run tests
-            ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-            coverage combine .coverage* &&
-            coverage xml -i
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -63,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9","3.10","3.11","3.12"]
+        python-version: ["3.8","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -78,19 +72,13 @@ jobs:
         run: |
           pip install coverage "tox>=3,<4"
       - name: Test trytond
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 15
-          max_attempts: 2
-          retry_wait_seconds: 5
-          shell: bash
-          command: |
-            set -x # print commands that are executed
-            coverage erase
-            # Run tests
-            ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-            coverage combine .coverage* &&
-            coverage xml -i
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
