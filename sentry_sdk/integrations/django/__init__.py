@@ -638,10 +638,8 @@ def install_sql_hook():
                         self.mogrify,
                         options,
                     )
-            result = real_execute(self, sql, params)
-
-        add_query_source(hub, span)
-        return result
+            add_query_source(hub, span)
+            return real_execute(self, sql, params)
 
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
@@ -653,11 +651,9 @@ def install_sql_hook():
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
             _set_db_data(span, self)
+            add_query_source(hub, span)
 
-            result = real_executemany(self, sql, param_list)
-
-        add_query_source(hub, span)
-        return result
+            return real_executemany(self, sql, param_list)
 
     def connect(self):
         # type: (BaseDatabaseWrapper) -> None
