@@ -17,6 +17,224 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
+  test-web_frameworks_1-pinned:
+    name: Web Frameworks 1 (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Test django pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test fastapi pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test flask pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-flask" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test starlette pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlette" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-web_frameworks_1-latest:
+    name: Web Frameworks 1 (latest)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Test django latest
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test fastapi latest
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test flask latest
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-flask-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test starlette latest
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-web_frameworks_1-py2.7:
+    name: Web Frameworks 1 (py2.7)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Test django py2.7
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test fastapi py2.7
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test flask py2.7
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test starlette py2.7
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
   check_required_tests:
     name: All Web Frameworks 1 tests passed
     # Always run this, even if a dependent job failed

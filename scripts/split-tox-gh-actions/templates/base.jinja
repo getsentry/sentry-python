@@ -45,22 +45,8 @@ jobs:
 {% include "check_permissions.jinja" %}
 {% endif %}
 
-{% if categories.pinned %}
-{% with category="pinned" %}
+{% for category in categories %}
 {% include "test_group.jinja" %}
-{% endwith %}
-{% endif %}
-
-{% if categories.py27 %}
-{% with category="py27" %}
-{% include "test_group.jinja" %}
-{% endwith %}
-{% endif %}
-
-{% if categories.latest %}
-{% with category="latest" %}
-{% include "test_group.jinja" %}
-{% endwith %}
-{% endif %}
+{% endfor %}
 
 {% include "check_required.jinja" %}
