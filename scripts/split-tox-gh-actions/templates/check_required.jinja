@@ -1,12 +1,6 @@
   check_required_tests:
-    name: All {{ framework }} tests passed or skipped
-    {% if py_versions.pinned and py_versions.py27 %}
-    needs: [test-pinned, test-py27]
-    {% elif py_versions.pinned %}
-    needs: test-pinned
-    {% elif py_versions.py27 %}
-    needs: test-py27
-    {% endif %}
+    name: All {{ group }} tests passed
+    needs: {{ needs }}
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
