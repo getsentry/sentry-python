@@ -43,29 +43,37 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - name: Test opentelemetry latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - name: Test pure_eval latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - name: Test trytond latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -96,29 +104,37 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - name: Test opentelemetry pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - name: Test pure_eval pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pure_eval" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - name: Test trytond pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          [ -e .coverage ] && coverage combine .coverage*
-          [ -e .coverage ] && coverage xml -i
+          if [ -e .coverage ]; then
+            coverage combine .coverage*
+            coverage xml -i
+          fi
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
