@@ -17,108 +17,6 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-web_frameworks_2-pinned:
-    name: Web Frameworks 2 (pinned)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test aiohttp pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test asgi pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test bottle pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test falcon pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test pyramid pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test quart pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test redis pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test rediscluster pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test sanic pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test starlite pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - name: Test tornado pinned
-        run: |
-          set -x # print commands that are executed
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-tornado" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   test-web_frameworks_2-latest:
     name: Web Frameworks 2 (latest)
     timeout-minutes: 30
@@ -126,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -221,14 +119,116 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-web_frameworks_2-py2.7:
+  test-web_frameworks_2-pinned:
+    name: Web Frameworks 2 (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Test aiohttp pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test asgi pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test bottle pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test falcon pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test pyramid pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test quart pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test redis pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test rediscluster pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test sanic pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test starlite pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test tornado pinned
+        run: |
+          set -x # print commands that are executed
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-tornado" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-web_frameworks_2-py27:
     name: Web Frameworks 2 (py2.7)
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6

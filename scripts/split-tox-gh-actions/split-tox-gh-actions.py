@@ -252,7 +252,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
     template = ENV.get_template("base.jinja")
 
     categories = set()
-    group_py_versions = set()
+    matrix_py_versions = set()
     for framework in frameworks:
         if py_versions_pinned[framework]:
             categories.add("pinned")
@@ -261,13 +261,15 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         if "2.7" in py_versions_pinned[framework]:
             categories.add("py2.7")
 
-        group_py_versions |= set(py_versions_pinned[framework])
-        group_py_versions |= set(py_versions_latest[framework])
+        matrix_py_versions |= set(py_versions_pinned[framework])
+        matrix_py_versions |= set(py_versions_latest[framework])
+
+    matrix_py_versions.discard("2.7")
 
     context = {
         "group": group,
         "frameworks": frameworks,
-        "categories": categories,
+        "categories": sorted(categories),
         "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
@@ -275,7 +277,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),
         "all_versions": [
-            f'"{version}"' for version in _normalize_py_versions(group_py_versions)
+            f'"{version}"' for version in _normalize_py_versions(matrix_py_versions)
         ],
         "py_versions": {
             framework: {
