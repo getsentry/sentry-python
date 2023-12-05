@@ -45,26 +45,16 @@ jobs:
 {% include "check_permissions.jinja" %}
 {% endif %}
 
-{% for framework in frameworks %}
-
-{% if py_versions.get(framework).pinned %}
-{% with category="pinned", versions=py_versions.get(framework).pinned %}
-{% include "test.jinja" %}
+{% with category="pinned" %}
+{% include "test_group.jinja" %}
 {% endwith %}
-{% endif %}
 
-{% if py_versions.get(framework).py27 %}
-{% with category="py27", versions=py_versions.get(framework).py27 %}
-{% include "test.jinja" %}
+{% with category="py27" %}
+{% include "test_group.jinja" %}
 {% endwith %}
-{% endif %}
 
-{% if py_versions.get(framework).latest %}
-{% with category="latest", versions=py_versions.get(framework).latest %}
-{% include "test.jinja" %}
+{% with category="latest" %}
+{% include "test_group.jinja" %}
 {% endwith %}
-{% endif %}
-
-{% endfor %}
 
 {% include "check_required.jinja" %}

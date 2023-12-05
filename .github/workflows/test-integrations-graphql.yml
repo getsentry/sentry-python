@@ -17,14 +17,14 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-ariadne-pinned:
+  test-graphql-pinned:
+    name: GraphQL (pinned)
     timeout-minutes: 30
-    name: ariadne pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.11"]
+        python-version: ["3.7","3.8","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -38,7 +38,7 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test ariadne
+      - name: Test ariadne pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -46,65 +46,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ariadne" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-ariadne-latest:
-    timeout-minutes: 30
-    name: ariadne latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test ariadne
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-gql-pinned:
-    timeout-minutes: 30
-    name: gql pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test gql
+      - name: Test gql pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -112,65 +54,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gql" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-gql-latest:
-    timeout-minutes: 30
-    name: gql latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test gql
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gql-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-graphene-pinned:
-    timeout-minutes: 30
-    name: graphene pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test graphene
+      - name: Test graphene pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -178,65 +62,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-graphene" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-graphene-latest:
-    timeout-minutes: 30
-    name: graphene latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test graphene
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-strawberry-pinned:
-    timeout-minutes: 30
-    name: strawberry pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test strawberry
+      - name: Test strawberry pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -248,14 +74,60 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-strawberry-latest:
+  test-graphql-py27:
+    name: GraphQL (py27)
     timeout-minutes: 30
-    name: strawberry latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Test ariadne py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-ariadne" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test gql py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-gql" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test graphene py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-graphene" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test strawberry py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-strawberry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-graphql-latest:
+    name: GraphQL (latest)
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.11","3.12"]
+        python-version: ["3.7","3.8","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -269,7 +141,31 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test strawberry
+      - name: Test ariadne latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test gql latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gql-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test graphene latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test strawberry latest
         run: |
           set -x # print commands that are executed
           coverage erase

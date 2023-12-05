@@ -17,14 +17,14 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-aiohttp-pinned:
+  test-web_frameworks_2-pinned:
+    name: Web Frameworks 2 (pinned)
     timeout-minutes: 30
-    name: aiohttp pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7","3.9","3.11"]
+        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -38,7 +38,7 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test aiohttp
+      - name: Test aiohttp pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -46,65 +46,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-aiohttp-latest:
-    timeout-minutes: 30
-    name: aiohttp latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test aiohttp
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiohttp-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-asgi-pinned:
-    timeout-minutes: 30
-    name: asgi pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test asgi
+      - name: Test asgi pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -112,32 +54,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-bottle-pinned:
-    timeout-minutes: 30
-    name: bottle pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.5","3.9"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test bottle
+      - name: Test bottle pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -145,87 +62,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-bottle-py27:
-    timeout-minutes: 30
-    name: bottle py27, python 2.7
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test bottle
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-bottle-latest:
-    timeout-minutes: 30
-    name: bottle latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.5","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test bottle
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-bottle-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-falcon-pinned:
-    timeout-minutes: 30
-    name: falcon pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.5","3.6","3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test falcon
+      - name: Test falcon pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -233,87 +70,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-falcon-py27:
-    timeout-minutes: 30
-    name: falcon py27, python 2.7
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test falcon
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-falcon-latest:
-    timeout-minutes: 30
-    name: falcon latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test falcon
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-pyramid-pinned:
-    timeout-minutes: 30
-    name: pyramid pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.5","3.6","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test pyramid
+      - name: Test pyramid pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -321,87 +78,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-pyramid-py27:
-    timeout-minutes: 30
-    name: pyramid py27, python 2.7
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test pyramid
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-pyramid-latest:
-    timeout-minutes: 30
-    name: pyramid latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.6","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test pyramid
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyramid-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-quart-pinned:
-    timeout-minutes: 30
-    name: quart pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test quart
+      - name: Test quart pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -409,65 +86,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-quart-latest:
-    timeout-minutes: 30
-    name: quart latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test quart
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-quart-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-redis-pinned:
-    timeout-minutes: 30
-    name: redis pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test redis
+      - name: Test redis pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -475,87 +94,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-redis-py27:
-    timeout-minutes: 30
-    name: redis py27, python 2.7
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test redis
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-redis-latest:
-    timeout-minutes: 30
-    name: redis latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test redis
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-rediscluster-pinned:
-    timeout-minutes: 30
-    name: rediscluster pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test rediscluster
+      - name: Test rediscluster pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -563,54 +102,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-rediscluster-py27:
-    timeout-minutes: 30
-    name: rediscluster py27, python 2.7
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test rediscluster
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-sanic-pinned:
-    timeout-minutes: 30
-    name: sanic pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test sanic
+      - name: Test sanic pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -618,65 +110,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-sanic-latest:
-    timeout-minutes: 30
-    name: sanic latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test sanic
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sanic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-starlite-pinned:
-    timeout-minutes: 30
-    name: starlite pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.11"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test starlite
+      - name: Test starlite pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -684,32 +118,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-tornado-pinned:
-    timeout-minutes: 30
-    name: tornado pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.8","3.9","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test tornado
+      - name: Test tornado pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -721,14 +130,116 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-tornado-latest:
+  test-web_frameworks_2-py27:
+    name: Web Frameworks 2 (py27)
     timeout-minutes: 30
-    name: tornado latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Test aiohttp py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test asgi py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test bottle py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test falcon py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test pyramid py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test quart py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test redis py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test rediscluster py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test sanic py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test starlite py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test tornado py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-tornado" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-web_frameworks_2-latest:
+    name: Web Frameworks 2 (latest)
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.11","3.12"]
+        python-version: ["2.7","3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -742,7 +253,87 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test tornado
+      - name: Test aiohttp latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiohttp-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test asgi latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-asgi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test bottle latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-bottle-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test falcon latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test pyramid latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pyramid-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test quart latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-quart-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test redis latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test rediscluster latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test sanic latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-sanic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test starlite latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test tornado latest
         run: |
           set -x # print commands that are executed
           coverage erase

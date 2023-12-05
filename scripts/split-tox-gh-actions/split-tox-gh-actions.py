@@ -213,14 +213,22 @@ def find_frameworks_missing_from_groups(py_versions_pinned, py_versions_latest):
 
 
 def _normalize_py_versions(py_versions):
-    normalized = defaultdict(set)
-    normalized |= {
-        framework: sorted(
-            [py.replace("py", "") for py in versions],
+    if isinstance(py_versions, dict):
+        normalized = defaultdict(set)
+        normalized |= {
+            framework: sorted(
+                [py.replace("py", "") for py in versions],
+                key=lambda v: tuple(map(int, v.split("."))),
+            )
+            for framework, versions in py_versions.items()
+        }
+
+    elif isinstance(py_versions, set):
+        normalized = sorted(
+            [py.replace("py", "") for py in py_versions],
             key=lambda v: tuple(map(int, v.split("."))),
         )
-        for framework, versions in py_versions.items()
-    }
+
     return normalized
 
 
@@ -243,6 +251,7 @@ def _union(seq):
 def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
     template = ENV.get_template("base.jinja")
 
+    group_py_versions = set()
     needs = []
     for framework in frameworks:
         if py_versions_pinned[framework]:
@@ -251,6 +260,9 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
             needs.append(f"test-{framework}-latest")
         if "2.7" in py_versions_pinned[framework]:
             needs.append(f"test-{framework}-py27")
+
+        group_py_versions |= set(py_versions_pinned[framework])
+        group_py_versions |= set(py_versions_latest[framework])
 
     context = {
         "group": group,
@@ -261,6 +273,9 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_github_secrets": bool(
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),
+        "versions": [
+            f'"{version}"' for version in _normalize_py_versions(group_py_versions)
+        ],
         "py_versions": {
             framework: {
                 # already formatted for including in the matrix

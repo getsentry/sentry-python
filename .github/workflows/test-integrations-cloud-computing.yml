@@ -17,14 +17,14 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-boto3-pinned:
+  test-cloud_computing-pinned:
+    name: Cloud Computing (pinned)
     timeout-minutes: 30
-    name: boto3 pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.11","3.12"]
+        python-version: ["2.7","3.6","3.7","3.9","3.10","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -38,7 +38,7 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test boto3
+      - name: Test boto3 pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -46,87 +46,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-boto3-py27:
-    timeout-minutes: 30
-    name: boto3 py27, python 2.7
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test boto3
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-boto3-latest:
-    timeout-minutes: 30
-    name: boto3 latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test boto3
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-chalice-pinned:
-    timeout-minutes: 30
-    name: chalice pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.6","3.9"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test chalice
+      - name: Test chalice pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -134,65 +54,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-chalice-latest:
-    timeout-minutes: 30
-    name: chalice latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.10"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test chalice
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
-  test-cloud_resource_context-pinned:
-    timeout-minutes: 30
-    name: cloud_resource_context pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.6","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test cloud_resource_context
+      - name: Test cloud_resource_context pinned
         run: |
           set -x # print commands that are executed
           coverage erase
@@ -200,18 +62,72 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
+      - name: Test gcp pinned
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-gcp-pinned:
+  test-cloud_computing-py27:
+    name: Cloud Computing (py27)
     timeout-minutes: 30
-    name: gcp pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Test boto3 py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test chalice py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test cloud_resource_context py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test gcp py27
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-cloud_computing-latest:
+    name: Cloud Computing (latest)
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7"]
+        python-version: ["2.7","3.6","3.7","3.9","3.10","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -225,12 +141,36 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test gcp
+      - name: Test boto3 latest
         run: |
           set -x # print commands that are executed
           coverage erase
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test chalice latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test cloud_resource_context latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
+          coverage combine .coverage* &&
+          coverage xml -i
+      - name: Test gcp latest
+        run: |
+          set -x # print commands that are executed
+          coverage erase
+          # Run tests
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
       - uses: codecov/codecov-action@v3
