@@ -273,7 +273,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_github_secrets": bool(
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),
-        "versions": [
+        "all_versions": [
             f'"{version}"' for version in _normalize_py_versions(group_py_versions)
         ],
         "py_versions": {

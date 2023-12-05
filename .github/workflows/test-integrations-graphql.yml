@@ -41,7 +41,6 @@ jobs:
       - name: Test ariadne pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ariadne" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -49,7 +48,6 @@ jobs:
       - name: Test gql pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gql" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -57,7 +55,6 @@ jobs:
       - name: Test graphene pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-graphene" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -65,7 +62,6 @@ jobs:
       - name: Test strawberry pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-strawberry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -87,7 +83,6 @@ jobs:
       - name: Test ariadne py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-ariadne" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -95,7 +90,6 @@ jobs:
       - name: Test gql py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-gql" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -103,7 +97,6 @@ jobs:
       - name: Test graphene py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-graphene" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -111,7 +104,6 @@ jobs:
       - name: Test strawberry py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-strawberry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -144,7 +136,6 @@ jobs:
       - name: Test ariadne latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -152,7 +143,6 @@ jobs:
       - name: Test gql latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gql-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -160,7 +150,6 @@ jobs:
       - name: Test graphene latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -168,7 +157,6 @@ jobs:
       - name: Test strawberry latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -179,12 +167,11 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All GraphQL tests passed
-    needs: [test-ariadne-pinned, test-ariadne-latest, test-gql-pinned, test-gql-latest, test-graphene-pinned, test-graphene-latest, test-strawberry-pinned, test-strawberry-latest]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-pinned.result, 'failure')
+        if: contains(needs.test-graphql-pinned.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

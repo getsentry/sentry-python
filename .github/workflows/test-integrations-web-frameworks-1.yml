@@ -62,7 +62,6 @@ jobs:
       - name: Test django pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -70,7 +69,6 @@ jobs:
       - name: Test fastapi pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -78,7 +76,6 @@ jobs:
       - name: Test flask pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-flask" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -86,7 +83,6 @@ jobs:
       - name: Test starlette pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlette" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -129,7 +125,6 @@ jobs:
       - name: Test django py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -137,7 +132,6 @@ jobs:
       - name: Test fastapi py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -145,7 +139,6 @@ jobs:
       - name: Test flask py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-flask" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -153,7 +146,6 @@ jobs:
       - name: Test starlette py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-starlette" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -207,7 +199,6 @@ jobs:
       - name: Test django latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -215,7 +206,6 @@ jobs:
       - name: Test fastapi latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -223,7 +213,6 @@ jobs:
       - name: Test flask latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-flask-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -231,7 +220,6 @@ jobs:
       - name: Test starlette latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -242,12 +230,11 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Web Frameworks 1 tests passed
-    needs: [test-django-pinned, test-django-latest, test-django-py27, test-fastapi-pinned, test-fastapi-latest, test-flask-pinned, test-flask-latest, test-flask-py27, test-starlette-pinned, test-starlette-latest]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-pinned.result, 'failure')
+        if: contains(needs.test-web_frameworks_1-pinned.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

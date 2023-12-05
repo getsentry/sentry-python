@@ -76,7 +76,6 @@ jobs:
       - name: Test aws_lambda pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -101,7 +100,6 @@ jobs:
       - name: Test aws_lambda py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -137,7 +135,6 @@ jobs:
       - name: Test aws_lambda latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -148,12 +145,11 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All AWS Lambda tests passed
-    needs: [test-aws_lambda-pinned]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-pinned.result, 'failure')
+        if: contains(needs.test-aws_lambda-pinned.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -41,7 +41,6 @@ jobs:
       - name: Test boto3 pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -49,7 +48,6 @@ jobs:
       - name: Test chalice pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -57,7 +55,6 @@ jobs:
       - name: Test cloud_resource_context pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -65,7 +62,6 @@ jobs:
       - name: Test gcp pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -87,7 +83,6 @@ jobs:
       - name: Test boto3 py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -95,7 +90,6 @@ jobs:
       - name: Test chalice py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -103,7 +97,6 @@ jobs:
       - name: Test cloud_resource_context py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -111,7 +104,6 @@ jobs:
       - name: Test gcp py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -144,7 +136,6 @@ jobs:
       - name: Test boto3 latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -152,7 +143,6 @@ jobs:
       - name: Test chalice latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -160,7 +150,6 @@ jobs:
       - name: Test cloud_resource_context latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -168,7 +157,6 @@ jobs:
       - name: Test gcp latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -179,12 +167,11 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Cloud Computing tests passed
-    needs: [test-boto3-pinned, test-boto3-latest, test-boto3-py27, test-chalice-pinned, test-chalice-latest, test-cloud_resource_context-pinned, test-gcp-pinned]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-pinned.result, 'failure')
+        if: contains(needs.test-cloud_computing-pinned.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

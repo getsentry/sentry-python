@@ -41,7 +41,6 @@ jobs:
       - name: Test gevent pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -49,7 +48,6 @@ jobs:
       - name: Test grpc pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -57,7 +55,6 @@ jobs:
       - name: Test httpx pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -65,7 +62,6 @@ jobs:
       - name: Test requests pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -87,7 +83,6 @@ jobs:
       - name: Test gevent py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -95,7 +90,6 @@ jobs:
       - name: Test grpc py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -103,7 +97,6 @@ jobs:
       - name: Test httpx py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -111,7 +104,6 @@ jobs:
       - name: Test requests py27
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -144,7 +136,6 @@ jobs:
       - name: Test gevent latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -152,7 +143,6 @@ jobs:
       - name: Test grpc latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -160,7 +150,6 @@ jobs:
       - name: Test httpx latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -168,7 +157,6 @@ jobs:
       - name: Test requests latest
         run: |
           set -x # print commands that are executed
-          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-requests-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
@@ -179,12 +167,11 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Networking tests passed
-    needs: [test-gevent-pinned, test-gevent-py27, test-grpc-pinned, test-grpc-latest, test-httpx-pinned, test-httpx-latest, test-requests-pinned, test-requests-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-pinned.result, 'failure')
+        if: contains(needs.test-networking-pinned.result, 'failure')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
