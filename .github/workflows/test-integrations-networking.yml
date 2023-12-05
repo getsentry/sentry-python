@@ -42,29 +42,29 @@ jobs:
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test grpc latest
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test httpx latest
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test requests latest
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-requests-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-requests-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
@@ -95,29 +95,29 @@ jobs:
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test grpc pinned
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test httpx pinned
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test requests pinned
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
@@ -137,29 +137,29 @@ jobs:
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test grpc py27
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py2.7-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test httpx py27
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py2.7-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - name: Test requests py27
         run: |
           set -x # print commands that are executed
           # Run tests
-          ./scripts/runtox.sh --exclude-latest "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
+          ./scripts/runtox.sh --exclude-latest "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
