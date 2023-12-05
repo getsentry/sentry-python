@@ -43,35 +43,35 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test beam latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test celery latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test huey latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test rq latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
@@ -103,35 +103,35 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test beam pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test celery pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test huey pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test rq pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
@@ -152,35 +152,35 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-arq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test beam py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test celery py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-celery" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test huey py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test rq py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-rq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:

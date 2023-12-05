@@ -43,28 +43,28 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-ariadne-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test gql latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gql-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test graphene latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-graphene-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test strawberry latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-strawberry-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
@@ -96,28 +96,28 @@ jobs:
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-ariadne" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test gql pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gql" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test graphene pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-graphene" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - name: Test strawberry pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-strawberry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v3
         with:

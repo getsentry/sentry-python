@@ -87,7 +87,7 @@
           {% elif category == "latest" %}
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           {% endif %}
-          coverage combine .coverage*
+          [ -e .coverage ] && coverage combine .coverage*
           coverage xml -i
       {% endfor %}
 
