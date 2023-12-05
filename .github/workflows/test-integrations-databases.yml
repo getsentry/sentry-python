@@ -63,6 +63,7 @@ jobs:
       - name: Test asyncpg latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -72,6 +73,7 @@ jobs:
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -81,6 +83,7 @@ jobs:
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -90,6 +93,7 @@ jobs:
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -146,6 +150,7 @@ jobs:
       - name: Test asyncpg pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -155,6 +160,7 @@ jobs:
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -164,6 +170,7 @@ jobs:
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -173,6 +180,7 @@ jobs:
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -218,6 +226,7 @@ jobs:
       - name: Test asyncpg py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -227,6 +236,7 @@ jobs:
       - name: Test clickhouse_driver py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -236,6 +246,7 @@ jobs:
       - name: Test pymongo py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -245,6 +256,7 @@ jobs:
       - name: Test sqlalchemy py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then

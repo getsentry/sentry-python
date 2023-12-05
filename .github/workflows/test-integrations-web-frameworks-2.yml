@@ -41,6 +41,7 @@ jobs:
       - name: Test aiohttp latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-aiohttp-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -50,6 +51,7 @@ jobs:
       - name: Test asgi latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-asgi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -59,6 +61,7 @@ jobs:
       - name: Test bottle latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-bottle-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -68,6 +71,7 @@ jobs:
       - name: Test falcon latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -77,6 +81,7 @@ jobs:
       - name: Test pyramid latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pyramid-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -86,6 +91,7 @@ jobs:
       - name: Test quart latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-quart-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -95,6 +101,7 @@ jobs:
       - name: Test redis latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -104,6 +111,7 @@ jobs:
       - name: Test rediscluster latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -113,6 +121,7 @@ jobs:
       - name: Test sanic latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sanic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -122,6 +131,7 @@ jobs:
       - name: Test starlite latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-starlite-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -131,6 +141,7 @@ jobs:
       - name: Test tornado latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-tornado-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -165,6 +176,7 @@ jobs:
       - name: Test aiohttp pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -174,6 +186,7 @@ jobs:
       - name: Test asgi pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -183,6 +196,7 @@ jobs:
       - name: Test bottle pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -192,6 +206,7 @@ jobs:
       - name: Test falcon pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -201,6 +216,7 @@ jobs:
       - name: Test pyramid pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -210,6 +226,7 @@ jobs:
       - name: Test quart pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -219,6 +236,7 @@ jobs:
       - name: Test redis pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -228,6 +246,7 @@ jobs:
       - name: Test rediscluster pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -237,6 +256,7 @@ jobs:
       - name: Test sanic pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -246,6 +266,7 @@ jobs:
       - name: Test starlite pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -255,6 +276,7 @@ jobs:
       - name: Test tornado pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-tornado" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -278,6 +300,7 @@ jobs:
       - name: Test aiohttp py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -287,6 +310,7 @@ jobs:
       - name: Test asgi py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -296,6 +320,7 @@ jobs:
       - name: Test bottle py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -305,6 +330,7 @@ jobs:
       - name: Test falcon py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -314,6 +340,7 @@ jobs:
       - name: Test pyramid py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -323,6 +350,7 @@ jobs:
       - name: Test quart py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -332,6 +360,7 @@ jobs:
       - name: Test redis py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -341,6 +370,7 @@ jobs:
       - name: Test rediscluster py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -350,6 +380,7 @@ jobs:
       - name: Test sanic py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -359,6 +390,7 @@ jobs:
       - name: Test starlite py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -368,6 +400,7 @@ jobs:
       - name: Test tornado py27
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-tornado" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then

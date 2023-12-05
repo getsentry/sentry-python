@@ -41,6 +41,7 @@ jobs:
       - name: Test loguru latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -50,6 +51,7 @@ jobs:
       - name: Test opentelemetry latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -59,6 +61,7 @@ jobs:
       - name: Test pure_eval latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -68,6 +71,7 @@ jobs:
       - name: Test trytond latest
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -102,6 +106,7 @@ jobs:
       - name: Test loguru pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -111,6 +116,7 @@ jobs:
       - name: Test opentelemetry pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -120,6 +126,7 @@ jobs:
       - name: Test pure_eval pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pure_eval" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then
@@ -129,6 +136,7 @@ jobs:
       - name: Test trytond pinned
         run: |
           set -x # print commands that are executed
+          coverage erase
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           if [ -e .coverage ]; then

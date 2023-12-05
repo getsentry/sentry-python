@@ -79,6 +79,8 @@
         run: |
           set -x # print commands that are executed
 
+          coverage erase
+
           # Run tests
           {% if category == "py27" %}
           ./scripts/runtox.sh --exclude-latest "py2.7-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
