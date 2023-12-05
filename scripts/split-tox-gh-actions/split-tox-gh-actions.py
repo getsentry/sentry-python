@@ -251,15 +251,15 @@ def _union(seq):
 def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
     template = ENV.get_template("base.jinja")
 
+    categories = set()
     group_py_versions = set()
-    needs = []
     for framework in frameworks:
         if py_versions_pinned[framework]:
-            needs.append(f"test-{framework}-pinned")
+            categories.add("pinned")
         if py_versions_latest[framework]:
-            needs.append(f"test-{framework}-latest")
+            categories.add("latest")
         if "2.7" in py_versions_pinned[framework]:
-            needs.append(f"test-{framework}-py27")
+            categories.add("py2.7")
 
         group_py_versions |= set(py_versions_pinned[framework])
         group_py_versions |= set(py_versions_latest[framework])
@@ -267,6 +267,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
     context = {
         "group": group,
         "frameworks": frameworks,
+        "categories": categories,
         "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
@@ -287,7 +288,6 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
             }
             for framework in frameworks
         },
-        "needs": str(needs).replace("'", ""),
     }
     rendered = template.render(context)
     rendered = postprocess_template(rendered)
