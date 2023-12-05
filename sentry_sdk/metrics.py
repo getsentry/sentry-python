@@ -375,20 +375,22 @@ class LocalAggregator(object):
 
     def to_json(self):
         # type: (...) -> Dict[str, Any]
-        rv = {}
+        rv = {}  # type: Any
         for (export_key, tags), (
             v_min,
             v_max,
             v_count,
             v_sum,
         ) in self._measurements.items():
-            rv[export_key] = {
-                "tags": _tags_to_dict(tags),
-                "min": v_min,
-                "max": v_max,
-                "count": v_count,
-                "sum": v_sum,
-            }
+            rv.setdefault(export_key, []).append(
+                {
+                    "tags": _tags_to_dict(tags),
+                    "min": v_min,
+                    "max": v_max,
+                    "count": v_count,
+                    "sum": v_sum,
+                }
+            )
         return rv
 
 
