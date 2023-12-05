@@ -1,4 +1,3 @@
-  {% with lowercase_group=group | replace(" ", "_") | lower %}
   check_required_tests:
     name: All {{ group }} tests passed
     {% if "pinned" in categories and "py27" in categories %}
@@ -20,4 +19,3 @@
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
       {% endif %}
-    {% endwith %}

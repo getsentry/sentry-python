@@ -1,4 +1,4 @@
-  test-{{ group | replace(" ", "_") | lower }}-{{ category }}:
+  test-{{ lowercase_group }}-{{ category }}:
     name: {{ group }} ({{ category }})
     timeout-minutes: 30
 

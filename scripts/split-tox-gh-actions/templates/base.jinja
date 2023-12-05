@@ -1,3 +1,4 @@
+{% with lowercase_group=group | replace(" ", "_") | lower %}
 name: Test {{ group }}
 
 on:
@@ -50,3 +51,4 @@ jobs:
 {% endfor %}
 
 {% include "check_required.jinja" %}
+{% endwith %}
