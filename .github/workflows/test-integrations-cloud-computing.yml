@@ -44,28 +44,28 @@ jobs:
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-boto3-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test chalice latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-chalice-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test cloud_resource_context latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-cloud_resource_context-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test gcp latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gcp-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -97,28 +97,28 @@ jobs:
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test chalice pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test cloud_resource_context pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test gcp pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -139,28 +139,28 @@ jobs:
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test chalice py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test cloud_resource_context py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test gcp py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

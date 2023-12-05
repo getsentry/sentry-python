@@ -79,7 +79,7 @@ jobs:
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

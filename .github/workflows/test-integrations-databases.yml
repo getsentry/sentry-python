@@ -66,28 +66,28 @@ jobs:
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -141,28 +141,28 @@ jobs:
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -205,28 +205,28 @@ jobs:
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test clickhouse_driver py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test pymongo py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - name: Test sqlalchemy py27
         run: |
           set -x # print commands that are executed
           # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           [ -e .coverage ] && coverage combine .coverage*
-          coverage xml -i
+          [ -e .coverage ] && coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
