@@ -250,15 +250,6 @@ def add_query_source(hub, span):
             span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def add_additional_span_data(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
-    """
-    Adds additional data to the span
-    """
-    if span.op == OP.DB:
-        add_query_source(hub, span)
-
-
 def extract_sentrytrace_data(header):
     # type: (Optional[str]) -> Optional[Dict[str, Union[str, bool, None]]]
     """
