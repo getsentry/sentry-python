@@ -20,6 +20,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
     NoOpSpan,
+    Span,
     Transaction,
 )
 from sentry_sdk._types import TYPE_CHECKING
@@ -48,8 +49,6 @@ if TYPE_CHECKING:
         Hint,
         Type,
     )
-
-    from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
