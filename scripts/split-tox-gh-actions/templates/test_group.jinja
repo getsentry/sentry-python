@@ -14,7 +14,7 @@
     strategy:
       fail-fast: false
       matrix:
-        python-version: [{{ all_versions|join(",") }}]
+        python-version: [{{ versions.get(category)|join(",") }}]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
