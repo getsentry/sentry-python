@@ -168,18 +168,10 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-databases-py27:
-    name: Databases (py2.7)
+    name: Databases (py27)
     timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+    runs-on: ubuntu-20.04
+    container: python:2.7
     services:
       postgres:
         image: postgres
@@ -198,40 +190,41 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: postgres
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
-      - name: Test asyncpg py2.7
+          psql postgresql://postgres:sentry@postgres:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@postgres:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Test asyncpg py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - name: Test clickhouse_driver py2.7
+      - name: Test clickhouse_driver py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - name: Test pymongo py2.7
+      - name: Test pymongo py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - name: Test sqlalchemy py2.7
+      - name: Test sqlalchemy py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
       - uses: codecov/codecov-action@v3

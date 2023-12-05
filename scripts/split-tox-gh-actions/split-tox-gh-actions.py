@@ -259,7 +259,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         if py_versions_latest[framework]:
             categories.add("latest")
         if "2.7" in py_versions_pinned[framework]:
-            categories.add("py2.7")
+            categories.add("py27")
 
         matrix_py_versions |= set(py_versions_pinned[framework])
         matrix_py_versions |= set(py_versions_latest[framework])

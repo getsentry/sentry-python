@@ -124,48 +124,41 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-networking-py27:
-    name: Networking (py2.7)
+    name: Networking (py27)
     timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
+    runs-on: ubuntu-20.04
+    container: python:2.7
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
-      - name: Test gevent py2.7
+      - name: Test gevent py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - name: Test grpc py2.7
+      - name: Test grpc py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - name: Test httpx py2.7
+      - name: Test httpx py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
-      - name: Test requests py2.7
+      - name: Test requests py27
         run: |
           set -x # print commands that are executed
           # Run tests
+          ./scripts/runtox.sh --exclude-latest "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
           coverage combine .coverage* &&
           coverage xml -i
       - uses: codecov/codecov-action@v3
