@@ -719,8 +719,7 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        hub = kwargs.pop("hub", None)
-        client = kwargs.pop("client", None)
+        client = kwargs.get("client", None)
 
         configuration_instrumenter = client and client.options["instrumenter"]
 
@@ -739,7 +738,7 @@ class Scope(object):
 
             if isinstance(span, Transaction):
                 logger.warning(deprecation_msg)
-                return self.start_transaction(span)
+                return self.start_transaction(span, **kwargs)
 
             if "transaction" in kwargs:
                 logger.warning(deprecation_msg)
@@ -753,7 +752,7 @@ class Scope(object):
             logger.warning(deprecation_msg)
             return span
 
-        kwargs.setdefault("hub", hub)
+        kwargs.pop("client")
 
         active_span = self.span
         if active_span is not None:
