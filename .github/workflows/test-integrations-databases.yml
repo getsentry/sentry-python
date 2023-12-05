@@ -233,6 +233,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Databases tests passed
+    needs: [test-databases-pinned, test-databases-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04

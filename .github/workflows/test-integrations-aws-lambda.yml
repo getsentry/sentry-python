@@ -86,6 +86,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All AWS Lambda tests passed
+    needs: test-aws_lambda-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04

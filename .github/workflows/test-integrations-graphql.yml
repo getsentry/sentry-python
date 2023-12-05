@@ -125,6 +125,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All GraphQL tests passed
+    needs: test-graphql-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04

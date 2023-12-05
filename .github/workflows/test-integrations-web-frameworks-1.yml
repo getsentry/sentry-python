@@ -230,6 +230,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Web Frameworks 1 tests passed
+    needs: [test-web_frameworks_1-pinned, test-web_frameworks_1-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04

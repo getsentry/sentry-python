@@ -1,8 +1,8 @@
   check_required_tests:
     name: All {{ group }} tests passed
-    {% if py_versions.pinned and py_versions.py27 %}
+    {% if "pinned" in categories and "py27" in categories %}
     needs: [test-{{ group | replace(" ", "_") | lower }}-pinned, test-{{ group | replace(" ", "_") | lower }}-py27]
-    {% elif py_versions.pinned %}
+    {% elif "pinned" in categories %}
     needs: test-{{ group | replace(" ", "_") | lower }}-pinned
     {% endif %}
     # Always run this, even if a dependent job failed

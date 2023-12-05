@@ -167,6 +167,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Networking tests passed
+    needs: [test-networking-pinned, test-networking-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04

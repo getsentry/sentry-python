@@ -167,6 +167,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Cloud Computing tests passed
+    needs: [test-cloud_computing-pinned, test-cloud_computing-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
