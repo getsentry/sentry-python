@@ -6,7 +6,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 
 from sentry_sdk.utils import parse_version
 
@@ -84,6 +84,10 @@ def _before_cursor_execute(
 
 def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     # type: (Any, Any, Any, Any, Any, *Any) -> None
+    hub = Hub.current
+    if hub.get_integration(SqlalchemyIntegration) is None:
+        return
+
     ctx_mgr = getattr(
         context, "_sentry_sql_span_manager", None
     )  # type: Optional[ContextManager[Any]]
@@ -91,6 +95,10 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
+
+    span = context._sentry_sql_span
+    if span is not None:
+        add_query_source(hub, span)
 
 
 def _handle_error(context, *args):
