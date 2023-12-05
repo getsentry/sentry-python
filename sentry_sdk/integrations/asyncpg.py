@@ -66,8 +66,12 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             return await f(*args, **kwargs)
 
         query = args[1]
-        with record_sql_queries(hub, None, query, None, None, executemany=False):
+        with record_sql_queries(
+            hub, None, query, None, None, executemany=False
+        ) as span:
             res = await f(*args, **kwargs)
+
+        add_query_source(hub, span)
         return res
 
     return _inner
@@ -119,7 +123,6 @@ def _wrap_connection_method(
             _set_db_data(span, args[0])
             res = await f(*args, **kwargs)
 
-        add_query_source(hub, span)
         return res
 
     return _inner
@@ -147,7 +150,6 @@ def _wrap_cursor_creation(f: Callable[..., T]) -> Callable[..., T]:
             res = f(*args, **kwargs)
             span.set_data("db.cursor", res)
 
-        add_query_source(hub, span)
         return res
 
     return _inner
