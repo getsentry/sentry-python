@@ -74,14 +74,15 @@
           {% endif %}
           {% endif %}
 
+      - name: Erase coverage
+        run: |
+          coverage erase
+
       {% for framework in frameworks %}
       - name: Test {{ framework }} {{ category }}
         run: |
           set -x # print commands that are executed
 
-          coverage erase
-
-          # Run tests
           {% if category == "py27" %}
           ./scripts/runtox.sh --exclude-latest "py2.7-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           {% elif category == "pinned" %}
@@ -89,11 +90,12 @@
           {% elif category == "latest" %}
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           {% endif %}
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       {% endfor %}
+
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
 
       - uses: codecov/codecov-action@v3
         with:

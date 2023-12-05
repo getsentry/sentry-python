@@ -60,46 +60,29 @@ jobs:
           pip install coverage "tox>=3,<4"
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Erase coverage
+        run: |
+          coverage erase
       - name: Test asyncpg latest
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -147,46 +130,29 @@ jobs:
           pip install coverage "tox>=3,<4"
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Erase coverage
+        run: |
+          coverage erase
       - name: Test asyncpg pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -223,46 +189,29 @@ jobs:
           pip install coverage "tox>=3,<4"
           psql postgresql://postgres:sentry@postgres:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@postgres:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+      - name: Erase coverage
+        run: |
+          coverage erase
       - name: Test asyncpg py27
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test clickhouse_driver py27
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test pymongo py27
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
       - name: Test sqlalchemy py27
         run: |
           set -x # print commands that are executed
-          coverage erase
-          # Run tests
           ./scripts/runtox.sh --exclude-latest "py2.7-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-          if [ -e .coverage ]; then
-            coverage combine .coverage*
-            coverage xml -i
-          fi
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
       - uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
