@@ -597,33 +597,37 @@ def test_metric_summaries(sentry_init, capture_envelopes):
     t = transaction.items[0].get_transaction_event()
 
     assert t["_metrics_summary"] == {
-        "c:root-counter@none": {
-            "count": 1,
-            "min": 1.0,
-            "max": 1.0,
-            "sum": 1.0,
+        "c:root-counter@none": [
+            {
+                "count": 1,
+                "min": 1.0,
+                "max": 1.0,
+                "sum": 1.0,
+                "tags": {
+                    "transaction": "/foo",
+                    "release": "fun-release@1.0.0",
+                    "environment": "not-fun-env",
+                },
+            }
+        ]
+    }
+
+    assert t["spans"][0]["_metrics_summary"]["d:my-dist@none"] == [
+        {
+            "count": 10,
+            "min": 0.0,
+            "max": 9.0,
+            "sum": 45.0,
             "tags": {
-                "transaction": "/foo",
-                "release": "fun-release@1.0.0",
                 "environment": "not-fun-env",
+                "release": "fun-release@1.0.0",
+                "transaction": "/foo",
             },
         }
-    }
-
-    assert t["spans"][0]["_metrics_summary"]["d:my-dist@none"] == {
-        "count": 10,
-        "min": 0.0,
-        "max": 9.0,
-        "sum": 45.0,
-        "tags": {
-            "environment": "not-fun-env",
-            "release": "fun-release@1.0.0",
-            "transaction": "/foo",
-        },
-    }
+    ]
 
     assert t["spans"][0]["tags"] == {"a": "b"}
-    timer = t["spans"][0]["_metrics_summary"]["d:my-timer-metric@second"]
+    (timer,) = t["spans"][0]["_metrics_summary"]["d:my-timer-metric@second"]
     assert timer["count"] == 1
     assert timer["max"] == timer["min"] == timer["sum"]
     assert timer["sum"] > 0
@@ -697,6 +701,7 @@ def test_metrics_summary_filtered(sentry_init, capture_envelopes):
         op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
     ) as transaction:
         metrics.timing("foo", value=1.0, tags={"a": "b"}, timestamp=ts)
+        metrics.timing("foo", value=1.0, tags={"b": "c"}, timestamp=ts)
         metrics.timing("bar", value=1.0, tags={"a": "b"}, timestamp=ts)
 
     Hub.current.flush()
@@ -707,25 +712,40 @@ def test_metrics_summary_filtered(sentry_init, capture_envelopes):
     assert envelope.items[0].headers["type"] == "statsd"
     m = parse_metrics(envelope.items[0].payload.get_bytes())
 
-    assert len(m) == 2
+    assert len(m) == 3
     assert m[0][1] == "bar@second"
     assert m[1][1] == "foo@second"
+    assert m[2][1] == "foo@second"
 
     # Measurement Attachment
     t = transaction.items[0].get_transaction_event()["_metrics_summary"]
     assert t == {
-        "d:foo@second": {
-            "tags": {
-                "a": "b",
-                "environment": "not-fun-env",
-                "release": "fun-release@1.0.0",
-                "transaction": "/foo",
+        "d:foo@second": [
+            {
+                "tags": {
+                    "a": "b",
+                    "environment": "not-fun-env",
+                    "release": "fun-release@1.0.0",
+                    "transaction": "/foo",
+                },
+                "min": 1.0,
+                "max": 1.0,
+                "count": 1,
+                "sum": 1.0,
             },
-            "min": 1.0,
-            "max": 1.0,
-            "count": 1,
-            "sum": 1.0,
-        }
+            {
+                "tags": {
+                    "b": "c",
+                    "environment": "not-fun-env",
+                    "release": "fun-release@1.0.0",
+                    "transaction": "/foo",
+                },
+                "min": 1.0,
+                "max": 1.0,
+                "count": 1,
+                "sum": 1.0,
+            },
+        ]
     }
 
 
