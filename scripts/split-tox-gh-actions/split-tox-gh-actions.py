@@ -53,8 +53,12 @@ GROUPS = {
     "Common": [
         "common",
     ],
-    "Cloud Computing": [
+    "AWS Lambda": [
+        # this is separate from Cloud Computing because only this one test suite
+        # needs to run with access to GitHub secrets
         "aws_lambda",
+    ],
+    "Cloud Computing": [
         "boto3",
         "chalice",
         "cloud_resource_context",

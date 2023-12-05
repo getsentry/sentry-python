@@ -4,11 +4,7 @@ on:
     branches:
       - master
       - release/**
-  # XXX: We are using `pull_request_target` instead of `pull_request` because we want
-  # this to run on forks with access to the secrets necessary to run the test suite.
-  # Prefer to use `pull_request` when possible.
-  pull_request_target:
-    types: [labeled, opened, reopened, synchronize]
+  pull_request:
 # Cancel in progress workflows on pull_requests.
 # https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
 concurrency:
@@ -16,77 +12,12 @@ concurrency:
   cancel-in-progress: true
 permissions:
   contents: read
-  # `write` is needed to remove the `Trigger: tests using secrets` label
-  pull-requests: write
 env:
-  SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID: ${{ secrets.SENTRY_PYTHON_TEST_AWS_ACCESS_KEY_ID }}
-  SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTRY_PYTHON_TEST_AWS_SECRET_ACCESS_KEY }}
   BUILD_CACHE_KEY: ${{ github.sha }}
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  check-permissions:
-    name: permissions check
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
-        with:
-          persist-credentials: false
-      - name: Check permissions on PR
-        if: github.event_name == 'pull_request_target'
-        run: |
-          python3 -uS .github/workflows/scripts/trigger_tests_on_label.py \
-              --repo-id ${{ github.event.repository.id }} \
-              --pr ${{ github.event.number }} \
-              --event ${{ github.event.action }} \
-              --username "$ARG_USERNAME" \
-              --label-names "$ARG_LABEL_NAMES"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # these can contain special characters
-          ARG_USERNAME: ${{ github.event.pull_request.user.login }}
-          ARG_LABEL_NAMES: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-      - name: Check permissions on repo branch
-        if: github.event_name == 'push'
-        run: true
-  test-aws_lambda-pinned:
-    needs: check-permissions
-    timeout-minutes: 30
-    name: aws_lambda pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.9"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Test aws_lambda
-        run: |
-          set -x # print commands that are executed
-          coverage erase
-          # Run tests
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch &&
-          coverage combine .coverage* &&
-          coverage xml -i
-      - uses: codecov/codecov-action@v3
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   test-boto3-pinned:
-    needs: check-permissions
     timeout-minutes: 30
     name: boto3 pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -101,8 +32,6 @@ jobs:
         os: [ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -122,15 +51,12 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-boto3-py27:
-    needs: check-permissions
     timeout-minutes: 30
     name: boto3 py27, python 2.7
     runs-on: ubuntu-20.04
     container: python:2.7
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
@@ -147,7 +73,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-boto3-latest:
-    needs: check-permissions
     timeout-minutes: 30
     name: boto3 latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -162,8 +87,6 @@ jobs:
         os: [ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -183,7 +106,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-chalice-pinned:
-    needs: check-permissions
     timeout-minutes: 30
     name: chalice pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -198,8 +120,6 @@ jobs:
         os: [ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -219,7 +139,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-chalice-latest:
-    needs: check-permissions
     timeout-minutes: 30
     name: chalice latest, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -234,8 +153,6 @@ jobs:
         os: [ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -255,7 +172,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-cloud_resource_context-pinned:
-    needs: check-permissions
     timeout-minutes: 30
     name: cloud_resource_context pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -270,8 +186,6 @@ jobs:
         os: [ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -291,7 +205,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   test-gcp-pinned:
-    needs: check-permissions
     timeout-minutes: 30
     name: gcp pinned, python ${{ matrix.python-version }}, ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -306,8 +219,6 @@ jobs:
         os: [ubuntu-20.04]
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
@@ -328,7 +239,7 @@ jobs:
           files: coverage.xml
   check_required_tests:
     name: All Cloud Computing tests passed
-    needs: [test-aws_lambda-pinned, test-boto3-pinned, test-boto3-latest, test-boto3-py27, test-chalice-pinned, test-chalice-latest, test-cloud_resource_context-pinned, test-gcp-pinned]
+    needs: [test-boto3-pinned, test-boto3-latest, test-boto3-py27, test-chalice-pinned, test-chalice-latest, test-cloud_resource_context-pinned, test-gcp-pinned]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
