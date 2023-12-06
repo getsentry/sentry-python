@@ -213,21 +213,21 @@ def find_frameworks_missing_from_groups(py_versions_pinned, py_versions_latest):
 
 
 def _normalize_py_versions(py_versions):
+    def replace_and_sort(versions):
+        return sorted(
+            [py.replace("py", "") for py in versions],
+            key=lambda v: tuple(map(int, v.split("."))),
+        )
+
     if isinstance(py_versions, dict):
         normalized = defaultdict(set)
         normalized |= {
-            framework: sorted(
-                [py.replace("py", "") for py in versions],
-                key=lambda v: tuple(map(int, v.split("."))),
-            )
+            framework: replace_and_sort(versions)
             for framework, versions in py_versions.items()
         }
 
     elif isinstance(py_versions, set):
-        normalized = sorted(
-            [py.replace("py", "") for py in py_versions],
-            key=lambda v: tuple(map(int, v.split("."))),
-        )
+        normalized = replace_and_sort(py_versions)
 
     return normalized
 
