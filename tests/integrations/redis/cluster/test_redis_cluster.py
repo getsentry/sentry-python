@@ -33,11 +33,10 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
 
     # on initializing a RedisCluster, a COMMAND call is made - this is not important for the test
     # but must be accounted for
-    assert len(crumbs) <= 2
-    if len(crumbs) == 2:
-        assert event["breadcrumbs"]["values"][0]["message"] == "COMMAND"
+    assert len(crumbs) in (1, 2)
+    assert len(crumbs) == 1 or crumbs[0]["message"] == "COMMAND"
 
-    crumb = event["breadcrumbs"]["values"][-1]
+    crumb = crumbs[-1]
 
     assert crumb == {
         "category": "redis",
@@ -77,11 +76,10 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
 
     # on initializing a RedisCluster, a COMMAND call is made - this is not important for the test
     # but must be accounted for
-    assert len(spans) <= 2
-    if len(spans) == 2:
-        assert event["spans"][0]["description"] == "COMMAND"
+    assert len(spans) in (1, 2)
+    assert len(spans) == 1 or spans[0]["description"] == "COMMAND"
 
-    span = event["spans"][-1]
+    span = spans[-1]
     assert span["op"] == "db.redis"
     assert span["description"] == description
     assert span["data"] == {
