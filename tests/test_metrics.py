@@ -680,11 +680,7 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
     assert "_metrics_summary" not in t["spans"][0]
 
 
-def test_metrics_summary_filtered(
-    sentry_init,
-    capture_envelopes,
-    DictionaryContaining,  # noqa: N803
-):
+def test_metrics_summary_filtered(sentry_init, capture_envelopes):
     def should_summarize_metric(key, tags):
         return key == "foo"
 
@@ -704,8 +700,8 @@ def test_metrics_summary_filtered(
     with start_transaction(
         op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
     ) as transaction:
-        metrics.timing("foo", value=1.0, tags={"a": "b"}, timestamp=ts)
-        metrics.timing("foo", value=1.0, tags={"b": "c"}, timestamp=ts)
+        metrics.timing("foo", value=3.0, tags={"a": "b"}, timestamp=ts)
+        metrics.timing("foo", value=2.0, tags={"b": "c"}, timestamp=ts)
         metrics.timing("bar", value=1.0, tags={"a": "b"}, timestamp=ts)
 
     Hub.current.flush()
@@ -723,36 +719,31 @@ def test_metrics_summary_filtered(
 
     # Measurement Attachment
     t = transaction.items[0].get_transaction_event()["_metrics_summary"]
-    assert t == DictionaryContaining(
-        {
-            "d:foo@second": [
-                {
-                    "tags": {
-                        "b": "c",
-                        "environment": "not-fun-env",
-                        "release": "fun-release@1.0.0",
-                        "transaction": "/foo",
-                    },
-                    "min": 1.0,
-                    "max": 1.0,
-                    "count": 1,
-                    "sum": 1.0,
-                },
-                {
-                    "tags": {
-                        "a": "b",
-                        "environment": "not-fun-env",
-                        "release": "fun-release@1.0.0",
-                        "transaction": "/foo",
-                    },
-                    "min": 1.0,
-                    "max": 1.0,
-                    "count": 1,
-                    "sum": 1.0,
-                },
-            ]
-        }
-    )
+    assert len(t["d:foo@second"]) == 2
+    assert {
+        "tags": {
+            "a": "b",
+            "environment": "not-fun-env",
+            "release": "fun-release@1.0.0",
+            "transaction": "/foo",
+        },
+        "min": 3.0,
+        "max": 3.0,
+        "count": 1,
+        "sum": 3.0,
+    } in t["d:foo@second"]
+    assert {
+        "tags": {
+            "b": "c",
+            "environment": "not-fun-env",
+            "release": "fun-release@1.0.0",
+            "transaction": "/foo",
+        },
+        "min": 2.0,
+        "max": 2.0,
+        "count": 1,
+        "sum": 2.0,
+    } in t["d:foo@second"]
 
 
 def test_tag_normalization(sentry_init, capture_envelopes):
