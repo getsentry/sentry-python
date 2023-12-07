@@ -680,7 +680,11 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
     assert "_metrics_summary" not in t["spans"][0]
 
 
-def test_metrics_summary_filtered(sentry_init, capture_envelopes, DictionaryContaining):
+def test_metrics_summary_filtered(
+    sentry_init,
+    capture_envelopes,
+    DictionaryContaining,  # noqa: N803
+):
     def should_summarize_metric(key, tags):
         return key == "foo"
 
