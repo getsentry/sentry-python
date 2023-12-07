@@ -600,9 +600,11 @@ def test_apply_async_no_args(init_celery):
 
     @celery.task
     def example_task():
-        pass
+        return "success"
 
     try:
-        example_task.apply_async(None, {})
+        result = example_task.apply_async(None, {})
     except TypeError:
         pytest.fail("Calling `apply_async` without arguments raised a TypeError")
+
+    assert result.get() == "success"
