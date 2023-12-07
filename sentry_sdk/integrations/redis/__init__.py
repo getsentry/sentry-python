@@ -166,12 +166,13 @@ def _set_async_cluster_db_data(span, async_redis_cluster_instance):
 
 def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
     # type: (Span, AsyncClusterPipeline[Any]) -> None
-    _set_async_cluster_db_data(
-        span,
-        # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
-        # does not recognize it - see https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
-        async_redis_cluster_pipeline_instance._client,  # type: ignore[attr-defined]
-    )
+    with capture_internal_exceptions():
+        _set_async_cluster_db_data(
+            span,
+            # the AsyncClusterPipeline has always had a `_client` attr but it is private so potentially problematic and mypy
+            # does not recognize it - see https://github.com/redis/redis-py/blame/v5.0.0/redis/asyncio/cluster.py#L1386
+            async_redis_cluster_pipeline_instance._client,  # type: ignore[attr-defined]
+        )
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn):
