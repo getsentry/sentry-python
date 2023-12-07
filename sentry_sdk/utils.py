@@ -1259,12 +1259,12 @@ def _make_threadlocal_contextvars(local):
             token = str(random.getrandbits(64))
             original_value = self.get()
             setattr(self._original_local, token, original_value)
-            setattr(self._local, "value", value)
+            self._local.value = value
             return token
 
         def reset(self, token):
             # type: (Any) -> None
-            setattr(self._local, "value", getattr(self._original_local, token))
+            self._local.value = getattr(self._original_local, token)
             setattr(self._original_local, token, None)
 
     return ContextVar
