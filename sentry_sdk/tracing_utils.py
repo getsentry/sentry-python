@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     match_regex_list,
     to_string,
     is_sentry_url,
-    _is_external_source,
+    _external_source,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -207,12 +207,21 @@ def add_query_source(hub, span):
         is_sentry_sdk_frame = namespace is not None and namespace.startswith(
             "sentry_sdk."
         )
+        external_source = _external_source(abs_path)
+        is_source_candidate = external_source is None or external_source not in (
+            "django",
+            "rest-framework",
+            "sqlalchemy",
+            "asyncpg",
+        )
+
         if (
             abs_path.startswith(project_root)
-            and not _is_external_source(abs_path)
+            and is_source_candidate
             and not is_sentry_sdk_frame
         ):
             break
+
         frame = frame.f_back
     else:
         frame = None

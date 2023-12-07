@@ -80,6 +80,8 @@ _installed_modules = None
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
+EXTERNAL_PACKAGE = re.compile(r"[\\/](?:dist|site)-packages[\\/](?P<package>.*?)[\\/]")
+
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 
@@ -1022,7 +1024,7 @@ def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=No
         if abs_path is None:
             continue
 
-        if _is_external_source(abs_path):
+        if _external_source(abs_path):
             frame["in_app"] = False
             continue
 
@@ -1091,13 +1093,14 @@ def _module_in_list(name, items):
     return False
 
 
-def _is_external_source(abs_path):
+def _external_source(abs_path):
     # type: (str) -> bool
     # check if frame is in 'site-packages' or 'dist-packages'
-    external_source = (
-        re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
-    )
-    return external_source
+    external_source = re.search(EXTERNAL_PACKAGE, abs_path)
+    if external_source:
+        return external_source.group(1)
+
+    return None
 
 
 def _is_in_project_root(abs_path, project_root):
