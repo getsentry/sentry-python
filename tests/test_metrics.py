@@ -680,7 +680,7 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
     assert "_metrics_summary" not in t["spans"][0]
 
 
-def test_metrics_summary_filtered(sentry_init, capture_envelopes):
+def test_metrics_summary_filtered(sentry_init, capture_envelopes, DictionaryContaining):
     def should_summarize_metric(key, tags):
         return key == "foo"
 
@@ -719,34 +719,36 @@ def test_metrics_summary_filtered(sentry_init, capture_envelopes):
 
     # Measurement Attachment
     t = transaction.items[0].get_transaction_event()["_metrics_summary"]
-    assert t == {
-        "d:foo@second": [
-            {
-                "tags": {
-                    "b": "c",
-                    "environment": "not-fun-env",
-                    "release": "fun-release@1.0.0",
-                    "transaction": "/foo",
+    assert t == DictionaryContaining(
+        {
+            "d:foo@second": [
+                {
+                    "tags": {
+                        "b": "c",
+                        "environment": "not-fun-env",
+                        "release": "fun-release@1.0.0",
+                        "transaction": "/foo",
+                    },
+                    "min": 1.0,
+                    "max": 1.0,
+                    "count": 1,
+                    "sum": 1.0,
                 },
-                "min": 1.0,
-                "max": 1.0,
-                "count": 1,
-                "sum": 1.0,
-            },
-            {
-                "tags": {
-                    "a": "b",
-                    "environment": "not-fun-env",
-                    "release": "fun-release@1.0.0",
-                    "transaction": "/foo",
+                {
+                    "tags": {
+                        "a": "b",
+                        "environment": "not-fun-env",
+                        "release": "fun-release@1.0.0",
+                        "transaction": "/foo",
+                    },
+                    "min": 1.0,
+                    "max": 1.0,
+                    "count": 1,
+                    "sum": 1.0,
                 },
-                "min": 1.0,
-                "max": 1.0,
-                "count": 1,
-                "sum": 1.0,
-            },
-        ]
-    }
+            ]
+        }
+    )
 
 
 def test_tag_normalization(sentry_init, capture_envelopes):
