@@ -1300,7 +1300,7 @@ def _get_contextvars():
             try:
                 from aiocontextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
         else:
