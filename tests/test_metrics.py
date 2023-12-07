@@ -723,7 +723,7 @@ def test_metrics_summary_filtered(sentry_init, capture_envelopes):
         "d:foo@second": [
             {
                 "tags": {
-                    "a": "b",
+                    "b": "c",
                     "environment": "not-fun-env",
                     "release": "fun-release@1.0.0",
                     "transaction": "/foo",
@@ -735,7 +735,7 @@ def test_metrics_summary_filtered(sentry_init, capture_envelopes):
             },
             {
                 "tags": {
-                    "b": "c",
+                    "a": "b",
                     "environment": "not-fun-env",
                     "release": "fun-release@1.0.0",
                     "transaction": "/foo",
