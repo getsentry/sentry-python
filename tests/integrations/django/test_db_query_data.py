@@ -124,7 +124,7 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        in_app_exclude=["tests.integrations.django.test_db_query_data"],
+        in_app_exclude=["tests.integrations.django.myapp.views"],
     )
 
     if "postgres" not in connections:
@@ -153,12 +153,12 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
 
             assert (
                 data.get(SPANDATA.CODE_NAMESPACE)
-                == "tests.integrations.django.myapp.views"
+                == "tests.integrations.django.myapp.settings"
             )
             assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                "tests/integrations/django/myapp/views.py"
+                "tests/integrations/django/myapp/settings.py"
             )
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert data.get(SPANDATA.CODE_FUNCTION) == "middleware"
 
             break
     else:
