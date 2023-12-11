@@ -97,8 +97,8 @@ def _get_debug_hub():
 
 def get_git_revision():
     # type: () -> Optional[str]
-    with open(os.path.devnull, "w+") as null:
-        try:
+    try:
+        with open(os.path.devnull, "w+") as null:
             revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
@@ -110,8 +110,8 @@ def get_git_revision():
                 .strip()
                 .decode("utf-8")
             )
-        except (OSError, IOError):
-            return None
+    except (OSError, IOError, FileNotFoundError):
+        return None
 
     return revision
 
