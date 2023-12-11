@@ -191,8 +191,8 @@ def add_query_source(hub, span):
         return
 
     project_root = client.options["project_root"]
-    in_app_include = client.options["in_app_include"]
-    in_app_exclude = client.options["in_app_exclude"]
+    in_app_include = client.options.get("in_app_include")
+    in_app_exclude = client.options.get("in_app_exclude")
 
     # Find the correct frame
     frame = sys._getframe()  # type: Union[FrameType, None]
