@@ -177,8 +177,19 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     assert amazing_nano() == 23
     Hub.current.flush()
 
-    (envelope,) = envelopes
-    statsd_item, meta_item = envelope.items
+    meta_item = None
+    statsd_item = None
+
+    # The items can be in one or multiple envelopes
+    for envelope in envelopes:
+        for item in envelope.items:
+            if item.type == "statsd":
+                statsd_item = item
+            elif item.type == "metric_meta":
+                meta_item = item
+
+    assert meta_item is not None
+    assert statsd_item is not None
 
     assert statsd_item.headers["type"] == "statsd"
     m = parse_metrics(statsd_item.payload.get_bytes())
