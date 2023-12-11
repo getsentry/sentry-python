@@ -203,7 +203,7 @@ def add_query_source(hub, span):
             abs_path = ""
 
         try:
-            namespace = frame.f_globals.get("__name__")  # type: str
+            namespace = frame.f_globals.get("__name__")  # type: Optional[str]
         except Exception:
             namespace = None
 
