@@ -1,10 +1,10 @@
-from importlib import import_module
 import os
 import uuid
 import random
 import socket
+from datetime import datetime, timezone
+from importlib import import_module
 
-from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -61,7 +61,7 @@ SDK_INFO = {
 
 def _get_options(*args, **kwargs):
     # type: (*Optional[str], **Any) -> Dict[str, Any]
-    if args and (isinstance(args[0], (text_type, bytes, str)) or args[0] is None):
+    if args and (isinstance(args[0], (bytes, str)) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:
@@ -75,7 +75,7 @@ def _get_options(*args, **kwargs):
     if dsn is not None and options.get("dsn") is None:
         options["dsn"] = dsn
 
-    for key, value in iteritems(options):
+    for key, value in options.items():
         if key not in rv:
             # Option "with_locals" was renamed to "include_local_variables"
             if key == "with_locals":
@@ -313,7 +313,7 @@ class _Client(object):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime_utcnow()
+            event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
@@ -356,7 +356,7 @@ class _Client(object):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = text_type(self.options[key]).strip()
+                event[key] = str(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -435,7 +435,7 @@ class _Client(object):
         for ignored_error in self.options["ignore_errors"]:
             # String types are matched against the type name in the
             # exception only
-            if isinstance(ignored_error, string_types):
+            if isinstance(ignored_error, str):
                 if ignored_error == error_full_name or ignored_error == error_type_name:
                     return True
             else:
@@ -538,7 +538,7 @@ class _Client(object):
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for k, v in iteritems(headers or {}):
+            for k, v in (headers or {}).items():
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
@@ -621,7 +621,7 @@ class _Client(object):
         if should_use_envelope_endpoint:
             headers = {
                 "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime_utcnow()),
+                "sent_at": format_timestamp(datetime.now(timezone.utc)),
             }
 
             if dynamic_sampling_context:

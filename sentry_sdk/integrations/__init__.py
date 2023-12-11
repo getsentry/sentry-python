@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from threading import Lock
 
-from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger
 
@@ -124,7 +123,7 @@ def setup_integrations(
                 integrations[instance.identifier] = instance
                 used_as_default_integration.add(instance.identifier)
 
-    for identifier, integration in iteritems(integrations):
+    for identifier, integration in integrations.items():
         with _installer_lock:
             if identifier not in _processed_integrations:
                 logger.debug(
@@ -156,7 +155,7 @@ def setup_integrations(
 
     integrations = {
         identifier: integration
-        for identifier, integration in iteritems(integrations)
+        for identifier, integration in integrations.items()
         if identifier in _installed_integrations
     }
 

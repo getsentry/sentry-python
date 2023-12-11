@@ -36,7 +36,7 @@ import uuid
 from collections import deque
 
 import sentry_sdk
-from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._compat import PY311
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -187,10 +187,6 @@ def setup_profiler(options):
 
     if _scheduler is not None:
         logger.debug("[Profiling] Profiler is already setup")
-        return False
-
-    if not PY33:
-        logger.warn("[Profiling] Profiler requires Python >= 3.3")
         return False
 
     frequency = DEFAULT_SAMPLING_FREQUENCY

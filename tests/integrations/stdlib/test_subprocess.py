@@ -2,18 +2,12 @@ import os
 import platform
 import subprocess
 import sys
+from collections.abc import Mapping
 
 import pytest
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk._compat import PY2
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-
-
-if PY2:
-    from collections import Mapping
-else:
-    from collections.abc import Mapping
 
 
 class ImmutableDict(Mapping):
