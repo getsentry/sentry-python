@@ -43,7 +43,10 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
     from typing import Sequence
+    from typing import Type
+    from typing import Union
 
+    from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
@@ -652,6 +655,22 @@ class _Client(object):
             logger.info("Discarded session update because of missing release")
         else:
             self.session_flusher.add_session(session)
+
+    def get_integration(
+        self, name_or_class  # type: Union[str, Type[Integration]]
+    ):
+        # type: (...) -> Any
+        """Returns the integration for this client by name or class.
+        If the client does not have that integration then `None` is returned.
+        """
+        if isinstance(name_or_class, str):
+            integration_name = name_or_class
+        elif name_or_class.identifier is not None:
+            integration_name = name_or_class.identifier
+        else:
+            raise ValueError("Integration has no name")
+
+        return self.integrations.get(integration_name)
 
     def close(
         self,
