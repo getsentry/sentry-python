@@ -6,6 +6,7 @@ from sentry_sdk.utils import (
     Components,
     Dsn,
     get_error_message,
+    get_git_revision,
     is_valid_sample_rate,
     logger,
     match_regex_list,
@@ -557,3 +558,17 @@ def test_installed_modules_caching():
 
             _get_installed_modules()
             mock_generate_installed_modules.assert_not_called()
+
+
+def test_devnull_inaccessible():
+    with mock.patch("sentry_sdk.utils.open", side_effect=OSError("oh no")):
+        revision = get_git_revision()
+
+    assert revision is None
+
+
+def test_devnull_not_found():
+    with mock.patch("sentry_sdk.utils.open", side_effect=FileNotFoundError("oh no")):
+        revision = get_git_revision()
+
+    assert revision is None
