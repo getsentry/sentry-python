@@ -17,9 +17,15 @@ class SpotlightClient(object):
         # type: (str) -> None
         self.url = url
         self.http = urllib3.PoolManager()
+        self.tries = 0
 
     def capture_envelope(self, envelope):
         # type: (Envelope) -> None
+        if self.tries > 3:
+            logger.warning(
+                "Too many errors sending to Spotlight, stop sending events there."
+            )
+            return
         body = io.BytesIO()
         envelope.serialize_into(body)
         try:
@@ -33,7 +39,8 @@ class SpotlightClient(object):
             )
             req.close()
         except Exception as e:
-            logger.exception(str(e))
+            self.tries += 1
+            logger.warning(str(e))
 
 
 def setup_spotlight(options):

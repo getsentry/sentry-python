@@ -167,7 +167,7 @@ def _wrap_apply_async(f):
 
         try:
             task_started_from_beat = args[1][0] == "BEAT"
-        except IndexError:
+        except (IndexError, TypeError):
             task_started_from_beat = False
 
         task = args[0]
