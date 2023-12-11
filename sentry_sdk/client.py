@@ -1,5 +1,4 @@
 from importlib import import_module
-import copy
 import os
 import sys
 import uuid
@@ -7,6 +6,7 @@ import random
 import socket
 
 from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
+from sentry_sdk.scope import _update_scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -145,24 +145,6 @@ def _get_options(*args, **kwargs):
         rv["event_scrubber"] = EventScrubber()
 
     return rv
-
-
-def _update_scope(base, scope_change, scope_kwargs):
-    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
-    if scope_change and scope_kwargs:
-        raise TypeError("cannot provide scope and kwargs")
-    if scope_change is not None:
-        final_scope = copy.copy(base)
-        if callable(scope_change):
-            scope_change(final_scope)
-        else:
-            final_scope.update_from_scope(scope_change)
-    elif scope_kwargs:
-        final_scope = copy.copy(base)
-        final_scope.update_from_kwargs(**scope_kwargs)
-    else:
-        final_scope = base
-    return final_scope
 
 
 try:
