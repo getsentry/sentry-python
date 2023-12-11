@@ -21,7 +21,6 @@ try:
     from urllib.parse import urlencode
     from urllib.parse import urlsplit
     from urllib.parse import urlunsplit
-
 except ImportError:
     # Python 2
     from cgi import parse_qs  # type: ignore
@@ -29,6 +28,13 @@ except ImportError:
     from urllib import urlencode  # type: ignore
     from urlparse import urlsplit  # type: ignore
     from urlparse import urlunsplit  # type: ignore
+
+try:
+    # Python 3
+    FileNotFoundError
+except NameError:
+    # Python 2
+    FileNotFoundError = IOError
 
 try:
     # Python 3.11
