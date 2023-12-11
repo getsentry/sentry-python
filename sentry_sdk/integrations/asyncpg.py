@@ -71,7 +71,9 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         ) as span:
             res = await f(*args, **kwargs)
 
-        add_query_source(hub, span)
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
         return res
 
     return _inner

@@ -640,7 +640,9 @@ def install_sql_hook():
                     )
             result = real_execute(self, sql, params)
 
-        add_query_source(hub, span)
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
         return result
 
     def executemany(self, sql, param_list):
@@ -656,7 +658,9 @@ def install_sql_hook():
 
             result = real_executemany(self, sql, param_list)
 
-        add_query_source(hub, span)
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
         return result
 
     def connect(self):

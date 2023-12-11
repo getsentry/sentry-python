@@ -7,8 +7,7 @@ from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
-
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -98,7 +97,8 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
 
     span = context._sentry_sql_span
     if span is not None:
-        add_query_source(hub, span)
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
 
 
 def _handle_error(context, *args):
