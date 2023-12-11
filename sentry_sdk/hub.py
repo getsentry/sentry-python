@@ -316,9 +316,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is None:
             return None
 
-        scope_kwargs["top_scope"] = top_scope
-
-        last_event_id = client.capture_event(event, hint, scope, **scope_kwargs)
+        last_event_id = client.capture_event(
+            event, hint, scope=scope, top_scope=top_scope, **scope_kwargs
+        )
 
         is_transaction = event.get("type") == "transaction"
         if last_event_id is not None and not is_transaction:
@@ -348,10 +348,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is None:
             return None
 
-        scope_kwargs["top_scope"] = top_scope
-
         last_event_id = client.capture_message(
-            message, level=level, scope=scope, **scope_kwargs
+            message, level=level, scope=scope, top_scope=top_scope, **scope_kwargs
         )
 
         if last_event_id is not None:
@@ -376,9 +374,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is None:
             return None
 
-        scope_kwargs["top_scope"] = top_scope
-
-        last_event_id = client.capture_exception(error, scope=scope, **scope_kwargs)
+        last_event_id = client.capture_exception(
+            error, scope=scope, top_scope=top_scope, **scope_kwargs
+        )
 
         if last_event_id is not None:
             self._last_event_id = last_event_id

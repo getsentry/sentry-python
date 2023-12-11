@@ -548,6 +548,7 @@ class _Client(object):
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
         scope=None,  # type: Optional[Scope]
+        top_scope=None,  # type: Optional[Scope]
         **scope_kwargs  # type: Any
     ):
         # type: (...) -> Optional[str]
@@ -557,8 +558,9 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param scope: An optional scope to use for determining whether this event
-            should be captured.
+        :param scope: An optional scope to use for determining whether this event should be captured.
+
+        :param top_scope: An optional top scope that should also be merged into the scope to be applied to the event.
 
         :param scope_kwargs: For supported `**scope_kwargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
@@ -568,8 +570,7 @@ class _Client(object):
         if disable_capture_event.get(False):
             return None
 
-        if scope_kwargs is not None and "top_scope" in scope_kwargs:
-            top_scope = scope_kwargs.pop("top_scope")
+        if scope_kwargs is not None and top_scope is not None:
             scope = _update_scope(top_scope, scope, scope_kwargs)
 
         if hint is None:
@@ -659,8 +660,15 @@ class _Client(object):
 
         return event_id
 
-    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
+    def capture_message(
+        self,
+        message,  # type: str
+        level=None,  # type: Optional[str]
+        scope=None,  # type: Optional[Scope]
+        top_scope=None,  # type: Optional[Scope]
+        **scope_kwargs  # type: Any
+    ):
+        # type: (...) -> Optional[str]
         """
         Captures a message.
 
@@ -669,6 +677,8 @@ class _Client(object):
         :param level: If no level is provided, the default level is `info`.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
+
+        :param top_scope: An optional top scope that should also be merged into the scope to be applied to the event.
 
         :param scope_kwargs: For supported `**scope_kwargs` see
             :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
@@ -679,17 +689,29 @@ class _Client(object):
             level = "info"
 
         return self.capture_event(
-            {"message": message, "level": level}, scope=scope, **scope_kwargs
+            {"message": message, "level": level},
+            scope=scope,
+            top_scope=top_scope,
+            **scope_kwargs
         )
 
-    def capture_exception(self, error=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
+    def capture_exception(
+        self,
+        error=None,  # type: Optional[Union[BaseException, ExcInfo]]
+        scope=None,  # type: Optional[Scope]
+        top_scope=None,  # type: Optional[Scope]
+        **scope_kwargs  # type: Any
+    ):
+        # type: (...) -> Optional[str]
         """Captures an exception.
 
         :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
 
-        :param scope_kwargs: For supported `**scope_kwargs` see
-            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
+
+        :param top_scope: An optional top scope that should also be merged into the scope to be applied to the event.
+
+        :param scope_kwargs: For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
@@ -701,7 +723,9 @@ class _Client(object):
         event, hint = event_from_exception(exc_info, client_options=self.options)
 
         try:
-            return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)
+            return self.capture_event(
+                event, hint=hint, scope=scope, top_scope=top_scope, **scope_kwargs
+            )
         except Exception:
             self._capture_internal_exception(sys.exc_info())
 
