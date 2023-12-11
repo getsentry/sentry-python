@@ -200,7 +200,7 @@ def add_query_source(hub, span):
     while frame is not None:
         try:
             abs_path = frame.f_code.co_filename
-            if PY2:
+            if abs_path and PY2:
                 abs_path = os.path.abspath(abs_path)
         except Exception:
             abs_path = ""
