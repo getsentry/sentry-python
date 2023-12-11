@@ -1,14 +1,14 @@
 from __future__ import absolute_import
-import sys
 
 import pytest
+
+from django import VERSION as DJANGO_VERSION
+from django.db import connections
 
 try:
     from django.urls import reverse
 except ImportError:
     from django.core.urlresolvers import reverse
-
-from django.db import connections
 
 from werkzeug.test import Client
 
@@ -152,7 +152,7 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
 
-            if sys.version_info >= (3, 6):
+            if DJANGO_VERSION >= (1, 11):
                 assert (
                     data.get(SPANDATA.CODE_NAMESPACE)
                     == "tests.integrations.django.myapp.settings"
