@@ -26,6 +26,13 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+try:
+    # Python 3
+    FileNotFoundError
+except NameError:
+    # Python 2
+    FileNotFoundError = IOError
+
 
 def _normalize_distribution_name(name):
     # type: (str) -> str
