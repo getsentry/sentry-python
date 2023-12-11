@@ -224,7 +224,7 @@ def add_query_source(hub, span):
                 should_be_included = True
 
         if (
-            (abs_path.startswith(project_root) or PY2)
+            abs_path.startswith(project_root)
             and should_be_included
             and not is_sentry_sdk_frame
         ):
