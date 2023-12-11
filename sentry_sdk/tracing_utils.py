@@ -11,6 +11,7 @@ from sentry_sdk.utils import (
     to_string,
     is_sentry_url,
     _is_external_source,
+    _module_in_list,
 )
 from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
@@ -190,6 +191,8 @@ def add_query_source(hub, span):
         return
 
     project_root = client.options["project_root"]
+    in_app_include = client.options["in_app_include"]
+    in_app_exclude = client.options["in_app_exclude"]
 
     # Find the correct frame
     frame = sys._getframe()  # type: Union[FrameType, None]
@@ -208,9 +211,17 @@ def add_query_source(hub, span):
             "sentry_sdk."
         )
 
+        should_be_included = not _is_external_source(abs_path)
+        if in_app_exclude and _module_in_list(namespace, in_app_include):
+            should_be_included = False
+        if in_app_include and _module_in_list(namespace, in_app_exclude):
+            # in_app_include takes precedence over in_app_exclude, so doing it
+            # at the end
+            should_be_included = True
+
         if (
             abs_path.startswith(project_root)
-            and not _is_external_source(abs_path)
+            and should_be_included
             and not is_sentry_sdk_frame
         ):
             break
