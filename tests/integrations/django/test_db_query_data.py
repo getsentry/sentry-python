@@ -11,7 +11,6 @@ from django.db import connections
 
 from werkzeug.test import Client
 
-from sentry_sdk._compat import PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -102,24 +101,15 @@ def test_query_source(sentry_init, client, capture_events):
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
 
-            if PY2:
-                assert (
-                    data.get(SPANDATA.CODE_NAMESPACE)
-                    == "tests.integrations.django.test_db_query_data"
-                )
-                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                    "tests/integrations/django/test_db_query_data.py"
-                )
-                assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
-            else:
-                assert (
-                    data.get(SPANDATA.CODE_NAMESPACE)
-                    == "tests.integrations.django.myapp.views"
-                )
-                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                    "tests/integrations/django/myapp/views.py"
-                )
-                assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+            assert (
+                data.get(SPANDATA.CODE_NAMESPACE)
+                == "tests.integrations.django.myapp.views"
+            )
+            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                "tests/integrations/django/myapp/views.py"
+            )
+            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+
             break
     else:
         raise AssertionError("No db span found")

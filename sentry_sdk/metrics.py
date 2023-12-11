@@ -6,13 +6,12 @@ import threading
 import random
 import time
 import zlib
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps, partial
 from threading import Event, Lock, Thread
 from contextlib import contextmanager
 
 import sentry_sdk
-from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
     now,
     nanosecond_time,
@@ -270,7 +269,7 @@ def _encode_metrics(flushable_buckets):
     # relay side emission and should not happen commonly.
 
     for timestamp, buckets in flushable_buckets:
-        for bucket_key, metric in iteritems(buckets):
+        for bucket_key, metric in buckets.items():
             metric_type, metric_name, metric_unit, metric_tags = bucket_key
             metric_name = _sanitize_key(metric_name)
             _write(metric_name.encode("utf-8"))
@@ -478,14 +477,14 @@ class MetricsAggregator(object):
                 self._force_flush = False
             else:
                 flushable_buckets = []
-                for buckets_timestamp, buckets in iteritems(self.buckets):
+                for buckets_timestamp, buckets in self.buckets.items():
                     # If the timestamp of the bucket is newer that the rollup we want to skip it.
                     if buckets_timestamp <= cutoff:
                         flushable_buckets.append((buckets_timestamp, buckets))
 
                 # We will clear the elements while holding the lock, in order to avoid requesting it downstream again.
                 for buckets_timestamp, buckets in flushable_buckets:
-                    for _, metric in iteritems(buckets):
+                    for metric in buckets.values():
                         weight_to_remove += metric.weight
                     del self.buckets[buckets_timestamp]
 
@@ -568,7 +567,7 @@ class MetricsAggregator(object):
         if timestamp is None:
             timestamp = time.time()
         meta_key = (ty, key, unit)
-        start_of_day = utc_from_timestamp(timestamp).replace(
+        start_of_day = datetime.fromtimestamp(timestamp, timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
         start_of_day = int(to_timestamp(start_of_day))
@@ -595,7 +594,7 @@ class MetricsAggregator(object):
         if self._enable_code_locations:
             return False
         meta_key = (ty, key, unit)
-        start_of_day = utc_from_timestamp(timestamp).replace(
+        start_of_day = datetime.fromtimestamp(timestamp, timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
         start_of_day = int(to_timestamp(start_of_day))
@@ -637,7 +636,7 @@ class MetricsAggregator(object):
             encoded_metrics = _encode_metrics(flushable_buckets)
             envelope.add_item(Item(payload=encoded_metrics, type="statsd"))
 
-        for timestamp, locations in iteritems(code_locations):
+        for timestamp, locations in code_locations.items():
             encoded_locations = _encode_locations(timestamp, locations)
             envelope.add_item(Item(payload=encoded_locations, type="metric_meta"))
 
@@ -655,14 +654,14 @@ def _serialize_tags(
         return ()
 
     rv = []
-    for key, value in iteritems(tags):
+    for key, value in tags.items():
         # If the value is a collection, we want to flatten it.
         if isinstance(value, (list, tuple)):
             for inner_value in value:
                 if inner_value is not None:
-                    rv.append((key, text_type(inner_value)))
+                    rv.append((key, str(inner_value)))
         elif value is not None:
-            rv.append((key, text_type(value)))
+            rv.append((key, str(value)))
 
     # It's very important to sort the tags in order to obtain the
     # same bucket key.

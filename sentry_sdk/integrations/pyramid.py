@@ -11,7 +11,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-from sentry_sdk._compat import reraise, iteritems
+from sentry_sdk._compat import reraise
 
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
@@ -192,7 +192,7 @@ class PyramidRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, str]
         return {
             key: value
-            for key, value in iteritems(self.request.POST)
+            for key, value in self.request.POST.items()
             if not getattr(value, "filename", None)
         }
 
@@ -200,7 +200,7 @@ class PyramidRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, cgi_FieldStorage]
         return {
             key: value
-            for key, value in iteritems(self.request.POST)
+            for key, value in self.request.POST.items()
             if getattr(value, "filename", None)
         }
 

@@ -1,9 +1,10 @@
 import sys
 import weakref
 from inspect import isawaitable
+from urllib.parse import urlsplit
 
 from sentry_sdk import continue_trace
-from sentry_sdk._compat import urlparse, reraise
+from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
@@ -365,7 +366,7 @@ def _make_request_processor(weak_request):
             extractor.extract_into_event(event)
 
             request_info = event["request"]
-            urlparts = urlparse.urlsplit(request.url)
+            urlparts = urlsplit(request.url)
 
             request_info["url"] = "%s://%s%s" % (
                 urlparts.scheme,

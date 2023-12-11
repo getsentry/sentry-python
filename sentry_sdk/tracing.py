@@ -1,23 +1,20 @@
 import uuid
 import random
-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk._compat import datetime_utcnow, utc_from_timestamp, PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    import typing
-
     from typing import Any
     from typing import Dict
     from typing import Iterator
     from typing import List
+    from typing import Mapping
     from typing import Optional
     from typing import Tuple
     from typing import Union
@@ -148,9 +145,9 @@ class Span(object):
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         if start_timestamp is None:
-            start_timestamp = datetime_utcnow()
+            start_timestamp = datetime.now(timezone.utc)
         elif isinstance(start_timestamp, float):
-            start_timestamp = utc_from_timestamp(start_timestamp)
+            start_timestamp = datetime.fromtimestamp(start_timestamp, timezone.utc)
         self.start_timestamp = start_timestamp
         try:
             # profiling depends on this value and requires that
@@ -271,7 +268,7 @@ class Span(object):
     @classmethod
     def continue_from_environ(
         cls,
-        environ,  # type: typing.Mapping[str, str]
+        environ,  # type: Mapping[str, str]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
@@ -297,7 +294,7 @@ class Span(object):
     @classmethod
     def continue_from_headers(
         cls,
-        headers,  # type: typing.Mapping[str, str]
+        headers,  # type: Mapping[str, str]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
@@ -477,7 +474,7 @@ class Span(object):
         try:
             if end_timestamp:
                 if isinstance(end_timestamp, float):
-                    end_timestamp = utc_from_timestamp(end_timestamp)
+                    end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
@@ -485,7 +482,7 @@ class Span(object):
                     microseconds=elapsed / 1000
                 )
         except AttributeError:
-            self.timestamp = datetime_utcnow()
+            self.timestamp = datetime.now(timezone.utc)
 
         maybe_create_breadcrumbs_from_span(hub, self)
         add_additional_span_data(hub, self)
@@ -1003,10 +1000,7 @@ def trace(func=None):
         async def my_async_function():
             ...
     """
-    if PY2:
-        from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
-    else:
-        from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
+    from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
 
     # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
     # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278

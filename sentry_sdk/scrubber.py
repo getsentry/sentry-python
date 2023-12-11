@@ -3,7 +3,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     iter_event_frames,
 )
-from sentry_sdk._compat import string_types
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -70,7 +69,7 @@ class EventScrubber(object):
             return
 
         for k in d.keys():
-            if isinstance(k, string_types) and k.lower() in self.denylist:
+            if isinstance(k, str) and k.lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
 
     def scrub_request(self, event):

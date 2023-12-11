@@ -5,8 +5,6 @@ from copy import deepcopy
 
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
-from sentry_sdk._compat import text_type, iteritems
-
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
@@ -124,8 +122,8 @@ class RequestExtractor(object):
         form = self.form()
         files = self.files()
         if form or files:
-            data = dict(iteritems(form))
-            for key, _ in iteritems(files):
+            data = dict(form.items())
+            for key in files.keys():
                 data[key] = AnnotatedValue.removed_because_raw_data()
 
             return data
@@ -146,7 +144,7 @@ class RequestExtractor(object):
             if raw_data is None:
                 return None
 
-            if isinstance(raw_data, text_type):
+            if isinstance(raw_data, str):
                 return json.loads(raw_data)
             else:
                 return json.loads(raw_data.decode("utf-8"))
@@ -189,5 +187,5 @@ def _filter_headers(headers):
             if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
             else AnnotatedValue.removed_because_over_size_limit()
         )
-        for k, v in iteritems(headers)
+        for k, v in headers.items()
     }

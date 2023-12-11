@@ -2,7 +2,6 @@ import io
 import json
 import mimetypes
 
-from sentry_sdk._compat import text_type, PY2
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.session import Session
 from sentry_sdk.utils import json_dumps, capture_internal_exceptions
@@ -19,9 +18,9 @@ if TYPE_CHECKING:
 
 
 def parse_json(data):
-    # type: (Union[bytes, text_type]) -> Any
+    # type: (Union[bytes, str]) -> Any
     # on some python 3 versions this needs to be bytes
-    if not PY2 and isinstance(data, bytes):
+    if isinstance(data, bytes):
         data = data.decode("utf-8", "replace")
     return json.loads(data)
 
@@ -159,7 +158,7 @@ class PayloadRef(object):
     def __init__(
         self,
         bytes=None,  # type: Optional[bytes]
-        path=None,  # type: Optional[Union[bytes, text_type]]
+        path=None,  # type: Optional[Union[bytes, str]]
         json=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
@@ -202,7 +201,7 @@ class PayloadRef(object):
 class Item(object):
     def __init__(
         self,
-        payload,  # type: Union[bytes, text_type, PayloadRef]
+        payload,  # type: Union[bytes, str, PayloadRef]
         headers=None,  # type: Optional[Dict[str, Any]]
         type=None,  # type: Optional[str]
         content_type=None,  # type: Optional[str]
@@ -215,7 +214,7 @@ class Item(object):
         self.headers = headers
         if isinstance(payload, bytes):
             payload = PayloadRef(bytes=payload)
-        elif isinstance(payload, text_type):
+        elif isinstance(payload, str):
             payload = PayloadRef(bytes=payload.encode("utf-8"))
         else:
             payload = payload

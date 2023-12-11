@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 
 import pytest
@@ -16,19 +17,8 @@ try:
 except ImportError:
     eventlet = None
 
-try:
-    # Python 2
-    import BaseHTTPServer
-
-    HTTPServer = BaseHTTPServer.HTTPServer
-    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
-except Exception:
-    # Python 3
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-
 import sentry_sdk
-from sentry_sdk._compat import iteritems, reraise, string_types
+from sentry_sdk._compat import reraise
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
@@ -146,8 +136,8 @@ def _capture_internal_warnings():
 def monkeypatch_test_transport(monkeypatch, validate_event_schema):
     def check_event(event):
         def check_string_keys(map):
-            for key, value in iteritems(map):
-                assert isinstance(key, string_types)
+            for key, value in map.items():
+                assert isinstance(key, str)
                 if isinstance(value, dict):
                     check_string_keys(value)
 
@@ -411,13 +401,7 @@ def string_containing_matcher():
     class StringContaining(object):
         def __init__(self, substring):
             self.substring = substring
-
-            try:
-                # the `unicode` type only exists in python 2, so if this blows up,
-                # we must be in py3 and have the `bytes` type
-                self.valid_types = (str, unicode)
-            except NameError:
-                self.valid_types = (str, bytes)
+            self.valid_types = (str, bytes)
 
         def __eq__(self, test_string):
             if not isinstance(test_string, self.valid_types):

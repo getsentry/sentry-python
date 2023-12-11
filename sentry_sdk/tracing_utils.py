@@ -1,6 +1,8 @@
 import contextlib
 import re
 import sys
+from collections.abc import Mapping
+from urllib.parse import quote, unquote
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -12,19 +14,9 @@ from sentry_sdk.utils import (
     is_sentry_url,
     _is_external_source,
 )
-from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
-if PY2:
-    from collections import Mapping
-    from urllib import quote, unquote
-else:
-    from collections.abc import Mapping
-    from urllib.parse import quote, unquote
-
 if TYPE_CHECKING:
-    import typing
-
     from typing import Any
     from typing import Dict
     from typing import Generator
@@ -57,7 +49,7 @@ base64_stripped = (
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: typing.Mapping[str, str]
+        environ,  # type: Mapping[str, str]
         prefix="HTTP_",  # type: str
     ):
         # type: (...) -> None
@@ -454,7 +446,7 @@ class Baggage(object):
         # type: () -> Dict[str, str]
         header = {}
 
-        for key, item in iteritems(self.sentry_items):
+        for key, item in self.sentry_items.items():
             header[key] = item
 
         return header
@@ -463,7 +455,7 @@ class Baggage(object):
         # type: (bool) -> str
         items = []
 
-        for key, val in iteritems(self.sentry_items):
+        for key, val in self.sentry_items.items():
             with capture_internal_exceptions():
                 item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
                 items.append(item)
