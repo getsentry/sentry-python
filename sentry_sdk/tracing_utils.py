@@ -203,7 +203,7 @@ def add_query_source(hub, span):
             abs_path = ""
 
         try:
-            namespace = frame.f_globals.get("__name__")
+            namespace = frame.f_globals.get("__name__")  # type: str
         except Exception:
             namespace = None
 
@@ -212,12 +212,13 @@ def add_query_source(hub, span):
         )
 
         should_be_included = not _is_external_source(abs_path)
-        if in_app_exclude and _module_in_list(namespace, in_app_exclude):
-            should_be_included = False
-        if in_app_include and _module_in_list(namespace, in_app_include):
-            # in_app_include takes precedence over in_app_exclude, so doing it
-            # at the end
-            should_be_included = True
+        if namespace is not None:
+            if in_app_exclude and _module_in_list(namespace, in_app_exclude):
+                should_be_included = False
+            if in_app_include and _module_in_list(namespace, in_app_include):
+                # in_app_include takes precedence over in_app_exclude, so doing it
+                # at the end
+                should_be_included = True
 
         if (
             abs_path.startswith(project_root)
