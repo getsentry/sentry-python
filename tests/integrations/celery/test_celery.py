@@ -593,3 +593,18 @@ def test_apply_async_from_beat_no_span(sentry_init):
         ],
         headers={},
     )
+
+
+def test_apply_async_no_args(init_celery):
+    celery = init_celery()
+
+    @celery.task
+    def example_task():
+        return "success"
+
+    try:
+        result = example_task.apply_async(None, {})
+    except TypeError:
+        pytest.fail("Calling `apply_async` without arguments raised a TypeError")
+
+    assert result.get() == "success"

@@ -5,10 +5,7 @@ import os
 import uuid
 
 from sentry_sdk.attachments import Attachment
-from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.consts import FALSE_VALUES
 from sentry_sdk._functools import wraps
-from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
@@ -23,6 +20,9 @@ from sentry_sdk.tracing import (
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
+from sentry_sdk.consts import FALSE_VALUES
+
+
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         Breadcrumb,
-        BreadcrumbHint,
         Event,
         EventProcessor,
         ErrorProcessor,
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
+    from sentry_sdk.session import Session
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
@@ -516,97 +516,6 @@ class Scope(object):
                 add_to_transactions=add_to_transactions,
             )
         )
-
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
-        """
-        Adds a breadcrumb.
-
-        :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
-
-        :param hint: An optional value that can be used by `before_breadcrumb`
-            to customize the breadcrumbs that are emitted.
-        """
-        client = kwargs.pop("client", None)
-        if client is None:
-            return
-
-        before_breadcrumb = client.options.get("before_breadcrumb")
-        max_breadcrumbs = client.options.get("max_breadcrumbs")
-
-        crumb = dict(crumb or ())  # type: Breadcrumb
-        crumb.update(kwargs)
-        if not crumb:
-            return
-
-        hint = dict(hint or ())  # type: Hint
-
-        if crumb.get("timestamp") is None:
-            crumb["timestamp"] = datetime_utcnow()
-        if crumb.get("type") is None:
-            crumb["type"] = "default"
-
-        if before_breadcrumb is not None:
-            new_crumb = before_breadcrumb(crumb, hint)
-        else:
-            new_crumb = crumb
-
-        if new_crumb is not None:
-            self._breadcrumbs.append(new_crumb)
-        else:
-            logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
-
-        while len(self._breadcrumbs) > max_breadcrumbs:
-            self._breadcrumbs.popleft()
-
-    def start_session(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        """Starts a new session."""
-        client = kwargs.pop("client", None)
-        session_mode = kwargs.pop("session_mode", "application")
-
-        self.end_session(client=client)
-
-        self._session = Session(
-            release=client.options["release"] if client else None,
-            environment=client.options["environment"] if client else None,
-            user=self._user,
-            session_mode=session_mode,
-        )
-
-    def end_session(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        """Ends the current session if there is one."""
-        client = kwargs.pop("client", None)
-
-        session = self._session
-        self._session = None
-
-        if session is not None:
-            session.close()
-            if client is not None:
-                client.capture_session(session)
-
-    def stop_auto_session_tracking(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        """Stops automatic session tracking.
-
-        This temporarily session tracking for the current scope when called.
-        To resume session tracking call `resume_auto_session_tracking`.
-        """
-        client = kwargs.pop("client", None)
-
-        self.end_session(client=client)
-
-        self._force_auto_session_tracking = False
-
-    def resume_auto_session_tracking(self):
-        # type: (...) -> None
-        """Resumes automatic session tracking for the current scope if
-        disabled earlier.  This requires that generally automatic session
-        tracking is enabled.
-        """
-        self._force_auto_session_tracking = None
 
     def add_event_processor(
         self, func  # type: EventProcessor
