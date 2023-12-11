@@ -3,7 +3,7 @@ import sys
 
 from contextlib import contextmanager
 
-from sentry_sdk._compat import with_metaclass
+from sentry_sdk._compat import datetime_utcnow, with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
@@ -15,6 +15,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
+from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     has_tracing_enabled,
     normalize_incoming_data,
@@ -293,9 +294,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
+        if isinstance(name_or_class, str):
+            integration_name = name_or_class
+        elif name_or_class.identifier is not None:
+            integration_name = name_or_class.identifier
+        else:
+            raise ValueError("Integration has no name")
+
         client = self.client
         if client is not None:
-            return client.get_integration(name_or_class)
+            rv = client.integrations.get(integration_name)
+            if rv is not None:
+                return rv
 
     @property
     def client(self):
@@ -420,9 +430,31 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        kwargs["client"] = client
+        crumb = dict(crumb or ())  # type: Breadcrumb
+        crumb.update(kwargs)
+        if not crumb:
+            return
 
-        scope.add_breadcrumb(crumb, hint, **kwargs)
+        hint = dict(hint or ())  # type: Hint
+
+        if crumb.get("timestamp") is None:
+            crumb["timestamp"] = datetime_utcnow()
+        if crumb.get("type") is None:
+            crumb["type"] = "default"
+
+        if client.options["before_breadcrumb"] is not None:
+            new_crumb = client.options["before_breadcrumb"](crumb, hint)
+        else:
+            new_crumb = crumb
+
+        if new_crumb is not None:
+            scope._breadcrumbs.append(new_crumb)
+        else:
+            logger.info("before breadcrumb dropped breadcrumb (%s)", crumb)
+
+        max_breadcrumbs = client.options["max_breadcrumbs"]  # type: int
+        while len(scope._breadcrumbs) > max_breadcrumbs:
+            scope._breadcrumbs.popleft()
 
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (Optional[Span], str, Any) -> Span
@@ -680,9 +712,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> None
         """Starts a new session."""
+        self.end_session()
         client, scope = self._stack[-1]
-        scope.start_session(
-            client=client,
+        scope._session = Session(
+            release=client.options["release"] if client else None,
+            environment=client.options["environment"] if client else None,
+            user=scope._user,
             session_mode=session_mode,
         )
 
@@ -690,7 +725,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (...) -> None
         """Ends the current session if there is one."""
         client, scope = self._stack[-1]
-        scope.end_session(client=client)
+        session = scope._session
+        self.scope._session = None
+
+        if session is not None:
+            session.close()
+            if client is not None:
+                client.capture_session(session)
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
@@ -699,8 +740,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
         """
+        self.end_session()
         client, scope = self._stack[-1]
-        scope.stop_auto_session_tracking(client=client)
+        scope._force_auto_session_tracking = False
 
     def resume_auto_session_tracking(self):
         # type: (...) -> None
@@ -708,8 +750,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
-        scope = self._stack[-1][1]
-        scope.resume_auto_session_tracking()
+        client, scope = self._stack[-1]
+        scope._force_auto_session_tracking = None
 
     def flush(
         self,
