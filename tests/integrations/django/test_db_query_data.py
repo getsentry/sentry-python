@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+import sys
 
 import pytest
 
@@ -151,14 +152,27 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
 
-            assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
-                == "tests.integrations.django.myapp.settings"
-            )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                "tests/integrations/django/myapp/settings.py"
-            )
-            assert data.get(SPANDATA.CODE_FUNCTION) == "middleware"
+            if sys.version_info >= (3, 6):
+                assert (
+                    data.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.django.myapp.settings"
+                )
+                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                    "tests/integrations/django/myapp/settings.py"
+                )
+                assert data.get(SPANDATA.CODE_FUNCTION) == "middleware"
+            else:
+                assert (
+                    data.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.django.test_db_query_data"
+                )
+                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                    "tests/integrations/django/test_db_query_data.py"
+                )
+                assert (
+                    data.get(SPANDATA.CODE_FUNCTION)
+                    == "test_query_source_with_in_app_exclude"
+                )
 
             break
     else:
