@@ -501,10 +501,6 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
-# Circular imports
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
-
-
 def start_child_span_decorator(func):
     # type: (Any) -> Any
     """
@@ -560,3 +556,7 @@ def start_child_span_decorator(func):
                 return func(*args, **kwargs)
 
     return func_with_tracing
+
+
+# Circular imports
+from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
