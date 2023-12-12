@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk.tracing_utils_py3 import (
+from sentry_sdk.tracing_utils import (
     start_child_span_decorator as start_child_span_decorator_py3,
 )
 from sentry_sdk.utils import logger
@@ -22,7 +22,7 @@ def test_trace_decorator_sync_py3():
     fake_transaction.start_child = fake_start_child
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py3.get_current_span",
+        "sentry_sdk.tracing_utils.get_current_span",
         return_value=fake_transaction,
     ):
         result = my_example_function()
@@ -40,7 +40,7 @@ def test_trace_decorator_sync_py3_no_trx():
     fake_transaction = None
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py3.get_current_span",
+        "sentry_sdk.tracing_utils.get_current_span",
         return_value=fake_transaction,
     ):
         with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
@@ -64,7 +64,7 @@ async def test_trace_decorator_async_py3():
     fake_transaction.start_child = fake_start_child
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py3.get_current_span",
+        "sentry_sdk.tracing_utils.get_current_span",
         return_value=fake_transaction,
     ):
         result = await my_async_example_function()
@@ -83,7 +83,7 @@ async def test_trace_decorator_async_py3_no_trx():
     fake_transaction = None
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py3.get_current_span",
+        "sentry_sdk.tracing_utils.get_current_span",
         return_value=fake_transaction,
     ):
         with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
