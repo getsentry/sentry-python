@@ -1,18 +1,17 @@
 import json
 import logging
-import pytest
 from io import BytesIO
 
 import pyramid.testing
-
+import pytest
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
+from werkzeug.test import Client
 
 from sentry_sdk import capture_message, add_breadcrumb
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-
-from werkzeug.test import Client
+from tests.conftest import unpack_werkzeug_response
 
 
 try:
@@ -317,8 +316,8 @@ def test_errorhandler_500(
     pyramid_config.add_view(errorhandler, context=Exception)
 
     client = get_client()
-    app_iter, status, headers = client.get("/")
-    assert b"".join(app_iter) == b"bad request"
+    app_iter, status, headers = unpack_werkzeug_response(client.get("/"))
+    assert app_iter == b"bad request"
     assert status.lower() == "500 internal server error"
 
     (error,) = errors
