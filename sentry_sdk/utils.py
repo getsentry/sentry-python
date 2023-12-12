@@ -151,7 +151,7 @@ def get_sdk_name(installed_integrations):
     return "sentry.python"
 
 
-class CaptureInternalException(object):
+class CaptureInternalException:
     __slots__ = ()
 
     def __enter__(self):
@@ -207,7 +207,7 @@ class BadDsn(ValueError):
     """Raised on invalid DSNs."""
 
 
-class Dsn(object):
+class Dsn:
     """Represents a DSN."""
 
     def __init__(self, value):
@@ -280,7 +280,7 @@ class Dsn(object):
         )
 
 
-class Auth(object):
+class Auth:
     """Helper object that represents the auth info."""
 
     def __init__(
@@ -337,7 +337,7 @@ class Auth(object):
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
-class AnnotatedValue(object):
+class AnnotatedValue:
     """
     Meta information for a data field in the event payload.
     This is to tell Relay that we have tampered with the fields value.
@@ -1186,7 +1186,7 @@ def _is_contextvars_broken():
 
 def _make_threadlocal_contextvars(local):
     # type: (type) -> type
-    class ContextVar(object):
+    class ContextVar:
         # Super-limited impl of ContextVar
 
         def __init__(self, name):

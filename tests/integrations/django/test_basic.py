@@ -669,7 +669,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
 
 
 def test_set_db_data_custom_backend():
-    class DummyBackend(object):
+    class DummyBackend:
         # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
         def __getattr__(self, attr):
             return self

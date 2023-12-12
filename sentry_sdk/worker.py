@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 _TERMINATOR = object()
 
 
-class BackgroundWorker(object):
+class BackgroundWorker:
     def __init__(self, queue_size=DEFAULT_QUEUE_SIZE):
         # type: (int) -> None
         check_thread_support()

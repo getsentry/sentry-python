@@ -44,7 +44,7 @@ def get_regex(resolver_or_pattern):
     return regex
 
 
-class RavenResolver(object):
+class RavenResolver:
     _new_style_group_matcher = re.compile(
         r"<(?:([^>:]+):)?([^>]+)>"
     )  # https://github.com/django/django/blob/21382e2743d06efbf5623e7c9b6dccf2a325669b/django/urls/resolvers.py#L245-L247

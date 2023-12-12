@@ -5,7 +5,7 @@ import grpc
 import grpc_test_service_pb2 as grpc__test__service__pb2
 
 
-class gRPCTestServiceStub(object):
+class gRPCTestServiceStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -15,151 +15,200 @@ class gRPCTestServiceStub(object):
             channel: A grpc.Channel.
         """
         self.TestServe = channel.unary_unary(
-                '/grpc_test_server.gRPCTestService/TestServe',
-                request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-                response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                )
+            "/grpc_test_server.gRPCTestService/TestServe",
+            request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+            response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+        )
         self.TestUnaryStream = channel.unary_stream(
-                '/grpc_test_server.gRPCTestService/TestUnaryStream',
-                request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-                response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                )
+            "/grpc_test_server.gRPCTestService/TestUnaryStream",
+            request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+            response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+        )
         self.TestStreamStream = channel.stream_stream(
-                '/grpc_test_server.gRPCTestService/TestStreamStream',
-                request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-                response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                )
+            "/grpc_test_server.gRPCTestService/TestStreamStream",
+            request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+            response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+        )
         self.TestStreamUnary = channel.stream_unary(
-                '/grpc_test_server.gRPCTestService/TestStreamUnary',
-                request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-                response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                )
+            "/grpc_test_server.gRPCTestService/TestStreamUnary",
+            request_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+            response_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+        )
 
 
-class gRPCTestServiceServicer(object):
+class gRPCTestServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
     def TestServe(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def TestUnaryStream(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def TestStreamStream(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def TestStreamUnary(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_gRPCTestServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'TestServe': grpc.unary_unary_rpc_method_handler(
-                    servicer.TestServe,
-                    request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                    response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-            ),
-            'TestUnaryStream': grpc.unary_stream_rpc_method_handler(
-                    servicer.TestUnaryStream,
-                    request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                    response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-            ),
-            'TestStreamStream': grpc.stream_stream_rpc_method_handler(
-                    servicer.TestStreamStream,
-                    request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                    response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-            ),
-            'TestStreamUnary': grpc.stream_unary_rpc_method_handler(
-                    servicer.TestStreamUnary,
-                    request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
-                    response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
-            ),
+        "TestServe": grpc.unary_unary_rpc_method_handler(
+            servicer.TestServe,
+            request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+            response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+        ),
+        "TestUnaryStream": grpc.unary_stream_rpc_method_handler(
+            servicer.TestUnaryStream,
+            request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+            response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+        ),
+        "TestStreamStream": grpc.stream_stream_rpc_method_handler(
+            servicer.TestStreamStream,
+            request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+            response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+        ),
+        "TestStreamUnary": grpc.stream_unary_rpc_method_handler(
+            servicer.TestStreamUnary,
+            request_deserializer=grpc__test__service__pb2.gRPCTestMessage.FromString,
+            response_serializer=grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'grpc_test_server.gRPCTestService', rpc_method_handlers)
+        "grpc_test_server.gRPCTestService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
 
 
- # This class is part of an EXPERIMENTAL API.
-class gRPCTestService(object):
+# This class is part of an EXPERIMENTAL API.
+class gRPCTestService:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def TestServe(request,
+    def TestServe(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/grpc_test_server.gRPCTestService/TestServe',
+            "/grpc_test_server.gRPCTestService/TestServe",
             grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
             grpc__test__service__pb2.gRPCTestMessage.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def TestUnaryStream(request,
+    def TestUnaryStream(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_stream(
+            request,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/grpc_test_server.gRPCTestService/TestUnaryStream',
+            "/grpc_test_server.gRPCTestService/TestUnaryStream",
             grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
             grpc__test__service__pb2.gRPCTestMessage.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def TestStreamStream(request_iterator,
+    def TestStreamStream(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.stream_stream(
+            request_iterator,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_stream(request_iterator, target, '/grpc_test_server.gRPCTestService/TestStreamStream',
+            "/grpc_test_server.gRPCTestService/TestStreamStream",
             grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
             grpc__test__service__pb2.gRPCTestMessage.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
 
     @staticmethod
-    def TestStreamUnary(request_iterator,
+    def TestStreamUnary(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.stream_unary(
+            request_iterator,
             target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_unary(request_iterator, target, '/grpc_test_server.gRPCTestService/TestStreamUnary',
+            "/grpc_test_server.gRPCTestService/TestStreamUnary",
             grpc__test__service__pb2.gRPCTestMessage.SerializeToString,
             grpc__test__service__pb2.gRPCTestMessage.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )

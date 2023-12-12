@@ -25,7 +25,7 @@ def parse_json(data):
     return json.loads(data)
 
 
-class Envelope(object):
+class Envelope:
     def __init__(
         self,
         headers=None,  # type: Optional[Dict[str, Any]]
@@ -154,7 +154,7 @@ class Envelope(object):
         return "<Envelope headers=%r items=%r>" % (self.headers, self.items)
 
 
-class PayloadRef(object):
+class PayloadRef:
     def __init__(
         self,
         bytes=None,  # type: Optional[bytes]
@@ -198,7 +198,7 @@ class PayloadRef(object):
         return "<Payload %r>" % (self.inferred_content_type,)
 
 
-class Item(object):
+class Item:
     def __init__(
         self,
         payload,  # type: Union[bytes, str, PayloadRef]

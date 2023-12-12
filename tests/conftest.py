@@ -306,7 +306,7 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
     return inner
 
 
-class EventStreamReader(object):
+class EventStreamReader:
     def __init__(self, read_file, write_file):
         self.read_file = read_file
         self.write_file = write_file
@@ -398,7 +398,7 @@ def string_containing_matcher():
 
     """
 
-    class StringContaining(object):
+    class StringContaining:
         def __init__(self, substring):
             self.substring = substring
             self.valid_types = (str, bytes)
@@ -475,7 +475,7 @@ def dictionary_containing_matcher():
     >>> f.assert_any_call(DictionaryContaining({"dogs": "yes"})) # no AssertionError
     """
 
-    class DictionaryContaining(object):
+    class DictionaryContaining:
         def __init__(self, subdict):
             self.subdict = subdict
 
@@ -515,7 +515,7 @@ def object_described_by_matcher():
 
     Used like this:
 
-    >>> class Dog(object):
+    >>> class Dog:
     ...     pass
     ...
     >>> maisey = Dog()
@@ -527,7 +527,7 @@ def object_described_by_matcher():
     >>> f.assert_any_call(ObjectDescribedBy(attrs={"name": "Maisey"})) # no AssertionError
     """
 
-    class ObjectDescribedBy(object):
+    class ObjectDescribedBy:
         def __init__(self, type=None, attrs=None):
             self.type = type
             self.attrs = attrs
