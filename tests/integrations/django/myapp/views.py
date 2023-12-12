@@ -194,6 +194,12 @@ def postgres_select(request, *args, **kwargs):
 
 
 @csrf_exempt
+def postgres_select_orm(request, *args, **kwargs):
+    user = User.objects.using("postgres").all().first()
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
 

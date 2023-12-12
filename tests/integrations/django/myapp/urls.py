@@ -57,6 +57,7 @@ urlpatterns = [
     path("template-test2", views.template_test2, name="template_test2"),
     path("template-test3", views.template_test3, name="template_test3"),
     path("postgres-select", views.postgres_select, name="postgres_select"),
+    path("postgres-select-slow", views.postgres_select_orm, name="postgres_select_orm"),
     path(
         "permission-denied-exc",
         views.permission_denied_exc,
