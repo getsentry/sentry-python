@@ -82,7 +82,7 @@ def add_global_repr_processor(processor):
     global_repr_processors.append(processor)
 
 
-class Memo(object):
+class Memo:
     __slots__ = ("_ids", "_objs")
 
     def __init__(self):

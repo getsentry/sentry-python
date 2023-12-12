@@ -58,7 +58,7 @@ DEFAULT_DENYLIST = [
 ]
 
 
-class EventScrubber(object):
+class EventScrubber:
     def __init__(self, denylist=None):
         # type: (Optional[List[str]]) -> None
         self.denylist = DEFAULT_DENYLIST if denylist is None else denylist

@@ -176,7 +176,7 @@ class DidNotEnable(Exception):  # noqa: N818
     """
 
 
-class Integration(object):
+class Integration:
     """Baseclass for all integrations.
 
     To accept options for an integration, implement your own constructor that

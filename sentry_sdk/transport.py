@@ -41,7 +41,7 @@ except ImportError:
     from urllib import getproxies  # type: ignore
 
 
-class Transport(object):
+class Transport:
     """Baseclass for all transports.
 
     A transport is used to send an event to sentry.

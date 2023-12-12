@@ -66,7 +66,7 @@ def get_request_url(environ, use_x_forwarded_for=False):
     )
 
 
-class SentryWsgiMiddleware(object):
+class SentryWsgiMiddleware:
     __slots__ = ("app", "use_x_forwarded_for")
 
     def __init__(self, app, use_x_forwarded_for=False):
@@ -198,7 +198,7 @@ def _capture_exception(hub):
     return exc_info
 
 
-class _ScopedResponse(object):
+class _ScopedResponse:
     __slots__ = ("_response", "_hub")
 
     def __init__(self, hub, response):

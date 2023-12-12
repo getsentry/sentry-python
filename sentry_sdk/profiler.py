@@ -435,7 +435,7 @@ def get_current_thread_id(thread=None):
     return None
 
 
-class Profile(object):
+class Profile:
     def __init__(
         self,
         transaction,  # type: sentry_sdk.tracing.Transaction
@@ -751,7 +751,7 @@ class Profile(object):
         return True
 
 
-class Scheduler(object):
+class Scheduler:
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):

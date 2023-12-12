@@ -903,7 +903,7 @@ def test_object_sends_exception(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    class C(object):
+    class C:
         def __repr__(self):
             try:
                 1 / 0
@@ -971,7 +971,7 @@ def test_dict_changed_during_iteration(sentry_init, capture_events):
     sentry_init(send_default_pii=True)
     events = capture_events()
 
-    class TooSmartClass(object):
+    class TooSmartClass:
         def __init__(self, environ):
             self.environ = environ
 
