@@ -15,7 +15,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
@@ -638,7 +638,12 @@ def install_sql_hook():
                         self.mogrify,
                         options,
                     )
-            return real_execute(self, sql, params)
+            result = real_execute(self, sql, params)
+
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
+        return result
 
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
@@ -650,7 +655,13 @@ def install_sql_hook():
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
             _set_db_data(span, self)
-            return real_executemany(self, sql, param_list)
+
+            result = real_executemany(self, sql, param_list)
+
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
+        return result
 
     def connect(self):
         # type: (BaseDatabaseWrapper) -> None
