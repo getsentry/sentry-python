@@ -1,6 +1,5 @@
 import datetime
-import sys
-from unittest import mock  # python 3.3 and above
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
@@ -373,10 +372,6 @@ def test_get_monitor_config_timezone_in_app_conf():
     assert monitor_config["timezone"] == "Asia/Karachi"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 0),
-    reason="no datetime.timezone for Python 2, so skipping this test.",
-)
 def test_get_monitor_config_timezone_in_celery_schedule():
     app = MagicMock()
     app.timezone = "Asia/Karachi"

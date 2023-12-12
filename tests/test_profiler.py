@@ -31,12 +31,6 @@ from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._queue import Queue
 
 
-def requires_python_version(major, minor, reason=None):
-    if reason is None:
-        reason = "Requires Python {}.{}".format(major, minor)
-    return pytest.mark.skipif(sys.version_info < (major, minor), reason=reason)
-
-
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
@@ -55,7 +49,6 @@ def experimental_options(mode=None, sample_rate=None):
     }
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -78,7 +71,6 @@ def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
         setup_profiler(make_options(mode))
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -99,7 +91,6 @@ def test_profiler_valid_mode(mode, make_options, teardown_profiling):
     setup_profiler(make_options(mode))
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "make_options",
     [
@@ -114,7 +105,6 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
     assert not setup_profiler(make_options())
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -180,7 +170,6 @@ def test_profiles_sample_rate(
         assert reports == [("sample_rate", "profile")]
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -248,7 +237,6 @@ def test_profiles_sampler(
         assert reports == [("sample_rate", "profile")]
 
 
-@requires_python_version(3, 3)
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
@@ -278,7 +266,6 @@ def test_minimum_unique_samples_required(
     assert reports == [("insufficient_data", "profile")]
 
 
-@requires_python_version(3, 3)
 def test_profile_captured(
     sentry_init,
     capture_envelopes,
@@ -368,7 +355,6 @@ class GetFrame(GetFrameBase):
         return inspect.currentframe()
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("frame", "frame_name"),
     [
@@ -448,7 +434,6 @@ def test_get_frame_name(frame, frame_name):
     assert get_frame_name(frame) == frame_name
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("get_frame", "function"),
     [
@@ -476,7 +461,6 @@ def test_extract_frame(get_frame, function):
     assert isinstance(extracted_frame["lineno"], int)
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("depth", "max_stack_depth", "actual_depth"),
     [
@@ -518,7 +502,6 @@ def test_extract_stack_with_max_depth(depth, max_stack_depth, actual_depth):
         assert frames[actual_depth]["function"] == "<lambda>", actual_depth
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("frame", "depth"),
     [(get_frame(depth=1), len(inspect.stack()))],
@@ -541,7 +524,6 @@ def test_extract_stack_with_cache(frame, depth):
         assert frame1 is frame2, i
 
 
-@requires_python_version(3, 3)
 def test_get_current_thread_id_explicit_thread():
     results = Queue(maxsize=1)
 
@@ -563,7 +545,6 @@ def test_get_current_thread_id_explicit_thread():
     assert thread1.ident == results.get(timeout=1)
 
 
-@requires_python_version(3, 3)
 @requires_gevent
 def test_get_current_thread_id_gevent_in_thread():
     results = Queue(maxsize=1)
@@ -579,7 +560,6 @@ def test_get_current_thread_id_gevent_in_thread():
     assert thread.ident == results.get(timeout=1)
 
 
-@requires_python_version(3, 3)
 def test_get_current_thread_id_running_thread():
     results = Queue(maxsize=1)
 
@@ -592,7 +572,6 @@ def test_get_current_thread_id_running_thread():
     assert thread.ident == results.get(timeout=1)
 
 
-@requires_python_version(3, 3)
 def test_get_current_thread_id_main_thread():
     results = Queue(maxsize=1)
 
@@ -601,7 +580,7 @@ def test_get_current_thread_id_main_thread():
         with mock.patch("threading.current_thread", side_effect=[None]):
             results.put(get_current_thread_id())
 
-    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
+    thread_id = threading.main_thread().ident
 
     thread = threading.Thread(target=target)
     thread.start()
@@ -613,7 +592,6 @@ def get_scheduler_threads(scheduler):
     return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("scheduler_class",),
     [
@@ -657,7 +635,6 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
     assert len(get_scheduler_threads(scheduler)) == 0
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("scheduler_class",),
     [
@@ -702,7 +679,6 @@ def test_thread_scheduler_no_thread_on_shutdown(scheduler_class):
     assert len(get_scheduler_threads(scheduler)) == 0
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("scheduler_class",),
     [
@@ -780,7 +756,6 @@ sample_stacks = [
 ]
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     ("samples", "expected"),
     [

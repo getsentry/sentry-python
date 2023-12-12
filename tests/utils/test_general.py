@@ -41,10 +41,6 @@ def test_safe_repr_regressions():
     # fmt: on
 
 
-@pytest.mark.xfail(
-    sys.version_info < (3,),
-    reason="Fixing this in Python 2 would break other behaviors",
-)
 # fmt: off
 @pytest.mark.parametrize("prefix", ("", "abcd", u"лошадь"))
 @pytest.mark.parametrize("character", u"\x00\x07\x1b\n")

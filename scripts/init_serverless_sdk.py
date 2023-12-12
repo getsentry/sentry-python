@@ -48,7 +48,6 @@ class AWSLambdaModuleLoader:
             module_name = module_path.split(os.path.sep)[-1]
             module_file_path = module_path + ".py"
 
-            # Supported python versions are 2.7, 3.6, 3.7, 3.8
             if py_version >= (3, 5):
                 import importlib.util
 
@@ -57,12 +56,6 @@ class AWSLambdaModuleLoader:
                 )
                 self.lambda_function_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(self.lambda_function_module)
-            elif py_version[0] < 3:
-                import imp
-
-                self.lambda_function_module = imp.load_source(
-                    module_name, module_file_path
-                )
             else:
                 raise ValueError("Python version %s is not supported." % py_version)
         else:

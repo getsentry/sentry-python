@@ -1,14 +1,11 @@
 from unittest import mock
+
 import pytest
-import sys
 
 from sentry_sdk.tracing_utils_py3 import (
     start_child_span_decorator as start_child_span_decorator_py3,
 )
 from sentry_sdk.utils import logger
-
-if sys.version_info < (3, 6):
-    pytest.skip("Async decorator only works on Python 3.6+", allow_module_level=True)
 
 
 def my_example_function():
