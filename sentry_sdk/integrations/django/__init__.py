@@ -398,14 +398,15 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         if hasattr(urlconf, "handler404"):
             handler = urlconf.handler404
             if isinstance(handler, string_types):
-                transaction_name = handler
+                transaction_name = handler  # type: ignore
             else:
                 transaction_name = transaction_from_function(
                     getattr(handler, "view_class", handler)
                 )
-            scope.set_transaction_name(
-                transaction_name, source=TRANSACTION_SOURCE_COMPONENT
-            )
+            if transaction_name is not None:
+                scope.set_transaction_name(
+                    transaction_name, source=TRANSACTION_SOURCE_COMPONENT
+                )
     except Exception:
         pass
 
