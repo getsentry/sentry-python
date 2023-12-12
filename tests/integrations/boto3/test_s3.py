@@ -1,16 +1,12 @@
-import pytest
+from unittest import mock
 
+import pytest
 import boto3
 
 from sentry_sdk import Hub
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from tests.integrations.boto3.aws_mock import MockResponse
 from tests.integrations.boto3 import read_fixture
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 session = boto3.Session(

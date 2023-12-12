@@ -1,7 +1,10 @@
 import datetime
 import sys
+from unittest import mock  # python 3.3 and above
+from unittest.mock import MagicMock
 
 import pytest
+from celery.schedules import crontab, schedule
 
 from sentry_sdk.integrations.celery import (
     _get_headers,
@@ -13,14 +16,6 @@ from sentry_sdk.integrations.celery import (
     crons_task_retry,
 )
 from sentry_sdk.crons import MonitorStatus
-from celery.schedules import crontab, schedule
-
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
 
 
 def test_get_headers():

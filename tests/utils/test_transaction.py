@@ -1,14 +1,9 @@
 import sys
-from functools import partial
+from functools import partial, partialmethod
 
 import pytest
 
 from sentry_sdk.utils import transaction_from_function
-
-try:
-    from functools import partialmethod
-except ImportError:
-    pass
 
 
 class MyClass:

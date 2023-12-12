@@ -1,3 +1,5 @@
+from unittest import mock
+
 from sentry_sdk import (
     configure_scope,
     continue_trace,
@@ -7,11 +9,6 @@ from sentry_sdk import (
     start_transaction,
 )
 from sentry_sdk.hub import Hub
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def test_get_current_span():

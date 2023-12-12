@@ -1,13 +1,11 @@
 import copy
 import os
+from unittest import mock
+
 import pytest
+
 from sentry_sdk import capture_exception
 from sentry_sdk.scope import Scope
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def test_copying():

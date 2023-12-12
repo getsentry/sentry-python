@@ -1,32 +1,14 @@
 import random
+from http.client import HTTPConnection, HTTPSConnection
+from unittest import mock
+from urllib.request import urlopen
 
 import pytest
-
-try:
-    # py3
-    from urllib.request import urlopen
-except ImportError:
-    # py2
-    from urllib import urlopen
-
-try:
-    # py2
-    from httplib import HTTPConnection, HTTPSConnection
-except ImportError:
-    # py3
-    from http.client import HTTPConnection, HTTPSConnection
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-
 from tests.conftest import create_mock_http_server
 
 PORT = create_mock_http_server()

@@ -1,11 +1,7 @@
 import gc
 import sys
+from concurrent import futures
 from threading import Thread
-
-try:
-    from concurrent import futures
-except ImportError:
-    futures = None
 
 import pytest
 
@@ -79,10 +75,6 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
         assert "stage1" not in event.get("tags", {})
 
 
-@pytest.mark.skipif(
-    futures is None,
-    reason="ThreadPool was added in 3.2",
-)
 @pytest.mark.parametrize("propagate_hub", (True, False))
 def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
     sentry_init(

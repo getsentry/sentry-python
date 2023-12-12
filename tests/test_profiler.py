@@ -3,10 +3,16 @@ import os
 import sys
 import threading
 import time
+from collections import defaultdict
+from unittest import mock
 
 import pytest
 
-from collections import defaultdict
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
 from sentry_sdk import start_transaction
 from sentry_sdk.profiler import (
     GeventScheduler,
@@ -23,16 +29,6 @@ from sentry_sdk.profiler import (
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._queue import Queue
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
-try:
-    import gevent
-except ImportError:
-    gevent = None
 
 
 def requires_python_version(major, minor, reason=None):

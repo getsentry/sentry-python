@@ -1,15 +1,12 @@
+from unittest import mock
+
+import rq
 import pytest
 from fakeredis import FakeStrictRedis
+
 from sentry_sdk import configure_scope, start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
-
-import rq
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.fixture(autouse=True)

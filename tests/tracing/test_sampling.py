@@ -1,15 +1,11 @@
 import random
+from unittest import mock
 
 import pytest
 
 from sentry_sdk import Hub, start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def test_sampling_decided_only_for_transactions(sentry_init, capture_events):

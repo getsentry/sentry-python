@@ -1,21 +1,16 @@
-from datetime import datetime
 import time
 import pytest
+from datetime import datetime
+from unittest import mock  # python 3.3 and above
+from unittest.mock import MagicMock
 
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock
-    from mock import MagicMock  # python < 3.3
+from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
 
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
 from sentry_sdk.tracing import Span, Transaction
-
-from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
 
