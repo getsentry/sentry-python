@@ -130,7 +130,7 @@ def get_default_release():
         return release
 
     release = get_git_revision()
-    if release is not None:
+    if release:
         return release
 
     for var in (
