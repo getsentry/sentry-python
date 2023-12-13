@@ -37,12 +37,13 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
+        ErrorProcessor,
         Event,
         EventProcessor,
-        ErrorProcessor,
         ExcInfo,
         Hint,
         Type,
+        Union,
     )
 
     from sentry_sdk.profiler import Profile
@@ -580,6 +581,65 @@ class Scope(object):
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+
+    def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
+        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
+        """
+        Captures an event.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_event`.
+
+        :param scope_kwargs: For supported `**scope_kwargs` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+        """
+        client = scope_kwargs.pop("client")
+
+        return client.capture_event(
+            event, hint, scope=scope, top_scope=self, **scope_kwargs
+        )
+
+    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
+        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
+        """
+        Captures a message.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_message`.
+
+        :param message: The string to send as the message.
+
+        :param level: If no level is provided, the default level is `info`.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
+
+        :param scope_kwargs: For supported `**scope_kwargs` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        """
+        client = scope_kwargs.pop("client")
+
+        return client.capture_message(
+            message, level=level, scope=scope, top_scope=self, **scope_kwargs
+        )
+
+    def capture_exception(self, error=None, scope=None, **scope_kwargs):
+        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
+        """Captures an exception.
+
+        Alias of :py:meth:`sentry_sdk.Client.capture_exception`.
+
+        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
+
+        :param scope_kwargs: For supported `**scope_kwargs` see
+            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        """
+        client = scope_kwargs.pop("client")
+
+        return client.capture_exception(
+            error, scope=scope, top_scope=self, **scope_kwargs
+        )
 
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
