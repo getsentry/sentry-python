@@ -143,6 +143,7 @@ class Scope(object):
         "_force_auto_session_tracking",
         "_profile",
         "_propagation_context",
+        "_capture_internal_exception",
     )
 
     def __init__(self):
