@@ -485,7 +485,6 @@ class Span:
             self.timestamp = datetime.now(timezone.utc)
 
         maybe_create_breadcrumbs_from_span(hub, self)
-        add_additional_span_data(hub, self)
 
         return None
 
@@ -1015,7 +1014,6 @@ def trace(func=None):
 from sentry_sdk.tracing_utils import (
     Baggage,
     EnvironHeaders,
-    add_additional_span_data,
     extract_sentrytrace_data,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
