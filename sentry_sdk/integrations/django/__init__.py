@@ -706,7 +706,7 @@ def _set_db_data(span, cursor_or_db):
             hasattr(cursor_or_db, "connection")
             and hasattr(cursor_or_db.connection, "info")
             and hasattr(cursor_or_db.connection.info, "get_parameters")
-            and inspect.isfunction(cursor_or_db.connection.info.get_parameters)
+            and inspect.isroutine(cursor_or_db.connection.info.get_parameters)
         )
         if is_psycopg3:
             connection_params = cursor_or_db.connection.info.get_parameters()
