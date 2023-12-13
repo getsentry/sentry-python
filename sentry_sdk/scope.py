@@ -2,6 +2,7 @@ from copy import copy
 from collections import deque
 from itertools import chain
 import os
+import sys
 import uuid
 
 from sentry_sdk.attachments import Attachment
@@ -21,7 +22,12 @@ from sentry_sdk.tracing import (
     Transaction,
 )
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.utils import (
+    event_from_exception,
+    exc_info_from_error,
+    logger,
+    capture_internal_exceptions,
+)
 
 if TYPE_CHECKING:
     from typing import Any
@@ -82,7 +88,7 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-def _update_scope(base, scope_change, scope_kwargs):
+def _merge_scopes(base, scope_change, scope_kwargs):
     # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
     if scope_change and scope_kwargs:
         raise TypeError("cannot provide scope and kwargs")
@@ -594,9 +600,10 @@ class Scope(object):
         """
         client = scope_kwargs.pop("client")
 
-        return client.capture_event(
-            event, hint, scope=scope, top_scope=self, **scope_kwargs
-        )
+        if scope_kwargs is not None:
+            scope = _merge_scopes(self, scope, scope_kwargs)
+
+        return client.capture_event(event, hint, scope=scope)
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
@@ -616,10 +623,13 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        client = scope_kwargs.pop("client")
+        if level is None:
+            level = "info"
 
-        return client.capture_message(
-            message, level=level, scope=scope, top_scope=self, **scope_kwargs
+        # the client is in scope_kwargs
+
+        return self.capture_event(
+            {"message": message, "level": level}, scope=scope, **scope_kwargs
         )
 
     def capture_exception(self, error=None, scope=None, **scope_kwargs):
@@ -635,11 +645,33 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        client = scope_kwargs.pop("client")
+        if error is not None:
+            exc_info = exc_info_from_error(error)
+        else:
+            exc_info = sys.exc_info()
 
-        return client.capture_exception(
-            error, scope=scope, top_scope=self, **scope_kwargs
-        )
+        event, hint = event_from_exception(exc_info, client_options=self.options)
+
+        try:
+            # the client is in scope_kwargs
+
+            return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)
+        except Exception:
+            self._capture_internal_exception(sys.exc_info())
+
+        return None
+
+    def _capture_internal_exception(
+        self, exc_info  # type: Any
+    ):
+        # type: (...) -> Any
+        """
+        Capture an exception that is likely caused by a bug in the SDK
+        itself.
+
+        These exceptions do not end up in Sentry and are just logged instead.
+        """
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
