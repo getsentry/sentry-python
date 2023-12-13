@@ -44,14 +44,13 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
-    from aiohttp.abc import AbstractMatchInfo
+    from aiohttp.web_urldispatcher import UrlMappingMatchInfo
     from aiohttp import TraceRequestStartParams, TraceRequestEndParams
     from types import SimpleNamespace
     from typing import Any
     from typing import Dict
     from typing import Optional
     from typing import Tuple
-    from typing import Callable
     from typing import Union
 
     from sentry_sdk.utils import ExcInfo
@@ -113,8 +112,9 @@ class AioHttpIntegration(Integration):
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
+                    headers = dict(request.headers)
                     transaction = continue_trace(
-                        request.headers,
+                        headers,
                         op=OP.HTTP_SERVER,
                         # If this transaction name makes it to the UI, AIOHTTP's
                         # URL resolver did not find a route or died trying.
@@ -141,12 +141,12 @@ class AioHttpIntegration(Integration):
                         transaction.set_http_status(response.status)
                         return response
 
-        Application._handle = sentry_app_handle
+        Application._handle = sentry_app_handle  # type: ignore[method-assign]
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
         async def sentry_urldispatcher_resolve(self, request):
-            # type: (UrlDispatcher, Request) -> AbstractMatchInfo
+            # type: (UrlDispatcher, Request) -> UrlMappingMatchInfo
             rv = await old_urldispatcher_resolve(self, request)
 
             hub = Hub.current
@@ -173,12 +173,12 @@ class AioHttpIntegration(Integration):
 
             return rv
 
-        UrlDispatcher.resolve = sentry_urldispatcher_resolve
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve  # type: ignore[method-assign]
 
         old_client_session_init = ClientSession.__init__
 
         def init(*args, **kwargs):
-            # type: (Any, Any) -> ClientSession
+            # type: (Any, Any) -> None
             hub = Hub.current
             if hub.get_integration(AioHttpIntegration) is None:
                 return old_client_session_init(*args, **kwargs)
@@ -190,7 +190,7 @@ class AioHttpIntegration(Integration):
             kwargs["trace_configs"] = client_trace_configs
             return old_client_session_init(*args, **kwargs)
 
-        ClientSession.__init__ = init
+        ClientSession.__init__ = init  # type: ignore[method-assign]
 
 
 def create_trace_config():
@@ -253,7 +253,7 @@ def create_trace_config():
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> EventProcessor
+    # type: (weakref.ReferenceType[Request]) -> EventProcessor
     def aiohttp_processor(
         event,  # type: Dict[str, Any]
         hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
