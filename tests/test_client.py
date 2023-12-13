@@ -365,7 +365,7 @@ def test_ignore_errors(sentry_init, capture_events):
         reraise(*exc_info)
 
     sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
-    Hub.current.client._capture_internal_exception = raise_it
+    Hub.current.scope._capture_internal_exception = raise_it
 
     def e(exc):
         try:
