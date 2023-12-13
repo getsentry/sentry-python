@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.39.0
+
+### Various fixes & improvements
+
+- Add support for cluster clients from Redis SDK (#2394) by @md384
+- Improve location reporting for timer metrics (#2552) by @mitsuhiko
+- Fix Celery `TypeError` with no-argument `apply_async` (#2575) by @szokeasaurusrex
+- Fix Lambda integration with EventBridge source (#2546) by @davidcroda
+- Add max tries to Spotlight (#2571) by @hazAT
+- Handle `os.path.devnull` access issues (#2579) by @sentrivana
+- Change `code.filepath` frame picking logic (#2568) by @sentrivana
+- Trigger AWS Lambda tests on label (#2538) by @sentrivana
+- Run permissions step on pull_request_target but not push (#2548) by @sentrivana
+- Hash AWS Lambda test functions based on current revision (#2557) by @sentrivana
+- Update Django version in tests (#2562) by @sentrivana
+- Make metrics tests non-flaky (#2572) by @antonpirker
+
+## 1.38.0
+
+### Various fixes & improvements
+
+- Only add trace context to checkins and do not run `event_processors` for checkins (#2536) by @antonpirker
+- Metric span summaries (#2522) by @mitsuhiko
+- Add source context to code locations (#2539) by @jan-auer
+- Use in-app filepath instead of absolute path (#2541) by @antonpirker
+- Switch to `jinja2` for generating CI yamls (#2534) by @sentrivana
+
+## 1.37.1
+
+### Various fixes & improvements
+
+- Fix `NameError` on `parse_version` with eventlet (#2532) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `68def1e` to `e9f7d58` (#2501) by @dependabot
+
 ## 1.37.0
 
 ### Various fixes & improvements

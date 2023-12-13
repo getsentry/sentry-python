@@ -44,6 +44,7 @@ jobs:
           python-version: 3.12
 
       - run: |
+          pip install jinja2
           python scripts/split-tox-gh-actions/split-tox-gh-actions.py --fail-on-changes
 
   build_lambda_layer:

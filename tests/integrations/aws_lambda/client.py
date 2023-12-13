@@ -8,6 +8,7 @@ import sys
 import tempfile
 
 from sentry_sdk.consts import VERSION as SDK_VERSION
+from sentry_sdk.utils import get_git_revision
 
 AWS_REGION_NAME = "us-east-1"
 AWS_CREDENTIALS = {
@@ -226,7 +227,8 @@ def run_lambda_function(
     # Making a unique function name depending on all the code that is run in it (function code plus SDK version)
     # The name needs to be short so the generated event/envelope json blobs are small enough to be output
     # in the log result of the Lambda function.
-    function_hash = hashlib.shake_256((code + SDK_VERSION).encode("utf-8")).hexdigest(5)
+    rev = get_git_revision() or SDK_VERSION
+    function_hash = hashlib.shake_256((code + rev).encode("utf-8")).hexdigest(6)
     fn_name = "test_{}".format(function_hash)
     full_fn_name = "{}_{}".format(
         fn_name, runtime.replace(".", "").replace("python", "py")

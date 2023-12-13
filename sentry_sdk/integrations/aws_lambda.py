@@ -137,9 +137,10 @@ def _wrap_handler(handler):
                     # Starting the thread to raise timeout warning exception
                     timeout_thread.start()
 
-            headers = request_data.get("headers")
-            # AWS Service may set an explicit `{headers: None}`, we can't rely on `.get()`'s default.
-            if headers is None:
+            headers = request_data.get("headers", {})
+            # Some AWS Services (ie. EventBridge) set headers as a list
+            # or None, so we must ensure it is a dict
+            if not isinstance(headers, dict):
                 headers = {}
 
             transaction = continue_trace(

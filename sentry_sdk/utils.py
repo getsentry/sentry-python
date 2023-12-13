@@ -21,7 +21,6 @@ try:
     from urllib.parse import urlencode
     from urllib.parse import urlsplit
     from urllib.parse import urlunsplit
-
 except ImportError:
     # Python 2
     from cgi import parse_qs  # type: ignore
@@ -29,6 +28,13 @@ except ImportError:
     from urllib import urlencode  # type: ignore
     from urlparse import urlsplit  # type: ignore
     from urlparse import urlunsplit  # type: ignore
+
+try:
+    # Python 3
+    FileNotFoundError
+except NameError:
+    # Python 2
+    FileNotFoundError = IOError
 
 try:
     # Python 3.11
@@ -95,16 +101,11 @@ def _get_debug_hub():
     pass
 
 
-def get_default_release():
+def get_git_revision():
     # type: () -> Optional[str]
-    """Try to guess a default release."""
-    release = os.environ.get("SENTRY_RELEASE")
-    if release:
-        return release
-
-    with open(os.path.devnull, "w+") as null:
-        try:
-            release = (
+    try:
+        with open(os.path.devnull, "w+") as null:
+            revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
                     stdout=subprocess.PIPE,
@@ -115,11 +116,22 @@ def get_default_release():
                 .strip()
                 .decode("utf-8")
             )
-        except (OSError, IOError):
-            pass
+    except (OSError, IOError, FileNotFoundError):
+        return None
 
-        if release:
-            return release
+    return revision
+
+
+def get_default_release():
+    # type: () -> Optional[str]
+    """Try to guess a default release."""
+    release = os.environ.get("SENTRY_RELEASE")
+    if release:
+        return release
+
+    release = get_git_revision()
+    if release is not None:
+        return release
 
     for var in (
         "HEROKU_SLUG_COMMIT",
@@ -1127,6 +1139,58 @@ def strip_string(value, max_length=None):
     return value
 
 
+def parse_version(version):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    """
+    Parses a version string into a tuple of integers.
+    This uses the parsing loging from PEP 440:
+    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+    """
+    VERSION_PATTERN = r"""  # noqa: N806
+        v?
+        (?:
+            (?:(?P<epoch>[0-9]+)!)?                           # epoch
+            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+            (?P<pre>                                          # pre-release
+                [-_\.]?
+                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+                [-_\.]?
+                (?P<pre_n>[0-9]+)?
+            )?
+            (?P<post>                                         # post release
+                (?:-(?P<post_n1>[0-9]+))
+                |
+                (?:
+                    [-_\.]?
+                    (?P<post_l>post|rev|r)
+                    [-_\.]?
+                    (?P<post_n2>[0-9]+)?
+                )
+            )?
+            (?P<dev>                                          # dev release
+                [-_\.]?
+                (?P<dev_l>dev)
+                [-_\.]?
+                (?P<dev_n>[0-9]+)?
+            )?
+        )
+        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+    """
+
+    pattern = re.compile(
+        r"^\s*" + VERSION_PATTERN + r"\s*$",
+        re.VERBOSE | re.IGNORECASE,
+    )
+
+    try:
+        release = pattern.match(version).groupdict()["release"]  # type: ignore
+        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+    return release_tuple
+
+
 def _is_contextvars_broken():
     # type: () -> bool
     """
@@ -1519,58 +1583,6 @@ def is_sentry_url(hub, url):
         and hub.client.transport.parsed_dsn is not None
         and hub.client.transport.parsed_dsn.netloc in url
     )
-
-
-def parse_version(version):
-    # type: (str) -> Optional[Tuple[int, ...]]
-    """
-    Parses a version string into a tuple of integers.
-    This uses the parsing loging from PEP 440:
-    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
-    """
-    VERSION_PATTERN = r"""  # noqa: N806
-        v?
-        (?:
-            (?:(?P<epoch>[0-9]+)!)?                           # epoch
-            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
-            (?P<pre>                                          # pre-release
-                [-_\.]?
-                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
-                [-_\.]?
-                (?P<pre_n>[0-9]+)?
-            )?
-            (?P<post>                                         # post release
-                (?:-(?P<post_n1>[0-9]+))
-                |
-                (?:
-                    [-_\.]?
-                    (?P<post_l>post|rev|r)
-                    [-_\.]?
-                    (?P<post_n2>[0-9]+)?
-                )
-            )?
-            (?P<dev>                                          # dev release
-                [-_\.]?
-                (?P<dev_l>dev)
-                [-_\.]?
-                (?P<dev_n>[0-9]+)?
-            )?
-        )
-        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
-    """
-
-    pattern = re.compile(
-        r"^\s*" + VERSION_PATTERN + r"\s*$",
-        re.VERBOSE | re.IGNORECASE,
-    )
-
-    try:
-        release = pattern.match(version).groupdict()["release"]  # type: ignore
-        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
-    except (TypeError, ValueError, AttributeError):
-        return None
-
-    return release_tuple
 
 
 def _generate_installed_modules():

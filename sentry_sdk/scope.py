@@ -652,6 +652,12 @@ class Scope(object):
 
         self._apply_contexts_to_event(event, hint, options)
 
+        if is_check_in:
+            # Check-ins only support the trace context, strip all others
+            event["contexts"] = {
+                "trace": event.setdefault("contexts", {}).get("trace", {})
+            }
+
         if not is_check_in:
             self._apply_level_to_event(event, hint, options)
             self._apply_fingerprint_to_event(event, hint, options)
@@ -680,13 +686,16 @@ class Scope(object):
                 event = new_event
 
         # run event processors
-        for event_processor in chain(global_event_processors, self._event_processors):
-            new_event = event
-            with capture_internal_exceptions():
-                new_event = event_processor(event, hint)
-            if new_event is None:
-                return _drop(event_processor, "event processor")
-            event = new_event
+        if not is_check_in:
+            for event_processor in chain(
+                global_event_processors, self._event_processors
+            ):
+                new_event = event
+                with capture_internal_exceptions():
+                    new_event = event_processor(event, hint)
+                if new_event is None:
+                    return _drop(event_processor, "event processor")
+                event = new_event
 
         return event
 

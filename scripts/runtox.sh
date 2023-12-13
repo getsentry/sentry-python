@@ -35,4 +35,9 @@ else
     ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
 fi
 
+if [ -z "${ENV}" ]; then
+    echo "No targets found. Skipping."
+    exit 0
+fi
+
 exec $TOXPATH -vv -e "$ENV" -- "${@:2}"

@@ -855,3 +855,26 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
         == error_event["contexts"]["trace"]["trace_id"]
         == "471a43a4192642f0b136d5159a501701"
     )
+
+
+def test_basic_with_eventbridge_source(run_lambda_function):
+    _, events, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk()
+
+        def test_handler(event, context):
+            raise Exception("Oh!")
+        """
+        ),
+        b'[{"topic":"lps-ranges","partition":1,"offset":0,"timestamp":1701268939207,"timestampType":"CREATE_TIME","key":"REDACTED","value":"REDACTED","headers":[],"eventSourceArn":"REDACTED","bootstrapServers":"REDACTED","eventSource":"aws:kafka","eventSourceKey":"lps-ranges-1"}]',
+    )
+
+    assert response["FunctionError"] == "Unhandled"
+
+    (event,) = events
+    assert event["level"] == "error"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "Oh!"
