@@ -27,7 +27,7 @@ class BackgroundWorker(object):
         self._thread = None  # type: Optional[threading.Thread]
         self._thread_for_pid = None  # type: Optional[int]
 
-        self.start()
+        self._ensure_thread()
 
     @property
     def is_alive(self):
