@@ -466,20 +466,28 @@ class _Client(object):
         hint,  # type: Hint
     ):
         # type: (...) -> bool
-        sampler = self.options.get("error_sampler", None)
+        error_sampler = self.options.get("error_sampler", None)
 
-        if callable(sampler):
+        if callable(error_sampler):
             with capture_internal_exceptions():
-                sample_rate = sampler(event, hint)
+                sample_rate = error_sampler(event, hint)
         else:
             sample_rate = self.options["sample_rate"]
 
         try:
             not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
+        except NameError:
+            logger.warning(
+                "The provided error_sampler raised an error. Defaulting to sampling the event."
+            )
+
+            # If the error_sampler raised an error, we should sample the event, since the default behavior
+            # (when no sample_rate or error_sampler is provided) is to sample all events.
+            not_in_sample_rate = False
         except TypeError:
             parameter, verb = (
                 ("error_sampler", "returned")
-                if callable(sampler)
+                if callable(error_sampler)
                 else ("sample_rate", "contains")
             )
             logger.warning(
