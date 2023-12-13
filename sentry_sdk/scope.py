@@ -650,7 +650,9 @@ class Scope(object):
         else:
             exc_info = sys.exc_info()
 
-        event, hint = event_from_exception(exc_info, client_options=self.options)
+        event, hint = event_from_exception(
+            exc_info, client_options=scope_kwargs["client"].options
+        )
 
         try:
             # the client is in scope_kwargs
