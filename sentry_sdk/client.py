@@ -157,7 +157,7 @@ class _Client(object):
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`Client`.
+    Alias of :py:class:`Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
