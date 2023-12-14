@@ -6,11 +6,13 @@
 
 ## Changed
 
-- Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `tracing_utils.py`.
+- `start_child_span_decorator` was moved from `sentry_sdk.tracing_utils_py3` to `sentry_sdk.tracing_utils`.
 
 ## Removed
 
 - Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
-- Removed `tracing_utils_py2.py`. The `start_child_span_decorator` is now in `tracing_utils.py`.
+- `sentry_sdk.tracing_utils_py2` was removed.
+- `sentry_sdk.tracing_utils_py3` was removed.
+- `get_current_span` is no longer available from `sentry_sdk.tracing_utils`. Use `sentry_sdk.get_current_span` directly.
 
 ## Deprecated
