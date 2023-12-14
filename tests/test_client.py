@@ -378,7 +378,7 @@ def test_ignore_errors(sentry_init, capture_events):
         e(MyDivisionError())
         e(ValueError())
 
-        mock_capture_internal_exception.assert_called_once()
+        assert mock_capture_internal_exception.call_count == 1
         assert mock_capture_internal_exception.call_args[0][0][0] == EventCapturedError
 
 
