@@ -358,7 +358,6 @@ def test_simple_transport(sentry_init):
 
 
 def test_ignore_errors(sentry_init, capture_events):
-
     with mock.patch(
         "sentry_sdk.scope.Scope._capture_internal_exception"
     ) as mock_capture_internal_exception:
