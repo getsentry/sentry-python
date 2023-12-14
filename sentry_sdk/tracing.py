@@ -3,9 +3,8 @@ import random
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.consts import INSTRUMENTER, SPANDATA
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
 

@@ -7,7 +7,6 @@ from functools import wraps
 from urllib.parse import quote, unquote
 
 import sentry_sdk
-from sentry_sdk import get_current_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -513,6 +512,7 @@ def start_child_span_decorator(func):
 
     See also ``sentry_sdk.tracing.trace()``.
     """
+    from sentry_sdk import get_current_span
 
     # Asynchronous case
     if inspect.iscoroutinefunction(func):
