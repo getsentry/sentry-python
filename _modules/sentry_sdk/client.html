@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.client - sentry-python 1.39.0 documentation</title>
+      <title>sentry_sdk.client - sentry-python 1.39.1 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
   <script>
     const isDarkTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -608,269 +608,277 @@ html.dark {
 </span><span id="1-466">        <span class="n">hint</span><span class="p">,</span>  <span class="c1"># type: Hint</span>
 </span><span id="1-467">    <span class="p">):</span>
 </span><span id="1-468">        <span class="c1"># type: (...) -&gt; bool</span>
-</span><span id="1-469">        <span class="n">sampler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error_sampler&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="1-469">        <span class="n">error_sampler</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error_sampler&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 </span><span id="1-470">
-</span><span id="1-471">        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">sampler</span><span class="p">):</span>
+</span><span id="1-471">        <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">error_sampler</span><span class="p">):</span>
 </span><span id="1-472">            <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-473">                <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">sampler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</span><span id="1-473">                <span class="n">sample_rate</span> <span class="o">=</span> <span class="n">error_sampler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
 </span><span id="1-474">        <span class="k">else</span><span class="p">:</span>
 </span><span id="1-475">            <span class="n">sample_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">]</span>
 </span><span id="1-476">
 </span><span id="1-477">        <span class="k">try</span><span class="p">:</span>
 </span><span id="1-478">            <span class="n">not_in_sample_rate</span> <span class="o">=</span> <span class="n">sample_rate</span> <span class="o">&lt;</span> <span class="mf">1.0</span> <span class="ow">and</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&gt;=</span> <span class="n">sample_rate</span>
-</span><span id="1-479">        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-</span><span id="1-480">            <span class="n">parameter</span><span class="p">,</span> <span class="n">verb</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-481">                <span class="p">(</span><span class="s2">&quot;error_sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;returned&quot;</span><span class="p">)</span>
-</span><span id="1-482">                <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">sampler</span><span class="p">)</span>
-</span><span id="1-483">                <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">,</span> <span class="s2">&quot;contains&quot;</span><span class="p">)</span>
-</span><span id="1-484">            <span class="p">)</span>
-</span><span id="1-485">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span id="1-486">                <span class="s2">&quot;The provided </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> an invalid value of </span><span class="si">%s</span><span class="s2">. The value should be a float or a bool. Defaulting to sampling the event.&quot;</span>
-</span><span id="1-487">                <span class="o">%</span> <span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">verb</span><span class="p">,</span> <span class="nb">repr</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">))</span>
-</span><span id="1-488">            <span class="p">)</span>
-</span><span id="1-489">
-</span><span id="1-490">            <span class="c1"># If the sample_rate has an invalid value, we should sample the event, since the default behavior</span>
-</span><span id="1-491">            <span class="c1"># (when no sample_rate or error_sampler is provided) is to sample all events.</span>
-</span><span id="1-492">            <span class="n">not_in_sample_rate</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-493">
-</span><span id="1-494">        <span class="k">if</span> <span class="n">not_in_sample_rate</span><span class="p">:</span>
-</span><span id="1-495">            <span class="c1"># because we will not sample this event, record a &quot;lost event&quot;.</span>
-</span><span id="1-496">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="p">:</span>
-</span><span id="1-497">                <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
-</span><span id="1-498">
-</span><span id="1-499">            <span class="k">return</span> <span class="kc">False</span>
-</span><span id="1-500">
-</span><span id="1-501">        <span class="k">return</span> <span class="kc">True</span>
-</span><span id="1-502">
-</span><span id="1-503">    <span class="k">def</span> <span class="nf">_update_session_from_event</span><span class="p">(</span>
-</span><span id="1-504">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-505">        <span class="n">session</span><span class="p">,</span>  <span class="c1"># type: Session</span>
-</span><span id="1-506">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
-</span><span id="1-507">    <span class="p">):</span>
-</span><span id="1-508">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-509">
-</span><span id="1-510">        <span class="n">crashed</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-511">        <span class="n">errored</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-512">        <span class="n">user_agent</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="1-513">
-</span><span id="1-514">        <span class="n">exceptions</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exception&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;values&quot;</span><span class="p">)</span>
-</span><span id="1-515">        <span class="k">if</span> <span class="n">exceptions</span><span class="p">:</span>
-</span><span id="1-516">            <span class="n">errored</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="1-517">            <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">exceptions</span><span class="p">:</span>
-</span><span id="1-518">                <span class="n">mechanism</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mechanism&quot;</span><span class="p">)</span>
-</span><span id="1-519">                <span class="k">if</span> <span class="n">mechanism</span> <span class="ow">and</span> <span class="n">mechanism</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;handled&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
-</span><span id="1-520">                    <span class="n">crashed</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="1-521">                    <span class="k">break</span>
-</span><span id="1-522">
-</span><span id="1-523">        <span class="n">user</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">)</span>
-</span><span id="1-524">
-</span><span id="1-525">        <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">user_agent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-526">            <span class="n">headers</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;request&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headers&quot;</span><span class="p">)</span>
-</span><span id="1-527">            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">headers</span> <span class="ow">or</span> <span class="p">{}):</span>
-</span><span id="1-528">                <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;user-agent&quot;</span><span class="p">:</span>
-</span><span id="1-529">                    <span class="n">user_agent</span> <span class="o">=</span> <span class="n">v</span>
-</span><span id="1-530">                    <span class="k">break</span>
-</span><span id="1-531">
-</span><span id="1-532">        <span class="n">session</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
-</span><span id="1-533">            <span class="n">status</span><span class="o">=</span><span class="s2">&quot;crashed&quot;</span> <span class="k">if</span> <span class="n">crashed</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="1-534">            <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
-</span><span id="1-535">            <span class="n">user_agent</span><span class="o">=</span><span class="n">user_agent</span><span class="p">,</span>
-</span><span id="1-536">            <span class="n">errors</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">errors</span> <span class="o">+</span> <span class="p">(</span><span class="n">errored</span> <span class="ow">or</span> <span class="n">crashed</span><span class="p">),</span>
-</span><span id="1-537">        <span class="p">)</span>
-</span><span id="1-538">
-</span><span id="1-539">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
-</span><span id="1-540">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-541">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
-</span><span id="1-542">        <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
-</span><span id="1-543">        <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
-</span><span id="1-544">    <span class="p">):</span>
-</span><span id="1-545">        <span class="c1"># type: (...) -&gt; Optional[str]</span>
-</span><span id="1-546"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Captures an event.</span>
-</span><span id="1-547">
-</span><span id="1-548"><span class="sd">        :param event: A ready-made event that can be directly sent to Sentry.</span>
-</span><span id="1-549">
-</span><span id="1-550"><span class="sd">        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.</span>
-</span><span id="1-551">
-</span><span id="1-552"><span class="sd">        :param scope: An optional scope to use for determining whether this event</span>
-</span><span id="1-553"><span class="sd">            should be captured.</span>
-</span><span id="1-554">
-</span><span id="1-555"><span class="sd">        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.</span>
-</span><span id="1-556"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-557">        <span class="k">if</span> <span class="n">disable_capture_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">False</span><span class="p">):</span>
-</span><span id="1-558">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-479">        <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+</span><span id="1-480">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+</span><span id="1-481">                <span class="s2">&quot;The provided error_sampler raised an error. Defaulting to sampling the event.&quot;</span>
+</span><span id="1-482">            <span class="p">)</span>
+</span><span id="1-483">
+</span><span id="1-484">            <span class="c1"># If the error_sampler raised an error, we should sample the event, since the default behavior</span>
+</span><span id="1-485">            <span class="c1"># (when no sample_rate or error_sampler is provided) is to sample all events.</span>
+</span><span id="1-486">            <span class="n">not_in_sample_rate</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-487">        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+</span><span id="1-488">            <span class="n">parameter</span><span class="p">,</span> <span class="n">verb</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-489">                <span class="p">(</span><span class="s2">&quot;error_sampler&quot;</span><span class="p">,</span> <span class="s2">&quot;returned&quot;</span><span class="p">)</span>
+</span><span id="1-490">                <span class="k">if</span> <span class="nb">callable</span><span class="p">(</span><span class="n">error_sampler</span><span class="p">)</span>
+</span><span id="1-491">                <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">,</span> <span class="s2">&quot;contains&quot;</span><span class="p">)</span>
+</span><span id="1-492">            <span class="p">)</span>
+</span><span id="1-493">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+</span><span id="1-494">                <span class="s2">&quot;The provided </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> an invalid value of </span><span class="si">%s</span><span class="s2">. The value should be a float or a bool. Defaulting to sampling the event.&quot;</span>
+</span><span id="1-495">                <span class="o">%</span> <span class="p">(</span><span class="n">parameter</span><span class="p">,</span> <span class="n">verb</span><span class="p">,</span> <span class="nb">repr</span><span class="p">(</span><span class="n">sample_rate</span><span class="p">))</span>
+</span><span id="1-496">            <span class="p">)</span>
+</span><span id="1-497">
+</span><span id="1-498">            <span class="c1"># If the sample_rate has an invalid value, we should sample the event, since the default behavior</span>
+</span><span id="1-499">            <span class="c1"># (when no sample_rate or error_sampler is provided) is to sample all events.</span>
+</span><span id="1-500">            <span class="n">not_in_sample_rate</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-501">
+</span><span id="1-502">        <span class="k">if</span> <span class="n">not_in_sample_rate</span><span class="p">:</span>
+</span><span id="1-503">            <span class="c1"># because we will not sample this event, record a &quot;lost event&quot;.</span>
+</span><span id="1-504">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="p">:</span>
+</span><span id="1-505">                <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;sample_rate&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
+</span><span id="1-506">
+</span><span id="1-507">            <span class="k">return</span> <span class="kc">False</span>
+</span><span id="1-508">
+</span><span id="1-509">        <span class="k">return</span> <span class="kc">True</span>
+</span><span id="1-510">
+</span><span id="1-511">    <span class="k">def</span> <span class="nf">_update_session_from_event</span><span class="p">(</span>
+</span><span id="1-512">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-513">        <span class="n">session</span><span class="p">,</span>  <span class="c1"># type: Session</span>
+</span><span id="1-514">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
+</span><span id="1-515">    <span class="p">):</span>
+</span><span id="1-516">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-517">
+</span><span id="1-518">        <span class="n">crashed</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-519">        <span class="n">errored</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-520">        <span class="n">user_agent</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-521">
+</span><span id="1-522">        <span class="n">exceptions</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exception&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;values&quot;</span><span class="p">)</span>
+</span><span id="1-523">        <span class="k">if</span> <span class="n">exceptions</span><span class="p">:</span>
+</span><span id="1-524">            <span class="n">errored</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="1-525">            <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">exceptions</span><span class="p">:</span>
+</span><span id="1-526">                <span class="n">mechanism</span> <span class="o">=</span> <span class="n">error</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mechanism&quot;</span><span class="p">)</span>
+</span><span id="1-527">                <span class="k">if</span> <span class="n">mechanism</span> <span class="ow">and</span> <span class="n">mechanism</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;handled&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+</span><span id="1-528">                    <span class="n">crashed</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="1-529">                    <span class="k">break</span>
+</span><span id="1-530">
+</span><span id="1-531">        <span class="n">user</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;user&quot;</span><span class="p">)</span>
+</span><span id="1-532">
+</span><span id="1-533">        <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">user_agent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-534">            <span class="n">headers</span> <span class="o">=</span> <span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;request&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;headers&quot;</span><span class="p">)</span>
+</span><span id="1-535">            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">headers</span> <span class="ow">or</span> <span class="p">{}):</span>
+</span><span id="1-536">                <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;user-agent&quot;</span><span class="p">:</span>
+</span><span id="1-537">                    <span class="n">user_agent</span> <span class="o">=</span> <span class="n">v</span>
+</span><span id="1-538">                    <span class="k">break</span>
+</span><span id="1-539">
+</span><span id="1-540">        <span class="n">session</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+</span><span id="1-541">            <span class="n">status</span><span class="o">=</span><span class="s2">&quot;crashed&quot;</span> <span class="k">if</span> <span class="n">crashed</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="1-542">            <span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+</span><span id="1-543">            <span class="n">user_agent</span><span class="o">=</span><span class="n">user_agent</span><span class="p">,</span>
+</span><span id="1-544">            <span class="n">errors</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">errors</span> <span class="o">+</span> <span class="p">(</span><span class="n">errored</span> <span class="ow">or</span> <span class="n">crashed</span><span class="p">),</span>
+</span><span id="1-545">        <span class="p">)</span>
+</span><span id="1-546">
+</span><span id="1-547">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+</span><span id="1-548">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-549">        <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
+</span><span id="1-550">        <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
+</span><span id="1-551">        <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Scope]</span>
+</span><span id="1-552">    <span class="p">):</span>
+</span><span id="1-553">        <span class="c1"># type: (...) -&gt; Optional[str]</span>
+</span><span id="1-554"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Captures an event.</span>
+</span><span id="1-555">
+</span><span id="1-556"><span class="sd">        :param event: A ready-made event that can be directly sent to Sentry.</span>
+</span><span id="1-557">
+</span><span id="1-558"><span class="sd">        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.</span>
 </span><span id="1-559">
-</span><span id="1-560">        <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-561">            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
-</span><span id="1-562">        <span class="n">event_id</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;event_id&quot;</span><span class="p">)</span>
-</span><span id="1-563">        <span class="n">hint</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">hint</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Hint</span>
-</span><span id="1-564">
-</span><span id="1-565">        <span class="k">if</span> <span class="n">event_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-566">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event_id</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
-</span><span id="1-567">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
-</span><span id="1-568">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-569">
-</span><span id="1-570">        <span class="n">profile</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;profile&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="1-571">
-</span><span id="1-572">        <span class="n">event_opt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
-</span><span id="1-573">        <span class="k">if</span> <span class="n">event_opt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-574">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-575">
-</span><span id="1-576">        <span class="c1"># whenever we capture an event we also check if the session needs</span>
-</span><span id="1-577">        <span class="c1"># to be updated based on that information.</span>
-</span><span id="1-578">        <span class="n">session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="k">if</span> <span class="n">scope</span> <span class="k">else</span> <span class="kc">None</span>
-</span><span id="1-579">        <span class="k">if</span> <span class="n">session</span><span class="p">:</span>
-</span><span id="1-580">            <span class="bp">self</span><span class="o">.</span><span class="n">_update_session_from_event</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
-</span><span id="1-581">
-</span><span id="1-582">        <span class="n">is_transaction</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span>
-</span><span id="1-583">        <span class="n">is_checkin</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
-</span><span id="1-584">
-</span><span id="1-585">        <span class="k">if</span> <span class="p">(</span>
-</span><span id="1-586">            <span class="ow">not</span> <span class="n">is_transaction</span>
-</span><span id="1-587">            <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_checkin</span>
-</span><span id="1-588">            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_sample_error</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-</span><span id="1-589">        <span class="p">):</span>
-</span><span id="1-590">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-591">
-</span><span id="1-592">        <span class="n">tracing_enabled</span> <span class="o">=</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
-</span><span id="1-593">        <span class="n">attachments</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;attachments&quot;</span><span class="p">)</span>
-</span><span id="1-594">
-</span><span id="1-595">        <span class="n">trace_context</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span id="1-596">        <span class="n">dynamic_sampling_context</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;dynamic_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span id="1-597">
-</span><span id="1-598">        <span class="c1"># If tracing is enabled all events should go to /envelope endpoint.</span>
-</span><span id="1-599">        <span class="c1"># If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.</span>
-</span><span id="1-600">        <span class="n">should_use_envelope_endpoint</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-601">            <span class="n">tracing_enabled</span>
-</span><span id="1-602">            <span class="ow">or</span> <span class="n">is_transaction</span>
-</span><span id="1-603">            <span class="ow">or</span> <span class="n">is_checkin</span>
-</span><span id="1-604">            <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="n">attachments</span><span class="p">)</span>
-</span><span id="1-605">            <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spotlight</span><span class="p">)</span>
-</span><span id="1-606">        <span class="p">)</span>
-</span><span id="1-607">        <span class="k">if</span> <span class="n">should_use_envelope_endpoint</span><span class="p">:</span>
-</span><span id="1-608">            <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-609">                <span class="s2">&quot;event_id&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">],</span>
-</span><span id="1-610">                <span class="s2">&quot;sent_at&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="n">datetime_utcnow</span><span class="p">()),</span>
-</span><span id="1-611">            <span class="p">}</span>
-</span><span id="1-612">
-</span><span id="1-613">            <span class="k">if</span> <span class="n">dynamic_sampling_context</span><span class="p">:</span>
-</span><span id="1-614">                <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;trace&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dynamic_sampling_context</span>
-</span><span id="1-615">
-</span><span id="1-616">            <span class="n">envelope</span> <span class="o">=</span> <span class="n">Envelope</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">)</span>
-</span><span id="1-617">
-</span><span id="1-618">            <span class="k">if</span> <span class="n">is_transaction</span><span class="p">:</span>
-</span><span id="1-619">                <span class="k">if</span> <span class="n">profile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-620">                    <span class="n">envelope</span><span class="o">.</span><span class="n">add_profile</span><span class="p">(</span><span class="n">profile</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">event_opt</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">))</span>
-</span><span id="1-621">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_transaction</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
-</span><span id="1-622">            <span class="k">elif</span> <span class="n">is_checkin</span><span class="p">:</span>
-</span><span id="1-623">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_checkin</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
-</span><span id="1-624">            <span class="k">else</span><span class="p">:</span>
-</span><span id="1-625">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
-</span><span id="1-626">
-</span><span id="1-627">            <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="n">attachments</span> <span class="ow">or</span> <span class="p">():</span>
-</span><span id="1-628">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">to_envelope_item</span><span class="p">())</span>
-</span><span id="1-629">
-</span><span id="1-630">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">spotlight</span><span class="p">:</span>
-</span><span id="1-631">                <span class="bp">self</span><span class="o">.</span><span class="n">spotlight</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
-</span><span id="1-632">
-</span><span id="1-633">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-634">                <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-635">
-</span><span id="1-636">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
+</span><span id="1-560"><span class="sd">        :param scope: An optional scope to use for determining whether this event</span>
+</span><span id="1-561"><span class="sd">            should be captured.</span>
+</span><span id="1-562">
+</span><span id="1-563"><span class="sd">        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.</span>
+</span><span id="1-564"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-565">        <span class="k">if</span> <span class="n">disable_capture_event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="kc">False</span><span class="p">):</span>
+</span><span id="1-566">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-567">
+</span><span id="1-568">        <span class="k">if</span> <span class="n">hint</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-569">            <span class="n">hint</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="1-570">        <span class="n">event_id</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;event_id&quot;</span><span class="p">)</span>
+</span><span id="1-571">        <span class="n">hint</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">hint</span> <span class="ow">or</span> <span class="p">())</span>  <span class="c1"># type: Hint</span>
+</span><span id="1-572">
+</span><span id="1-573">        <span class="k">if</span> <span class="n">event_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-574">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">event_id</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
+</span><span id="1-575">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_capture</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+</span><span id="1-576">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-577">
+</span><span id="1-578">        <span class="n">profile</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;profile&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="1-579">
+</span><span id="1-580">        <span class="n">event_opt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="p">)</span>
+</span><span id="1-581">        <span class="k">if</span> <span class="n">event_opt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-582">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-583">
+</span><span id="1-584">        <span class="c1"># whenever we capture an event we also check if the session needs</span>
+</span><span id="1-585">        <span class="c1"># to be updated based on that information.</span>
+</span><span id="1-586">        <span class="n">session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span> <span class="k">if</span> <span class="n">scope</span> <span class="k">else</span> <span class="kc">None</span>
+</span><span id="1-587">        <span class="k">if</span> <span class="n">session</span><span class="p">:</span>
+</span><span id="1-588">            <span class="bp">self</span><span class="o">.</span><span class="n">_update_session_from_event</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+</span><span id="1-589">
+</span><span id="1-590">        <span class="n">is_transaction</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span>
+</span><span id="1-591">        <span class="n">is_checkin</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
+</span><span id="1-592">
+</span><span id="1-593">        <span class="k">if</span> <span class="p">(</span>
+</span><span id="1-594">            <span class="ow">not</span> <span class="n">is_transaction</span>
+</span><span id="1-595">            <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_checkin</span>
+</span><span id="1-596">            <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_should_sample_error</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</span><span id="1-597">        <span class="p">):</span>
+</span><span id="1-598">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-599">
+</span><span id="1-600">        <span class="n">tracing_enabled</span> <span class="o">=</span> <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+</span><span id="1-601">        <span class="n">attachments</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;attachments&quot;</span><span class="p">)</span>
+</span><span id="1-602">
+</span><span id="1-603">        <span class="n">trace_context</span> <span class="o">=</span> <span class="n">event_opt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span id="1-604">        <span class="n">dynamic_sampling_context</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;dynamic_sampling_context&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span id="1-605">
+</span><span id="1-606">        <span class="c1"># If tracing is enabled all events should go to /envelope endpoint.</span>
+</span><span id="1-607">        <span class="c1"># If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.</span>
+</span><span id="1-608">        <span class="n">should_use_envelope_endpoint</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-609">            <span class="n">tracing_enabled</span>
+</span><span id="1-610">            <span class="ow">or</span> <span class="n">is_transaction</span>
+</span><span id="1-611">            <span class="ow">or</span> <span class="n">is_checkin</span>
+</span><span id="1-612">            <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="n">attachments</span><span class="p">)</span>
+</span><span id="1-613">            <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">spotlight</span><span class="p">)</span>
+</span><span id="1-614">        <span class="p">)</span>
+</span><span id="1-615">        <span class="k">if</span> <span class="n">should_use_envelope_endpoint</span><span class="p">:</span>
+</span><span id="1-616">            <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-617">                <span class="s2">&quot;event_id&quot;</span><span class="p">:</span> <span class="n">event_opt</span><span class="p">[</span><span class="s2">&quot;event_id&quot;</span><span class="p">],</span>
+</span><span id="1-618">                <span class="s2">&quot;sent_at&quot;</span><span class="p">:</span> <span class="n">format_timestamp</span><span class="p">(</span><span class="n">datetime_utcnow</span><span class="p">()),</span>
+</span><span id="1-619">            <span class="p">}</span>
+</span><span id="1-620">
+</span><span id="1-621">            <span class="k">if</span> <span class="n">dynamic_sampling_context</span><span class="p">:</span>
+</span><span id="1-622">                <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;trace&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dynamic_sampling_context</span>
+</span><span id="1-623">
+</span><span id="1-624">            <span class="n">envelope</span> <span class="o">=</span> <span class="n">Envelope</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">)</span>
+</span><span id="1-625">
+</span><span id="1-626">            <span class="k">if</span> <span class="n">is_transaction</span><span class="p">:</span>
+</span><span id="1-627">                <span class="k">if</span> <span class="n">profile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-628">                    <span class="n">envelope</span><span class="o">.</span><span class="n">add_profile</span><span class="p">(</span><span class="n">profile</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">event_opt</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">))</span>
+</span><span id="1-629">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_transaction</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
+</span><span id="1-630">            <span class="k">elif</span> <span class="n">is_checkin</span><span class="p">:</span>
+</span><span id="1-631">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_checkin</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
+</span><span id="1-632">            <span class="k">else</span><span class="p">:</span>
+</span><span id="1-633">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
+</span><span id="1-634">
+</span><span id="1-635">            <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="n">attachments</span> <span class="ow">or</span> <span class="p">():</span>
+</span><span id="1-636">                <span class="n">envelope</span><span class="o">.</span><span class="n">add_item</span><span class="p">(</span><span class="n">attachment</span><span class="o">.</span><span class="n">to_envelope_item</span><span class="p">())</span>
 </span><span id="1-637">
-</span><span id="1-638">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-639">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-640">                <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-641">
-</span><span id="1-642">            <span class="c1"># All other events go to the legacy /store/ endpoint (will be removed in the future).</span>
-</span><span id="1-643">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
-</span><span id="1-644">
-</span><span id="1-645">        <span class="k">return</span> <span class="n">event_id</span>
-</span><span id="1-646">
-</span><span id="1-647">    <span class="k">def</span> <span class="nf">capture_session</span><span class="p">(</span>
-</span><span id="1-648">        <span class="bp">self</span><span class="p">,</span> <span class="n">session</span>  <span class="c1"># type: Session</span>
-</span><span id="1-649">    <span class="p">):</span>
-</span><span id="1-650">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-651">        <span class="k">if</span> <span class="ow">not</span> <span class="n">session</span><span class="o">.</span><span class="n">release</span><span class="p">:</span>
-</span><span id="1-652">            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Discarded session update because of missing release&quot;</span><span class="p">)</span>
-</span><span id="1-653">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-654">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">add_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
-</span><span id="1-655">
-</span><span id="1-656">    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span>
-</span><span id="1-657">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-658">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span id="1-659">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
-</span><span id="1-660">    <span class="p">):</span>
-</span><span id="1-661">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-662"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-663"><span class="sd">        Close the client and shut down the transport. Arguments have the same</span>
-</span><span id="1-664"><span class="sd">        semantics as :py:meth:`Client.flush`.</span>
-</span><span id="1-665"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-666">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-667">            <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
-</span><span id="1-668">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span id="1-669">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-670">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span id="1-671">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="p">:</span>
-</span><span id="1-672">                <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span id="1-673">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span id="1-674">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="1-675">
-</span><span id="1-676">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
-</span><span id="1-677">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-678">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
-</span><span id="1-679">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
-</span><span id="1-680">    <span class="p">):</span>
-</span><span id="1-681">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-682"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-683"><span class="sd">        Wait for the current events to be sent.</span>
-</span><span id="1-684">
-</span><span id="1-685"><span class="sd">        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.</span>
-</span><span id="1-686">
-</span><span id="1-687"><span class="sd">        :param callback: Is invoked with the number of pending events and the configured timeout.</span>
-</span><span id="1-688"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-689">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-690">            <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-691">                <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
-</span><span id="1-692">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-</span><span id="1-693">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-694">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-</span><span id="1-695">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
-</span><span id="1-696">
-</span><span id="1-697">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-698">        <span class="c1"># type: () -&gt; _Client</span>
-</span><span id="1-699">        <span class="k">return</span> <span class="bp">self</span>
-</span><span id="1-700">
-</span><span id="1-701">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
-</span><span id="1-702">        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
-</span><span id="1-703">        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span><span id="1-638">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">spotlight</span><span class="p">:</span>
+</span><span id="1-639">                <span class="bp">self</span><span class="o">.</span><span class="n">spotlight</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
+</span><span id="1-640">
+</span><span id="1-641">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-642">                <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-643">
+</span><span id="1-644">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
+</span><span id="1-645">
+</span><span id="1-646">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-647">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-648">                <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-649">
+</span><span id="1-650">            <span class="c1"># All other events go to the legacy /store/ endpoint (will be removed in the future).</span>
+</span><span id="1-651">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event_opt</span><span class="p">)</span>
+</span><span id="1-652">
+</span><span id="1-653">        <span class="k">return</span> <span class="n">event_id</span>
+</span><span id="1-654">
+</span><span id="1-655">    <span class="k">def</span> <span class="nf">capture_session</span><span class="p">(</span>
+</span><span id="1-656">        <span class="bp">self</span><span class="p">,</span> <span class="n">session</span>  <span class="c1"># type: Session</span>
+</span><span id="1-657">    <span class="p">):</span>
+</span><span id="1-658">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-659">        <span class="k">if</span> <span class="ow">not</span> <span class="n">session</span><span class="o">.</span><span class="n">release</span><span class="p">:</span>
+</span><span id="1-660">            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Discarded session update because of missing release&quot;</span><span class="p">)</span>
+</span><span id="1-661">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-662">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">add_session</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+</span><span id="1-663">
+</span><span id="1-664">    <span class="k">def</span> <span class="nf">close</span><span class="p">(</span>
+</span><span id="1-665">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-666">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span id="1-667">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+</span><span id="1-668">    <span class="p">):</span>
+</span><span id="1-669">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-670"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-671"><span class="sd">        Close the client and shut down the transport. Arguments have the same</span>
+</span><span id="1-672"><span class="sd">        semantics as :py:meth:`Client.flush`.</span>
+</span><span id="1-673"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-674">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-675">            <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
+</span><span id="1-676">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span id="1-677">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-678">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span id="1-679">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="p">:</span>
+</span><span id="1-680">                <span class="bp">self</span><span class="o">.</span><span class="n">monitor</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span id="1-681">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span id="1-682">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-683">
+</span><span id="1-684">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span id="1-685">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-686">        <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[float]</span>
+</span><span id="1-687">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Callable[[int, float], None]]</span>
+</span><span id="1-688">    <span class="p">):</span>
+</span><span id="1-689">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-690"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-691"><span class="sd">        Wait for the current events to be sent.</span>
+</span><span id="1-692">
+</span><span id="1-693"><span class="sd">        :param timeout: Wait for at most `timeout` seconds. If no `timeout` is provided, the `shutdown_timeout` option value is used.</span>
+</span><span id="1-694">
+</span><span id="1-695"><span class="sd">        :param callback: Is invoked with the number of pending events and the configured timeout.</span>
+</span><span id="1-696"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-697">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transport</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-698">            <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-699">                <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;shutdown_timeout&quot;</span><span class="p">]</span>
+</span><span id="1-700">            <span class="bp">self</span><span class="o">.</span><span class="n">session_flusher</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+</span><span id="1-701">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-702">                <span class="bp">self</span><span class="o">.</span><span class="n">metrics_aggregator</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+</span><span id="1-703">            <span class="bp">self</span><span class="o">.</span><span class="n">transport</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
 </span><span id="1-704">
-</span><span id="1-705">
-</span><span id="1-706"><span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
-</span><span id="1-707">
-</span><span id="1-708"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span id="1-709">    <span class="c1"># Make mypy, PyCharm and other static analyzers think `get_options` is a</span>
-</span><span id="1-710">    <span class="c1"># type to have nicer autocompletion for params.</span>
-</span><span id="1-711">    <span class="c1">#</span>
-</span><span id="1-712">    <span class="c1"># Use `ClientConstructor` to define the argument types of `init` and</span>
-</span><span id="1-713">    <span class="c1"># `Dict[str, Any]` to tell static analyzers about the return type.</span>
-</span><span id="1-714">
-</span><span id="1-715">    <span class="k">class</span> <span class="nc">get_options</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>  <span class="c1"># noqa: N801</span>
-</span><span id="1-716">        <span class="k">pass</span>
-</span><span id="1-717">
+</span><span id="1-705">    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-706">        <span class="c1"># type: () -&gt; _Client</span>
+</span><span id="1-707">        <span class="k">return</span> <span class="bp">self</span>
+</span><span id="1-708">
+</span><span id="1-709">    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">,</span> <span class="n">tb</span><span class="p">):</span>
+</span><span id="1-710">        <span class="c1"># type: (Any, Any, Any) -&gt; None</span>
+</span><span id="1-711">        <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+</span><span id="1-712">
+</span><span id="1-713">
+</span><span id="1-714"><span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span id="1-715">
+</span><span id="1-716"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span id="1-717">    <span class="c1"># Make mypy, PyCharm and other static analyzers think `get_options` is a</span>
+</span><span id="1-718">    <span class="c1"># type to have nicer autocompletion for params.</span>
+</span><span id="1-719">    <span class="c1">#</span>
+</span><span id="1-720">    <span class="c1"># Use `ClientConstructor` to define the argument types of `init` and</span>
+</span><span id="1-721">    <span class="c1"># `Dict[str, Any]` to tell static analyzers about the return type.</span>
+</span><span id="1-722">
+</span><span id="1-723">    <span class="k">class</span> <span class="nc">get_options</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>  <span class="c1"># noqa: N801</span>
+</span><span id="1-724">        <span class="k">pass</span>
+</span><span id="1-725">
 <div class="viewcode-block" id="Client">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Client">[docs]</a>
-</span><span id="1-718">    <span class="k">class</span> <span class="nc">Client</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">_Client</span><span class="p">):</span>
-</span><span id="1-719">        <span class="k">pass</span></div>
+</span><span id="1-726">    <span class="k">class</span> <span class="nc">Client</span><span class="p">(</span><span class="n">ClientConstructor</span><span class="p">,</span> <span class="n">_Client</span><span class="p">):</span>
+</span><span id="1-727">        <span class="k">pass</span></div>
 
-</span><span id="1-720">
-</span><span id="1-721"><span class="k">else</span><span class="p">:</span>
-</span><span id="1-722">    <span class="c1"># Alias `get_options` for actual usage. Go through the lambda indirection</span>
-</span><span id="1-723">    <span class="c1"># to throw PyCharm off of the weakly typed signature (it would otherwise</span>
-</span><span id="1-724">    <span class="c1"># discover both the weakly typed signature of `_init` and our faked `init`</span>
-</span><span id="1-725">    <span class="c1"># type).</span>
-</span><span id="1-726">
-</span><span id="1-727">    <span class="n">get_options</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_get_options</span><span class="p">)()</span>
-</span><span id="1-728">    <span class="n">Client</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_Client</span><span class="p">)()</span>
+</span><span id="1-728">
+</span><span id="1-729"><span class="k">else</span><span class="p">:</span>
+</span><span id="1-730">    <span class="c1"># Alias `get_options` for actual usage. Go through the lambda indirection</span>
+</span><span id="1-731">    <span class="c1"># to throw PyCharm off of the weakly typed signature (it would otherwise</span>
+</span><span id="1-732">    <span class="c1"># discover both the weakly typed signature of `_init` and our faked `init`</span>
+</span><span id="1-733">    <span class="c1"># type).</span>
+</span><span id="1-734">
+</span><span id="1-735">    <span class="n">get_options</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_get_options</span><span class="p">)()</span>
+</span><span id="1-736">    <span class="n">Client</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">_Client</span><span class="p">)()</span>
 </span></pre></div>
         </article>
         
@@ -903,7 +911,7 @@ html.dark {
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=7135ddfe"></script>
+      <script src="../../_static/documentation_options.js?v=d54d59e7"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3e5c8598"></script>
