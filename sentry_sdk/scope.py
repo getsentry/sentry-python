@@ -253,7 +253,7 @@ class Scope(object):
         """
         client = kwargs.pop("client", None)
 
-        # If we have an active span, return trashparent from there
+        # If we have an active span, return traceparent from there
         if (
             client is not None
             and has_tracing_enabled(client.options)
