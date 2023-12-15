@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor

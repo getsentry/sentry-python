@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import sys
 import types
 from sentry_sdk._functools import wraps

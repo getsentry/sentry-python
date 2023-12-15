@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (

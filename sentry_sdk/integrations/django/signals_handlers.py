@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from django.dispatch import Signal
 
 from sentry_sdk import Hub

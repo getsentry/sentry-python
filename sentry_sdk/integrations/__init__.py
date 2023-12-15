@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 from threading import Lock
 
 from sentry_sdk._types import TYPE_CHECKING
