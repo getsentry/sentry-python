@@ -26,13 +26,12 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ContextVar,
     event_from_exception,
     exc_info_from_error,
     logger,
-    capture_internal_exceptions,
 )
-
-from sentry_sdk.globals import sentry_current_scope, sentry_isolation_scope
 
 if TYPE_CHECKING:
     from typing import Any
@@ -63,6 +62,10 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
 
+
+SENTRY_GLOBAL_SCOPE = None  # type: Optional[Scope]
+sentry_isolation_scope = ContextVar("sentry_isolation_scope", default=None)
+sentry_current_scope = ContextVar("sentry_current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
 
