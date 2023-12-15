@@ -169,7 +169,7 @@ def _wrap_coroutine(name, coroutine):
         # type: (Dict[Any, Any], *Any, **Any) -> Any
         hub = Hub.current
         if hub.get_integration(ArqIntegration) is None:
-            return await coroutine(*args, **kwargs)
+            return await coroutine(ctx, *args, **kwargs)
 
         hub.scope.add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)

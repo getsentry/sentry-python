@@ -1,0 +1,126 @@
+name: Test Miscellaneous
+on:
+  push:
+    branches:
+      - master
+      - release/**
+  pull_request:
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+jobs:
+  test-miscellaneous-latest:
+    name: Miscellaneous (latest)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.5","3.8","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test loguru latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test opentelemetry latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test pure_eval latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test trytond latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-miscellaneous-pinned:
+    name: Miscellaneous (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test loguru pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-loguru" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test opentelemetry pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test pure_eval pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pure_eval" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test trytond pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-trytond" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  check_required_tests:
+    name: All Miscellaneous tests passed
+    needs: test-miscellaneous-pinned
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test-miscellaneous-pinned.result, 'failure') || contains(needs.test-miscellaneous-pinned.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

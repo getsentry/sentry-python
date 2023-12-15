@@ -1,10 +1,30 @@
 # Changelog
 
+## 1.39.1
+
+### Various fixes & improvements
+
+- Fix psycopg2 detection in the Django integration (#2593) by @sentrivana
+- Filter out empty string releases (#2591) by @sentrivana
+- Fixed local var not present when there is an error in a user's `error_sampler` function (#2511) by @antonpirker
+- Fixed typing in `aiohttp` (#2590) by @antonpirker
+
 ## 1.39.0
 
 ### Various fixes & improvements
 
+- Add support for cluster clients from Redis SDK (#2394) by @md384
 - Improve location reporting for timer metrics (#2552) by @mitsuhiko
+- Fix Celery `TypeError` with no-argument `apply_async` (#2575) by @szokeasaurusrex
+- Fix Lambda integration with EventBridge source (#2546) by @davidcroda
+- Add max tries to Spotlight (#2571) by @hazAT
+- Handle `os.path.devnull` access issues (#2579) by @sentrivana
+- Change `code.filepath` frame picking logic (#2568) by @sentrivana
+- Trigger AWS Lambda tests on label (#2538) by @sentrivana
+- Run permissions step on pull_request_target but not push (#2548) by @sentrivana
+- Hash AWS Lambda test functions based on current revision (#2557) by @sentrivana
+- Update Django version in tests (#2562) by @sentrivana
+- Make metrics tests non-flaky (#2572) by @antonpirker
 
 ## 1.38.0
 

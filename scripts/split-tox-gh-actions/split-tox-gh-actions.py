@@ -1,7 +1,7 @@
 """Split Tox to GitHub Actions
 
 This is a small script to split a tox.ini config file into multiple GitHub actions configuration files.
-This way each framework defined in tox.ini will get its own GitHub actions configuration file
+This way each group of frameworks defined in tox.ini will get its own GitHub actions configuration file
 which allows them to be run in parallel in GitHub actions.
 
 This will generate/update several configuration files, that need to be commited to Git afterwards.
@@ -18,6 +18,7 @@ import configparser
 import hashlib
 import sys
 from collections import defaultdict
+from functools import reduce
 from glob import glob
 from pathlib import Path
 
@@ -28,22 +29,93 @@ OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
-FRAMEWORKS_NEEDING_POSTGRES = [
+FRAMEWORKS_NEEDING_POSTGRES = {
     "django",
     "asyncpg",
-]
+}
 
-FRAMEWORKS_NEEDING_CLICKHOUSE = [
+FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
-]
+}
 
-FRAMEWORKS_NEEDING_AWS = [
+FRAMEWORKS_NEEDING_AWS = {
     "aws_lambda",
-]
+}
 
-FRAMEWORKS_NEEDING_GITHUB_SECRETS = [
+FRAMEWORKS_NEEDING_GITHUB_SECRETS = {
     "aws_lambda",
-]
+}
+
+# Frameworks grouped here will be tested together to not hog all GitHub runners.
+# If you add or remove a group, make sure to git rm the generated YAML file as
+# well.
+GROUPS = {
+    "Common": [
+        "common",
+    ],
+    "AWS Lambda": [
+        # this is separate from Cloud Computing because only this one test suite
+        # needs to run with access to GitHub secrets
+        "aws_lambda",
+    ],
+    "Cloud Computing": [
+        "boto3",
+        "chalice",
+        "cloud_resource_context",
+        "gcp",
+    ],
+    "Data Processing": [
+        "arq",
+        "beam",
+        "celery",
+        "huey",
+        "rq",
+    ],
+    "Databases": [
+        "asyncpg",
+        "clickhouse_driver",
+        "pymongo",
+        "sqlalchemy",
+    ],
+    "GraphQL": [
+        "ariadne",
+        "gql",
+        "graphene",
+        "strawberry",
+    ],
+    "Networking": [
+        "gevent",
+        "grpc",
+        "httpx",
+        "requests",
+    ],
+    "Web Frameworks 1": [
+        "django",
+        "fastapi",
+        "flask",
+        "starlette",
+    ],
+    "Web Frameworks 2": [
+        "aiohttp",
+        "asgi",
+        "bottle",
+        "falcon",
+        "pyramid",
+        "quart",
+        "redis",
+        "rediscluster",
+        "sanic",
+        "starlite",
+        "tornado",
+    ],
+    "Miscellaneous": [
+        "loguru",
+        "opentelemetry",
+        "pure_eval",
+        "trytond",
+    ],
+}
+
 
 ENV = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
@@ -58,14 +130,24 @@ def main(fail_on_changes):
     print("Parsing tox.ini...")
     py_versions_pinned, py_versions_latest = parse_tox()
 
-    print("Rendering templates...")
-    for framework in py_versions_pinned:
-        contents = render_template(
-            framework,
-            py_versions_pinned[framework],
-            py_versions_latest[framework],
+    if fail_on_changes:
+        print("Checking if all frameworks belong in a group...")
+        missing_frameworks = find_frameworks_missing_from_groups(
+            py_versions_pinned, py_versions_latest
         )
-        filename = write_file(contents, framework)
+        if missing_frameworks:
+            raise RuntimeError(
+                "Please add the following frameworks to the corresponding group "
+                "in `GROUPS` in `scripts/split-tox-gh-actions/split-tox-gh-actions.py: "
+                + ", ".join(missing_frameworks)
+            )
+
+    print("Rendering templates...")
+    for group, frameworks in GROUPS.items():
+        contents = render_template(
+            group, frameworks, py_versions_pinned, py_versions_latest
+        )
+        filename = write_file(contents, group)
         print(f"Created {filename}")
 
     if fail_on_changes:
@@ -124,15 +206,29 @@ def parse_tox():
     return py_versions_pinned, py_versions_latest
 
 
+def find_frameworks_missing_from_groups(py_versions_pinned, py_versions_latest):
+    frameworks_in_a_group = _union(GROUPS.values())
+    all_frameworks = set(py_versions_pinned.keys()) | set(py_versions_latest.keys())
+    return all_frameworks - frameworks_in_a_group
+
+
 def _normalize_py_versions(py_versions):
-    normalized = defaultdict(set)
-    normalized |= {
-        framework: sorted(
+    def replace_and_sort(versions):
+        return sorted(
             [py.replace("py", "") for py in versions],
             key=lambda v: tuple(map(int, v.split("."))),
         )
-        for framework, versions in py_versions.items()
-    }
+
+    if isinstance(py_versions, dict):
+        normalized = defaultdict(set)
+        normalized |= {
+            framework: replace_and_sort(versions)
+            for framework, versions in py_versions.items()
+        }
+
+    elif isinstance(py_versions, set):
+        normalized = replace_and_sort(py_versions)
+
     return normalized
 
 
@@ -148,20 +244,41 @@ def get_files_hash():
     return hasher.hexdigest()
 
 
-def render_template(framework, py_versions_pinned, py_versions_latest):
+def _union(seq):
+    return reduce(lambda x, y: set(x) | set(y), seq)
+
+
+def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
     template = ENV.get_template("base.jinja")
 
+    categories = set()
+    py_versions = defaultdict(set)
+    for framework in frameworks:
+        if py_versions_pinned[framework]:
+            categories.add("pinned")
+            py_versions["pinned"] |= set(py_versions_pinned[framework])
+        if py_versions_latest[framework]:
+            categories.add("latest")
+            py_versions["latest"] |= set(py_versions_latest[framework])
+        if "2.7" in py_versions_pinned[framework]:
+            categories.add("py27")
+
+    py_versions["pinned"].discard("2.7")
+    py_versions["latest"].discard("2.7")
+
     context = {
-        "framework": framework,
-        "needs_aws_credentials": framework in FRAMEWORKS_NEEDING_AWS,
-        "needs_clickhouse": framework in FRAMEWORKS_NEEDING_CLICKHOUSE,
-        "needs_postgres": framework in FRAMEWORKS_NEEDING_POSTGRES,
-        "needs_github_secrets": framework in FRAMEWORKS_NEEDING_GITHUB_SECRETS,
+        "group": group,
+        "frameworks": frameworks,
+        "categories": sorted(categories),
+        "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
+        "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
+        "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
+        "needs_github_secrets": bool(
+            set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
+        ),
         "py_versions": {
-            # formatted for including in the matrix
-            "pinned": [f'"{v}"' for v in py_versions_pinned if v != "2.7"],
-            "py27": ['"2.7"'] if "2.7" in py_versions_pinned else [],
-            "latest": [f'"{v}"' for v in py_versions_latest],
+            category: [f'"{version}"' for version in _normalize_py_versions(versions)]
+            for category, versions in py_versions.items()
         },
     }
     rendered = template.render(context)
@@ -173,11 +290,9 @@ def postprocess_template(rendered):
     return "\n".join([line for line in rendered.split("\n") if line.strip()]) + "\n"
 
 
-def write_file(contents, framework):
-    if framework == "common":
-        outfile = OUT_DIR / f"test-{framework}.yml"
-    else:
-        outfile = OUT_DIR / f"test-integration-{framework}.yml"
+def write_file(contents, group):
+    group = group.lower().replace(" ", "-")
+    outfile = OUT_DIR / f"test-integrations-{group}.yml"
 
     with open(outfile, "w") as file:
         file.write(contents)
