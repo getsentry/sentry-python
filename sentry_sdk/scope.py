@@ -197,12 +197,11 @@ class Scope(object):
     @classmethod
     def get_global_scope(cls):
         # type: () -> Scope
-        scope = SENTRY_GLOBAL_SCOPE
-        if scope is None:
-            scope = Scope(ty="global")
-            SENTRY_GLOBAL_SCOPE = scope
+        global SENTRY_GLOBAL_SCOPE
+        if SENTRY_GLOBAL_SCOPE is None:
+            SENTRY_GLOBAL_SCOPE = Scope(ty="global")
 
-        return scope
+        return SENTRY_GLOBAL_SCOPE
 
     @property
     def is_forked(self):
