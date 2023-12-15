@@ -137,7 +137,7 @@ def setup_integrations(
                             "deprecated. Use `setup_once`.",
                             identifier,
                         )
-                        integration.install()
+                        integration.install()  # type: ignore[misc]
                     else:
                         raise
                 except DidNotEnable as e:
