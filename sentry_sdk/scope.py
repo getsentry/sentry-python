@@ -32,7 +32,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 
-from sentry_sdk import globals
 from sentry_sdk.globals import sentry_current_scope, sentry_isolation_scope
 
 if TYPE_CHECKING:
@@ -195,6 +194,7 @@ class Scope(object):
     @classmethod
     def get_global_scope(cls):
         # type: () -> Scope
+        from sentry_sdk import globals
         scope = globals.SENTRY_GLOBAL_SCOPE
         if scope is None:
             scope = Scope(ty="global")
