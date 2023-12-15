@@ -407,8 +407,6 @@ def string_containing_matcher():
             if not isinstance(test_string, self.valid_types):
                 return False
 
-            # this is safe even in py2 because as of 2.6, `bytes` exists in py2
-            # as an alias for `str`
             if isinstance(test_string, bytes):
                 test_string = test_string.decode()
 
