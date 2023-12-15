@@ -48,7 +48,7 @@ class AWSLambdaModuleLoader:
             module_name = module_path.split(os.path.sep)[-1]
             module_file_path = module_path + ".py"
 
-            if py_version >= (3, 5):
+            if py_version >= (3, 6):
                 import importlib.util
 
                 spec = importlib.util.spec_from_file_location(
