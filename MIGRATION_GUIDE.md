@@ -17,5 +17,6 @@
 - `sentry_sdk.tracing_utils_py2` was removed.
 - `sentry_sdk.tracing_utils_py3` was removed and its contents were moved to `sentry_sdk.tracing_utils`.
 - `get_current_span` is no longer available from `sentry_sdk.tracing_utils`. Use `sentry_sdk.get_current_span` directly.
+- `sentry_sdk._functools` was removed.
 
 ## Deprecated

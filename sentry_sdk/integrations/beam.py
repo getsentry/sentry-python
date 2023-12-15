@@ -1,6 +1,6 @@
 import sys
 import types
-from sentry_sdk._functools import wraps
+from functools import wraps
 
 from sentry_sdk.hub import Hub
 from sentry_sdk._compat import reraise
