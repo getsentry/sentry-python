@@ -1,7 +1,7 @@
 import sys
+from functools import partial
 
 from sentry_sdk._compat import PY2, reraise
-from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.api import continue_trace

@@ -1,4 +1,5 @@
 import sys
+from functools import wraps
 
 from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
@@ -11,7 +12,6 @@ from sentry_sdk.utils import (
     parse_version,
 )
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk._functools import wraps
 
 import chalice  # type: ignore
 from chalice import Chalice, ChaliceViewError

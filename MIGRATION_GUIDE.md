@@ -14,5 +14,6 @@
 - Removed support for Celery 3.\*.
 - Removed support for Django 1.8, 1.9, 1.10.
 - Removed support for Flask 0.\*.
+- `sentry_sdk._functools` was removed.
 
 ## Deprecated

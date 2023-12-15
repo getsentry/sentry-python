@@ -1,11 +1,11 @@
-from copy import copy
-from collections import deque
-from itertools import chain
 import os
 import uuid
+from copy import copy
+from collections import deque
+from functools import wraps
+from itertools import chain
 
 from sentry_sdk.attachments import Attachment
-from sentry_sdk._functools import wraps
 from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
