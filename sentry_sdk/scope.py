@@ -197,12 +197,10 @@ class Scope(object):
     @classmethod
     def get_global_scope(cls):
         # type: () -> Scope
-        from sentry_sdk import globals
-
-        scope = globals.SENTRY_GLOBAL_SCOPE
+        scope = SENTRY_GLOBAL_SCOPE
         if scope is None:
             scope = Scope(ty="global")
-            globals.SENTRY_GLOBAL_SCOPE = scope
+            SENTRY_GLOBAL_SCOPE = scope
 
         return scope
 
