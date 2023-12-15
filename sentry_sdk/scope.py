@@ -32,6 +32,9 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 
+from sentry_sdk import globals
+from sentry_sdk.globals import sentry_current_scope, sentry_isolation_scope
+
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
@@ -146,20 +149,81 @@ class Scope(object):
         "_force_auto_session_tracking",
         "_profile",
         "_propagation_context",
+        "client",
+        "original_scope",
+        "_ty",
     )
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self, ty=None, client=None):
+        # type: (Optional[str], Optional[sentry_sdk.Client]) -> None
+        self._ty = ty
+        self.original_scope = None  # type: Optional[Scope]
+
         self._event_processors = []  # type: List[EventProcessor]
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
+        self.set_client(client)
+
         self.clear()
 
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
+
+    @classmethod
+    def get_current_scope(cls):
+        # type: () -> Scope
+        scope = sentry_current_scope.get()
+        if scope is None:
+            scope = Scope(ty="current")
+            sentry_current_scope.set(scope)
+
+        return scope
+
+    @classmethod
+    def get_isolation_scope(cls):
+        # type: () -> Scope
+        scope = sentry_isolation_scope.get()
+        if scope is None:
+            scope = Scope(ty="isolation")
+            sentry_isolation_scope.set(scope)
+
+        return scope
+
+    @classmethod
+    def get_global_scope(cls):
+        # type: () -> Scope
+        scope = globals.SENTRY_GLOBAL_SCOPE
+        if scope is None:
+            scope = Scope(ty="global")
+            globals.SENTRY_GLOBAL_SCOPE = scope
+
+        return scope
+
+    @property
+    def is_forked(self):
+        # type: () -> bool
+        return self.original_scope is not None
+
+    def fork(self):
+        # type: () -> Scope
+        self.original_scope = self
+        return copy(self)
+
+    def isolate(self):
+        # type: () -> None
+        """
+        Create a new isolation scope for this scope.
+        """
+        isolation_scope = Scope.get_isolation_scope()
+        forked_isolation_scope = isolation_scope.fork()
+        sentry_isolation_scope.set(forked_isolation_scope)
+
+    def set_client(self, client=None):
+        # type: (Optional[sentry_sdk.Client]) -> None
+        self.client = client
 
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
