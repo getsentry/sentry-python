@@ -1,4 +1,3 @@
-# coding: utf-8
 from sentry_sdk.tracing_utils import Baggage
 
 
