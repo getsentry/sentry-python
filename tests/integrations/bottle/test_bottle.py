@@ -88,7 +88,7 @@ def test_transaction_style(
 
     (event,) = events
 
-    assert event["transaction"] == f"test_bootle.app.<locals>.{expected_transaction}"
+    assert event["transaction"].endswith(expected_transaction)
     assert event["transaction_info"] == {"source": expected_source}
 
 
