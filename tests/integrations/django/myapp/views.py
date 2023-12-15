@@ -1,7 +1,6 @@
 import json
 import threading
 
-from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -218,38 +217,31 @@ def thread_ids_sync(*args, **kwargs):
     return HttpResponse(response)
 
 
-if VERSION >= (3, 1):
-    # Use exec to produce valid Python 2
-    exec(
-        """async def async_message(request):
+async def async_message(request):
     sentry_sdk.capture_message("hi")
-    return HttpResponse("ok")"""
-    )
+    return HttpResponse("ok")
 
-    exec(
-        """async def my_async_view(request):
+
+async def my_async_view(request):
     import asyncio
+
     await asyncio.sleep(1)
-    return HttpResponse('Hello World')"""
-    )
+    return HttpResponse("Hello World")
 
-    exec(
-        """async def thread_ids_async(request):
-    response = json.dumps({
-        "main": threading.main_thread().ident,
-        "active": threading.current_thread().ident,
-    })
-    return HttpResponse(response)"""
-    )
 
-    exec(
-        """async def post_echo_async(request):
+async def thread_ids_async(request):
+    response = json.dumps(
+        {
+            "main": threading.main_thread().ident,
+            "active": threading.current_thread().ident,
+        }
+    )
+    return HttpResponse(response)
+
+
+async def post_echo_async(request):
     sentry_sdk.capture_message("hi")
     return HttpResponse(request.body)
-post_echo_async.csrf_exempt = True"""
-    )
-else:
-    async_message = None
-    my_async_view = None
-    thread_ids_async = None
-    post_echo_async = None
+
+
+post_echo_async.csrf_exempt = True

@@ -210,7 +210,7 @@ class AwsLambdaIntegration(Integration):
             )
             return
 
-        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6 or 2.7
+        pre_37 = hasattr(lambda_bootstrap, "handle_http_request")  # Python 3.6
 
         if pre_37:
             old_handle_event_request = lambda_bootstrap.handle_event_request
@@ -286,8 +286,6 @@ class AwsLambdaIntegration(Integration):
 def get_lambda_bootstrap():
     # type: () -> Optional[Any]
 
-    # Python 2.7: Everything is in `__main__`.
-    #
     # Python 3.7: If the bootstrap module is *already imported*, it is the
     # one we actually want to use (no idea what's in __main__)
     #

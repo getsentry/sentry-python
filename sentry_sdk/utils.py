@@ -1283,8 +1283,6 @@ def qualname_from_function(func):
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
-    elif hasattr(func, "__name__"):  # Python 2.7 has no __qualname__
-        func_qualname = func.__name__
 
     # Python 3: methods, functions, classes
     if func_qualname is not None:
