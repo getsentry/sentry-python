@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sentry_sdk._compat import text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
