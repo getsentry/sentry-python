@@ -239,12 +239,12 @@ class Scope(object):
 
     @classmethod
     def get_global_scope(cls):
+        # type: () -> Scope
         """
         Returns the global scope.
 
         .. versionadded:: 1.XX.0
         """
-        # type: () -> Scope
         global SENTRY_GLOBAL_SCOPE
         if SENTRY_GLOBAL_SCOPE is None:
             SENTRY_GLOBAL_SCOPE = Scope(ty="global")
