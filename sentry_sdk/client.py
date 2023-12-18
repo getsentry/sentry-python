@@ -5,37 +5,37 @@ import random
 import socket
 
 from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    current_stacktrace,
-    disable_capture_event,
-    format_timestamp,
-    get_sdk_name,
-    get_type_name,
-    get_default_release,
-    handle_in_app,
-    logger,
-)
-from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace, has_tracing_enabled
-from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
+    ClientConstructor,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
     VERSION,
-    ClientConstructor,
 )
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
-from sentry_sdk.utils import ContextVar
-from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
-from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.monitor import Monitor
+from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.scope import Scope
+from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.spotlight import setup_spotlight
-
+from sentry_sdk.tracing import trace, has_tracing_enabled
+from sentry_sdk.transport import make_transport
+from sentry_sdk.serializer import serialize
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ContextVar,
+    current_stacktrace,
+    disable_capture_event,
+    format_timestamp,
+    get_default_release,
+    get_sdk_name,
+    get_type_name,
+    handle_in_app,
+    logger,
+)
 
 if TYPE_CHECKING:
     from typing import Any
@@ -47,7 +47,6 @@ if TYPE_CHECKING:
     from typing import Union
 
     from sentry_sdk.integrations import Integration
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
 
