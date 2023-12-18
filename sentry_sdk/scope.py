@@ -1,4 +1,4 @@
-from copy import copy
+from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
 from itertools import chain
@@ -141,7 +141,7 @@ def _copy_on_write(property_name):
                 setattr(
                     self,
                     property_name,
-                    copy.deepcopy(getattr(self.original_scope, property_name)),
+                    deepcopy(getattr(self.original_scope, property_name)),
                 )
 
             return func(*args, **kwargs)
