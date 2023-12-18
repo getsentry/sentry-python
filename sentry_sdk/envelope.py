@@ -263,7 +263,7 @@ class Item(object):
         elif ty == "statsd":
             return "statsd"
         elif ty == "check_in":
-            return "check_in"
+            return "monitor"
         else:
             return "default"
 
