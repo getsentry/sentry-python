@@ -2,6 +2,8 @@
 Create spans from Django middleware invocations
 """
 
+from typing import Any
+
 from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
@@ -38,7 +40,8 @@ DJANGO_SUPPORTS_ASYNC_MIDDLEWARE = DJANGO_VERSION >= (3, 1)
 if DJANGO_SUPPORTS_ASYNC_MIDDLEWARE:
     from .asgi import _asgi_middleware_mixin_factory
 else:
-    _asgi_middleware_mixin_factory = lambda _: object
+    def _asgi_middleware_mixin_factory(_) -> Any:
+        return object
 
 
 def patch_django_middlewares():
