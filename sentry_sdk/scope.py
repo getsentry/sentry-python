@@ -1,6 +1,7 @@
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
+from functools import wraps
 from itertools import chain
 import os
 import sys
@@ -118,6 +119,37 @@ def _merge_scopes(base, scope_change, scope_kwargs):
         final_scope = base
 
     return final_scope
+
+
+def copy_on_write(property_name):
+    # type: (str) -> Callable[[Any], Any]
+    """
+    Decorator that implements copy-on-write on a property of the Scope.
+    """
+
+    def decorator(func):
+        # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            self = args[0]
+
+            same_property_different_scope = self.is_forked and id(
+                getattr(self, property_name)
+            ) == id(getattr(self.original_scope, property_name))
+
+            if same_property_different_scope:
+                setattr(
+                    self,
+                    property_name,
+                    copy.deepcopy(getattr(self.original_scope, property_name)),
+                )
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 class Scope(object):
