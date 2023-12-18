@@ -274,7 +274,7 @@ class Scope(object):
     def isolate(self):
         # type: () -> None
         """
-        Creates a new isolation scope for this scope. 
+        Creates a new isolation scope for this scope.
         The new isolation scope will be a fork of the current isolation scope.
 
         .. versionadded:: 1.XX.0
@@ -288,7 +288,7 @@ class Scope(object):
         """
         Sets the client for this scope.
 
-        :param client: The client to use in this scope. 
+        :param client: The client to use in this scope.
             If `None` the client of the scope will be deleted.
 
         .. versionadded:: 1.XX.0

@@ -157,6 +157,7 @@ class NoopClient:
 
     .. versionadded:: 1.XX.0
     """
+
     def __repr__(self):
         # type: () -> str
         return "<{} id={}>".format(self.__class__.__name__, id(self))

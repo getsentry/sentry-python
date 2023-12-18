@@ -91,7 +91,7 @@ def clientemethod(f):
 def sentry_is_initialized():
     # type: () -> bool
     """
-    Returns whether Sentry has been initialized or not. 
+    Returns whether Sentry has been initialized or not.
     If an client is available Sentry is initialized.
 
     .. versionadded:: 1.XX.0
