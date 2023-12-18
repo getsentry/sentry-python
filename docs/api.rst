@@ -40,6 +40,7 @@ Distributed Tracing
 .. autofunction:: sentry_sdk.api.get_baggage
 .. autofunction:: sentry_sdk.api.get_traceparent
 
+
 New Scopes/Client APIs
 ======================
 
