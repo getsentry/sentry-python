@@ -158,6 +158,11 @@ class NoopClient:
     .. versionadded:: 1.XX.0
     """
 
+    options = _get_options() # type: Dict[str, Any]
+    metrics_aggregator = None  # type: Optional[Any]
+    monitor = None  # type: Optional[Any]
+    transport = None  # type: Optional[Any]
+
     def __repr__(self):
         # type: () -> str
         return "<{} id={}>".format(self.__class__.__name__, id(self))
@@ -267,7 +272,7 @@ class _Client(NoopClient):
 
     @classmethod
     def get_client(cls):
-        # type: () -> Union[Client, NoopClient]
+        # type: () -> NoopClient
         """
         Returns the current :py:class:`sentry_sdk.Client`. If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
 
