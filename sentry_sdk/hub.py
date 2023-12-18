@@ -399,14 +399,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        client, scope = self._stack[-1]
-        if client is None:
-            logger.info("Dropped breadcrumb because no client bound")
-            return
-
-        # TODO: fix client
-        kwargs["client"] = client
-
         Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):

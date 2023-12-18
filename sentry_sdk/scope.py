@@ -8,7 +8,7 @@ import uuid
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.client import Client
+from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
 from sentry_sdk._functools import wraps
 from sentry_sdk.profiler import Profile
@@ -766,8 +766,10 @@ class Scope(object):
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        client = kwargs.pop("client", None)
-        if client is None:
+        client = Client.get_client()
+
+        if client.__class__ == NoopClient:
+            logger.info("Dropped breadcrumb because no client bound")
             return
 
         before_breadcrumb = client.options.get("before_breadcrumb")
