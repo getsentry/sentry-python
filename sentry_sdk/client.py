@@ -154,6 +154,8 @@ except Exception:
 class NoopClient:
     """
     A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+
+    .. versionadded:: 1.XX.0
     """
     def __repr__(self):
         # type: () -> str
@@ -267,6 +269,8 @@ class _Client(NoopClient):
         # type: () -> Union[Client, NoopClient]
         """
         Returns the current :py:class:`sentry_sdk.Client`. If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+
+        .. versionadded:: 1.XX.0
         """
         client = Scope.get_current_scope().client
         if client is not None:

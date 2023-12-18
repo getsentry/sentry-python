@@ -212,6 +212,8 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns the current scope.
+
+        .. versionadded:: 1.XX.0
         """
         scope = sentry_current_scope.get()
         if scope is None:
@@ -225,6 +227,8 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns the isolation scope.
+
+        .. versionadded:: 1.XX.0
         """
         scope = sentry_isolation_scope.get()
         if scope is None:
@@ -237,6 +241,8 @@ class Scope(object):
     def get_global_scope(cls):
         """
         Returns the global scope.
+
+        .. versionadded:: 1.XX.0
         """
         # type: () -> Scope
         global SENTRY_GLOBAL_SCOPE
@@ -250,6 +256,8 @@ class Scope(object):
         # type: () -> bool
         """
         Weither this scope is a fork of another scope.
+
+        .. versionadded:: 1.XX.0
         """
         return self.original_scope is not None
 
@@ -257,6 +265,8 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns a fork of this scope.
+
+        .. versionadded:: 1.XX.0
         """
         self.original_scope = self
         return copy(self)
@@ -266,6 +276,8 @@ class Scope(object):
         """
         Creates a new isolation scope for this scope. 
         The new isolation scope will be a fork of the current isolation scope.
+
+        .. versionadded:: 1.XX.0
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
@@ -278,6 +290,8 @@ class Scope(object):
 
         :param client: The client to use in this scope. 
             If `None` the client of the scope will be deleted.
+
+        .. versionadded:: 1.XX.0
         """
         self.client = client
 
