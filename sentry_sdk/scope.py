@@ -248,17 +248,24 @@ class Scope(object):
     @property
     def is_forked(self):
         # type: () -> bool
+        """
+        Weither this scope is a fork of another scope.
+        """
         return self.original_scope is not None
 
     def fork(self):
         # type: () -> Scope
+        """
+        Returns a fork of this scope.
+        """
         self.original_scope = self
         return copy(self)
 
     def isolate(self):
         # type: () -> None
         """
-        Create a new isolation scope for this scope.
+        Creates a new isolation scope for this scope. 
+        The new isolation scope will be a fork of the current isolation scope.
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
@@ -266,6 +273,12 @@ class Scope(object):
 
     def set_client(self, client=None):
         # type: (Optional[sentry_sdk.Client]) -> None
+        """
+        Sets the client for this scope.
+
+        :param client: The client to use in this scope. 
+            If `None` the client of the scope will be deleted.
+        """
         self.client = client
 
     def _load_trace_data_from_env(self):
