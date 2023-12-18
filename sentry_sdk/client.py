@@ -16,7 +16,6 @@ from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
-from sentry_sdk.scope import Scope
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.spotlight import setup_spotlight
@@ -49,6 +48,7 @@ if TYPE_CHECKING:
     from sentry_sdk.integrations import Integration
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
+    from sentry_sdk.scope import Scope
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -277,6 +277,8 @@ class _Client(NoopClient):
 
         .. versionadded:: 1.XX.0
         """
+        from sentry_sdk.scope import Scope
+
         client = Scope.get_current_scope().client
         if client is not None:
             return client
