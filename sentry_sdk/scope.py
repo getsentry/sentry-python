@@ -210,6 +210,9 @@ class Scope(object):
     @classmethod
     def get_current_scope(cls):
         # type: () -> Scope
+        """
+        Returns the current scope.
+        """
         scope = sentry_current_scope.get()
         if scope is None:
             scope = Scope(ty="current")
@@ -220,6 +223,9 @@ class Scope(object):
     @classmethod
     def get_isolation_scope(cls):
         # type: () -> Scope
+        """
+        Returns the isolation scope.
+        """
         scope = sentry_isolation_scope.get()
         if scope is None:
             scope = Scope(ty="isolation")
@@ -229,6 +235,9 @@ class Scope(object):
 
     @classmethod
     def get_global_scope(cls):
+        """
+        Returns the global scope.
+        """
         # type: () -> Scope
         global SENTRY_GLOBAL_SCOPE
         if SENTRY_GLOBAL_SCOPE is None:
