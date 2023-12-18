@@ -120,7 +120,7 @@ def _merge_scopes(base, scope_change, scope_kwargs):
     return final_scope
 
 
-def copy_on_write(property_name):
+def _copy_on_write(property_name):
     # type: (str) -> Callable[[Any], Any]
     """
     Decorator that implements copy-on-write on a property of the Scope.
