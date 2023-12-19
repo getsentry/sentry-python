@@ -79,35 +79,12 @@ def scopemethod(f):
     return f
 
 
-def clientemethod(f):
-    # type: (F) -> F
-    f.__doc__ = "%s\n\n%s" % (
-        "Alias for :py:meth:`sentry_sdk._Client.%s`" % f.__name__,
-        inspect.getdoc(getattr(Client, f.__name__)),
-    )
-    return f
-
-
 def get_client():
     # type: () -> Union[Client, NoopClient]
     """
-    Returns the current :py:class:`sentry_sdk.Client`. If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
-
-    .. versionadded:: 1.XX.0
+    Returns the current client. If no client is bound, returns a noop client.
     """
-    client = Scope.get_current_scope().client
-    if client is not None:
-        return client
-
-    client = Scope.get_isolation_scope().client
-    if client is not None:
-        return client
-
-    client = Scope.get_global_scope().client
-    if client is not None:
-        return client
-
-    return NoopClient()
+    return Scope.get_active_client()
 
 
 def sentry_is_initialized():
@@ -118,11 +95,7 @@ def sentry_is_initialized():
 
     .. versionadded:: 1.XX.0
     """
-    client = get_client()
-    if client.__class__ == NoopClient:
-        return False
-    else:
-        return True
+    return Scope.get_active_client().is_active()
 
 
 @scopemethod

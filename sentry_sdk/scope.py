@@ -6,9 +6,9 @@ import os
 import sys
 import uuid
 
-from sentry_sdk.api import get_client
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
+from sentry_sdk.client import NoopClient
 from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
 from sentry_sdk._functools import wraps
 from sentry_sdk.profiler import Profile
@@ -252,6 +252,30 @@ class Scope(object):
 
         return SENTRY_GLOBAL_SCOPE
 
+    @classmethod
+    def get_active_client(cls):
+        # type: () -> Union[sentry_sdk.Client, NoopClient]
+        """
+        Returns the current :py:class:`sentry_sdk.Client`.
+        This checks the current scope, the isolation scope and the global scope for a client.
+        If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+
+        .. versionadded:: 1.XX.0
+        """
+        client = Scope.get_current_scope().client
+        if client is not None:
+            return client
+
+        client = Scope.get_isolation_scope().client
+        if client is not None:
+            return client
+
+        client = Scope.get_global_scope().client
+        if client is not None:
+            return client
+
+        return NoopClient()
+
     @property
     def is_forked(self):
         # type: () -> bool
@@ -417,7 +441,7 @@ class Scope(object):
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the
         currently active span or the scopes Propagation Context.
         """
-        client = get_client()
+        client = Scope.get_active_client()
 
         # If we have an active span, return traceparent from there
         if (
@@ -438,7 +462,7 @@ class Scope(object):
 
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
-        client = get_client()
+        client = Scope.get_active_client()
 
         # If we have an active span, return baggage from there
         if (
@@ -528,7 +552,7 @@ class Scope(object):
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        client = get_client()
+        client = Scope.get_active_client()
         if not client.options.get("propagate_traces"):
             return
 
@@ -766,7 +790,7 @@ class Scope(object):
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        client = get_client()
+        client = Scope.get_active_client()
 
         if not client.is_active():
             logger.info("Dropped breadcrumb because no client bound")
@@ -825,7 +849,7 @@ class Scope(object):
         if scope_kwargs is not None:
             scope = _merge_scopes(self, scope, scope_kwargs)
 
-        return get_client().capture_event(event=event, hint=hint, scope=scope)
+        return Scope.get_active_client().capture_event(event=event, hint=hint, scope=scope)
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
@@ -880,7 +904,7 @@ class Scope(object):
             exc_info = sys.exc_info()
 
         event, hint = event_from_exception(
-            exc_info, client_options=get_client().options
+            exc_info, client_options=Scope.get_active_client().options
         )
 
         try:
@@ -931,7 +955,7 @@ class Scope(object):
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         hub = kwargs.pop("hub", None)
-        client = get_client()
+        client = Scope.get_active_client()
 
         configuration_instrumenter = client.options.get("instrumenter")
 
@@ -984,7 +1008,7 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        client = get_client()
+        client = Scope.get_active_client()
 
         configuration_instrumenter = client.options.get("instrumenter")
 
@@ -1056,7 +1080,7 @@ class Scope(object):
 
         self.end_session()
 
-        client = get_client()
+        client = Scope.get_active_client()
         self._session = Session(
             release=client.options.get("release"),
             environment=client.options.get("environment"),
@@ -1072,7 +1096,7 @@ class Scope(object):
 
         if session is not None:
             session.close()
-            get_client().capture_session(session)
+            Scope.get_active_client().capture_session(session)
 
     def stop_auto_session_tracking(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
