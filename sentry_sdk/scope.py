@@ -210,45 +210,51 @@ class Scope(object):
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
     @classmethod
-    def get_current_scope(cls):
-        # type: () -> Scope
+    def get_current_scope(cls, should_create_scope=True):
+        # type: (bool) -> Scope
         """
         Returns the current scope.
+
+        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         scope = sentry_current_scope.get()
-        if scope is None:
+        if scope is None and should_create_scope:
             scope = Scope(ty="current")
             sentry_current_scope.set(scope)
 
         return scope
 
     @classmethod
-    def get_isolation_scope(cls):
-        # type: () -> Scope
+    def get_isolation_scope(cls, should_create_scope=True):
+        # type: (bool) -> Scope
         """
         Returns the isolation scope.
+
+        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         scope = sentry_isolation_scope.get()
-        if scope is None:
+        if scope is None and should_create_scope:
             scope = Scope(ty="isolation")
             sentry_isolation_scope.set(scope)
 
         return scope
 
     @classmethod
-    def get_global_scope(cls):
-        # type: () -> Scope
+    def get_global_scope(cls, should_create_scope=True):
+        # type: (bool) -> Scope
         """
         Returns the global scope.
+
+        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         global SENTRY_GLOBAL_SCOPE
-        if SENTRY_GLOBAL_SCOPE is None:
+        if SENTRY_GLOBAL_SCOPE is None and should_create_scope:
             SENTRY_GLOBAL_SCOPE = Scope(ty="global")
 
         return SENTRY_GLOBAL_SCOPE
@@ -263,19 +269,17 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        # We do not call Scope.get_current_scope() here, do not exidently create a new scope.
-        scope = sentry_current_scope.get()
-        if scope is not None and scope.client is not None:
-            return scope.client
-        
-        # We do not call Scope.get_isolation_scope() here, do not exidently create a new scope.
-        scope = sentry_isolation_scope.get()
-        if scope is not None and scope.client is not None:
+        scope = Scope.get_current_scope(should_create_scope=False)
+        if scope and scope.client:
             return scope.client
 
-        # We do not call Scope.get_global_scope() here, do not exidently create a new scope.
-        if SENTRY_GLOBAL_SCOPE is not None and SENTRY_GLOBAL_SCOPE.client is not None:
-            return SENTRY_GLOBAL_SCOPE.client
+        scope = Scope.get_isolation_scope(should_create_scope=False)
+        if scope and scope.client:
+            return scope.client
+
+        scope = Scope.get_global_scope(should_create_scope=False)
+        if scope and scope.client:
+            return scope.client
 
         return NoopClient()
 
