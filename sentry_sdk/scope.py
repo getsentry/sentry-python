@@ -614,8 +614,7 @@ class Scope(object):
         if client is None:
             return None
 
-        if scope_kwargs is not None:
-            scope = _merge_scopes(self, scope, scope_kwargs)
+        scope = _merge_scopes(self, scope, scope_kwargs)
 
         return client.capture_event(event=event, hint=hint, scope=scope)
 
