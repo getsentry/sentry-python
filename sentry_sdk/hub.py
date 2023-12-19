@@ -215,6 +215,17 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
+        if isinstance(client_or_hub, Hub):
+            hub = client_or_hub
+            client, other_scope = hub._stack[-1]
+            if scope is None:
+                scope = copy.copy(other_scope)
+        else:
+            client = client_or_hub
+        if scope is None:
+            scope = Scope()
+
+        self._stack = [(client, scope)]
         self._last_event_id = None  # type: Optional[str]
         self._old_hubs = []  # type: List[Hub]
 
