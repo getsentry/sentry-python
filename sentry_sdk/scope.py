@@ -263,17 +263,19 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        client = Scope.get_current_scope().client
-        if client is not None:
-            return client
+        # We do not call Scope.get_current_scope() here, do not exidently create a new scope.
+        scope = sentry_current_scope.get()
+        if scope is not None and scope.client is not None:
+            return scope.client
+        
+        # We do not call Scope.get_isolation_scope() here, do not exidently create a new scope.
+        scope = sentry_isolation_scope.get()
+        if scope is not None and scope.client is not None:
+            return scope.client
 
-        client = Scope.get_isolation_scope().client
-        if client is not None:
-            return client
-
-        client = Scope.get_global_scope().client
-        if client is not None:
-            return client
+        # We do not call Scope.get_global_scope() here, do not exidently create a new scope.
+        if SENTRY_GLOBAL_SCOPE is not None and SENTRY_GLOBAL_SCOPE.client is not None:
+            return SENTRY_GLOBAL_SCOPE.client
 
         return NoopClient()
 
