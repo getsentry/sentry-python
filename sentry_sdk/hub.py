@@ -276,7 +276,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         if not client.is_active():
             return None
-        
+
         return client  # type: ignore
 
     @property
