@@ -254,6 +254,7 @@ class NoopClient:
         # type: (Any, Any, Any) -> None
         return None
 
+
 class _Client(NoopClient):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes

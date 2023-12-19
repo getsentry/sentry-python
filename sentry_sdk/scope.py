@@ -29,7 +29,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     copy_context,
-    ContextVar,    
+    ContextVar,
     event_from_exception,
     exc_info_from_error,
     logger,
@@ -188,7 +188,7 @@ class Scope(object):
         "_propagation_context",
         "client",
         "original_scope",
-        "_ty",        
+        "_ty",
     )
 
     def __init__(self, ty=None, client=None):
@@ -203,7 +203,7 @@ class Scope(object):
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
         self.set_client(client)
-        
+
         self.clear()
 
         incoming_trace_information = self._load_trace_data_from_env()
@@ -279,6 +279,7 @@ class Scope(object):
         Sets the client for this scope.
         :param client: The client to use in this scope.
             If `None` the client of the scope will be deleted.
+
         .. versionadded:: 1.XX.0
         """
         self.client = client
@@ -306,6 +307,7 @@ class Scope(object):
         """
         Creates a new isolation scope for this scope.
         The new isolation scope will be a fork of the current isolation scope.
+
         .. versionadded:: 1.XX.0
         """
         isolation_scope = Scope.get_isolation_scope()
