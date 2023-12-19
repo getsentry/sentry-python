@@ -38,6 +38,7 @@ from collections import deque
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._lru_cache import LRUCache
+from sentry_sdk.scope import Scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -589,7 +590,7 @@ class Profile(object):
         # type: () -> Profile
         hub = self.hub or sentry_sdk.Hub.current
 
-        _, scope = hub._stack[-1]
+        scope = Scope.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
