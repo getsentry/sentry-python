@@ -8,6 +8,7 @@ import uuid
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
+from sentry_sdk.client import NoopClient
 from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
 from sentry_sdk._functools import wraps
 from sentry_sdk.profiler import Profile
@@ -250,6 +251,30 @@ class Scope(object):
             SENTRY_GLOBAL_SCOPE = Scope(ty="global")
 
         return SENTRY_GLOBAL_SCOPE
+
+    @classmethod
+    def get_client(cls):
+        # type: () -> Union[sentry_sdk.Client, NoopClient]
+        """
+        Returns the current :py:class:`sentry_sdk.Client`.
+        This checks the current scope, the isolation scope and the global scope for a client.
+        If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+
+        .. versionadded:: 1.XX.0
+        """
+        client = Scope.get_current_scope().client
+        if client is not None:
+            return client
+
+        client = Scope.get_isolation_scope().client
+        if client is not None:
+            return client
+
+        client = Scope.get_global_scope().client
+        if client is not None:
+            return client
+
+        return NoopClient()
 
     @property
     def is_forked(self):
