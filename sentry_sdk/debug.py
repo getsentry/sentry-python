@@ -2,7 +2,6 @@ import sys
 import logging
 
 from sentry_sdk import utils
-from sentry_sdk.api import get_client
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.client import _client_init_debug
