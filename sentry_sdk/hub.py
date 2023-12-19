@@ -266,13 +266,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
-        Scope.get_active_client().get_integration(name_or_class)
+        Scope.get_client().get_integration(name_or_class)
 
     @property
     def client(self):
         # type: () -> Optional[NoopClient]
         """Returns the current client on the hub."""
-        return Scope.get_active_client()
+        return Scope.get_client()
 
     @property
     def scope(self):
