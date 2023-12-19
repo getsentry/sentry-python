@@ -14,9 +14,10 @@ class _HubBasedClientFilter(logging.Filter):
         # type: (LogRecord) -> bool
         if _client_init_debug.get(False):
             return True
-
-        return get_client().options["debug"]
-
+        hub = Hub.current
+        if hub is not None and hub.client is not None:
+            return hub.client.options["debug"]
+        return False
 
 def init_debug_support():
     # type: () -> None
