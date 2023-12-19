@@ -210,6 +210,11 @@ class Scope(object):
     @classmethod
     def get_current_scope(cls):
         # type: () -> Scope
+        """
+        Returns the current scope.
+
+        .. versionadded:: 1.XX.0
+        """
         scope = sentry_current_scope.get()
         if scope is None:
             scope = Scope(ty="current")
@@ -220,6 +225,11 @@ class Scope(object):
     @classmethod
     def get_isolation_scope(cls):
         # type: () -> Scope
+        """
+        Returns the isolation scope.
+
+        .. versionadded:: 1.XX.0
+        """
         scope = sentry_isolation_scope.get()
         if scope is None:
             scope = Scope(ty="isolation")
@@ -230,6 +240,11 @@ class Scope(object):
     @classmethod
     def get_global_scope(cls):
         # type: () -> Scope
+        """
+        Returns the global scope.
+
+        .. versionadded:: 1.XX.0
+        """
         global SENTRY_GLOBAL_SCOPE
         if SENTRY_GLOBAL_SCOPE is None:
             SENTRY_GLOBAL_SCOPE = Scope(ty="global")
@@ -239,17 +254,30 @@ class Scope(object):
     @property
     def is_forked(self):
         # type: () -> bool
+        """
+        Weither this scope is a fork of another scope.
+
+        .. versionadded:: 1.XX.0
+        """
         return self.original_scope is not None
 
     def fork(self):
         # type: () -> Scope
+        """
+        Returns a fork of this scope.
+
+        .. versionadded:: 1.XX.0
+        """
         self.original_scope = self
         return copy(self)
 
     def isolate(self):
         # type: () -> None
         """
-        Create a new isolation scope for this scope.
+        Creates a new isolation scope for this scope.
+        The new isolation scope will be a fork of the current isolation scope.
+
+        .. versionadded:: 1.XX.0
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
@@ -257,6 +285,14 @@ class Scope(object):
 
     def set_client(self, client=None):
         # type: (Optional[sentry_sdk.Client]) -> None
+        """
+        Sets the client for this scope.
+
+        :param client: The client to use in this scope.
+            If `None` the client of the scope will be deleted.
+
+        .. versionadded:: 1.XX.0
+        """
         self.client = client
 
     def _load_trace_data_from_env(self):
