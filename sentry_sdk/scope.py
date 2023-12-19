@@ -2,6 +2,7 @@ from copy import copy
 from collections import deque
 from itertools import chain
 import os
+import sys
 import uuid
 
 from sentry_sdk.attachments import Attachment
@@ -21,7 +22,12 @@ from sentry_sdk.tracing import (
     Transaction,
 )
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import logger, capture_internal_exceptions
+from sentry_sdk.utils import (
+    event_from_exception,
+    exc_info_from_error,
+    logger,
+    capture_internal_exceptions,
+)
 
 if TYPE_CHECKING:
     from typing import Any
@@ -37,14 +43,16 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
+        ErrorProcessor,
         Event,
         EventProcessor,
-        ErrorProcessor,
         ExcInfo,
         Hint,
         Type,
+        Union,
     )
 
+    import sentry_sdk
     from sentry_sdk.profiler import Profile
     from sentry_sdk.tracing import Span
 
@@ -79,6 +87,28 @@ def _disable_capture(fn):
             self._should_capture = True
 
     return wrapper  # type: ignore
+
+
+def _merge_scopes(base, scope_change, scope_kwargs):
+    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
+    if scope_change and scope_kwargs:
+        raise TypeError("cannot provide scope and kwargs")
+
+    if scope_change is not None:
+        final_scope = copy(base)
+        if callable(scope_change):
+            scope_change(final_scope)
+        else:
+            final_scope.update_from_scope(scope_change)
+
+    elif scope_kwargs:
+        final_scope = copy(base)
+        final_scope.update_from_kwargs(**scope_kwargs)
+
+    else:
+        final_scope = base
+
+    return final_scope
 
 
 class Scope(object):
@@ -558,6 +588,118 @@ class Scope(object):
 
         while len(self._breadcrumbs) > max_breadcrumbs:
             self._breadcrumbs.popleft()
+
+    def capture_event(self, event, hint=None, client=None, scope=None, **scope_kwargs):
+        # type: (Event, Optional[Hint], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+        """
+        Captures an event.
+
+        Merges given scope data and calls :py:meth:`sentry_sdk.Client.capture_event`.
+
+        :param event: A ready-made event that can be directly sent to Sentry.
+
+        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
+
+        :param client: The client to use for sending the event to Sentry.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
+
+        :param scope_kwargs: Optional data to apply to event.
+            For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        """
+        if client is None:
+            return None
+
+        scope = _merge_scopes(self, scope, scope_kwargs)
+
+        return client.capture_event(event=event, hint=hint, scope=scope)
+
+    def capture_message(
+        self, message, level=None, client=None, scope=None, **scope_kwargs
+    ):
+        # type: (str, Optional[str], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+        """
+        Captures a message.
+
+        :param message: The string to send as the message.
+
+        :param level: If no level is provided, the default level is `info`.
+
+        :param client: The client to use for sending the event to Sentry.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
+
+        :param scope_kwargs: Optional data to apply to event.
+            For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        """
+        if client is None:
+            return None
+
+        if level is None:
+            level = "info"
+
+        event = {
+            "message": message,
+            "level": level,
+        }
+
+        return self.capture_event(event, client=client, scope=scope, **scope_kwargs)
+
+    def capture_exception(self, error=None, client=None, scope=None, **scope_kwargs):
+        # type: (Optional[Union[BaseException, ExcInfo]], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+        """Captures an exception.
+
+        :param error: An exception to capture. If `None`, `sys.exc_info()` will be used.
+
+        :param client: The client to use for sending the event to Sentry.
+
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
+
+        :param scope_kwargs: Optional data to apply to event.
+            For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
+
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        """
+        if client is None:
+            return None
+
+        if error is not None:
+            exc_info = exc_info_from_error(error)
+        else:
+            exc_info = sys.exc_info()
+
+        event, hint = event_from_exception(exc_info, client_options=client.options)
+
+        try:
+            return self.capture_event(
+                event, hint=hint, client=client, scope=scope, **scope_kwargs
+            )
+        except Exception:
+            self._capture_internal_exception(sys.exc_info())
+
+        return None
+
+    def _capture_internal_exception(
+        self, exc_info  # type: Any
+    ):
+        # type: (...) -> Any
+        """
+        Capture an exception that is likely caused by a bug in the SDK
+        itself.
+
+        These exceptions do not end up in Sentry and are just logged instead.
+        """
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None

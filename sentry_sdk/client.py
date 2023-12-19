@@ -156,6 +156,8 @@ class _Client(object):
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
+
+    Alias of :py:class:`Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
@@ -560,8 +562,8 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param scope: An optional scope to use for determining whether this event
-            should be captured.
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
