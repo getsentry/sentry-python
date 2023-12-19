@@ -278,6 +278,18 @@ class Scope(object):
 
         return NoopClient()
 
+    def set_client(self, client=None):
+        # type: (Optional[sentry_sdk.Client]) -> None
+        """
+        Sets the client for this scope.
+
+        :param client: The client to use in this scope.
+            If `None` the client of the scope will be deleted.
+
+        .. versionadded:: 1.XX.0
+        """
+        self.client = client
+
     @property
     def is_forked(self):
         # type: () -> bool
@@ -309,18 +321,6 @@ class Scope(object):
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
         sentry_isolation_scope.set(forked_isolation_scope)
-
-    def set_client(self, client=None):
-        # type: (Optional[sentry_sdk.Client]) -> None
-        """
-        Sets the client for this scope.
-
-        :param client: The client to use in this scope.
-            If `None` the client of the scope will be deleted.
-
-        .. versionadded:: 1.XX.0
-        """
-        self.client = client
 
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
