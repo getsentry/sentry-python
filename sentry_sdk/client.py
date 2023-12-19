@@ -171,8 +171,15 @@ class NoopClient:
         # type: () -> bool
         return False
 
+    # new!
     def is_active(self):
         # type: () -> bool
+        """
+        Returns weither the client is active (able to send data to Sentry)
+
+        .. versionadded:: 1.XX.0
+        """
+
         return False
 
     def __init__(self, *args, **kwargs):
@@ -397,6 +404,11 @@ class _Client(NoopClient):
 
     def is_active(self):
         # type: () -> bool
+        """
+        Returns weither the client is active (able to send data to Sentry)
+
+        .. versionadded:: 1.XX.0
+        """
         return True
 
     @property
