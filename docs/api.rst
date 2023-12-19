@@ -41,6 +41,19 @@ Distributed Tracing
 .. autofunction:: sentry_sdk.api.get_traceparent
 
 
+New Scopes/Client APIs
+======================
+
+.. autofunction:: sentry_sdk.api.get_client
+.. autofunction:: sentry_sdk.api.sentry_is_initialized
+.. autofunction:: sentry_sdk.api.get_current_scope
+.. autofunction:: sentry_sdk.api.get_isolation_scope
+.. autofunction:: sentry_sdk.api.get_global_scope    
+
+.. autofunction:: sentry_sdk.api.set_current_scope
+.. autofunction:: sentry_sdk.api.set_isolation_scope
+
+
 Managing Scope (advanced)
 =========================
 

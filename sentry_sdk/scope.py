@@ -1,5 +1,6 @@
-from copy import copy
+from copy import copy, deepcopy
 from collections import deque
+from contextlib import contextmanager
 from itertools import chain
 import os
 import sys
@@ -26,10 +27,12 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    copy_context,
+    ContextVar,    
     event_from_exception,
     exc_info_from_error,
     logger,
-    capture_internal_exceptions,
 )
 
 if TYPE_CHECKING:
@@ -62,6 +65,10 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
 
+
+SENTRY_GLOBAL_SCOPE = None  # type: Optional[Scope]
+sentry_isolation_scope = ContextVar("sentry_isolation_scope", default=None)
+sentry_current_scope = ContextVar("sentry_current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
 
@@ -114,6 +121,38 @@ def _merge_scopes(base, scope_change, scope_kwargs):
     return final_scope
 
 
+def _copy_on_write(property_name):
+    # type: (str) -> Callable[[Any], Any]
+    """
+    Decorator that implements copy-on-write on a property of the Scope.
+    .. versionadded:: 1.XX.0
+    """
+
+    def decorator(func):
+        # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+            self = args[0]
+
+            same_property_different_scope = self.is_forked and id(
+                getattr(self, property_name)
+            ) == id(getattr(self.original_scope, property_name))
+
+            if same_property_different_scope:
+                setattr(
+                    self,
+                    property_name,
+                    deepcopy(getattr(self.original_scope, property_name)),
+                )
+
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
@@ -147,20 +186,131 @@ class Scope(object):
         "_force_auto_session_tracking",
         "_profile",
         "_propagation_context",
+        "client",
+        "original_scope",
+        "_ty",        
     )
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self, ty=None, client=None):
+        # type: (Optional[str], Optional[sentry_sdk.Client]) -> None
+        self._ty = ty
+        self.original_scope = None  # type: Optional[Scope]
+
         self._event_processors = []  # type: List[EventProcessor]
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
+        self.set_client(client)
+        
         self.clear()
 
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
+
+    @classmethod
+    def get_current_scope(cls):
+        # type: () -> Scope
+        """
+        Returns the current scope.
+        .. versionadded:: 1.XX.0
+        """
+        scope = sentry_current_scope.get()
+        if scope is None:
+            scope = Scope(ty="current")
+            sentry_current_scope.set(scope)
+
+        return scope
+
+    @classmethod
+    def get_isolation_scope(cls):
+        # type: () -> Scope
+        """
+        Returns the isolation scope.
+        .. versionadded:: 1.XX.0
+        """
+        scope = sentry_isolation_scope.get()
+        if scope is None:
+            scope = Scope(ty="isolation")
+            sentry_isolation_scope.set(scope)
+
+        return scope
+
+    @classmethod
+    def get_global_scope(cls):
+        # type: () -> Scope
+        """
+        Returns the global scope.
+        .. versionadded:: 1.XX.0
+        """
+        global SENTRY_GLOBAL_SCOPE
+        if SENTRY_GLOBAL_SCOPE is None:
+            SENTRY_GLOBAL_SCOPE = Scope(ty="global")
+
+        return SENTRY_GLOBAL_SCOPE
+
+    @classmethod
+    def get_client(cls):
+        # type: () -> Union[sentry_sdk.Client, sentry_sdk.client.NoopClient]
+        """
+        Returns the currently used :py:class:`sentry_sdk.Client`.
+        This checks the current scope, the isolation scope and the global scope for a client.
+        If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+        .. versionadded:: 1.XX.0
+        """
+        client = Scope.get_current_scope().client
+        if client is not None:
+            return client
+
+        client = Scope.get_isolation_scope().client
+        if client is not None:
+            return client
+
+        client = Scope.get_global_scope().client
+        if client is not None:
+            return client
+
+        return NoopClient()
+
+    def set_client(self, client=None):
+        # type: (Optional[sentry_sdk.Client]) -> None
+        """
+        Sets the client for this scope.
+        :param client: The client to use in this scope.
+            If `None` the client of the scope will be deleted.
+        .. versionadded:: 1.XX.0
+        """
+        self.client = client
+
+    @property
+    def is_forked(self):
+        # type: () -> bool
+        """
+        Weither this scope is a fork of another scope.
+        .. versionadded:: 1.XX.0
+        """
+        return self.original_scope is not None
+
+    def fork(self):
+        # type: () -> Scope
+        """
+        Returns a fork of this scope.
+        .. versionadded:: 1.XX.0
+        """
+        self.original_scope = self
+        return copy(self)
+
+    def isolate(self):
+        # type: () -> None
+        """
+        Creates a new isolation scope for this scope.
+        The new isolation scope will be a fork of the current isolation scope.
+        .. versionadded:: 1.XX.0
+        """
+        isolation_scope = Scope.get_isolation_scope()
+        forked_isolation_scope = isolation_scope.fork()
+        sentry_isolation_scope.set(forked_isolation_scope)
 
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
@@ -1251,3 +1401,66 @@ class Scope(object):
             hex(id(self)),
             self._name,
         )
+
+
+def _with_new_scope():
+    # type: () -> Generator[Scope, None, None]
+
+    current_scope = Scope.get_current_scope()
+    forked_scope = current_scope.fork()
+    token = sentry_current_scope.set(forked_scope)
+
+    try:
+        yield forked_scope
+
+    finally:
+        # restore original scope
+        sentry_current_scope.reset(token)
+
+
+@contextmanager
+def new_scope():
+    # type: () -> Generator[Scope, None, None]
+    """
+    Context manager that forks the current scope and runs the wrapped code in it.
+    .. versionadded:: 1.XX.0
+    """
+    ctx = copy_context()  # This does not exist in Python 2.7
+    return ctx.run(_with_new_scope)
+
+
+def _with_isolated_scope():
+    # type: () -> Generator[Scope, None, None]
+
+    # fork current scope
+    current_scope = Scope.get_current_scope()
+    forked_current_scope = current_scope.fork()
+    current_token = sentry_current_scope.set(forked_current_scope)
+
+    # fork isolation scope
+    isolation_scope = Scope.get_isolation_scope()
+    forked_isolation_scope = isolation_scope.fork()
+    isolation_token = sentry_isolation_scope.set(forked_isolation_scope)
+
+    try:
+        yield forked_isolation_scope
+
+    finally:
+        # restore original scopes
+        sentry_current_scope.reset(current_token)
+        sentry_isolation_scope.reset(isolation_token)
+
+
+@contextmanager
+def isolated_scope():
+    # type: () -> Generator[Scope, None, None]
+    """
+    Context manager that forks the current isolation scope (and the related current scope) and runs the wrapped code in it.
+    .. versionadded:: 1.XX.0
+    """
+    ctx = copy_context()
+    return ctx.run(_with_isolated_scope)
+
+
+# Circular imports
+from sentry_sdk.client import NoopClient

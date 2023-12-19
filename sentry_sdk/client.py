@@ -151,13 +151,116 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class _Client(object):
+class NoopClient:
+    """
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+    .. versionadded:: 1.XX.0
+    """
+
+    options = _get_options()  # type: Dict[str, Any]
+    metrics_aggregator = None  # type: Optional[Any]
+    monitor = None  # type: Optional[Any]
+    transport = None  # type: Optional[Any]
+
+    def __repr__(self):
+        # type: () -> str
+        return "<{} id={}>".format(self.__class__.__name__, id(self))
+
+    # new!
+    def should_send_default_pii(self):
+        # type: () -> bool
+        return False
+
+    # new!
+    def is_active(self):
+        # type: () -> bool
+        """
+        Returns weither the client is active (able to send data to Sentry)
+        .. versionadded:: 1.XX.0
+        """
+
+        return False
+
+    def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def __getstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return {"options": {}}
+
+    def __setstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        pass
+
+    def _setup_instrumentation(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def _init_impl(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    @property
+    def dsn(self):
+        # type: () -> Optional[str]
+        return None
+
+    def _prepare_event(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Optional[Any]
+        return None
+
+    def _is_ignored_error(self, *args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        return True
+
+    def _should_capture(self, *args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        return False
+
+    def _should_sample_error(self, *args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        return False
+
+    def _update_session_from_event(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def capture_event(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Optional[str]
+        return None
+
+    def capture_session(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def get_integration(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return None
+
+    def close(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def flush(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def __enter__(self):
+        # type: () -> NoopClient
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
+        return None
+
+class _Client(NoopClient):
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
@@ -296,6 +399,14 @@ class _Client(object):
             _client_init_debug.set(old_debug)
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
+
+    def is_active(self):
+        # type: () -> bool
+        """
+        Returns weither the client is active (able to send data to Sentry)
+        .. versionadded:: 1.XX.0
+        """
+        return True
 
     @property
     def dsn(self):

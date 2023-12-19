@@ -1,5 +1,6 @@
 import inspect
 
+from sentry_sdk import scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from typing import ContextManager
     from typing import Union
 
+    from sentry_sdk.client import Client, NoopClient
     from sentry_sdk._types import (
         Event,
         Hint,
@@ -75,6 +77,61 @@ def scopemethod(f):
         inspect.getdoc(getattr(Scope, f.__name__)),
     )
     return f
+
+
+def sentry_is_initialized():
+    # type: () -> bool
+    """
+    Returns whether Sentry has been initialized or not.
+    If an client is available Sentry is initialized.
+    .. versionadded:: 1.XX.0
+    """
+    return Scope.get_client().is_active()
+
+
+@scopemethod
+def get_client():
+    # type: () -> Union[Client, NoopClient]
+    return Scope.get_client()
+
+
+@scopemethod
+def get_current_scope():
+    # type: () -> Scope
+    return Scope.get_current_scope()
+
+
+@scopemethod
+def get_isolation_scope():
+    # type: () -> Scope
+    return Scope.get_isolation_scope()
+
+
+@scopemethod
+def get_global_scope():
+    # type: () -> Scope
+    return Scope.get_global_scope()
+
+
+def set_current_scope(new_current_scope):
+    # type: (Scope) -> None
+    """
+    Sets the given scope as the new current scope overwritting the existing current scope.
+    :param new_current_scope: The scope to set as the new current scope.
+    .. versionadded:: 1.XX.0
+    """
+
+    scope.sentry_current_scope.set(new_current_scope)
+
+
+def set_isolation_scope(new_isolation_scope):
+    # type: (Scope) -> None
+    """
+    Sets the given scope as the new isolation scope overwritting the existing isolation scope.
+    :param new_isolation_scope: The scope to set as the new isolation scope.
+    .. versionadded:: 1.XX.0
+    """
+    scope.sentry_isolation_scope.set(new_isolation_scope)
 
 
 @hubmethod
