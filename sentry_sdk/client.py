@@ -157,7 +157,7 @@ class NoopClient:
     .. versionadded:: 1.XX.0
     """
 
-    options = _get_options() # type: Dict[str, Any]
+    options = _get_options()  # type: Dict[str, Any]
     metrics_aggregator = None  # type: Optional[Any]
     monitor = None  # type: Optional[Any]
     transport = None  # type: Optional[Any]
@@ -168,6 +168,10 @@ class NoopClient:
 
     # new!
     def should_send_default_pii(self):
+        # type: () -> bool
+        return False
+
+    def is_active(self):
         # type: () -> bool
         return False
 
@@ -268,30 +272,6 @@ class _Client(NoopClient):
         # type: (Any) -> None
         self.options = state["options"]
         self._init_impl()
-
-    @classmethod
-    def get_client(cls):
-        # type: () -> NoopClient
-        """
-        Returns the current :py:class:`sentry_sdk.Client`. If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
-
-        .. versionadded:: 1.XX.0
-        """
-        from sentry_sdk.scope import Scope
-
-        client = Scope.get_current_scope().client
-        if client is not None:
-            return client
-
-        client = Scope.get_isolation_scope().client
-        if client is not None:
-            return client
-
-        client = Scope.get_global_scope().client
-        if client is not None:
-            return client
-
-        return NoopClient()
 
     def _setup_instrumentation(self, functions_to_trace):
         # type: (Sequence[Dict[str, str]]) -> None
@@ -414,6 +394,10 @@ class _Client(NoopClient):
             _client_init_debug.set(old_debug)
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
+
+    def is_active(self):
+        # type: () -> bool
+        return True
 
     @property
     def dsn(self):

@@ -88,6 +88,28 @@ def clientemethod(f):
     return f
 
 
+def get_client():
+    # type: () -> Union[Client, NoopClient]
+    """
+    Returns the current :py:class:`sentry_sdk.Client`. If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+
+    .. versionadded:: 1.XX.0
+    """
+    client = Scope.get_current_scope().client
+    if client is not None:
+        return client
+
+    client = Scope.get_isolation_scope().client
+    if client is not None:
+        return client
+
+    client = Scope.get_global_scope().client
+    if client is not None:
+        return client
+
+    return NoopClient()
+
+
 def sentry_is_initialized():
     # type: () -> bool
     """
@@ -96,17 +118,11 @@ def sentry_is_initialized():
 
     .. versionadded:: 1.XX.0
     """
-    client = Client.get_client()
+    client = get_client()
     if client.__class__ == NoopClient:
         return False
     else:
         return True
-
-
-@clientemethod
-def get_client():
-    # type: () -> Union[Client, NoopClient]
-    return Client.get_client()
 
 
 @scopemethod

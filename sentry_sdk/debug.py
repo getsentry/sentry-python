@@ -2,7 +2,7 @@ import sys
 import logging
 
 from sentry_sdk import utils
-from sentry_sdk.client import Client
+from sentry_sdk.api import get_client
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import logger
 from sentry_sdk.client import _client_init_debug
@@ -14,8 +14,8 @@ class _HubBasedClientFilter(logging.Filter):
         # type: (LogRecord) -> bool
         if _client_init_debug.get(False):
             return True
-        
-        return Client.get_client().options["debug"]
+
+        return get_client().options["debug"]
 
 
 def init_debug_support():

@@ -3,6 +3,7 @@ import sys
 
 from contextlib import contextmanager
 
+from sentry_sdk.api import get_client
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
@@ -266,13 +267,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
-        Client.get_client().get_integration(name_or_class)
+        get_client().get_integration(name_or_class)
 
     @property
     def client(self):
         # type: () -> Optional[NoopClient]
         """Returns the current client on the hub."""
-        return Client.get_client()
+        return get_client()
 
     @property
     def scope(self):
@@ -610,7 +611,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Alias for :py:meth:`sentry_sdk.Client.flush`
         """
-        return Client.get_client().flush(timeout=timeout, callback=callback)
+        return get_client().flush(timeout=timeout, callback=callback)
 
     def get_traceparent(self):
         # type: () -> Optional[str]
