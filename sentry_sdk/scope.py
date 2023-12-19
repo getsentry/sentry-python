@@ -441,7 +441,7 @@ class Scope(object):
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the
         currently active span or the scopes Propagation Context.
         """
-        client = kwargs.pop("client", None)
+        client = Scope.get_client()
 
         # If we have an active span, return traceparent from there
         if (
@@ -462,7 +462,7 @@ class Scope(object):
 
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
-        client = kwargs.pop("client", None)
+        client = Scope.get_client()
 
         # If we have an active span, return baggage from there
         if (
@@ -512,18 +512,16 @@ class Scope(object):
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
 
-        client = kwargs.pop("client", None)
-
         meta = ""
 
-        sentry_trace = self.get_traceparent(client=client)
+        sentry_trace = self.get_traceparent()
         if sentry_trace is not None:
             meta += '<meta name="%s" content="%s">' % (
                 SENTRY_TRACE_HEADER_NAME,
                 sentry_trace,
             )
 
-        baggage = self.get_baggage(client=client)
+        baggage = self.get_baggage()
         if baggage is not None:
             meta += '<meta name="%s" content="%s">' % (
                 BAGGAGE_HEADER_NAME,
@@ -554,13 +552,11 @@ class Scope(object):
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        span = kwargs.pop("span", None)
-        client = kwargs.pop("client", None)
-
-        propagate_traces = client and client.options["propagate_traces"]
-        if not propagate_traces:
+        client = Scope.get_client()
+        if not client.options.get("propagate_traces"):
             return
 
+        span = kwargs.pop("span", None)
         span = span or self.span
 
         if client and has_tracing_enabled(client.options) and span is not None:
@@ -794,12 +790,14 @@ class Scope(object):
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        client = kwargs.pop("client", None)
-        if client is None:
+        client = Scope.get_client()
+
+        if not client.is_active():
+            logger.info("Dropped breadcrumb because no client bound")
             return
 
-        before_breadcrumb = client.options.get("before_breadcrumb")
-        max_breadcrumbs = client.options.get("max_breadcrumbs")
+        before_breadcrumb = client.options["before_breadcrumb"]
+        max_breadcrumbs = client.options["max_breadcrumbs"]
 
         crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
@@ -855,7 +853,7 @@ class Scope(object):
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         hub = kwargs.pop("hub", None)
-        client = kwargs.pop("client", None)
+        client = Scope.get_client()
 
         configuration_instrumenter = client and client.options["instrumenter"]
 
@@ -975,8 +973,8 @@ class Scope(object):
 
         return transaction
 
-    def capture_event(self, event, hint=None, client=None, scope=None, **scope_kwargs):
-        # type: (Event, Optional[Hint], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+    def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
+        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
         """
         Captures an event.
 
@@ -986,8 +984,6 @@ class Scope(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param client: The client to use for sending the event to Sentry.
-
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
@@ -997,17 +993,12 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        if client is None:
-            return None
-
         scope = _merge_scopes(self, scope, scope_kwargs)
 
-        return client.capture_event(event=event, hint=hint, scope=scope)
+        return Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
 
-    def capture_message(
-        self, message, level=None, client=None, scope=None, **scope_kwargs
-    ):
-        # type: (str, Optional[str], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
+        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
 
@@ -1015,8 +1006,6 @@ class Scope(object):
 
         :param level: If no level is provided, the default level is `info`.
 
-        :param client: The client to use for sending the event to Sentry.
-
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
@@ -1026,9 +1015,6 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        if client is None:
-            return None
-
         if level is None:
             level = "info"
 
@@ -1037,15 +1023,13 @@ class Scope(object):
             "level": level,
         }
 
-        return self.capture_event(event, client=client, scope=scope, **scope_kwargs)
+        return self.capture_event(event, scope=scope, **scope_kwargs)
 
-    def capture_exception(self, error=None, client=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+    def capture_exception(self, error=None, scope=None, **scope_kwargs):
+        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
         :param error: An exception to capture. If `None`, `sys.exc_info()` will be used.
-
-        :param client: The client to use for sending the event to Sentry.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
@@ -1056,20 +1040,17 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        if client is None:
-            return None
-
         if error is not None:
             exc_info = exc_info_from_error(error)
         else:
             exc_info = sys.exc_info()
 
-        event, hint = event_from_exception(exc_info, client_options=client.options)
+        event, hint = event_from_exception(
+            exc_info, client_options=Scope.get_client().options
+        )
 
         try:
-            return self.capture_event(
-                event, hint=hint, client=client, scope=scope, **scope_kwargs
-            )
+            return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)
         except Exception:
             self._capture_internal_exception(sys.exc_info())
 
@@ -1090,11 +1071,11 @@ class Scope(object):
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         """Starts a new session."""
-        client = kwargs.pop("client", None)
         session_mode = kwargs.pop("session_mode", "application")
 
-        self.end_session(client=client)
+        self.end_session()
 
+        client = Scope.get_client()
         self._session = Session(
             release=client.options["release"] if client else None,
             environment=client.options["environment"] if client else None,
@@ -1105,15 +1086,12 @@ class Scope(object):
     def end_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         """Ends the current session if there is one."""
-        client = kwargs.pop("client", None)
-
         session = self._session
         self._session = None
 
         if session is not None:
             session.close()
-            if client is not None:
-                client.capture_session(session)
+            Scope.get_client().capture_session(session)
 
     def stop_auto_session_tracking(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -1122,10 +1100,7 @@ class Scope(object):
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
         """
-        client = kwargs.pop("client", None)
-
-        self.end_session(client=client)
-
+        self.end_session()
         self._force_auto_session_tracking = False
 
     def resume_auto_session_tracking(self):
