@@ -7,17 +7,10 @@ from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
-from sentry_sdk.profiler import Profile
 from sentry_sdk.tracing import (
     NoOpSpan,
     Span,
     Transaction,
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
-)
-from sentry_sdk.tracing_utils import (
-    has_tracing_enabled,
-    normalize_incoming_data,
 )
 
 from sentry_sdk.utils import (
@@ -28,18 +21,18 @@ from sentry_sdk.utils import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union
     from typing import Any
-    from typing import Optional
-    from typing import Tuple
-    from typing import Dict
-    from typing import List
     from typing import Callable
+    from typing import ContextManager
+    from typing import Dict
     from typing import Generator
+    from typing import List
+    from typing import Optional
+    from typing import overload
+    from typing import Tuple
     from typing import Type
     from typing import TypeVar
-    from typing import overload
-    from typing import ContextManager
+    from typing import Union
 
     from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
@@ -447,54 +440,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+        client, scope = self._stack[-1]
 
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
+        kwargs["hub"] = self
+        kwargs["client"] = client
 
-        # THIS BLOCK IS DEPRECATED
-        # TODO: consider removing this in a future release.
-        # This is for backwards compatibility with releases before
-        # start_transaction existed, to allow for a smoother transition.
-        if isinstance(span, Transaction) or "transaction" in kwargs:
-            deprecation_msg = (
-                "Deprecated: use start_transaction to start transactions and "
-                "Transaction.start_child to start spans."
-            )
-
-            if isinstance(span, Transaction):
-                logger.warning(deprecation_msg)
-                return self.start_transaction(span)
-
-            if "transaction" in kwargs:
-                logger.warning(deprecation_msg)
-                name = kwargs.pop("transaction")
-                return self.start_transaction(name=name, **kwargs)
-
-        # THIS BLOCK IS DEPRECATED
-        # We do not pass a span into start_span in our code base, so I deprecate this.
-        if span is not None:
-            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future."
-            logger.warning(deprecation_msg)
-            return span
-
-        kwargs.setdefault("hub", self)
-
-        active_span = self.scope.span
-        if active_span is not None:
-            new_child_span = active_span.start_child(**kwargs)
-            return new_child_span
-
-        # If there is already a trace_id in the propagation context, use it.
-        # This does not need to be done for `start_child` above because it takes
-        # the trace_id from the parent span.
-        if "trace_id" not in kwargs:
-            traceparent = self.get_traceparent()
-            trace_id = traceparent.split("-")[0] if traceparent else None
-            if trace_id is not None:
-                kwargs["trace_id"] = trace_id
-
-        return Span(**kwargs)
+        return scope.start_span(span=span, instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
@@ -524,55 +475,25 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
-        configuration_instrumenter = self.client and self.client.options["instrumenter"]
+        client, scope = self._stack[-1]
 
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
+        kwargs["hub"] = self
+        kwargs["client"] = client
 
-        custom_sampling_context = kwargs.pop("custom_sampling_context", {})
-
-        # if we haven't been given a transaction, make one
-        if transaction is None:
-            kwargs.setdefault("hub", self)
-            transaction = Transaction(**kwargs)
-
-        # use traces_sample_rate, traces_sampler, and/or inheritance to make a
-        # sampling decision
-        sampling_context = {
-            "transaction_context": transaction.to_json(),
-            "parent_sampled": transaction.parent_sampled,
-        }
-        sampling_context.update(custom_sampling_context)
-        transaction._set_initial_sampling_decision(sampling_context=sampling_context)
-
-        profile = Profile(transaction, hub=self)
-        profile._set_initial_sampling_decision(sampling_context=sampling_context)
-
-        # we don't bother to keep spans if we already know we're not going to
-        # send the transaction
-        if transaction.sampled:
-            max_spans = (
-                self.client and self.client.options["_experiments"].get("max_spans")
-            ) or 1000
-            transaction.init_span_recorder(maxlen=max_spans)
-
-        return transaction
+        return scope.start_transaction(
+            transaction=transaction, instrumenter=instrumenter, **kwargs
+        )
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
         # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
-        with self.configure_scope() as scope:
-            scope.generate_propagation_context(environ_or_headers)
+        scope = self._stack[-1][1]
 
-        transaction = Transaction.continue_from_headers(
-            normalize_incoming_data(environ_or_headers),
-            op=op,
-            name=name,
-            source=source,
+        return scope.continue_trace(
+            environ_or_headers=environ_or_headers, op=op, name=name, source=source
         )
-        return transaction
 
     @overload
     def push_scope(
@@ -735,25 +656,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Returns the traceparent either from the active span or from the scope.
         """
-        if self.client is not None:
-            if has_tracing_enabled(self.client.options) and self.scope.span is not None:
-                return self.scope.span.to_traceparent()
-
-        return self.scope.get_traceparent()
+        client, scope = self._stack[-1]
+        return scope.get_traceparent(client=client)
 
     def get_baggage(self):
         # type: () -> Optional[str]
         """
         Returns Baggage either from the active span or from the scope.
         """
-        if (
-            self.client is not None
-            and has_tracing_enabled(self.client.options)
-            and self.scope.span is not None
-        ):
-            baggage = self.scope.span.to_baggage()
-        else:
-            baggage = self.scope.get_baggage()
+        client, scope = self._stack[-1]
+        baggage = scope.get_baggage(client=client)
 
         if baggage is not None:
             return baggage.serialize()
@@ -767,19 +679,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        client = self._stack[-1][0]
-        propagate_traces = client and client.options["propagate_traces"]
-        if not propagate_traces:
-            return
+        client, scope = self._stack[-1]
 
-        span = span or self.scope.span
-
-        if client and has_tracing_enabled(client.options) and span is not None:
-            for header in span.iter_headers():
-                yield header
-        else:
-            for header in self.scope.iter_headers():
-                yield header
+        return scope.iter_trace_propagation_headers(span=span, client=client)
 
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str
@@ -792,23 +694,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
             )
 
-        meta = ""
-
-        sentry_trace = self.get_traceparent()
-        if sentry_trace is not None:
-            meta += '<meta name="%s" content="%s">' % (
-                SENTRY_TRACE_HEADER_NAME,
-                sentry_trace,
-            )
-
-        baggage = self.get_baggage()
-        if baggage is not None:
-            meta += '<meta name="%s" content="%s">' % (
-                BAGGAGE_HEADER_NAME,
-                baggage,
-            )
-
-        return meta
+        client, scope = self._stack[-1]
+        return scope.trace_propagation_meta(span=span, client=client)
 
 
 GLOBAL_HUB = Hub()
