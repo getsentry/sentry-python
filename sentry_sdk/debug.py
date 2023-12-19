@@ -19,6 +19,7 @@ class _HubBasedClientFilter(logging.Filter):
             return hub.client.options["debug"]
         return False
 
+
 def init_debug_support():
     # type: () -> None
     if not logger.handlers:
