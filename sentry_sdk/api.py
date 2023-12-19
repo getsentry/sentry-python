@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from typing import ContextManager
     from typing import Union
 
+    import sentry_sdk
     from sentry_sdk._types import (
         Event,
         Hint,
@@ -79,6 +80,7 @@ def scopemethod(f):
     return f
 
 
+@scopemethod
 def get_client():
     # type: () -> Union[Client, NoopClient]
     """

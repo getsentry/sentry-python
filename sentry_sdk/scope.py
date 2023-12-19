@@ -125,6 +125,8 @@ def _copy_on_write(property_name):
     # type: (str) -> Callable[[Any], Any]
     """
     Decorator that implements copy-on-write on a property of the Scope.
+
+    .. versionadded:: 1.XX.0
     """
 
     def decorator(func):
@@ -276,6 +278,18 @@ class Scope(object):
 
         return NoopClient()
 
+    def set_client(self, client=None):
+        # type: (Optional[sentry_sdk.Client]) -> None
+        """
+        Sets the client for this scope.
+
+        :param client: The client to use in this scope.
+            If `None` the client of the scope will be deleted.
+
+        .. versionadded:: 1.XX.0
+        """
+        self.client = client
+
     @property
     def is_forked(self):
         # type: () -> bool
@@ -307,18 +321,6 @@ class Scope(object):
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
         sentry_isolation_scope.set(forked_isolation_scope)
-
-    def set_client(self, client=None):
-        # type: (Optional[sentry_sdk.Client]) -> None
-        """
-        Sets the client for this scope.
-
-        :param client: The client to use in this scope.
-            If `None` the client of the scope will be deleted.
-
-        .. versionadded:: 1.XX.0
-        """
-        self.client = client
 
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
@@ -1391,7 +1393,7 @@ class Scope(object):
         )
 
 
-def with_new_scope():
+def _with_new_scope():
     # type: () -> Generator[Scope, None, None]
 
     current_scope = Scope.get_current_scope()
@@ -1409,12 +1411,16 @@ def with_new_scope():
 @contextmanager
 def new_scope():
     # type: () -> Generator[Scope, None, None]
-    """Forks the current scope and runs the wrapped code in it."""
+    """
+    Context manager that forks the current scope and runs the wrapped code in it.
+
+    .. versionadded:: 1.XX.0
+    """
     ctx = copy_context()  # This does not exist in Python 2.7
-    return ctx.run(with_new_scope)
+    return ctx.run(_with_new_scope)
 
 
-def with_isolated_scope():
+def _with_isolated_scope():
     # type: () -> Generator[Scope, None, None]
 
     # fork current scope
@@ -1439,6 +1445,10 @@ def with_isolated_scope():
 @contextmanager
 def isolated_scope():
     # type: () -> Generator[Scope, None, None]
-    """Forks the current isolation scope (and the related current scope) and runs the wrapped code in it."""
+    """
+    Context manager that forks the current isolation scope (and the related current scope) and runs the wrapped code in it.
+
+    .. versionadded:: 1.XX.0
+    """
     ctx = copy_context()
-    return ctx.run(with_isolated_scope)
+    return ctx.run(_with_isolated_scope)
