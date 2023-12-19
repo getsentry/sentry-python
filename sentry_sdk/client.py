@@ -154,6 +154,7 @@ except Exception:
 class NoopClient:
     """
     A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+
     .. versionadded:: 1.XX.0
     """
 
@@ -176,6 +177,7 @@ class NoopClient:
         # type: () -> bool
         """
         Returns weither the client is active (able to send data to Sentry)
+
         .. versionadded:: 1.XX.0
         """
 
@@ -405,6 +407,7 @@ class _Client(NoopClient):
         # type: () -> bool
         """
         Returns weither the client is active (able to send data to Sentry)
+        
         .. versionadded:: 1.XX.0
         """
         return True
