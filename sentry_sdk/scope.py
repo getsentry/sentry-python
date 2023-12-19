@@ -125,6 +125,7 @@ def _copy_on_write(property_name):
     # type: (str) -> Callable[[Any], Any]
     """
     Decorator that implements copy-on-write on a property of the Scope.
+
     .. versionadded:: 1.XX.0
     """
 
@@ -214,6 +215,7 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns the current scope.
+
         .. versionadded:: 1.XX.0
         """
         scope = sentry_current_scope.get()
@@ -228,6 +230,7 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns the isolation scope.
+
         .. versionadded:: 1.XX.0
         """
         scope = sentry_isolation_scope.get()
@@ -242,6 +245,7 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns the global scope.
+
         .. versionadded:: 1.XX.0
         """
         global SENTRY_GLOBAL_SCOPE
@@ -257,6 +261,7 @@ class Scope(object):
         Returns the currently used :py:class:`sentry_sdk.Client`.
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+
         .. versionadded:: 1.XX.0
         """
         client = Scope.get_current_scope().client
@@ -289,6 +294,7 @@ class Scope(object):
         # type: () -> bool
         """
         Weither this scope is a fork of another scope.
+
         .. versionadded:: 1.XX.0
         """
         return self.original_scope is not None
@@ -297,6 +303,7 @@ class Scope(object):
         # type: () -> Scope
         """
         Returns a fork of this scope.
+
         .. versionadded:: 1.XX.0
         """
         self.original_scope = self
@@ -1425,6 +1432,7 @@ def new_scope():
     # type: () -> Generator[Scope, None, None]
     """
     Context manager that forks the current scope and runs the wrapped code in it.
+
     .. versionadded:: 1.XX.0
     """
     ctx = copy_context()  # This does not exist in Python 2.7
@@ -1457,7 +1465,9 @@ def _with_isolated_scope():
 def isolated_scope():
     # type: () -> Generator[Scope, None, None]
     """
-    Context manager that forks the current isolation scope (and the related current scope) and runs the wrapped code in it.
+    Context manager that forks the current isolation scope 
+    (and the related current scope) and runs the wrapped code in it.
+
     .. versionadded:: 1.XX.0
     """
     ctx = copy_context()
