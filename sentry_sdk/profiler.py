@@ -38,7 +38,6 @@ from collections import deque
 import sentry_sdk
 from sentry_sdk._compat import PY33, PY311
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk.scope import Scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
@@ -1046,3 +1045,7 @@ class GeventScheduler(Scheduler):
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
             last = time.perf_counter()
+
+
+# Circular imports
+from sentry_sdk.scope import Scope
