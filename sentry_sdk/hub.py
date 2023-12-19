@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
-from sentry_sdk.client import Client, NoopClient
+from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
     NoOpSpan,
     Span,
@@ -270,9 +270,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @property
     def client(self):
-        # type: () -> Optional[Union[Client, NoopClient]]
+        # type: () -> Optional[Client]
         """Returns the current client on the hub."""
-        return Scope.get_client()
+        client = Scope.get_client()
+
+        if not client.is_active():
+            return None
+        
+        return client  # type: ignore
 
     @property
     def scope(self):
