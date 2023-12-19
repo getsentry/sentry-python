@@ -84,7 +84,7 @@ def get_client():
     """
     Returns the current client. If no client is bound, returns a noop client.
     """
-    return Scope.get_active_client()
+    return Scope.get_client()
 
 
 def sentry_is_initialized():
@@ -95,7 +95,7 @@ def sentry_is_initialized():
 
     .. versionadded:: 1.XX.0
     """
-    return Scope.get_active_client().is_active()
+    return Scope.get_client().is_active()
 
 
 @scopemethod

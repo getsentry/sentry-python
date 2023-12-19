@@ -610,7 +610,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Alias for :py:meth:`sentry_sdk.Client.flush`
         """
-        return Scope.get_active_client().flush(timeout=timeout, callback=callback)
+        return Scope.get_client().flush(timeout=timeout, callback=callback)
 
     def get_traceparent(self):
         # type: () -> Optional[str]
