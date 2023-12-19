@@ -157,7 +157,6 @@ class NoopClient:
 
     .. versionadded:: 1.XX.0
     """
-
     options = _get_options()  # type: Dict[str, Any]
     metrics_aggregator = None  # type: Optional[Any]
     monitor = None  # type: Optional[Any]
@@ -167,12 +166,10 @@ class NoopClient:
         # type: () -> str
         return "<{} id={}>".format(self.__class__.__name__, id(self))
 
-    # new!
     def should_send_default_pii(self):
         # type: () -> bool
         return False
 
-    # new!
     def is_active(self):
         # type: () -> bool
         """
@@ -180,7 +177,6 @@ class NoopClient:
 
         .. versionadded:: 1.XX.0
         """
-
         return False
 
     def __init__(self, *args, **kwargs):
@@ -407,7 +403,7 @@ class _Client(NoopClient):
         # type: () -> bool
         """
         Returns weither the client is active (able to send data to Sentry)
-        
+
         .. versionadded:: 1.XX.0
         """
         return True
