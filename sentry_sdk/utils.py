@@ -1271,7 +1271,7 @@ def _make_threadlocal_contextvars(local):
         def reset(self, token):
             # type: (Any) -> None
             self._local.value = getattr(self._original_local, token)
-            setattr(self._original_local, token, None)
+            del self._original_local[token]
 
     return ContextVar
 
