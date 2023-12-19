@@ -125,6 +125,8 @@ def _copy_on_write(property_name):
     # type: (str) -> Callable[[Any], Any]
     """
     Decorator that implements copy-on-write on a property of the Scope.
+
+    .. versionadded:: 1.XX.0
     """
 
     def decorator(func):
@@ -1412,7 +1414,7 @@ class Scope(object):
         )
 
 
-def with_new_scope():
+def _with_new_scope():
     # type: () -> Generator[Scope, None, None]
 
     current_scope = Scope.get_current_scope()
@@ -1430,12 +1432,16 @@ def with_new_scope():
 @contextmanager
 def new_scope():
     # type: () -> Generator[Scope, None, None]
-    """Forks the current scope and runs the wrapped code in it."""
+    """
+    Forks the current scope and runs the wrapped code in it.
+
+    .. versionadded:: 1.XX.0
+    """
     ctx = copy_context()  # This does not exist in Python 2.7
-    return ctx.run(with_new_scope)
+    return ctx.run(_with_new_scope)
 
 
-def with_isolated_scope():
+def _with_isolated_scope():
     # type: () -> Generator[Scope, None, None]
 
     # fork current scope
@@ -1460,6 +1466,10 @@ def with_isolated_scope():
 @contextmanager
 def isolated_scope():
     # type: () -> Generator[Scope, None, None]
-    """Forks the current isolation scope (and the related current scope) and runs the wrapped code in it."""
+    """
+    Forks the current isolation scope (and the related current scope) and runs the wrapped code in it.
+
+    .. versionadded:: 1.XX.0
+    """
     ctx = copy_context()
-    return ctx.run(with_isolated_scope)
+    return ctx.run(_with_isolated_scope)
