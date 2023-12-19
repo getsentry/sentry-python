@@ -1433,7 +1433,7 @@ def _with_new_scope():
 def new_scope():
     # type: () -> Generator[Scope, None, None]
     """
-    Forks the current scope and runs the wrapped code in it.
+    Context manager that forks the current scope and runs the wrapped code in it.
 
     .. versionadded:: 1.XX.0
     """
@@ -1467,7 +1467,7 @@ def _with_isolated_scope():
 def isolated_scope():
     # type: () -> Generator[Scope, None, None]
     """
-    Forks the current isolation scope (and the related current scope) and runs the wrapped code in it.
+    Context manager that forks the current isolation scope (and the related current scope) and runs the wrapped code in it.
 
     .. versionadded:: 1.XX.0
     """

@@ -2,7 +2,6 @@ import inspect
 
 from sentry_sdk import scope
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
     from typing import ContextManager
     from typing import Union
 
+    import sentry_sdk
     from sentry_sdk._types import (
         Event,
         Hint,
@@ -92,12 +92,7 @@ def sentry_is_initialized():
 
 @scopemethod
 def get_client():
-    # type: () -> Union[Client, NoopClient]
-    """
-    Returns the current client. If no client is bound, returns a noop client.
-
-    .. versionadded:: 1.XX.0
-    """
+    # type: () -> Union[sentry_sdk.client.Client, sentry_sdk.client.NoopClient]
     return Scope.get_client()
 
 

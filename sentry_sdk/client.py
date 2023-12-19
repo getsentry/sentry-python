@@ -158,6 +158,11 @@ class NoopClient:
     .. versionadded:: 1.XX.0
     """
 
+    options = _get_options()  # type: Dict[str, Any]
+    metrics_aggregator = None  # type: Optional[Any]
+    monitor = None  # type: Optional[Any]
+    transport = None  # type: Optional[Any]
+
     def __repr__(self):
         # type: () -> str
         return "<{} id={}>".format(self.__class__.__name__, id(self))
