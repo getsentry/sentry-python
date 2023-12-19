@@ -451,8 +451,7 @@ class Scope(object):
 
         # If we have an active span, return traceparent from there
         if (
-            client is not None
-            and has_tracing_enabled(client.options)
+            has_tracing_enabled(client.options)
             and self.span is not None
         ):
             return self.span.to_traceparent()
@@ -472,8 +471,7 @@ class Scope(object):
 
         # If we have an active span, return baggage from there
         if (
-            client is not None
-            and has_tracing_enabled(client.options)
+            has_tracing_enabled(client.options)
             and self.span is not None
         ):
             return self.span.to_baggage()
@@ -565,7 +563,7 @@ class Scope(object):
         span = kwargs.pop("span", None)
         span = span or self.span
 
-        if client and has_tracing_enabled(client.options) and span is not None:
+        if has_tracing_enabled(client.options) and span is not None:
             for header in span.iter_headers():
                 yield header
         else:
@@ -861,7 +859,7 @@ class Scope(object):
         hub = kwargs.pop("hub", None)
         client = Scope.get_client()
 
-        configuration_instrumenter = client and client.options["instrumenter"]
+        configuration_instrumenter = client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
@@ -889,7 +887,7 @@ class Scope(object):
         # send the transaction
         if transaction.sampled:
             max_spans = (
-                client and client.options["_experiments"].get("max_spans")
+                client.options["_experiments"].get("max_spans")
             ) or 1000
             transaction.init_span_recorder(maxlen=max_spans)
 
@@ -914,7 +912,7 @@ class Scope(object):
         """
         client = kwargs.get("client", None)
 
-        configuration_instrumenter = client and client.options["instrumenter"]
+        configuration_instrumenter = client.options["instrumenter"]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
@@ -1083,8 +1081,8 @@ class Scope(object):
 
         client = Scope.get_client()
         self._session = Session(
-            release=client.options["release"] if client else None,
-            environment=client.options["environment"] if client else None,
+            release=client.options["release"],
+            environment=client.options["environment"],
             user=self._user,
             session_mode=session_mode,
         )
