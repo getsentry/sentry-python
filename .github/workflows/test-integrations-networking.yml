@@ -1,0 +1,167 @@
+name: Test Networking
+on:
+  push:
+    branches:
+      - master
+      - release/**
+  pull_request:
+# Cancel in progress workflows on pull_requests.
+# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  BUILD_CACHE_KEY: ${{ github.sha }}
+  CACHED_BUILD_PATHS: |
+    ${{ github.workspace }}/dist-serverless
+jobs:
+  test-networking-latest:
+    name: Networking (latest)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8","3.9","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test gevent latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test grpc latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test httpx latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test requests latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-requests-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-networking-pinned:
+    name: Networking (pinned)
+    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test gevent pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test grpc pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test httpx pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test requests pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  test-networking-py27:
+    name: Networking (py27)
+    timeout-minutes: 30
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test gevent py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test grpc py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test httpx py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test requests py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+  check_required_tests:
+    name: All Networking tests passed
+    needs: [test-networking-pinned, test-networking-py27]
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test-networking-pinned.result, 'failure') || contains(needs.test-networking-pinned.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+      - name: Check for 2.7 failures
+        if: contains(needs.test-networking-py27.result, 'failure') || contains(needs.test-networking-py27.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

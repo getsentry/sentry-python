@@ -1,7 +1,5 @@
 from importlib import import_module
-import copy
 import os
-import sys
 import uuid
 import random
 import socket
@@ -11,8 +9,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     disable_capture_event,
-    event_from_exception,
-    exc_info_from_error,
     format_timestamp,
     get_sdk_name,
     get_type_name,
@@ -52,7 +48,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
-    from sentry_sdk._types import Event, ExcInfo, Hint
+    from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
 
 
@@ -147,24 +143,6 @@ def _get_options(*args, **kwargs):
     return rv
 
 
-def _update_scope(base, scope_change, scope_kwargs):
-    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
-    if scope_change and scope_kwargs:
-        raise TypeError("cannot provide scope and kwargs")
-    if scope_change is not None:
-        final_scope = copy.copy(base)
-        if callable(scope_change):
-            scope_change(final_scope)
-        else:
-            final_scope.update_from_scope(scope_change)
-    elif scope_kwargs:
-        final_scope = copy.copy(base)
-        final_scope.update_from_kwargs(**scope_kwargs)
-    else:
-        final_scope = base
-    return final_scope
-
-
 try:
     # Python 3.6+
     module_not_found_error = ModuleNotFoundError
@@ -178,6 +156,8 @@ class _Client(object):
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
+
+    Alias of :py:class:`Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
@@ -491,20 +471,28 @@ class _Client(object):
         hint,  # type: Hint
     ):
         # type: (...) -> bool
-        sampler = self.options.get("error_sampler", None)
+        error_sampler = self.options.get("error_sampler", None)
 
-        if callable(sampler):
+        if callable(error_sampler):
             with capture_internal_exceptions():
-                sample_rate = sampler(event, hint)
+                sample_rate = error_sampler(event, hint)
         else:
             sample_rate = self.options["sample_rate"]
 
         try:
             not_in_sample_rate = sample_rate < 1.0 and random.random() >= sample_rate
+        except NameError:
+            logger.warning(
+                "The provided error_sampler raised an error. Defaulting to sampling the event."
+            )
+
+            # If the error_sampler raised an error, we should sample the event, since the default behavior
+            # (when no sample_rate or error_sampler is provided) is to sample all events.
+            not_in_sample_rate = False
         except TypeError:
             parameter, verb = (
                 ("error_sampler", "returned")
-                if callable(sampler)
+                if callable(error_sampler)
                 else ("sample_rate", "contains")
             )
             logger.warning(
@@ -566,7 +554,6 @@ class _Client(object):
         event,  # type: Event
         hint=None,  # type: Optional[Hint]
         scope=None,  # type: Optional[Scope]
-        **scope_kwargs  # type: Any
     ):
         # type: (...) -> Optional[str]
         """Captures an event.
@@ -575,20 +562,13 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param scope: An optional scope to use for determining whether this event
-            should be captured.
-
-        :param scope_kwargs: For supported `**scope_kwargs` see
-            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if disable_capture_event.get(False):
             return None
-
-        if scope_kwargs is not None and "top_scope" in scope_kwargs:
-            top_scope = scope_kwargs.pop("top_scope")
-            scope = _update_scope(top_scope, scope, scope_kwargs)
 
         if hint is None:
             hint = {}
@@ -676,66 +656,6 @@ class _Client(object):
             self.transport.capture_event(event_opt)
 
         return event_id
-
-    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
-        """
-        Captures a message.
-
-        :param message: The string to send as the message.
-
-        :param level: If no level is provided, the default level is `info`.
-
-        :param scope: An optional :py:class:`sentry_sdk.Scope` to use.
-
-        :param scope_kwargs: For supported `**scope_kwargs` see
-            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
-
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
-        """
-        if level is None:
-            level = "info"
-
-        return self.capture_event(
-            {"message": message, "level": level}, scope=scope, **scope_kwargs
-        )
-
-    def capture_exception(self, error=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
-        """Captures an exception.
-
-        :param error: An exception to catch. If `None`, `sys.exc_info()` will be used.
-
-        :param scope_kwargs: For supported `**scope_kwargs` see
-            :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
-
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
-        """
-        if error is not None:
-            exc_info = exc_info_from_error(error)
-        else:
-            exc_info = sys.exc_info()
-
-        event, hint = event_from_exception(exc_info, client_options=self.options)
-
-        try:
-            return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)
-        except Exception:
-            self._capture_internal_exception(sys.exc_info())
-
-        return None
-
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
-        """
-        Capture an exception that is likely caused by a bug in the SDK
-        itself.
-
-        These exceptions do not end up in Sentry and are just logged instead.
-        """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def capture_session(
         self, session  # type: Session
