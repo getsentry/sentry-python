@@ -681,8 +681,9 @@ class Scope(object):
         # type: (Optional[Dict[str, Any]]) -> None
         """Sets a user for the scope."""
         self._user = value
-        if self._session is not None:
-            self._session.update(user=value)
+        session = Scope.get_isolation_scope()._session
+        if session is not None:
+            session.update(user=value)
 
     @property
     def span(self):
@@ -1361,6 +1362,8 @@ class Scope(object):
             self._profile = scope._profile
         if scope._propagation_context:
             self._propagation_context = scope._propagation_context
+        if scope._session:
+            self._session = scope._session
 
     def update_from_kwargs(
         self,
