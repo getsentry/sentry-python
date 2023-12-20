@@ -943,8 +943,6 @@ class Scope(object):
             logger.warning(deprecation_msg)
             return span
 
-        kwargs.pop("client")
-
         active_span = self.span
         if active_span is not None:
             new_child_span = active_span.start_child(**kwargs)
