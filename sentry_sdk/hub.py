@@ -559,7 +559,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: If no callback is provided, returns a context manager that returns the scope.
         """
-        scope = Scope.get_isolation_scope()
+        scope = Scope.get_current_scope()
 
         if continue_trace:
             scope.generate_propagation_context()
