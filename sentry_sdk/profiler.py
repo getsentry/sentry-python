@@ -589,7 +589,7 @@ class Profile(object):
         # type: () -> Profile
         hub = self.hub or sentry_sdk.Hub.current
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.scope.Scope.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
@@ -1045,7 +1045,3 @@ class GeventScheduler(Scheduler):
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
             last = time.perf_counter()
-
-
-# Circular imports
-from sentry_sdk.scope import Scope
