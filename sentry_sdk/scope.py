@@ -98,28 +98,6 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-def _merge_scopes(base, scope_change, scope_kwargs):
-    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
-    if scope_change and scope_kwargs:
-        raise TypeError("cannot provide scope and kwargs")
-
-    if scope_change is not None:
-        final_scope = copy(base)
-        if callable(scope_change):
-            scope_change(final_scope)
-        else:
-            final_scope.update_from_scope(scope_change)
-
-    elif scope_kwargs:
-        final_scope = copy(base)
-        final_scope.update_from_kwargs(**scope_kwargs)
-
-    else:
-        final_scope = base
-
-    return final_scope
-
-
 def _copy_on_write(property_name):
     # type: (str) -> Callable[[Any], Any]
     """
@@ -258,6 +236,31 @@ class Scope(object):
             SENTRY_GLOBAL_SCOPE = Scope(ty="global")
 
         return SENTRY_GLOBAL_SCOPE
+    
+    @classmethod
+    def _merge_scopes(cls, additional_scope=None, additional_scope_kwargs=None):
+        # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
+        """
+        Merges global, isolation and current scope into a new scope and 
+        adds the given additional scope or additional scope kwargs to it.
+        """
+        if additional_scope and additional_scope_kwargs:
+            raise TypeError("cannot provide scope and kwargs")
+
+        final_scope = copy(Scope.get_global_scope())
+        final_scope.update_from_scope(Scope.get_isolation_scope())
+        final_scope.update_from_scope(Scope.get_current_scope())
+
+        if additional_scope is not None:
+            if callable(additional_scope):
+                additional_scope(final_scope)
+            else:
+                final_scope.update_from_scope(additional_scope)
+
+        elif additional_scope_kwargs:
+            final_scope.update_from_kwargs(**additional_scope_kwargs)
+
+        return final_scope
 
     @classmethod
     def get_client(cls):
@@ -995,7 +998,7 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        scope = _merge_scopes(self, scope, scope_kwargs)
+        scope = Scope._merge_scopes(scope, scope_kwargs)
 
         return Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
 

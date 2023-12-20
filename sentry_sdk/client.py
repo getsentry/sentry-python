@@ -675,7 +675,6 @@ class _Client(NoopClient):
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
-            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
