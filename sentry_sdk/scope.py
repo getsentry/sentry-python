@@ -1239,8 +1239,12 @@ class Scope(object):
         """
         exc_info = hint.get("exc_info")
         if exc_info is not None:
-            error_processors = self._error_processors
-            
+            error_processors = chain(
+                Scope.get_global_scope()._error_processors,
+                Scope.get_isolation_scope()._error_processors,
+                Scope.get_current_scope()._error_processors,
+            )
+
             for error_processor in error_processors:
                 new_event = error_processor(event, exc_info)
                 if new_event is None:
@@ -1261,7 +1265,9 @@ class Scope(object):
         if not is_check_in:
             event_processors = chain(
                 global_event_processors, 
-                self._event_processors
+                Scope.get_global_scope()._event_processors,
+                Scope.get_isolation_scope()._event_processors,
+                Scope.get_current_scope()._event_processors,
             )
 
             for event_processor in event_processors:
