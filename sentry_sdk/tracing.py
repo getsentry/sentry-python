@@ -198,7 +198,7 @@ class Span(object):
         # type: () -> Span
         hub = self.hub or sentry_sdk.Hub.current
 
-        _, scope = hub._stack[-1]
+        scope = sentry_sdk.Scope.get_current_scope()
         old_span = scope.span
         scope.span = self
         self._context_manager_state = (hub, scope, old_span)
