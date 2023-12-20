@@ -910,7 +910,7 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        client = kwargs.get("client", None)
+        client = Scope.get_client()
 
         configuration_instrumenter = client.options["instrumenter"]
 
