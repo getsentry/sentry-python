@@ -222,6 +222,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 scope = copy.copy(other_scope)
         else:
             client = client_or_hub
+            Scope.get_global_scope().set_client(client)
+
         if scope is None:
             scope = Scope()
 
