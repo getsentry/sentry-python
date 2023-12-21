@@ -395,7 +395,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         )
 
     with configure_scope() as scope:
-        scope.clear() # TODO: This clears the current scope, but the breadcrumbs are on the isolation scope
+        scope.clear()  # TODO: This clears the current scope, but the breadcrumbs are on the isolation scope
 
     capture_exception(ValueError())
     (event,) = events

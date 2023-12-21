@@ -158,6 +158,7 @@ class _ScopeManager(object):
         # type: (Any, Any, Any) -> None
         pass
 
+
 class Hub(with_metaclass(HubMeta)):  # type: ignore
     """The hub wraps the concurrency management of the SDK.  Each thread has
     its own hub but the hub might transfer with the flow of execution if
@@ -390,12 +391,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        # TODO: fix hub
-        kwargs["hub"] = self
+        scope = Scope.get_isolation_scope()
 
-        return Scope.get_isolation_scope().start_span(
-            span=span, instrumenter=instrumenter, **kwargs
-        )
+        # For backwards compatibility, we allow passing the scope as the hub.
+        # We need a major release to make this nice. (if someone searches the code: deprecated)
+        kwargs["hub"] = scope
+
+        return scope.start_span(span=span, instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
@@ -425,10 +427,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
-        # TODO: fix hub
-        kwargs["hub"] = self
+        scope = Scope.get_isolation_scope()
 
-        return Scope.get_isolation_scope().start_transaction(
+        # For backwards compatibility, we allow passing the scope as the hub.
+        # We need a major release to make this nice. (if someone searches the code: deprecated)
+        kwargs["hub"] = scope
+
+        return scope.start_transaction(
             transaction=transaction, instrumenter=instrumenter, **kwargs
         )
 

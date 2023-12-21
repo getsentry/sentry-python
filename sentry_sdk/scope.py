@@ -236,12 +236,12 @@ class Scope(object):
             SENTRY_GLOBAL_SCOPE = Scope(ty="global")
 
         return SENTRY_GLOBAL_SCOPE
-    
+
     @classmethod
     def _merge_scopes(cls, additional_scope=None, additional_scope_kwargs=None):
         # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
         """
-        Merges global, isolation and current scope into a new scope and 
+        Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
         """
         if additional_scope and additional_scope_kwargs:
@@ -453,10 +453,7 @@ class Scope(object):
         client = Scope.get_client()
 
         # If we have an active span, return traceparent from there
-        if (
-            has_tracing_enabled(client.options)
-            and self.span is not None
-        ):
+        if has_tracing_enabled(client.options) and self.span is not None:
             return self.span.to_traceparent()
 
         if self._propagation_context is None:
@@ -473,10 +470,7 @@ class Scope(object):
         client = Scope.get_client()
 
         # If we have an active span, return baggage from there
-        if (
-            has_tracing_enabled(client.options)
-            and self.span is not None
-        ):
+        if has_tracing_enabled(client.options) and self.span is not None:
             return self.span.to_baggage()
 
         if self._propagation_context is None:
@@ -860,7 +854,6 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
-        hub = kwargs.pop("hub", None)
         client = Scope.get_client()
 
         configuration_instrumenter = client.options["instrumenter"]
@@ -872,7 +865,6 @@ class Scope(object):
 
         # if we haven't been given a transaction, make one
         if transaction is None:
-            kwargs.setdefault("hub", hub)
             transaction = Transaction(**kwargs)
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
@@ -884,15 +876,13 @@ class Scope(object):
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
-        profile = Profile(transaction, hub=hub)
+        profile = Profile(transaction)
         profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
         if transaction.sampled:
-            max_spans = (
-                client.options["_experiments"].get("max_spans")
-            ) or 1000
+            max_spans = (client.options["_experiments"].get("max_spans")) or 1000
             transaction.init_span_recorder(maxlen=max_spans)
 
         return transaction
@@ -1254,7 +1244,7 @@ class Scope(object):
                 event = new_event
 
         return event
-    
+
     def run_event_processors(self, event, hint):
         # type: (Event, Hint) -> Optional[Event]
         """
@@ -1265,7 +1255,7 @@ class Scope(object):
 
         if not is_check_in:
             event_processors = chain(
-                global_event_processors, 
+                global_event_processors,
                 Scope.get_global_scope()._event_processors,
                 Scope.get_isolation_scope()._event_processors,
                 Scope.get_current_scope()._event_processors,
@@ -1326,11 +1316,11 @@ class Scope(object):
         event = self.run_error_processors(event, hint)
         if event is None:
             return None
-        
+
         event = self.run_event_processors(event, hint)
         if event is None:
             return None
-        
+
         return event
 
     def update_from_scope(self, scope):

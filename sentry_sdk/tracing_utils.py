@@ -8,6 +8,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
+    logger,
     match_regex_list,
     to_string,
     is_sentry_url,
@@ -152,7 +153,18 @@ def record_sql_queries(
 
 
 def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+    # type: (Union[sentry_sdk.Hub, sentry_sdk.Scope], sentry_sdk.tracing.Span) -> None
+
+    if type(hub) is sentry_sdk.Hub:
+        # For backwards compatibility, we allow passing the scope as the hub.
+        # We need a major release to make this nice. (if someone searches the code: deprecated)
+        # In the SDKs codebase a Hub that is not Hub.current is never passed in here, but it is probably
+        # done by users.
+        logger.warning(
+            "Deprecated: The Hub will be replaces by the Scope. Please use the Scope instead of the Hub."
+        )
+        hub = sentry_sdk.Scope.get_isolation_scope()
+
     if span.op == OP.DB_REDIS:
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
@@ -173,8 +185,8 @@ def add_query_source(hub, span):
     """
     Adds OTel compatible source code information to the span
     """
-    client = hub.client
-    if client is None:
+    client = sentry_sdk.Scope.get_client()
+    if not client.is_active():
         return
 
     if span.timestamp is None or span.start_timestamp is None:
