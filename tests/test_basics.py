@@ -394,7 +394,7 @@ def test_breadcrumbs(sentry_init, capture_events):
         )
 
     with configure_scope() as scope:
-        scope.clear()
+        scope.clear() # TODO: This clears the current scope, but the breadcrumbs are on the isolation scope
 
     capture_exception(ValueError())
     (event,) = events
@@ -456,7 +456,7 @@ def test_client_initialized_within_scope(sentry_init, caplog):
 
     sentry_init(debug=True)
 
-    with push_scope():
+    with push_scope():  # TODO: push scope and bind_client
         Hub.current.bind_client(Client())
 
     (record,) = (x for x in caplog.records if x.levelname == "WARNING")

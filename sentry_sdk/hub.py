@@ -148,50 +148,15 @@ class HubMeta(type):
 class _ScopeManager(object):
     def __init__(self, hub):
         # type: (Hub) -> None
-        self._hub = hub
-        self._original_len = len(hub._stack)
-        self._layer = hub._stack[-1]
+        pass
 
     def __enter__(self):
         # type: () -> Scope
-        scope = self._layer[1]
-        assert scope is not None
-        return scope
+        return Scope.get_current_scope()
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
-        current_len = len(self._hub._stack)
-        if current_len < self._original_len:
-            logger.error(
-                "Scope popped too soon. Popped %s scopes too many.",
-                self._original_len - current_len,
-            )
-            return
-        elif current_len > self._original_len:
-            logger.warning(
-                "Leaked %s scopes: %s",
-                current_len - self._original_len,
-                self._hub._stack[self._original_len :],
-            )
-
-        layer = self._hub._stack[self._original_len - 1]
-        del self._hub._stack[self._original_len - 1 :]
-
-        if layer[1] != self._layer[1]:
-            logger.error(
-                "Wrong scope found. Meant to pop %s, but popped %s.",
-                layer[1],
-                self._layer[1],
-            )
-        elif layer[0] != self._layer[0]:
-            warning = (
-                "init() called inside of pushed scope. This might be entirely "
-                "legitimate but usually occurs when initializing the SDK inside "
-                "a request handler or task/job function. Try to initialize the "
-                "SDK as early as possible instead."
-            )
-            logger.warning(warning)
-
+        pass
 
 class Hub(with_metaclass(HubMeta)):  # type: ignore
     """The hub wraps the concurrency management of the SDK.  Each thread has
@@ -509,16 +474,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             with self.push_scope() as scope:
                 callback(scope)
             return None
-
-        client, scope = self._stack[-1]
-
-        new_scope = copy.copy(scope)
-
-        if continue_trace:
-            new_scope.generate_propagation_context()
-
-        new_layer = (client, new_scope)
-        self._stack.append(new_layer)
 
         return _ScopeManager(self)
 

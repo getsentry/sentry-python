@@ -106,7 +106,7 @@ def test_continue_trace(sentry_init):
     with start_transaction(transaction):
         assert transaction.name == "some name"
 
-        propagation_context = Hub.current.scope._propagation_context
+        propagation_context = Hub.current.scope._propagation_context  # TODO: because this is the current scope and continue_trace was done on isolation scope.
         assert propagation_context["trace_id"] == transaction.trace_id == trace_id
         assert propagation_context["parent_span_id"] == parent_span_id
         assert propagation_context["parent_sampled"] == parent_sampled
