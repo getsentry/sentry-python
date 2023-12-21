@@ -68,6 +68,7 @@ def test_processors(sentry_init, capture_events):
     events = capture_events()
 
     with configure_scope() as scope:
+
         def error_processor(event, exc_info):
             event["exception"]["values"][0]["value"] += " whatever"
             return event
