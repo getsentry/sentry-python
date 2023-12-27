@@ -5,6 +5,8 @@ import time
 
 import pytest
 
+from tests.conftest import patch_start_tracing_child
+
 from sentry_sdk import (
     Client,
     push_scope,
@@ -736,3 +738,47 @@ def test_multiple_setup_integrations_calls():
 
     second_call_return = setup_integrations([NoOpIntegration()], with_defaults=False)
     assert second_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
+
+
+class TracingTestClass:
+    @staticmethod
+    def static(arg):
+        return arg
+
+    @classmethod
+    def class_(cls, arg):
+        return cls, arg
+
+
+def test_staticmethod_tracing(sentry_init):
+    test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
+    assert (
+        ".".join(
+            [TracingTestClass.static.__module__, TracingTestClass.static.__qualname__]
+        )
+        == test_staticmethod_name
+    ), "The test static method was moved or renamed. Please update the name accordingly"
+
+    sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
+
+    for instance_or_class in (TracingTestClass, TracingTestClass()):
+        with patch_start_tracing_child() as fake_start_child:
+            assert instance_or_class.static(1) == 1
+            fake_start_child.assert_called_once()
+
+
+def test_classmethod_tracing(sentry_init):
+    test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
+    assert (
+        ".".join(
+            [TracingTestClass.class_.__module__, TracingTestClass.class_.__qualname__]
+        )
+        == test_classmethod_name
+    ), "The test class method was moved or renamed. Please update the name accordingly"
+
+    sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
+
+    for instance_or_class in (TracingTestClass, TracingTestClass()):
+        with patch_start_tracing_child() as fake_start_child:
+            assert instance_or_class.class_(1) == (TracingTestClass, 1)
+            fake_start_child.assert_called_once()
