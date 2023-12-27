@@ -27,7 +27,7 @@ def test_trace_decorator():
 
         result2 = start_child_span_decorator(my_example_function)()
         fake_start_child.assert_called_once_with(
-            op="function", description="test_decorator_py2.my_example_function"
+            op="function", description="test_decorator_sync.my_example_function"
         )
         assert result2 == "return_of_sync_function"
 
