@@ -770,7 +770,7 @@ def test_staticmethod_tracing(sentry_init):
     for instance_or_class in (TracingTestClass, TracingTestClass()):
         with patch_start_tracing_child() as fake_start_child:
             assert instance_or_class.static(1) == 1
-            assert fake_start_child.call_counnt == 1
+            assert fake_start_child.call_count == 1
 
 
 def test_classmethod_tracing(sentry_init):
