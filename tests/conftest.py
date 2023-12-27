@@ -635,12 +635,14 @@ def werkzeug_set_cookie(client, servername, key, value):
 
 
 @contextmanager
-def patch_start_tracing_child(fake_transaction=mock.MagicMock()):
-    # type: (Optional[mock.MagicMock]) -> Iterator[Optional[mock.MagicMock]]
-    if fake_transaction is not None:
+def patch_start_tracing_child(fake_transaction_is_none=False):
+    # type: (bool) -> Iterator[Optional[mock.MagicMock]]
+    if not fake_transaction_is_none:
+        fake_transaction = mock.MagicMock()
         fake_start_child = mock.MagicMock()
         fake_transaction.start_child = fake_start_child
     else:
+        fake_transaction = None
         fake_start_child = None
 
     version = "2" if PY2 else "3"

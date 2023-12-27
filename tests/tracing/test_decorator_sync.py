@@ -33,7 +33,7 @@ def test_trace_decorator():
 
 
 def test_trace_decorator_no_trx():
-    with patch_start_tracing_child(fake_transaction=None):
+    with patch_start_tracing_child(fake_transaction_is_none=True):
         with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
             result = my_example_function()
             fake_warning.assert_not_called()

@@ -34,7 +34,7 @@ async def test_trace_decorator_async_py3():
 
 @pytest.mark.asyncio
 async def test_trace_decorator_async_py3_no_trx():
-    with patch_start_tracing_child(fake_transaction=None):
+    with patch_start_tracing_child(fake_transaction_is_none=True):
         with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
             result = await my_async_example_function()
             fake_warning.assert_not_called()
