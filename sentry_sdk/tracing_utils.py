@@ -422,15 +422,18 @@ class Baggage(object):
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-        hub = transaction.hub or sentry_sdk.Hub.current
-        client = hub.client
+        client = sentry_sdk.Scope.get_client()
         sentry_items = {}  # type: Dict[str, str]
 
-        if not client:
+        if not client.is_active():
             return Baggage(sentry_items)
 
         options = client.options or {}
-        user = (hub.scope and hub.scope._user) or {}
+        # For backwards compatibility, we allow passing the scope as the hub.
+        # So hub here can be an instance of Scope.
+        # We need a major release to make this nice. (if someone searches the code: deprecated)
+        hub = transaction.hub or sentry_sdk.Hub.current
+        user = hub._user or (hasattr(hub, "scope") and hub.scope and hub.scope._user) or {}
 
         sentry_items["trace_id"] = transaction.trace_id
 

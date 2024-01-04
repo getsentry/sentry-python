@@ -194,9 +194,15 @@ def reset_integrations():
 @pytest.fixture
 def sentry_init(monkeypatch_test_transport, request):
     def inner(*a, **kw):
+        # Clear scopes to not leak scope data between tests
+        sentry_sdk.scope.SENTRY_GLOBAL_SCOPE = None
+        sentry_sdk.scope.sentry_isolation_scope.set(None)
+        sentry_sdk.scope.sentry_current_scope.set(None)
+
         hub = sentry_sdk.Hub.current
         client = sentry_sdk.Client(*a, **kw)
         hub.bind_client(client)
+
         if "transport" not in kw:
             monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 

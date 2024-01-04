@@ -251,7 +251,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def scope(self):
         # type: () -> Scope
         """Returns the current scope on the hub."""
-        return Scope.get_current_scope()
+        return Scope.get_isolation_scope()
 
     def last_event_id(self):
         # type: () -> Optional[str]
@@ -521,7 +521,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: If no callback is provided, returns a context manager that returns the scope.
         """
-        scope = Scope.get_current_scope()
+        scope = Scope.get_isolation_scope()
 
         if continue_trace:
             scope.generate_propagation_context()
@@ -586,14 +586,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Returns the traceparent either from the active span or from the scope.
         """
-        return Scope.get_current_scope().get_traceparent()
+        return Scope.get_isolation_scope().get_traceparent()
 
     def get_baggage(self):
         # type: () -> Optional[str]
         """
         Returns Baggage either from the active span or from the scope.
         """
-        baggage = Scope.get_current_scope().get_baggage()
+        baggage = Scope.get_isolation_scope().get_baggage()
 
         if baggage is not None:
             return baggage.serialize()
