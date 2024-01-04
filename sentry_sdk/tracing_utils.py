@@ -433,7 +433,7 @@ class Baggage(object):
         # So hub here can be an instance of Scope.
         # We need a major release to make this nice. (if someone searches the code: deprecated)
         hub = transaction.hub or sentry_sdk.Hub.current
-        user = hub._user or (hasattr(hub, "scope") and hub.scope and hub.scope._user) or {}
+        user = (hasattr(hub, "_user") and hub._user) or (hasattr(hub, "scope") and hub.scope and hub.scope._user) or {}
 
         sentry_items["trace_id"] = transaction.trace_id
 
