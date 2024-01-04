@@ -667,6 +667,7 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
+        hub = hub or self.hub or sentry_sdk.Hub.current
         client = sentry_sdk.Scope.get_client()
 
         if not client.is_active():
