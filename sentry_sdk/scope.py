@@ -247,9 +247,16 @@ class Scope(object):
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
 
-        final_scope = copy(Scope.get_global_scope())
-        final_scope.update_from_scope(Scope.get_isolation_scope())
-        final_scope.update_from_scope(Scope.get_current_scope())
+        global_scope = Scope.get_global_scope(should_create_scope=False)
+        final_scope = copy(global_scope) or Scope()
+
+        isolation_scope = Scope.get_isolation_scope(should_create_scope=False)
+        if isolation_scope is not None:
+            final_scope.update_from_scope(isolated_scope)
+
+        current_scope = Scope.get_current_scope(should_create_scope=False)
+        if current_scope is not None:
+            final_scope.update_from_scope(current_scope)
 
         if additional_scope is not None:
             if callable(additional_scope):
