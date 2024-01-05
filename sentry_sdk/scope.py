@@ -252,7 +252,7 @@ class Scope(object):
 
         isolation_scope = Scope.get_isolation_scope(should_create_scope=False)
         if isolation_scope is not None:
-            final_scope.update_from_scope(isolated_scope)
+            final_scope.update_from_scope(isolation_scope)
 
         current_scope = Scope.get_current_scope(should_create_scope=False)
         if current_scope is not None:
