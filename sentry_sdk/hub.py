@@ -313,7 +313,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
         """
-        last_event_id = Scope.get_current_scope().capture_message(
+        last_event_id = Scope.get_isolation_scope().capture_message(
             message, level=level, scope=scope, **scope_kwargs
         )
 

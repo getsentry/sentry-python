@@ -166,12 +166,12 @@ class Scope(object):
         "_propagation_context",
         "client",
         "original_scope",
-        "_ty",
+        "_type",
     )
 
     def __init__(self, ty=None, client=None):
         # type: (Optional[str], Optional[sentry_sdk.Client]) -> None
-        self._ty = ty
+        self._type = ty
         self.original_scope = None  # type: Optional[Scope]
 
         self._event_processors = []  # type: List[EventProcessor]
@@ -431,7 +431,7 @@ class Scope(object):
                     self._propagation_context,
                 )
 
-        if self._propagation_context is None:
+        if self._propagation_context is None and self._type != "current":
             self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
@@ -1261,11 +1261,14 @@ class Scope(object):
         is_check_in = ty == "check_in"
 
         if not is_check_in:
+            global_scope = Scope.get_global_scope(should_create_scope=False)
+            isolation_scope = Scope.get_isolation_scope(should_create_scope=False)
+            current_scope = Scope.get_current_scope(should_create_scope=False)
             event_processors = chain(
                 global_event_processors,
-                Scope.get_global_scope()._event_processors,
-                Scope.get_isolation_scope()._event_processors,
-                Scope.get_current_scope()._event_processors,
+                global_scope and global_scope._event_processors or [],
+                isolation_scope and isolation_scope._event_processors or [],
+                current_scope and current_scope._event_processors or [],
             )
 
             for event_processor in event_processors:
