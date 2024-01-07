@@ -74,7 +74,7 @@ def test_basic_script_name_is_respected(sentry_init, crashing_app, capture_event
     events = capture_events()
 
     with pytest.raises(ZeroDivisionError):
-        # setting url with PATH_INFO: /bark, HTTP_HOST: dogs.are.great and SCRIPT_NAME: /woof/woof
+        # setting url with PATH_INFO: bark/, HTTP_HOST: dogs.are.great and SCRIPT_NAME: woof/woof/
         client.get("bark/", "https://dogs.are.great/woof/woof/")
 
     (event,) = events
