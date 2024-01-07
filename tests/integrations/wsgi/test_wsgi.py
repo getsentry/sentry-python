@@ -61,6 +61,29 @@ def test_basic(sentry_init, crashing_app, capture_events):
     }
 
 
+def test_basic_script_name_is_respected(sentry_init, crashing_app, capture_events):
+    sentry_init(send_default_pii=True)
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        # setting url with PATH_INFO: bark/, HTTP_HOST: dogs.are.great and SCRIPT_NAME: woof/woof/
+        client.get("bark/", "https://dogs.are.great/woof/woof/")
+
+    (event,) = events
+
+    assert event["transaction"] == "generic WSGI request"
+    print(event["request"])
+    assert event["request"] == {
+        "env": {"SERVER_NAME": "dogs.are.great", "SERVER_PORT": "443"},
+        "headers": {"Host": "dogs.are.great"},
+        "method": "GET",
+        "query_string": "",
+        "url": "https://dogs.are.great/woof/woof/bark/",
+    }
+
+
 @pytest.fixture(params=[0, None])
 def test_systemexit_zero_is_ignored(sentry_init, capture_events, request):
     zero_code = request.param
