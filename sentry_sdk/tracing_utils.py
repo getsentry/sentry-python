@@ -255,7 +255,10 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            in_app_path = filepath.replace(project_root, "")
+            if project_root is not None and filepath.startswith(project_root):
+                in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
+            else:
+                in_app_path = filepath
             span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:

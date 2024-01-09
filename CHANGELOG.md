@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.39.1
+
+### Various fixes & improvements
+
+- Fix psycopg2 detection in the Django integration (#2593) by @sentrivana
+- Filter out empty string releases (#2591) by @sentrivana
+- Fixed local var not present when there is an error in a user's `error_sampler` function (#2511) by @antonpirker
+- Fixed typing in `aiohttp` (#2590) by @antonpirker
+
 ## 1.39.0
 
 ### Various fixes & improvements
