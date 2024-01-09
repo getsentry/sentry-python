@@ -5,6 +5,7 @@ import sys
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    get_default_release,
     get_error_message,
     get_git_revision,
     is_valid_sample_rate,
@@ -579,3 +580,15 @@ def test_devnull_not_found():
         revision = get_git_revision()
 
     assert revision is None
+
+
+def test_default_release():
+    release = get_default_release()
+    assert release is not None
+
+
+def test_default_release_empty_string():
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release is None
