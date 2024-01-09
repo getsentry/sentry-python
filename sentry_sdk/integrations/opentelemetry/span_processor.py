@@ -173,9 +173,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
 
-        sentry_span.finish(
-            end_timestamp=utc_from_timestamp(otel_span.end_time / 1e9)
-        )
+        sentry_span.finish(end_timestamp=utc_from_timestamp(otel_span.end_time / 1e9))
 
     def _is_sentry_span(self, hub, otel_span):
         # type: (Hub, OTelSpan) -> bool
