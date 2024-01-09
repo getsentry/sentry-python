@@ -591,3 +591,7 @@ def test_strip_string():
     text_with_unicode_character = u"éê"
     assert strip_string(text_with_unicode_character, max_length=2).value == u"é..."
     # fmt: on
+
+    # This was causing UnicodeDecodeErrors in Python 2
+    text_with_unicode_character = "éê"
+    assert strip_string(text_with_unicode_character, max_length=2).value == "éê"
