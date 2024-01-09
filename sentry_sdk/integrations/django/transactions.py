@@ -153,9 +153,6 @@ class RavenResolver(object):
         urlconf=None,  # type: Union[None, Tuple[URLPattern, URLPattern, URLResolver], Tuple[URLPattern]]
     ):
         # type: (...) -> Optional[str]
-        import ipdb
-
-        ipdb.set_trace()
         resolver = get_resolver(urlconf)
         match = self._resolve(resolver, path)
         return match

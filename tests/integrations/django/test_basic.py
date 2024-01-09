@@ -718,9 +718,6 @@ def test_transaction_style(
     content, status, headers = unpack_werkzeug_response(client.get(client_url))
     assert content == expected_response
 
-    import ipdb
-
-    ipdb.set_trace()
     (event,) = events
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
