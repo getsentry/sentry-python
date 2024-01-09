@@ -1,5 +1,6 @@
-import sys
+import os
 import pytest
+import sys
 
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
@@ -327,6 +328,10 @@ def test_query_source(sentry_init, capture_events):
             assert data.get(SPANDATA.CODE_FILEPATH).endswith(
                 "tests/integrations/sqlalchemy/test_sqlalchemy.py"
             )
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
             assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
             break
     else:
