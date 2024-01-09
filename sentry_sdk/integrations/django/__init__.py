@@ -15,8 +15,8 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import (
-    SOURCE_FOR_STYLE, 
-    TRANSACTION_SOURCE_URL, 
+    SOURCE_FOR_STYLE,
+    TRANSACTION_SOURCE_URL,
     TRANSACTION_SOURCE_COMPONENT,
 )
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -368,6 +368,9 @@ def _patch_django_asgi_handler():
 def _set_transaction_name_and_source(scope, transaction_style, request):
     # type: (Scope, str, WSGIRequest) -> None
     try:
+        import ipdb
+
+        ipdb.set_trace()
         transaction_name = None
         if transaction_style == "function_name":
             fn = resolve(request.path).func
@@ -392,6 +395,9 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
             source=source,
         )
     except Resolver404:
+        import ipdb
+
+        ipdb.set_trace()
         urlconf = import_module(settings.ROOT_URLCONF)
         # This exception only gets thrown when transaction_style is `function_name`
         # So we don't check here what style is configured

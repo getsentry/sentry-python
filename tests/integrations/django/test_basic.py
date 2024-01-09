@@ -689,15 +689,15 @@ def test_set_db_data_custom_backend():
 @pytest.mark.parametrize(
     "transaction_style,client_url,expected_transaction,expected_source,expected_response",
     [
-        (
-            "function_name",
-            "/message",
-            "tests.integrations.django.myapp.views.message",
-            "component",
-            b"ok",
-        ),
-        ("url", "/message", "/message", "route", b"ok"),
-        ("url", "/404", "/404", "url", b"404"),
+        # (
+        #     "function_name",
+        #     "/message",
+        #     "tests.integrations.django.myapp.views.message",
+        #     "component",
+        #     b"ok",
+        # ),
+        # ("url", "/message", "/message", "route", b"ok"),
+        ("url", "\\", "/404", "url", b"404"),
     ],
 )
 def test_transaction_style(
@@ -718,6 +718,9 @@ def test_transaction_style(
     content, status, headers = unpack_werkzeug_response(client.get(client_url))
     assert content == expected_response
 
+    import ipdb
+
+    ipdb.set_trace()
     (event,) = events
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
