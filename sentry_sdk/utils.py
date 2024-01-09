@@ -1126,7 +1126,13 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value.encode("utf-8"))
+    length = len(value)
+    if isinstance(value, text_type):
+        # we want the size in bytes rather than characters, if possible
+        try:
+            length = len(value.encode("utf-8"))
+        except UnicodeDecodeError:
+            pass
 
     if length > max_length:
         return AnnotatedValue(
