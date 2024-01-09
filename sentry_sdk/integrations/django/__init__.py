@@ -14,7 +14,11 @@ from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
-from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE, 
+    TRANSACTION_SOURCE_URL, 
+    TRANSACTION_SOURCE_COMPONENT,
+)
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
