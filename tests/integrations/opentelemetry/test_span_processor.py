@@ -1,4 +1,3 @@
-from datetime import datetime
 import time
 import pytest
 
@@ -9,6 +8,7 @@ except ImportError:
     import mock
     from mock import MagicMock  # python < 3.3
 
+from sentry_sdk._compat import utc_from_timestamp
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
@@ -331,7 +331,7 @@ def test_on_start_transaction():
             parent_span_id="abcdef1234567890",
             trace_id="1234567890abcdef1234567890abcdef",
             baggage=None,
-            start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
+            start_timestamp=utc_from_timestamp(otel_span.start_time / 1e9),
             instrumenter="otel",
         )
 
@@ -376,7 +376,7 @@ def test_on_start_child():
         fake_span.start_child.assert_called_once_with(
             span_id="1234567890abcdef",
             description="Sample OTel Span",
-            start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
+            start_timestamp=utc_from_timestamp(otel_span.start_time / 1e9),
             instrumenter="otel",
         )
 
