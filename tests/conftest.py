@@ -3,6 +3,8 @@ import os
 import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
+from contextlib import contextmanager
+from unittest import mock
 
 import pytest
 import jsonschema
@@ -19,6 +21,7 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import reraise
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
@@ -26,6 +29,11 @@ from sentry_sdk.transport import Transport
 from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
+
+
+if TYPE_CHECKING:
+    from typing import Optional
+    from collections.abc import Iterator
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -602,3 +610,21 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(servername, key, value)
     except TypeError:
         client.set_cookie(key, value)
+
+
+@contextmanager
+def patch_start_tracing_child(fake_transaction_is_none=False):
+    # type: (bool) -> Iterator[Optional[mock.MagicMock]]
+    if not fake_transaction_is_none:
+        fake_transaction = mock.MagicMock()
+        fake_start_child = mock.MagicMock()
+        fake_transaction.start_child = fake_start_child
+    else:
+        fake_transaction = None
+        fake_start_child = None
+
+    with mock.patch(
+        "sentry_sdk.tracing_utils.get_current_span",
+        return_value=fake_transaction,
+    ):
+        yield fake_start_child
