@@ -19,7 +19,7 @@ def test_trace_decorator():
 
         result2 = start_child_span_decorator(my_example_function)()
         fake_start_child.assert_called_once_with(
-            op="function", description="test_decorator_sync.my_example_function"
+            op="function", description="test_decorator.my_example_function"
         )
         assert result2 == "return_of_sync_function"
 
@@ -35,7 +35,7 @@ def test_trace_decorator_no_trx():
             fake_warning.assert_called_once_with(
                 "Can not create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
-                "test_decorator_sync.my_example_function",
+                "test_decorator.my_example_function",
             )
             assert result2 == "return_of_sync_function"
 
@@ -54,7 +54,7 @@ async def test_trace_decorator_async():
         result2 = await start_child_span_decorator(my_async_example_function)()
         fake_start_child.assert_called_once_with(
             op="function",
-            description="test_decorator_async.my_async_example_function",
+            description="test_decorator.my_async_example_function",
         )
         assert result2 == "return_of_async_function"
 
@@ -71,6 +71,6 @@ async def test_trace_decorator_async_no_trx():
             fake_warning.assert_called_once_with(
                 "Can not create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
-                "test_decorator_async.my_async_example_function",
+                "test_decorator.my_async_example_function",
             )
             assert result2 == "return_of_async_function"
