@@ -122,7 +122,7 @@ def set_current_scope(new_current_scope):
 
     .. versionadded:: 1.XX.0
     """
-    scope.current_scope.set(new_current_scope)
+    scope._current_scope.set(new_current_scope)
 
 
 def set_isolation_scope(new_isolation_scope):
@@ -133,7 +133,7 @@ def set_isolation_scope(new_isolation_scope):
 
     .. versionadded:: 1.XX.0
     """
-    scope.isolation_scope.set(new_isolation_scope)
+    scope._isolation_scope.set(new_isolation_scope)
 
 
 @hubmethod

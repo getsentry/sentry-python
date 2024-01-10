@@ -66,9 +66,9 @@ if TYPE_CHECKING:
     T = TypeVar("T")
 
 
-GLOBAL_SCOPE = None  # type: Optional[Scope]
-isolation_scope = ContextVar("isolation_scope", default=None)
-current_scope = ContextVar("current_scope", default=None)
+_global_scope = None  # type: Optional[Scope]
+_isolation_scope = ContextVar("isolation_scope", default=None)
+_current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
 
@@ -223,12 +223,12 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        scope = current_scope.get()
-        if scope is None:
-            scope = Scope(ty="current")
-            current_scope.set(scope)
+        current_scope = _current_scope.get()
+        if current_scope is None:
+            current_scope = Scope(ty="current")
+            _current_scope.set(current_scope)
 
-        return scope
+        return current_scope
 
     @classmethod
     def get_isolation_scope(cls):
@@ -238,12 +238,12 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        scope = isolation_scope.get()
-        if scope is None:
-            scope = Scope(ty="isolation")
-            isolation_scope.set(scope)
+        isolation_scope = _isolation_scope.get()
+        if isolation_scope is None:
+            isolation_scope = Scope(ty="isolation")
+            _isolation_scope.set(isolation_scope)
 
-        return scope
+        return isolation_scope
 
     @classmethod
     def get_global_scope(cls):
@@ -253,11 +253,11 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        global GLOBAL_SCOPE
-        if GLOBAL_SCOPE is None:
-            GLOBAL_SCOPE = Scope(ty="global")
+        global _global_scope
+        if _global_scope is None:
+            _global_scope = Scope(ty="global")
 
-        return GLOBAL_SCOPE
+        return _global_scope
 
     @classmethod
     def get_client(cls):
@@ -324,7 +324,7 @@ class Scope(object):
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
-        isolation_scope.set(forked_isolation_scope)
+        _isolation_scope.set(forked_isolation_scope)
 
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
@@ -1422,14 +1422,14 @@ def _with_new_scope():
 
     current_scope = Scope.get_current_scope()
     forked_scope = current_scope.fork()
-    token = current_scope.set(forked_scope)
+    token = _current_scope.set(forked_scope)
 
     try:
         yield forked_scope
 
     finally:
         # restore original scope
-        current_scope.reset(token)
+        _current_scope.reset(token)
 
 
 @contextmanager
@@ -1450,20 +1450,20 @@ def _with_isolated_scope():
     # fork current scope
     current_scope = Scope.get_current_scope()
     forked_current_scope = current_scope.fork()
-    current_token = current_scope.set(forked_current_scope)
+    current_token = _current_scope.set(forked_current_scope)
 
     # fork isolation scope
     isolation_scope = Scope.get_isolation_scope()
     forked_isolation_scope = isolation_scope.fork()
-    isolation_token = isolation_scope.set(forked_isolation_scope)
+    isolation_token = _isolation_scope.set(forked_isolation_scope)
 
     try:
         yield forked_isolation_scope
 
     finally:
         # restore original scopes
-        current_scope.reset(current_token)
-        isolation_scope.reset(isolation_token)
+        _current_scope.reset(current_token)
+        _isolation_scope.reset(isolation_token)
 
 
 @contextmanager
