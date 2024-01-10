@@ -66,9 +66,9 @@ if TYPE_CHECKING:
     T = TypeVar("T")
 
 
-SENTRY_GLOBAL_SCOPE = None  # type: Optional[Scope]
-sentry_isolation_scope = ContextVar("sentry_isolation_scope", default=None)
-sentry_current_scope = ContextVar("sentry_current_scope", default=None)
+GLOBAL_SCOPE = None  # type: Optional[Scope]
+isolation_scope = ContextVar("isolation_scope", default=None)
+current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
 
@@ -218,10 +218,10 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        scope = sentry_current_scope.get()
+        scope = current_scope.get()
         if scope is None:
             scope = Scope(ty="current")
-            sentry_current_scope.set(scope)
+            current_scope.set(scope)
 
         return scope
 
@@ -233,10 +233,10 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        scope = sentry_isolation_scope.get()
+        scope = isolation_scope.get()
         if scope is None:
             scope = Scope(ty="isolation")
-            sentry_isolation_scope.set(scope)
+            isolation_scope.set(scope)
 
         return scope
 
@@ -248,11 +248,11 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        global SENTRY_GLOBAL_SCOPE
-        if SENTRY_GLOBAL_SCOPE is None:
-            SENTRY_GLOBAL_SCOPE = Scope(ty="global")
+        global GLOBAL_SCOPE
+        if GLOBAL_SCOPE is None:
+            GLOBAL_SCOPE = Scope(ty="global")
 
-        return SENTRY_GLOBAL_SCOPE
+        return GLOBAL_SCOPE
 
     @classmethod
     def get_client(cls):
@@ -319,7 +319,7 @@ class Scope(object):
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
-        sentry_isolation_scope.set(forked_isolation_scope)
+        isolation_scope.set(forked_isolation_scope)
 
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
@@ -1417,14 +1417,14 @@ def _with_new_scope():
 
     current_scope = Scope.get_current_scope()
     forked_scope = current_scope.fork()
-    token = sentry_current_scope.set(forked_scope)
+    token = current_scope.set(forked_scope)
 
     try:
         yield forked_scope
 
     finally:
         # restore original scope
-        sentry_current_scope.reset(token)
+        current_scope.reset(token)
 
 
 @contextmanager
@@ -1445,20 +1445,20 @@ def _with_isolated_scope():
     # fork current scope
     current_scope = Scope.get_current_scope()
     forked_current_scope = current_scope.fork()
-    current_token = sentry_current_scope.set(forked_current_scope)
+    current_token = current_scope.set(forked_current_scope)
 
     # fork isolation scope
     isolation_scope = Scope.get_isolation_scope()
     forked_isolation_scope = isolation_scope.fork()
-    isolation_token = sentry_isolation_scope.set(forked_isolation_scope)
+    isolation_token = isolation_scope.set(forked_isolation_scope)
 
     try:
         yield forked_isolation_scope
 
     finally:
         # restore original scopes
-        sentry_current_scope.reset(current_token)
-        sentry_isolation_scope.reset(isolation_token)
+        current_scope.reset(current_token)
+        isolation_scope.reset(isolation_token)
 
 
 @contextmanager
