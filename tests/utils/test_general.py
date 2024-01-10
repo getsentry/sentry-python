@@ -17,6 +17,8 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
     strip_string,
     AnnotatedValue,
+    _get_size_in_bytes,
+    _truncate_string_by_bytes,
 )
 from sentry_sdk._compat import text_type, string_types
 
@@ -572,26 +574,52 @@ def test_failed_base64_conversion(input):
         assert to_base64(input) is None
 
 
-def test_strip_string():
-    # If value is None returns None.
-    assert strip_string(None) is None
+@pytest.mark.parametrize(
+    "input,max_length,result",
+    [
+        [None, None, None],
+        ["a" * 256, None, "a" * 256],
+        [
+            "a" * 257,
+            256,
+            AnnotatedValue(
+                value="a" * 253 + "...",
+                metadata={"len": 257, "rem": [["!limit", "x", 253, 256]]},
+            ),
+        ],
+        # fmt: off
+        [u"éêéê", None, u"éêéê"],
+        [u"éêéê", 4, AnnotatedValue(value=u"é...", metadata={"len": 8, "rem": [["!limit", "x", 1, 4]]})],
+        # fmt: on
+        ["éêéê", None, "éêéê"],
+        [
+            "éêéê",
+            4,
+            AnnotatedValue(
+                value="é...", metadata={"len": 8, "rem": [["!limit", "x", 1, 4]]}
+            ),
+        ],
+    ],
+)
+def test_strip_string(input, max_length, result):
+    assert strip_string(input, max_length) == result
 
-    # If max_length is not passed, returns the full text (up to 1024 bytes).
-    text_1024_long = "a" * 1024
-    assert strip_string(text_1024_long).count("a") == 1024
 
-    # If value exceeds the max_length, returns an AnnotatedValue.
-    text_1025_long = "a" * 1025
-    stripped_text = strip_string(text_1025_long)
-    assert isinstance(stripped_text, AnnotatedValue)
-    assert stripped_text.value.count("a") == 1021  # + '...' is 1024
+@pytest.mark.parametrize(
+    "input,max_bytes,result",
+    [
+        [None, None],
+    ],
+)
+def test_truncate_by_bytes(input, max_bytes, result):
+    assert _truncate_string_by_bytes(input, max_bytes) == result
 
-    # If text has unicode characters, it counts bytes and not number of characters.
-    # fmt: off
-    text_with_unicode_character = u"éê"
-    assert strip_string(text_with_unicode_character, max_length=2).value == u"é..."
-    # fmt: on
 
-    # This was causing UnicodeDecodeErrors in Python 2
-    text_with_unicode_character = "éê"
-    assert strip_string(text_with_unicode_character, max_length=2).value == "éê"
+@pytest.mark.parametrize(
+    "input,result",
+    [
+        ["abc", 3],
+    ],
+)
+def test_get_size_in_bytes(input, max_bytes, result):
+    assert _get_size_in_bytes(input, max_bytes) == result

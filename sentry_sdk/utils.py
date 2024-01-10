@@ -1118,6 +1118,29 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
+def _truncate_string_by_bytes(string, max_bytes):
+    # type: (str, int) -> str
+    """
+    Truncate a UTF-8 encodable string to the last full codepoint so that it fits in max_bytes.
+    """
+    truncated = string.encode("utf-8")[: max_bytes - 3].decode("utf-8", errors="ignore")
+    return truncated + "..."
+
+
+def _get_size_in_bytes(value):
+    # type: (Union[str, bytes]) -> Optional[int]
+    if not isinstance(value, (bytes, text_type)):
+        return None
+
+    if isinstance(value, bytes):
+        return len(value)
+
+    try:
+        return len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        return None
+
+
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     if not value:
@@ -1126,23 +1149,25 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value)
-    if isinstance(value, text_type):
-        # we want the size in bytes rather than characters, if possible
-        try:
-            length = len(value.encode("utf-8"))
-        except UnicodeDecodeError:
-            pass
+    bytes_size = _get_size_in_bytes(value)
+    text_size = len(value)
 
-    if length > max_length:
-        return AnnotatedValue(
-            value=value[: max_length - 3] + "...",
-            metadata={
-                "len": length,
-                "rem": [["!limit", "x", max_length - 3, max_length]],
-            },
-        )
-    return value
+    if bytes_size and bytes_size > max_length:
+        # truncate to max_length bytes, preserving code points
+        truncated_value = _truncate_string_by_bytes(value, max_length)
+    elif text_size and text_size > max_length:
+        # fallback to truncating by string length
+        truncated_value = value[: max_length - 3] + "..."
+    else:
+        return value
+
+    return AnnotatedValue(
+        value=truncated_value,
+        metadata={
+            "len": bytes_size or text_size,
+            "rem": [["!limit", "x", max_length - 3, max_length]],
+        },
+    )
 
 
 def parse_version(version):
