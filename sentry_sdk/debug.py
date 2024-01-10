@@ -14,7 +14,7 @@ class _HubBasedClientFilter(logging.Filter):
         # type: (LogRecord) -> bool
         if _client_init_debug.get(False):
             return True
-        
+
         return sentry_sdk.Scope.get_client().options["debug"]
 
 
