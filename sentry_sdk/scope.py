@@ -203,6 +203,10 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
+        self.client = (
+            NoopClient()
+        )  # type: Union[sentry_sdk.Client, sentry_sdk.client.NoopClient]
+
         self.set_client(client)
 
         self.clear()
@@ -283,11 +287,11 @@ class Scope(object):
         """
         Sets the client for this scope.
         :param client: The client to use in this scope.
-            If `None` the client of the scope will be deleted.
+            If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NoopClient`.
 
         .. versionadded:: 1.XX.0
         """
-        self.client = client
+        self.client = client or NoopClient()
 
     @property
     def is_forked(self):
