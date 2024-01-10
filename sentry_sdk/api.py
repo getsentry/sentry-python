@@ -79,7 +79,7 @@ def scopemethod(f):
     return f
 
 
-def sentry_is_initialized():
+def is_initialized():
     # type: () -> bool
     """
     Returns whether Sentry has been initialized or not.
