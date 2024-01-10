@@ -109,7 +109,7 @@ def _install_httplib():
                 )
                 self.putheader(key, value)
 
-        self._sentrysdk_span = span
+        self._sentrysdk_span = span  # type: ignore[attr-defined]
 
         return rv
 
@@ -128,8 +128,8 @@ def _install_httplib():
 
         return rv
 
-    HTTPConnection.putrequest = putrequest
-    HTTPConnection.getresponse = getresponse
+    HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
+    HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
 
 
 def _init_argument(args, kwargs, name, position, setdefault_callback=None):
