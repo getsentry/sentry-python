@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.39.2
+
+### Various fixes & improvements
+
+- Fix timestamp in transaction created by OTel (#2627) by @antonpirker
+- Fix relative path in DB query source  (#2624) by @antonpirker
+- Run more CI checks on 2.0 branch (#2625) by @sentrivana
+- Fix tracing `TypeError` for static and class methods (#2559) by @szokeasaurusrex
+- Fix missing `ctx` in Arq integration (#2600) by @ivanovart
+- Change `data_category` from `check_in` to `monitor` (#2598) by @sentrivana
+
 ## 1.39.1
 
 ### Various fixes & improvements
