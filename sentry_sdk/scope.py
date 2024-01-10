@@ -54,7 +54,6 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         Type,
-        Union,
     )
 
     import sentry_sdk
