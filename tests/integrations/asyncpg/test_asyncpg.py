@@ -506,10 +506,10 @@ async def test_query_source_enabled(
     sentry_options = {
         "integrations": [AsyncPGIntegration()],
         "enable_tracing": True,
+        "db_query_source_threshold_ms": 0,
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
-        sentry_options["db_query_source_threshold_ms"] = 0
 
     sentry_init(**sentry_options)
 
