@@ -124,9 +124,7 @@ def test_custom_log_level_names(sentry_init, capture_events):
     }
 
     # set custom log level names
-    # fmt: off
-    logging.addLevelName(logging.DEBUG, u"custom level debüg: ")
-    # fmt: on
+    logging.addLevelName(logging.DEBUG, "custom level debüg: ")
     logging.addLevelName(logging.INFO, "")
     logging.addLevelName(logging.WARN, "custom level warn: ")
     logging.addLevelName(logging.WARNING, "custom level warning: ")

@@ -35,15 +35,11 @@ else:
 
 
 def test_safe_repr_regressions():
-    # fmt: off
-    assert u"лошадь" in safe_repr(u"лошадь")
-    # fmt: on
+    assert "лошадь" in safe_repr("лошадь")
 
 
-# fmt: off
-@pytest.mark.parametrize("prefix", ("", "abcd", u"лошадь"))
-@pytest.mark.parametrize("character", u"\x00\x07\x1b\n")
-# fmt: on
+@pytest.mark.parametrize("prefix", ("", "abcd", "лошадь"))
+@pytest.mark.parametrize("character", "\x00\x07\x1b\n")
 def test_safe_repr_non_printable(prefix, character):
     """Check that non-printable characters are escaped"""
     string = prefix + character
@@ -511,27 +507,25 @@ def test_iter_stacktraces():
     ) == {1, 2, 3}
 
 
-# fmt: off
 @pytest.mark.parametrize(
     ("original", "base64_encoded"),
     [
         # ascii only
         ("Dogs are great!", "RG9ncyBhcmUgZ3JlYXQh"),
         # emoji
-        (u"🐶", "8J+Qtg=="),
+        ("🐶", "8J+Qtg=="),
         # non-ascii
         (
-            u"Καλό κορίτσι, Μάιζεϊ!",
+            "Καλό κορίτσι, Μάιζεϊ!",
             "zprOsc67z4wgzrrOv8+Bzq/PhM+DzrksIM6czqzOuc62zrXPiiE=",
         ),
         # mix of ascii and non-ascii
         (
-            u"Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
+            "Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
             "T2YgbWFyZ2lyIGh1bmRhciEgw4lnIGdlcmkgcsOhw7AgZnlyaXIgYcOwIMOpZyDDvnVyZmkgc3TDpnJyYSByw7ptLg==",
         ),
     ],
 )
-# fmt: on
 def test_successful_base64_conversion(original, base64_encoded):
     # all unicode characters should be handled correctly
     assert to_base64(original) == base64_encoded
@@ -581,7 +575,5 @@ def test_strip_string():
     assert stripped_text.value.count("a") == 1021  # + '...' is 1024
 
     # If text has unicode characters, it counts bytes and not number of characters.
-    # fmt: off
-    text_with_unicode_character = u"éê"
-    assert strip_string(text_with_unicode_character, max_length=2).value == u"é..."
-    # fmt: on
+    text_with_unicode_character = "éê"
+    assert strip_string(text_with_unicode_character, max_length=2).value == "é..."
