@@ -464,8 +464,43 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enable_db_query_source", [None, False])
-async def test_query_source_disabled(
+async def test_query_source_disabled(sentry_init, capture_events):
+    sentry_options = {
+        "integrations": [AsyncPGIntegration()],
+        "enable_tracing": True,
+        "enable_db_query_source": False,
+        "db_query_source_threshold_ms": 0,
+    }
+
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+
+        await conn.execute(
+            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+        )
+
+        await conn.close()
+
+    (event,) = events
+
+    span = event["spans"][-1]
+    assert span["description"].startswith("INSERT INTO")
+
+    data = span.get("data", {})
+
+    assert SPANDATA.CODE_LINENO not in data
+    assert SPANDATA.CODE_NAMESPACE not in data
+    assert SPANDATA.CODE_FILEPATH not in data
+    assert SPANDATA.CODE_FUNCTION not in data
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enable_db_query_source", [None, True])
+async def test_query_source_enabled(
     sentry_init, capture_events, enable_db_query_source
 ):
     sentry_options = {
@@ -496,10 +531,10 @@ async def test_query_source_disabled(
 
     data = span.get("data", {})
 
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert SPANDATA.CODE_LINENO in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FILEPATH in data
+    assert SPANDATA.CODE_FUNCTION in data
 
 
 @pytest.mark.asyncio

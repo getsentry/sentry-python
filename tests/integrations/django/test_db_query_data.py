@@ -70,13 +70,17 @@ def test_query_source_disabled(sentry_init, client, capture_events):
 def test_query_source_enabled(
     sentry_init, client, capture_events, enable_db_query_source
 ):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-        enable_db_query_source=enable_db_query_source,
-        db_query_source_threshold_ms=0,
-    )
+    sentry_options = {
+        "integrations": [DjangoIntegration()],
+        "send_default_pii": True,
+        "traces_sample_rate": 1.0,
+        "db_query_source_threshold_ms": 0,
+    }
+
+    if enable_db_query_source is not None:
+        sentry_options["enable_db_query_source"] = enable_db_query_source
+
+    sentry_init(**sentry_options)
 
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
