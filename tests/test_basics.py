@@ -19,7 +19,7 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-from sentry_sdk._compat import reraise, PY2
+from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     Integration,
@@ -752,18 +752,15 @@ class TracingTestClass:
 
 def test_staticmethod_tracing(sentry_init):
     test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
-    if not PY2:
-        # Skip this check on Python 2 since __qualname__ is available in Python 3 only. Skipping is okay,
-        # since the assertion would be expected to fail in Python 3 if there is any problem.
-        assert (
-            ".".join(
-                [
-                    TracingTestClass.static.__module__,
-                    TracingTestClass.static.__qualname__,
-                ]
-            )
-            == test_staticmethod_name
-        ), "The test static method was moved or renamed. Please update the name accordingly"
+    assert (
+        ".".join(
+            [
+                TracingTestClass.static.__module__,
+                TracingTestClass.static.__qualname__,
+            ]
+        )
+        == test_staticmethod_name
+    ), "The test static method was moved or renamed. Please update the name accordingly"
 
     sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
 
@@ -775,18 +772,15 @@ def test_staticmethod_tracing(sentry_init):
 
 def test_classmethod_tracing(sentry_init):
     test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
-    if not PY2:
-        # Skip this check on Python 2 since __qualname__ is available in Python 3 only. Skipping is okay,
-        # since the assertion would be expected to fail in Python 3 if there is any problem.
-        assert (
-            ".".join(
-                [
-                    TracingTestClass.class_.__module__,
-                    TracingTestClass.class_.__qualname__,
-                ]
-            )
-            == test_classmethod_name
-        ), "The test class method was moved or renamed. Please update the name accordingly"
+    assert (
+        ".".join(
+            [
+                TracingTestClass.class_.__module__,
+                TracingTestClass.class_.__qualname__,
+            ]
+        )
+        == test_classmethod_name
+    ), "The test class method was moved or renamed. Please update the name accordingly"
 
     sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
 
