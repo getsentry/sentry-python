@@ -2,8 +2,9 @@ import os
 import subprocess
 import sys
 import platform
-from sentry_sdk.consts import OP, SPANDATA
+from http.client import HTTPConnection
 
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
@@ -27,12 +28,6 @@ if TYPE_CHECKING:
     from typing import List
 
     from sentry_sdk._types import Event, Hint
-
-
-try:
-    from httplib import HTTPConnection  # type: ignore
-except ImportError:
-    from http.client import HTTPConnection
 
 
 _RUNTIME_CONTEXT = {
