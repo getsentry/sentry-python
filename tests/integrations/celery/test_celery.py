@@ -316,9 +316,11 @@ def test_broken_prerun(init_celery, connect_signal):
 
     assert len(Hub.current._stack) == 1
     if VERSION < (4,):
-        assert stack_lengths == [2]
+        # This new scopes the _stack is deprecated and its length is always 1.
+        assert stack_lengths == [1]
     else:
-        assert stack_lengths == [2, 2]
+        # This new scopes the _stack is deprecated and its length is always 1.
+        assert stack_lengths == [1, 1]
 
 
 @pytest.mark.xfail(
