@@ -79,7 +79,7 @@ def scopemethod(f):
     return f
 
 
-def sentry_is_initialized():
+def is_initialized():
     # type: () -> bool
     """
     Returns whether Sentry has been initialized or not.
@@ -122,7 +122,7 @@ def set_current_scope(new_current_scope):
 
     .. versionadded:: 1.XX.0
     """
-    scope.sentry_current_scope.set(new_current_scope)
+    scope.current_scope.set(new_current_scope)
 
 
 def set_isolation_scope(new_isolation_scope):
@@ -133,7 +133,7 @@ def set_isolation_scope(new_isolation_scope):
 
     .. versionadded:: 1.XX.0
     """
-    scope.sentry_isolation_scope.set(new_isolation_scope)
+    scope.isolation_scope.set(new_isolation_scope)
 
 
 @hubmethod
