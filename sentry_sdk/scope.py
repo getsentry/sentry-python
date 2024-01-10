@@ -207,7 +207,8 @@ class Scope(object):
             NoopClient()
         )  # type: Union[sentry_sdk.Client, sentry_sdk.client.NoopClient]
 
-        self.set_client(client)
+        if client is not None:
+            self.set_client(client)
 
         self.clear()
 
