@@ -14,6 +14,7 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
+    from collections.abc import Callable
     from typing import Any
     from typing import Dict
     from typing import Iterator
@@ -21,6 +22,9 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Tuple
     from typing import Union
+    from typing import TypeVar
+
+    T = TypeVar("T", bound=Callable)
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
@@ -984,7 +988,7 @@ class NoOpSpan(Span):
 
 
 def trace(func=None):
-    # type: (Any) -> Any
+    # type: (T) -> T
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.
