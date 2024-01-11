@@ -1135,8 +1135,8 @@ def strip_string(value, max_length=None):
             pass
 
     if length > max_length:
-        # FIXME: the trimming here also needs to trim by bytes as opposed to
-        # characters/code points
+        # FIXME: the trimming and metadata here also needs to be in bytes
+        # as opposed to characters/code points
         return AnnotatedValue(
             value=value[: max_length - 3] + "...",
             metadata={
