@@ -1143,6 +1143,7 @@ def strip_string(value, max_length=None):
     if length > max_length:
         # FIXME: the trimming and metadata here also needs to be in bytes
         # as opposed to characters/code points
+        # https://github.com/getsentry/sentry-python/issues/2634
         return AnnotatedValue(
             value=value[: max_length - 3] + "...",
             metadata={
