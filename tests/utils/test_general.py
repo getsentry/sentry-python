@@ -573,7 +573,7 @@ def test_failed_base64_conversion(input):
 
 
 @pytest.mark.parametrize(
-    "input,max_length,result",
+    "string,max_length,result",
     [
         [None, None, None],
         ["a" * 256, None, "a" * 256],
@@ -586,18 +586,20 @@ def test_failed_base64_conversion(input):
             ),
         ],
         # fmt: off
-        [u"éêéê", None, u"éêéê"],
-        [u"éêéê", 4, AnnotatedValue(value=u"é...", metadata={"len": 8, "rem": [["!limit", "x", 1, 4]]})],
+        [u"éééééé", None, u"éééééé"],
+        # the following is wrong, see: https://github.com/getsentry/sentry-python/issues/2634
+        [u"éééééé", 4, AnnotatedValue(value=u"é...", metadata={"len": 12, "rem": [["!limit", "x", 1, 4]]})],
         # fmt: on
-        ["éêéê", None, "éêéê"],
+        ["éééééé", None, "éééééé"],
+        # the following is wrong, see: https://github.com/getsentry/sentry-python/issues/2634
         [
-            "éêéê",
+            "éééééé",
             4,
             AnnotatedValue(
-                value="é...", metadata={"len": 8, "rem": [["!limit", "x", 1, 4]]}
+                value="é...", metadata={"len": 12, "rem": [["!limit", "x", 1, 4]]}
             ),
         ],
     ],
 )
-def test_strip_string(input, max_length, result):
-    assert strip_string(input, max_length) == result
+def test_strip_string(string, max_length, result):
+    assert strip_string(string, max_length) == result

@@ -382,6 +382,12 @@ class AnnotatedValue(object):
         self.value = value
         self.metadata = metadata
 
+    def __eq__(self, other):
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
+
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
@@ -1127,7 +1133,7 @@ def strip_string(value, max_length=None):
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
     length = len(value)
-    if isinstance(length, text_type):
+    if isinstance(value, text_type):
         # prefer to use byte size if possible
         try:
             length = len(value.encode("utf-8"))
