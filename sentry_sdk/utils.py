@@ -382,6 +382,15 @@ class AnnotatedValue(object):
         self.value = value
         self.metadata = metadata
 
+    def __eq__(self, other):
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
+
+    def __repr__(self):
+        return self.value
+
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
@@ -1118,10 +1127,10 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
-def _truncate_string_by_bytes(string, max_bytes):
-    # type: (str, int) -> str
+def _truncate_by_bytes(string, max_bytes):
+    # type: (Union[str, bytes], int) -> str
     """
-    Truncate a UTF-8 encodable string to the last full codepoint so that it fits in max_bytes.
+    Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
     """
     truncated = string.encode("utf-8")[: max_bytes - 3].decode("utf-8", errors="ignore")
     return truncated + "..."
@@ -1129,6 +1138,8 @@ def _truncate_string_by_bytes(string, max_bytes):
 
 def _get_size_in_bytes(value):
     # type: (Union[str, bytes]) -> Optional[int]
+    # XXX: broken 'unicodehere' py2 -- can't be encoded
+    # XXX remove repr
     if not isinstance(value, (bytes, text_type)):
         return None
 
@@ -1137,7 +1148,7 @@ def _get_size_in_bytes(value):
 
     try:
         return len(value.encode("utf-8"))
-    except UnicodeEncodeError:
+    except (UnicodeEncodeError, UnicodeDecodeError):
         return None
 
 
@@ -1149,13 +1160,15 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    bytes_size = _get_size_in_bytes(value)
-    text_size = len(value)
+    byte_size = _get_size_in_bytes(value)
+    text_size = None
+    if isinstance(value, text_type):
+        text_size = len(value)
 
-    if bytes_size and bytes_size > max_length:
+    if byte_size is not None and byte_size > max_length:
         # truncate to max_length bytes, preserving code points
-        truncated_value = _truncate_string_by_bytes(value, max_length)
-    elif text_size and text_size > max_length:
+        truncated_value = _truncate_by_bytes(value, max_length)
+    elif text_size is not None and text_size > max_length:
         # fallback to truncating by string length
         truncated_value = value[: max_length - 3] + "..."
     else:
@@ -1164,7 +1177,7 @@ def strip_string(value, max_length=None):
     return AnnotatedValue(
         value=truncated_value,
         metadata={
-            "len": bytes_size or text_size,
+            "len": byte_size or text_size,
             "rem": [["!limit", "x", max_length - 3, max_length]],
         },
     )

@@ -17,8 +17,6 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
     strip_string,
     AnnotatedValue,
-    _get_size_in_bytes,
-    _truncate_string_by_bytes,
 )
 from sentry_sdk._compat import text_type, string_types
 
@@ -588,38 +586,18 @@ def test_failed_base64_conversion(input):
             ),
         ],
         # fmt: off
-        [u"éêéê", None, u"éêéê"],
-        [u"éêéê", 4, AnnotatedValue(value=u"é...", metadata={"len": 8, "rem": [["!limit", "x", 1, 4]]})],
+        [u"éééé", None, u"éééé"],
+        [u"éééé", 5, AnnotatedValue(value=u"é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]})],
         # fmt: on
-        ["éêéê", None, "éêéê"],
+        ["éééé", None, "éééé"],
         [
-            "éêéê",
-            4,
+            "éééé",
+            5,
             AnnotatedValue(
-                value="é...", metadata={"len": 8, "rem": [["!limit", "x", 1, 4]]}
+                value="é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]}
             ),
         ],
     ],
 )
 def test_strip_string(input, max_length, result):
     assert strip_string(input, max_length) == result
-
-
-@pytest.mark.parametrize(
-    "input,max_bytes,result",
-    [
-        [None, None],
-    ],
-)
-def test_truncate_by_bytes(input, max_bytes, result):
-    assert _truncate_string_by_bytes(input, max_bytes) == result
-
-
-@pytest.mark.parametrize(
-    "input,result",
-    [
-        ["abc", 3],
-    ],
-)
-def test_get_size_in_bytes(input, max_bytes, result):
-    assert _get_size_in_bytes(input, max_bytes) == result
