@@ -6,6 +6,8 @@
 
 ## Changed
 
+- The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
+
 ## Removed
 
 ## Deprecated
