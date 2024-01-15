@@ -198,7 +198,13 @@ class _Client(object):
                     module_obj = import_module(module_name)
                     class_obj = getattr(module_obj, class_name)
                     function_obj = getattr(class_obj, function_name)
-                    setattr(class_obj, function_name, trace(function_obj))
+                    function_type = type(class_obj.__dict__[function_name])
+                    traced_function = trace(function_obj)
+
+                    if function_type in (staticmethod, classmethod):
+                        traced_function = staticmethod(traced_function)
+
+                    setattr(class_obj, function_name, traced_function)
                     setattr(module_obj, class_name, class_obj)
                     logger.debug("Enabled tracing for %s", function_qualname)
 
