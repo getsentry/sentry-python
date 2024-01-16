@@ -34,12 +34,11 @@ except ImportError:
     import mock
 
 import sentry_sdk
-from sentry_sdk._compat import iteritems, reraise, string_types, PY2
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -158,8 +157,8 @@ def _capture_internal_warnings():
 def monkeypatch_test_transport(monkeypatch, validate_event_schema):
     def check_event(event):
         def check_string_keys(map):
-            for key, value in iteritems(map):
-                assert isinstance(key, string_types)
+            for key, value in map.items():
+                assert isinstance(key, str)
                 if isinstance(value, dict):
                     check_string_keys(value)
 
@@ -423,13 +422,7 @@ def string_containing_matcher():
     class StringContaining(object):
         def __init__(self, substring):
             self.substring = substring
-
-            try:
-                # the `unicode` type only exists in python 2, so if this blows up,
-                # we must be in py3 and have the `bytes` type
-                self.valid_types = (str, unicode)
-            except NameError:
-                self.valid_types = (str, bytes)
+            self.valid_types = (str, bytes)
 
         def __eq__(self, test_string):
             if not isinstance(test_string, self.valid_types):
@@ -645,10 +638,8 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         fake_transaction = None
         fake_start_child = None
 
-    version = "2" if PY2 else "3"
-
     with mock.patch(
-        "sentry_sdk.tracing_utils_py%s.get_current_span" % version,
+        "sentry_sdk.tracing_utils_py3.get_current_span",
         return_value=fake_transaction,
     ):
         yield fake_start_child
