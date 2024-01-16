@@ -580,7 +580,7 @@ def test_get_current_thread_id_main_thread():
         with mock.patch("threading.current_thread", side_effect=[None]):
             results.put(get_current_thread_id())
 
-    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
+    thread_id = threading.main_thread().ident
 
     thread = threading.Thread(target=target)
     thread.start()
