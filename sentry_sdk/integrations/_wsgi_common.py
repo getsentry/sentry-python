@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
     from typing import Any
     from typing import Dict
+    from typing import Mapping
     from typing import Optional
     from typing import Union
 
@@ -122,9 +123,11 @@ class RequestExtractor(object):
         form = self.form()
         files = self.files()
         if form or files:
-            data = dict(form.items())
-            for key in files.keys():
-                data[key] = AnnotatedValue.removed_because_raw_data()
+            if form:
+                data = dict(form.items())
+            if files:
+                for key in files.keys():
+                    data[key] = AnnotatedValue.removed_because_raw_data()
 
             return data
 
@@ -177,7 +180,7 @@ def _is_json_content_type(ct):
 
 
 def _filter_headers(headers):
-    # type: (Dict[str, str]) -> Dict[str, str]
+    # type: (Mapping[str, str]) -> Mapping[str, Union[AnnotatedValue, str]]
     if _should_send_default_pii():
         return headers
 
