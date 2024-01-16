@@ -1,13 +1,8 @@
 import json
+from unittest import mock  # python 3.3 and above
+from unittest.mock import MagicMock
 
 import pytest
-
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
 
 from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,

@@ -1,7 +1,9 @@
 import pytest
 import re
 import sys
+from unittest import mock
 
+import sentry_sdk
 from sentry_sdk.utils import (
     Components,
     Dsn,
@@ -19,20 +21,6 @@ from sentry_sdk.utils import (
     is_sentry_url,
     _get_installed_modules,
 )
-
-import sentry_sdk
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
-try:
-    # Python 3
-    FileNotFoundError
-except NameError:
-    # Python 2
-    FileNotFoundError = IOError
 
 
 def _normalize_distribution_name(name):

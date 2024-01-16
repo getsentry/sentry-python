@@ -600,10 +600,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         + dedent(inspect.getsource(ObjectDescribedBy))
         + dedent(
             """
-            try:
-                from unittest import mock  # python 3.3 and above
-            except ImportError:
-                import mock  # python < 3.3
+            from unittest import mock
 
             def _safe_is_equal(x, y):
                 # copied from conftest.py - see docstring and comments there

@@ -1,12 +1,8 @@
-import sentry_sdk
+from unittest import mock
 
+import sentry_sdk
 from sentry_sdk import Hub
 from sentry_sdk.sessions import auto_session_tracking
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def sorted_aggregates(item):

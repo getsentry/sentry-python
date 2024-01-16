@@ -1,3 +1,5 @@
+from unittest import mock
+
 from sentry_sdk._compat import PY2
 
 if PY2:
@@ -8,11 +10,6 @@ else:
 from sentry_sdk.utils import logger
 
 from tests.conftest import patch_start_tracing_child
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def my_example_function():

@@ -1,11 +1,13 @@
 import os
 import json
-import pytest
 import subprocess
 import sys
 import time
-
 from textwrap import dedent
+from unittest import mock
+
+import pytest
+
 from sentry_sdk import (
     Hub,
     Client,
@@ -20,7 +22,6 @@ from sentry_sdk import (
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk._compat import reraise, text_type, PY2
-from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
@@ -30,11 +31,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
     from sentry_sdk._types import Event
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 if PY2:
     # Importing ABCs from collections is deprecated, and will stop working in 3.8
@@ -807,7 +803,6 @@ def test_databag_breadth_stripping(sentry_init, capture_events, benchmark):
         assert len(json.dumps(event)) < 10000
 
 
-@pytest.mark.skipif(not HAS_CHAINED_EXCEPTIONS, reason="Only works on 3.3+")
 def test_chained_exceptions(sentry_init, capture_events):
     sentry_init()
     events = capture_events()

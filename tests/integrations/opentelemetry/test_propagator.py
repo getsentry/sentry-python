@@ -1,9 +1,5 @@
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
+from unittest import mock
+from unittest.mock import MagicMock
 
 from opentelemetry.context import get_current
 from opentelemetry.trace.propagation import get_current_span
@@ -16,7 +12,6 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
-
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.tracing_utils import Baggage

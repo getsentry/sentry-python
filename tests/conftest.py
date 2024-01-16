@@ -3,6 +3,8 @@ import os
 import socket
 from threading import Thread
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from unittest import mock
 
 import pytest
 import jsonschema
@@ -16,22 +18,6 @@ try:
     import eventlet
 except ImportError:
     eventlet = None
-
-try:
-    # Python 2
-    import BaseHTTPServer
-
-    HTTPServer = BaseHTTPServer.HTTPServer
-    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
-except Exception:
-    # Python 3
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 import sentry_sdk
 from sentry_sdk._compat import iteritems, reraise, string_types, PY2
