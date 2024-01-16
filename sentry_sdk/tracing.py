@@ -10,11 +10,11 @@ from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from typing import Any
     from typing import Dict
     from typing import Iterator
     from typing import List
-    from collections.abc import Mapping
     from typing import Optional
     from typing import Tuple
     from typing import Union
