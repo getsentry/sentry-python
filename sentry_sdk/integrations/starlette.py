@@ -2,7 +2,6 @@ import asyncio
 import functools
 from copy import deepcopy
 
-from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -582,7 +581,7 @@ class StarletteRequestExtractor:
             form = await self.form()
             if form:
                 form_data = {}
-                for key, val in iteritems(form):
+                for key, val in form.items():
                     is_file = isinstance(val, UploadFile)
                     form_data[key] = (
                         val

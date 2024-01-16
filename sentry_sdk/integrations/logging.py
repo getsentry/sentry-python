@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from fnmatch import fnmatch
 
 from sentry_sdk.hub import Hub
@@ -9,8 +10,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
-from sentry_sdk._compat import iteritems, utc_from_timestamp
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -157,7 +156,7 @@ class _BaseHandler(logging.Handler, object):
         # type: (LogRecord) -> Dict[str, None]
         return {
             k: v
-            for k, v in iteritems(vars(record))
+            for k, v in vars(record).items()
             if k not in self.COMMON_RECORD_ATTRS
             and (not isinstance(k, str) or not k.startswith("_"))
         }
@@ -284,6 +283,6 @@ class BreadcrumbHandler(_BaseHandler):
             "level": self._logging_to_event_level(record),
             "category": record.name,
             "message": record.message,
-            "timestamp": utc_from_timestamp(record.created),
+            "timestamp": datetime.fromtimestamp(record.created, timezone.utc),
             "data": self._extra_from_record(record),
         }
