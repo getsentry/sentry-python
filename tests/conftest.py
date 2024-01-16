@@ -34,12 +34,11 @@ except ImportError:
     import mock
 
 import sentry_sdk
-from sentry_sdk._compat import reraise
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 

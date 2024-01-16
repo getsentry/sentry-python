@@ -22,11 +22,9 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS, logger, reraise
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:

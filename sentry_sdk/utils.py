@@ -1574,6 +1574,14 @@ def package_version(package):
     return parse_version(version)
 
 
+def reraise(tp, value, tb=None):
+    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
+    assert value is not None
+    if value.__traceback__ is not tb:
+        raise value.with_traceback(tb)
+    raise value
+
+
 if PY37:
 
     def nanosecond_time():

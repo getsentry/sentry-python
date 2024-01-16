@@ -3,9 +3,7 @@ import sys
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
     from typing import Any
-    from typing import Type
     from typing import TypeVar
 
     T = TypeVar("T")
@@ -14,14 +12,6 @@ if TYPE_CHECKING:
 PY37 = sys.version_info[0] == 3 and sys.version_info[1] >= 7
 PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
-
-
-def reraise(tp, value, tb=None):
-    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
-    assert value is not None
-    if value.__traceback__ is not tb:
-        raise value.with_traceback(tb)
-    raise value
 
 
 def with_metaclass(meta, *bases):

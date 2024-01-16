@@ -13,10 +13,10 @@ from sentry_sdk.utils import (
     event_from_exception,
     logger,
     TimeoutThread,
+    reraise,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:

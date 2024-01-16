@@ -1,6 +1,5 @@
 import sys
 
-from sentry_sdk._compat import reraise
 from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._werkzeug import get_host, _get_headers
@@ -11,6 +10,7 @@ from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
     event_from_exception,
+    reraise,
 )
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.sessions import auto_session_tracking

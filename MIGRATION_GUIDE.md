@@ -7,6 +7,7 @@
 ## Changed
 
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
+- The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 
 ## Removed
 

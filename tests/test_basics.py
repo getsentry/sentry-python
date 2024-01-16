@@ -19,7 +19,6 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-from sentry_sdk._compat import reraise
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     Integration,
@@ -31,7 +30,7 @@ from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
-from sentry_sdk.utils import get_sdk_name
+from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
