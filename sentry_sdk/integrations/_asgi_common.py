@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal
 
-    from sentry_sdk import AnnotatedValue
+    from sentry_sdk.utils import AnnotatedValue
 
 
 def _get_headers(asgi_scope):
