@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Iterator
     from typing import List
-    from typing import Mapping
+    from collections.abc import Mapping
     from typing import Optional
     from typing import Tuple
     from typing import Union
