@@ -2,7 +2,6 @@ import sys
 import weakref
 
 from sentry_sdk.api import continue_trace
-from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -24,6 +23,7 @@ from sentry_sdk.utils import (
     logger,
     parse_url,
     parse_version,
+    reraise,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,

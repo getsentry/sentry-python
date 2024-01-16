@@ -1,6 +1,5 @@
 import sys
 
-from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
@@ -9,6 +8,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     parse_version,
+    reraise,
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._functools import wraps

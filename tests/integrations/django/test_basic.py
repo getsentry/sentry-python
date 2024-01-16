@@ -19,7 +19,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk._compat import PY2, PY310
+from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
@@ -1114,13 +1114,10 @@ def test_get_receiver_name():
 
     name = _get_receiver_name(dummy)
 
-    if PY2:
-        assert name == "tests.integrations.django.test_basic.dummy"
-    else:
-        assert (
-            name
-            == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
-        )
+    assert (
+        name
+        == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
+    )
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)

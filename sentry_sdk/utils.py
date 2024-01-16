@@ -11,30 +11,11 @@ import threading
 import time
 from collections import namedtuple
 from copy import copy
+from datetime import datetime
 from decimal import Decimal
+from functools import partial, partialmethod
 from numbers import Real
-
-try:
-    # Python 3
-    from urllib.parse import parse_qs
-    from urllib.parse import unquote
-    from urllib.parse import urlencode
-    from urllib.parse import urlsplit
-    from urllib.parse import urlunsplit
-except ImportError:
-    # Python 2
-    from cgi import parse_qs  # type: ignore
-    from urllib import unquote  # type: ignore
-    from urllib import urlencode  # type: ignore
-    from urlparse import urlsplit  # type: ignore
-    from urlparse import urlunsplit  # type: ignore
-
-try:
-    # Python 3
-    FileNotFoundError
-except NameError:
-    # Python 2
-    FileNotFoundError = IOError
+from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 try:
     # Python 3.11
@@ -43,18 +24,8 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
-from datetime import datetime
-from functools import partial
-
-try:
-    from functools import partialmethod
-
-    _PARTIALMETHOD_AVAILABLE = True
-except ImportError:
-    _PARTIALMETHOD_AVAILABLE = False
-
 import sentry_sdk
-from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
+from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 
@@ -67,6 +38,7 @@ if TYPE_CHECKING:
         Dict,
         Iterator,
         List,
+        NoReturn,
         Optional,
         Set,
         Tuple,
@@ -236,7 +208,6 @@ class BadDsn(ValueError):
     """Raised on invalid DSNs."""
 
 
-@implements_str
 class Dsn:
     """Represents a DSN."""
 
@@ -245,7 +216,7 @@ class Dsn:
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
-        parts = urlparse.urlsplit(text_type(value))
+        parts = urlsplit(str(value))
 
         if parts.scheme not in ("http", "https"):
             raise BadDsn("Unsupported scheme %r" % parts.scheme)
@@ -270,7 +241,7 @@ class Dsn:
         path = parts.path.rsplit("/", 1)
 
         try:
-            self.project_id = text_type(int(path.pop()))
+            self.project_id = str(int(path.pop()))
         except (ValueError, TypeError):
             raise BadDsn("Invalid project in DSN (%r)" % (parts.path or "")[1:])
 
@@ -554,46 +525,17 @@ def get_source_context(
 def safe_str(value):
     # type: (Any) -> str
     try:
-        return text_type(value)
+        return str(value)
     except Exception:
         return safe_repr(value)
 
 
-if PY2:
-
-    def safe_repr(value):
-        # type: (Any) -> str
-        try:
-            rv = repr(value).decode("utf-8", "replace")
-
-            # At this point `rv` contains a bunch of literal escape codes, like
-            # this (exaggerated example):
-            #
-            # u"\\x2f"
-            #
-            # But we want to show this string as:
-            #
-            # u"/"
-            try:
-                # unicode-escape does this job, but can only decode latin1. So we
-                # attempt to encode in latin1.
-                return rv.encode("latin1").decode("unicode-escape")
-            except Exception:
-                # Since usually strings aren't latin1 this can break. In those
-                # cases we just give up.
-                return rv
-        except Exception:
-            # If e.g. the call to `repr` already fails
-            return "<broken repr>"
-
-else:
-
-    def safe_repr(value):
-        # type: (Any) -> str
-        try:
-            return repr(value)
-        except Exception:
-            return "<broken repr>"
+def safe_repr(value):
+    # type: (Any) -> str
+    try:
+        return repr(value)
+    except Exception:
+        return "<broken repr>"
 
 
 def filename_for_module(module, abs_path):
@@ -961,7 +903,7 @@ def exceptions_from_error_tuple(
 def to_string(value):
     # type: (str) -> str
     try:
-        return text_type(value)
+        return str(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
 
@@ -1331,10 +1273,8 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if (
-        _PARTIALMETHOD_AVAILABLE
-        and hasattr(func, "_partialmethod")
-        and isinstance(func._partialmethod, partialmethod)
+    if hasattr(func, "_partialmethod") and isinstance(
+        func._partialmethod, partialmethod
     ):
         prefix, suffix = "partialmethod(<function ", ">)"
         func = func._partialmethod.func
@@ -1635,33 +1575,27 @@ def package_version(package):
     return parse_version(version)
 
 
+def reraise(tp, value, tb=None):
+    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> NoReturn
+    assert value is not None
+    if value.__traceback__ is not tb:
+        raise value.with_traceback(tb)
+    raise value
+
+
 if PY37:
 
     def nanosecond_time():
         # type: () -> int
         return time.perf_counter_ns()
 
-elif PY33:
+else:
 
     def nanosecond_time():
         # type: () -> int
         return int(time.perf_counter() * 1e9)
 
-else:
 
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.time() * 1e9)
-
-
-if PY2:
-
-    def now():
-        # type: () -> float
-        return time.time()
-
-else:
-
-    def now():
-        # type: () -> float
-        return time.perf_counter()
+def now():
+    # type: () -> float
+    return time.perf_counter()

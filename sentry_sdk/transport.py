@@ -5,19 +5,15 @@ import urllib3
 import certifi
 import gzip
 import time
-
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-
-from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from datetime import datetime
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -124,7 +120,7 @@ class Transport:
 def _parse_rate_limits(header, now=None):
     # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
     if now is None:
-        now = datetime_utcnow()
+        now = datetime.now(timezone.utc)
 
     for limit in header.split(","):
         try:
@@ -214,7 +210,7 @@ class HttpTransport(Transport):
         # sentries if a proxy in front wants to globally slow things down.
         elif response.status == 429:
             logger.warning("Rate-limited via 429")
-            self._disabled_until[None] = datetime_utcnow() + timedelta(
+            self._disabled_until[None] = datetime.now(timezone.utc) + timedelta(
                 seconds=self._retry.get_retry_after(response) or 60
             )
 
@@ -321,13 +317,15 @@ class HttpTransport(Transport):
         def _disabled(bucket):
             # type: (Any) -> bool
             ts = self._disabled_until.get(bucket)
-            return ts is not None and ts > datetime_utcnow()
+            return ts is not None and ts > datetime.now(timezone.utc)
 
         return _disabled(category) or _disabled(None)
 
     def _is_rate_limited(self):
         # type: () -> bool
-        return any(ts > datetime_utcnow() for ts in self._disabled_until.values())
+        return any(
+            ts > datetime.now(timezone.utc) for ts in self._disabled_until.values()
+        )
 
     def _is_worker_full(self):
         # type: () -> bool

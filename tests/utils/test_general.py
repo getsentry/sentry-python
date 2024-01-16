@@ -1,4 +1,3 @@
-# coding: utf-8
 import sys
 import os
 
@@ -18,7 +17,6 @@ from sentry_sdk.utils import (
     strip_string,
     AnnotatedValue,
 )
-from sentry_sdk._compat import text_type, string_types
 
 
 try:
@@ -32,7 +30,7 @@ else:
     @given(x=any_string)
     def test_safe_repr_never_broken_for_strings(x):
         r = safe_repr(x)
-        assert isinstance(r, text_type)
+        assert isinstance(r, str)
         assert "broken repr" not in r
 
 
@@ -562,7 +560,7 @@ def test_failed_base64_conversion(input):
 
     # any string can be converted to base64, so only type errors will cause
     # failures
-    if type(input) not in string_types:
+    if not isinstance(input, str):
         assert to_base64(input) is None
 
 
