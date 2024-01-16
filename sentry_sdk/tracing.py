@@ -21,11 +21,13 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import overload
+    from typing import ParamSpec
     from typing import Tuple
     from typing import Union
     from typing import TypeVar
 
-    T = TypeVar("T", bound=Callable[..., Any])
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
@@ -991,18 +993,18 @@ class NoOpSpan(Span):
 if TYPE_CHECKING:
 
     @overload
-    def trace(func):
-        # type: (None) -> Callable[[Any], Any]
+    def trace(func=None):
+        # type: (None) -> Callable[[Callable[P, R]], Callable[P, R]]
         pass
 
     @overload
     def trace(func):
-        # type: (T) -> T
+        # type: (Callable[P, R]) -> Callable[P, R]
         pass
 
 
 def trace(func=None):
-    # type: (Optional[T]) -> Union[T, Callable[[Any], Any]]
+    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.
