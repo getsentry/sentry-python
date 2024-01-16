@@ -3,7 +3,7 @@ import pickle
 import gzip
 import io
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
@@ -11,7 +11,6 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
-from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -117,7 +116,9 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
     capture_message("löl")
 
     getattr(client, client_flush_method)()

@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from textwrap import dedent
 from unittest import mock
 
@@ -21,8 +22,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk._compat import reraise, text_type, PY2
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, reraise
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk._types import TYPE_CHECKING
@@ -31,15 +31,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
     from sentry_sdk._types import Event
-
-if PY2:
-    # Importing ABCs from collections is deprecated, and will stop working in 3.8
-    # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
-    from collections import Mapping
-else:
-    # New in 3.3
-    # https://docs.python.org/3/library/collections.abc.html
-    from collections.abc import Mapping
 
 
 class EventCapturedError(Exception):
@@ -62,7 +53,7 @@ def test_transport_option(monkeypatch):
 
     monkeypatch.setenv("SENTRY_DSN", dsn)
     transport = Transport({"dsn": dsn2})
-    assert text_type(transport.parsed_dsn) == dsn2
+    assert str(transport.parsed_dsn) == dsn2
     assert str(Client(transport=transport).dsn) == dsn
 
 

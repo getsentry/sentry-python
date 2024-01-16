@@ -1,9 +1,9 @@
 import copy
 import sys
-
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
-from sentry_sdk._compat import datetime_utcnow, with_metaclass
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
@@ -438,7 +438,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         hint = dict(hint or ())  # type: Hint
 
         if crumb.get("timestamp") is None:
-            crumb["timestamp"] = datetime_utcnow()
+            crumb["timestamp"] = datetime.now(timezone.utc)
         if crumb.get("type") is None:
             crumb["type"] = "default"
 

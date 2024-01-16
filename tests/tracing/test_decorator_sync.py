@@ -1,14 +1,7 @@
 from unittest import mock
 
-from sentry_sdk._compat import PY2
-
-if PY2:
-    from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
-else:
-    from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
-
+from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
 from sentry_sdk.utils import logger
-
 from tests.conftest import patch_start_tracing_child
 
 
