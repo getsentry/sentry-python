@@ -10,4 +10,9 @@
 
 ## Removed
 
+- Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
+- Removed support for Celery 3.\*.
+- Removed support for Django 1.8, 1.9, 1.10.
+- Removed support for Flask 0.\*.
+
 ## Deprecated
