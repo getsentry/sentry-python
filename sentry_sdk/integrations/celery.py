@@ -6,7 +6,6 @@ from functools import wraps
 
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk._compat import reraise
 from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -18,6 +17,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     logger,
     match_regex_list,
+    reraise,
 )
 
 if TYPE_CHECKING:
