@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 
@@ -223,8 +224,6 @@ async def async_message(request):
 
 
 async def my_async_view(request):
-    import asyncio
-
     await asyncio.sleep(1)
     return HttpResponse("Hello World")
 
