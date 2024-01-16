@@ -38,6 +38,7 @@ if TYPE_CHECKING:
         Dict,
         Iterator,
         List,
+        NoReturn,
         Optional,
         Set,
         Tuple,
@@ -1575,7 +1576,7 @@ def package_version(package):
 
 
 def reraise(tp, value, tb=None):
-    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> None
+    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> NoReturn
     assert value is not None
     if value.__traceback__ is not tb:
         raise value.with_traceback(tb)
