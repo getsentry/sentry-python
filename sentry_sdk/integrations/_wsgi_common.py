@@ -123,6 +123,7 @@ class RequestExtractor(object):
         form = self.form()
         files = self.files()
         if form or files:
+            data = {}
             if form:
                 data = dict(form.items())
             if files:
