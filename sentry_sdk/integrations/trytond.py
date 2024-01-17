@@ -5,7 +5,6 @@ import sentry_sdk.integrations.wsgi
 from sentry_sdk._types import TYPE_CHECKING
 
 from trytond.exceptions import TrytonException  # type: ignore
-from trytond.wsgi import app  # type: ignore
 
 if TYPE_CHECKING:
     from typing import Any
@@ -22,6 +21,9 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
 
     @staticmethod
     def setup_once():  # type: () -> None
+        # Lazy import for potential setup as a trytond middleware
+        from trytond.wsgi import app  # type: ignore
+
         app.wsgi_app = sentry_sdk.integrations.wsgi.SentryWsgiMiddleware(app.wsgi_app)
 
         def error_handler(e):  # type: (Exception) -> None
