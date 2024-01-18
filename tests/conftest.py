@@ -638,8 +638,5 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         fake_transaction = None
         fake_start_child = None
 
-    with mock.patch(
-        "sentry_sdk.get_current_span",
-        return_value=fake_transaction,
-    ):
+    with mock.patch("sentry_sdk.get_current_span", return_value=fake_transaction):
         yield fake_start_child
