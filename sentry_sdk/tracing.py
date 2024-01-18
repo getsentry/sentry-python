@@ -54,7 +54,7 @@ SOURCE_FOR_STYLE = {
 }
 
 
-class _SpanRecorder(object):
+class _SpanRecorder:
     """Limits the number of spans recorded in a transaction."""
 
     __slots__ = ("maxlen", "spans")
@@ -77,7 +77,7 @@ class _SpanRecorder(object):
             self.spans.append(span)
 
 
-class Span(object):
+class Span:
     """A span holds timing information of a block of code.
     Spans can have multiple child spans thus forming a span tree."""
 

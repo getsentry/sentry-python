@@ -212,7 +212,7 @@ def test_flask_login_configured(
 ):
     sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
 
-    class User(object):
+    class User:
         is_authenticated = is_active = True
         is_anonymous = user_id is not None
 

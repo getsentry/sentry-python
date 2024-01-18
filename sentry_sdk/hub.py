@@ -92,7 +92,7 @@ def _should_send_default_pii():
     return client.options["send_default_pii"]
 
 
-class _InitGuard(object):
+class _InitGuard:
     def __init__(self, client):
         # type: (Client) -> None
         self._client = client
@@ -173,7 +173,7 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class _ScopeManager(object):
+class _ScopeManager:
     def __init__(self, hub):
         # type: (Hub) -> None
         self._hub = hub

@@ -1,7 +1,7 @@
 import asyncio
 from copy import deepcopy
+from functools import wraps
 
-from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable

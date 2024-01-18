@@ -95,7 +95,7 @@ class FalconRequestExtractor(RequestExtractor):
                 return self.request._media
 
 
-class SentryFalconMiddleware(object):
+class SentryFalconMiddleware:
     """Captures exceptions in Falcon requests and send to Sentry"""
 
     def process_request(self, req, resp, *args, **kwargs):

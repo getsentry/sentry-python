@@ -23,7 +23,7 @@ def crashing_app():
     return app
 
 
-class IterableApp(object):
+class IterableApp:
     def __init__(self, iterable):
         self.iterable = iterable
 
@@ -31,7 +31,7 @@ class IterableApp(object):
         return self.iterable
 
 
-class ExitingIterable(object):
+class ExitingIterable:
     def __init__(self, exc_func):
         self._exc_func = exc_func
 
