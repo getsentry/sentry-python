@@ -388,9 +388,6 @@ class AnnotatedValue(object):
 
         return self.value == other.value and self.metadata == other.metadata
 
-    def __repr__(self):
-        return self.value
-
     @classmethod
     def removed_because_raw_data(cls):
         # type: () -> AnnotatedValue
@@ -1128,18 +1125,26 @@ def _is_in_project_root(abs_path, project_root):
 
 
 def _truncate_by_bytes(string, max_bytes):
-    # type: (Union[str, bytes], int) -> str
+    # type: (str, int) -> str
     """
     Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
     """
-    truncated = string.encode("utf-8")[: max_bytes - 3].decode("utf-8", errors="ignore")
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if isinstance(string, bytes):
+        truncated = string[: max_bytes - 3]
+    else:
+        truncated = string.encode("utf-8")[: max_bytes - 3].decode(
+            "utf-8", errors="ignore"
+        )
+
     return truncated + "..."
 
 
 def _get_size_in_bytes(value):
-    # type: (Union[str, bytes]) -> Optional[int]
-    # XXX: broken 'unicodehere' py2 -- can't be encoded
-    # XXX remove repr
+    # type: (str) -> Optional[int]
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
     if not isinstance(value, (bytes, text_type)):
         return None
 
