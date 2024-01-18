@@ -639,7 +639,7 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         fake_start_child = None
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py3.get_current_span",
+        "sentry_sdk.get_current_span",
         return_value=fake_transaction,
     ):
         yield fake_start_child
