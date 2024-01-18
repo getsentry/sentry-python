@@ -110,7 +110,7 @@ def metrics_noop(func):
     return new_func
 
 
-class Metric(object):
+class Metric:
     __slots__ = ()
 
     @property
@@ -339,7 +339,7 @@ TIMING_FUNCTIONS = {
 }
 
 
-class LocalAggregator(object):
+class LocalAggregator:
     __slots__ = ("_measurements",)
 
     def __init__(self):
@@ -393,7 +393,7 @@ class LocalAggregator(object):
         return rv
 
 
-class MetricsAggregator(object):
+class MetricsAggregator:
     ROLLUP_IN_SECONDS = 10.0
     MAX_WEIGHT = 100000
     FLUSHER_SLEEP_TIME = 5.0
@@ -755,7 +755,7 @@ def incr(
         )
 
 
-class _Timing(object):
+class _Timing:
     def __init__(
         self,
         key,  # type: str

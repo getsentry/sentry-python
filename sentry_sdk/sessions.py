@@ -59,7 +59,7 @@ def make_aggregate_envelope(aggregate_states, attrs):
     return {"attrs": dict(attrs), "aggregates": list(aggregate_states.values())}
 
 
-class SessionFlusher(object):
+class SessionFlusher:
     def __init__(
         self,
         capture_func,  # type: Callable[[Envelope], None]

@@ -148,7 +148,7 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class _Client(object):
+class _Client:
     """The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first

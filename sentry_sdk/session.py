@@ -27,7 +27,7 @@ def _make_uuid(
     return uuid.UUID(val)
 
 
-class Session(object):
+class Session:
     def __init__(
         self,
         sid=None,  # type: Optional[Union[str, uuid.UUID]]
