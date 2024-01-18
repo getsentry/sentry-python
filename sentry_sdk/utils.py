@@ -383,6 +383,7 @@ class AnnotatedValue(object):
         self.metadata = metadata
 
     def __eq__(self, other):
+        # type: (Any) -> bool
         if not isinstance(other, AnnotatedValue):
             return False
 
