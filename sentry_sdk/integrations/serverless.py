@@ -1,10 +1,8 @@
 import sys
+from functools import wraps
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import event_from_exception, reraise
-from sentry_sdk._functools import wraps
-
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:

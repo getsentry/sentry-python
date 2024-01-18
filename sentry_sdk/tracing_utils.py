@@ -308,7 +308,7 @@ def _format_sql(cursor, sql):
     return real_sql or to_string(sql)
 
 
-class Baggage(object):
+class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
     """

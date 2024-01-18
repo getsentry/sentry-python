@@ -52,7 +52,7 @@ def request_body_within_bounds(client, content_length):
     )
 
 
-class RequestExtractor(object):
+class RequestExtractor:
     def __init__(self, request):
         # type: (Any) -> None
         self.request = request

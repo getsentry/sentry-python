@@ -94,7 +94,7 @@ class FullError(Exception):
     pass
 
 
-class Queue(object):
+class Queue:
     """Create a queue object with a given maximum size.
 
     If maxsize is <= 0, the queue size is infinite.

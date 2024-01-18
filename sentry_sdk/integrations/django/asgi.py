@@ -7,10 +7,11 @@ Since this file contains `async def` it is conditionally imported in
 """
 
 import asyncio
+import functools
 
 from django.core.handlers.wsgi import WSGIRequest
 
-from sentry_sdk import Hub, _functools
+from sentry_sdk import Hub
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
@@ -143,7 +144,7 @@ def patch_channels_asgi_handler_impl(cls):
 
 def wrap_async_view(hub, callback):
     # type: (Hub, Any) -> Any
-    @_functools.wraps(callback)
+    @functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
 

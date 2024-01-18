@@ -366,7 +366,7 @@ def test_error_in_authenticated_userid(
     )
     logger = logging.getLogger("test_pyramid")
 
-    class AuthenticationPolicy(object):
+    class AuthenticationPolicy:
         def authenticated_userid(self, request):
             logger.error("failed to identify user")
 
