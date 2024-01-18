@@ -38,7 +38,7 @@ from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import capture_internal_exceptions, reraise
+from sentry_sdk.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -154,30 +154,9 @@ def _capture_internal_warnings():
 
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, validate_event_schema):
-    def check_event(event):
-        def check_string_keys(map):
-            for key, value in map.items():
-                assert isinstance(key, str)
-                if isinstance(value, dict):
-                    check_string_keys(value)
-
-        with capture_internal_exceptions():
-            check_string_keys(event)
-            validate_event_schema(event)
-
-    def check_envelope(envelope):
-        with capture_internal_exceptions():
-            # There used to be a check here for errors are not sent in envelopes.
-            # We changed the behaviour to send errors in envelopes when tracing is enabled.
-            # This is checked in test_client.py::test_sending_events_with_tracing
-            # and test_client.py::test_sending_events_with_no_tracing
-            pass
-
+def monkeypatch_test_transport(monkeypatch):
     def inner(client):
-        monkeypatch.setattr(
-            client, "transport", TestTransport(check_event, check_envelope)
-        )
+        monkeypatch.setattr(client, "transport", TestTransport())
 
     return inner
 
@@ -209,6 +188,7 @@ def sentry_init(monkeypatch_test_transport, request):
         client = sentry_sdk.Client(*a, **kw)
         hub.bind_client(client)
         if "transport" not in kw:
+            # TODO: Why do we even monkeypatch the transport, when we could just set it on the kw before constructing the Client?
             monkeypatch_test_transport(sentry_sdk.Hub.current.client)
 
     if request.node.get_closest_marker("forked"):
@@ -222,11 +202,12 @@ def sentry_init(monkeypatch_test_transport, request):
 
 
 class TestTransport(Transport):
-    def __init__(self, capture_event_callback, capture_envelope_callback):
+    def __init__(self):
         Transport.__init__(self)
-        self.capture_event = capture_event_callback
-        self.capture_envelope = capture_envelope_callback
-        self._queue = None
+
+    def capture_envelope(self, _: Envelope) -> None:
+        """No-op capture_envelope for tests"""
+        pass
 
 
 @pytest.fixture
@@ -234,21 +215,16 @@ def capture_events(monkeypatch):
     def inner():
         events = []
         test_client = sentry_sdk.Hub.current.client
-        old_capture_event = test_client.transport.capture_event
         old_capture_envelope = test_client.transport.capture_envelope
 
-        def append_event(event):
-            events.append(event)
-            return old_capture_event(event)
-
-        def append_envelope(envelope):
+        def append_event(envelope):
             for item in envelope:
                 if item.headers.get("type") in ("event", "transaction"):
-                    test_client.transport.capture_event(item.payload.json)
+                    events.append(item.payload.json)
             return old_capture_envelope(envelope)
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append_event)
-        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_event)
+
         return events
 
     return inner
@@ -259,21 +235,14 @@ def capture_envelopes(monkeypatch):
     def inner():
         envelopes = []
         test_client = sentry_sdk.Hub.current.client
-        old_capture_event = test_client.transport.capture_event
         old_capture_envelope = test_client.transport.capture_envelope
-
-        def append_event(event):
-            envelope = Envelope()
-            envelope.add_event(event)
-            envelopes.append(envelope)
-            return old_capture_event(event)
 
         def append_envelope(envelope):
             envelopes.append(envelope)
             return old_capture_envelope(envelope)
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append_event)
         monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+
         return envelopes
 
     return inner

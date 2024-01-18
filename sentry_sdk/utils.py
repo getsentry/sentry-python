@@ -27,7 +27,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -46,7 +46,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -305,17 +305,8 @@ class Auth:
         self.version = version
         self.client = client
 
-    @property
-    def store_api_url(self):
-        # type: () -> str
-        """Returns the API url for storing events.
-
-        Deprecated: use get_api_url instead.
-        """
-        return self.get_api_url(type="store")
-
     def get_api_url(
-        self, type="store"  # type: EndpointType
+        self, type=EndpointType.ENVELOPE  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""

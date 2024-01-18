@@ -1,4 +1,8 @@
+from __future__ import print_function
+
+from abc import ABC, abstractmethod
 import io
+import warnings
 import urllib3
 import certifi
 import gzip
@@ -6,7 +10,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
-from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
+from sentry_sdk.consts import EndpointType
+from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk._types import TYPE_CHECKING
@@ -25,7 +30,7 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event, EndpointType
+    from sentry_sdk._types import Event
 
     DataCategory = Optional[str]
 
@@ -35,11 +40,17 @@ except ImportError:
     from urllib import getproxies  # type: ignore
 
 
-class Transport:
+class Transport(ABC):
     """Baseclass for all transports.
 
     A transport is used to send an event to sentry.
     """
+
+    # TODO: For the items without default implementations, we may wish to mark them as abstract methods,
+    #       or provide a default implementation. We could probably move implementations of some of the
+    #       methods (such as `record_lost_event`) from the HttpTransport class to this class.
+    #       However, marking methods as abstract methods is a breaking change, so we should consider
+    #       whether we would like to make the change for the SDK 2.0 release.
 
     parsed_dsn = None  # type: Optional[Dsn]
 
@@ -58,11 +69,22 @@ class Transport:
     ):
         # type: (...) -> None
         """
+        DEPRECATED: Please use capture_envelope instead.
+
         This gets invoked with the event dictionary when an event should
         be sent to sentry.
         """
-        raise NotImplementedError()
 
+        warnings.warn(
+            "capture_event is deprecated, please use capture_envelope instead!",
+            DeprecationWarning,
+        )
+
+        envelope = Envelope()
+        envelope.add_event(event)
+        self.capture_envelope(envelope)
+
+    @abstractmethod
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
@@ -71,11 +93,10 @@ class Transport:
         Send an envelope to Sentry.
 
         Envelopes are a data container format that can hold any type of data
-        submitted to Sentry. We use it for transactions and sessions, but
-        regular "error" events should go through `capture_event` for backwards
-        compat.
+        submitted to Sentry. We use it to send all event data (including errors,
+        transactions, crons checkins, etc.) to Sentry.
         """
-        raise NotImplementedError()
+        pass
 
     def flush(
         self,
@@ -216,7 +237,7 @@ class HttpTransport(Transport):
         self,
         body,  # type: bytes
         headers,  # type: Dict[str, str]
-        endpoint_type="store",  # type: EndpointType
+        endpoint_type=EndpointType.ENVELOPE,  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
     ):
         # type: (...) -> None
@@ -333,46 +354,6 @@ class HttpTransport(Transport):
         # type: () -> bool
         return not (self._is_worker_full() or self._is_rate_limited())
 
-    def _send_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
-
-        if self._check_disabled("error"):
-            self.on_dropped_event("self_rate_limits")
-            self.record_lost_event("ratelimit_backoff", data_category="error")
-            return None
-
-        body = io.BytesIO()
-        if self._compresslevel == 0:
-            body.write(json_dumps(event))
-        else:
-            with gzip.GzipFile(
-                fileobj=body, mode="w", compresslevel=self._compresslevel
-            ) as f:
-                f.write(json_dumps(event))
-
-        assert self.parsed_dsn is not None
-        logger.debug(
-            "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
-            % (
-                event.get("type") or "null",
-                event.get("level") or "null",
-                event.get("event_id") or "null",
-                self.parsed_dsn.project_id,
-                self.parsed_dsn.host,
-            )
-        )
-
-        headers = {
-            "Content-Type": "application/json",
-        }
-        if self._compresslevel > 0:
-            headers["Content-Encoding"] = "gzip"
-
-        self._send_request(body.getvalue(), headers=headers)
-        return None
-
     def _send_envelope(
         self, envelope  # type: Envelope
     ):
@@ -430,7 +411,7 @@ class HttpTransport(Transport):
         self._send_request(
             body.getvalue(),
             headers=headers,
-            endpoint_type="envelope",
+            endpoint_type=EndpointType.ENVELOPE,
             envelope=envelope,
         )
         return None
@@ -501,23 +482,6 @@ class HttpTransport(Transport):
         else:
             return urllib3.PoolManager(**opts)
 
-    def capture_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
-        hub = self.hub_cls.current
-
-        def send_event_wrapper():
-            # type: () -> None
-            with hub:
-                with capture_internal_exceptions():
-                    self._send_event(event)
-                    self._flush_client_reports()
-
-        if not self._worker.submit(send_event_wrapper):
-            self.on_dropped_event("full_queue")
-            self.record_lost_event("queue_overflow", data_category="error")
-
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
@@ -555,6 +519,11 @@ class HttpTransport(Transport):
 
 
 class _FunctionTransport(Transport):
+    """
+    DEPRECATED: Users wishing to provide a custom transport should subclass
+    the Transport class, rather than providing a function.
+    """
+
     def __init__(
         self, func  # type: Callable[[Event], None]
     ):
@@ -569,19 +538,31 @@ class _FunctionTransport(Transport):
         self._func(event)
         return None
 
+    def capture_envelope(self, envelope: Envelope) -> None:
+        # Since function transports expect to be called with an event, we need
+        # to iterate over the envelope and call the function for each event, via
+        # the deprecated capture_event method.
+        for event in envelope.events:
+            self.capture_event(event)
+
 
 def make_transport(options):
     # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
 
-    # If no transport is given, we use the http transport class
-    if ref_transport is None:
-        transport_cls = HttpTransport  # type: Type[Transport]
-    elif isinstance(ref_transport, Transport):
+    # By default, we use the http transport class
+    transport_cls = HttpTransport  # type: Type[Transport]
+
+    if isinstance(ref_transport, Transport):
         return ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
+        warnings.warn(
+            "Function transports are deprecated and will be removed in a future release."
+            "Please provide a Transport instance or subclass, instead.",
+            DeprecationWarning,
+        )
         return _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not

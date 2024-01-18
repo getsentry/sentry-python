@@ -95,11 +95,12 @@ class Envelope:
 
     def get_event(self):
         # type: (...) -> Optional[Event]
-        for items in self.items:
-            event = items.get_event()
-            if event is not None:
-                return event
-        return None
+        return next(self.events, None)
+
+    @property
+    def events(self):
+        # type: () -> Iterator[Event]
+        return (item.get_event() for item in self.items if item.get_event() is not None)
 
     def get_transaction_event(self):
         # type: (...) -> Optional[Event]

@@ -1,3 +1,4 @@
+from enum import StrEnum
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
@@ -234,6 +235,16 @@ class OP:
     WEBSOCKET_SERVER = "websocket.server"
     SOCKET_CONNECTION = "socket.connection"
     SOCKET_DNS = "socket.dns"
+
+
+class EndpointType(StrEnum):
+    """
+    The type of an endpoint. This is an enum, rather than a constant, for historical reasons
+    (the old /store endpoint). The enum also preserve future compatibility, in case we ever
+    have a new endpoint.
+    """
+
+    ENVELOPE = "envelope"
 
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
