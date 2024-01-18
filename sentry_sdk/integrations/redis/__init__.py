@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import _should_send_default_pii

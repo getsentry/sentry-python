@@ -1,8 +1,6 @@
-from __future__ import absolute_import
-
 import weakref
-from sentry_sdk.consts import OP
 
+from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration

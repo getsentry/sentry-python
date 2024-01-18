@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import sys
 
 from sentry_sdk.hub import Hub
