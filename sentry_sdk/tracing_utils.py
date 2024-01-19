@@ -563,5 +563,20 @@ def start_child_span_decorator(func):
     return func_with_tracing
 
 
+def get_current_span(hub=None):
+    # type: (Optional[sentry_sdk.Hub]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    if hub is None:
+        hub = sentry_sdk.Hub.current
+
+    current_span = hub.scope.span
+    return current_span
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span
