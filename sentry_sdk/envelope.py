@@ -100,7 +100,10 @@ class Envelope:
     @property
     def events(self):
         # type: () -> Iterator[Event]
-        return (item.get_event() for item in self.items if item.get_event() is not None)
+        for item in self.items:
+            event = item.get_event()
+            if event is not None:
+                yield event
 
     def get_transaction_event(self):
         # type: (...) -> Optional[Event]
