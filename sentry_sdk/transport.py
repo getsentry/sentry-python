@@ -78,6 +78,7 @@ class Transport(ABC):
         warnings.warn(
             "capture_event is deprecated, please use capture_envelope instead!",
             DeprecationWarning,
+            stacklevel=2,
         )
 
         envelope = Envelope()
@@ -572,6 +573,7 @@ def make_transport(options):
             "Function transports are deprecated and will be removed in a future release."
             "Please provide a Transport instance or subclass, instead.",
             DeprecationWarning,
+            stacklevel=2,
         )
         return _FunctionTransport(ref_transport)
 
