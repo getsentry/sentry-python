@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
@@ -237,7 +237,7 @@ class OP:
     SOCKET_DNS = "socket.dns"
 
 
-class EndpointType(StrEnum):
+class EndpointType(Enum):
     """
     The type of an endpoint. This is an enum, rather than a constant, for historical reasons
     (the old /store endpoint). The enum also preserve future compatibility, in case we ever

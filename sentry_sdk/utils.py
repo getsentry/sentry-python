@@ -315,7 +315,7 @@ class Auth:
             self.host,
             self.path,
             self.project_id,
-            type,
+            type.value,
         )
 
     def to_header(self):
