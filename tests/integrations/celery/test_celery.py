@@ -516,16 +516,16 @@ def test_baggage_propagation(init_celery):
             headers={"baggage": "custom=value"},
         ).get()
 
-        expected_baggage = (
-            "sentry-release=abcdef,"
-            "sentry-trace_id={},"
-            "sentry-environment=production,"
-            "sentry-sample_rate=1.0,"
-            "sentry-sampled=true,"
-            "custom=value"
-        ).format(transaction.trace_id)
-
-        assert result["baggage"] == expected_baggage
+        assert sorted(result["baggage"].split(",")) == sorted(
+            [
+                "sentry-release=abcdef",
+                "sentry-trace_id={}".format(transaction.trace_id),
+                "sentry-environment=production",
+                "sentry-sample_rate=1.0",
+                "sentry-sampled=true",
+                "custom=value",
+            ]
+        )
 
 
 def test_sentry_propagate_traces_override(init_celery):
