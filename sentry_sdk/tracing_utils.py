@@ -512,8 +512,6 @@ def start_child_span_decorator(func):
 
     See also ``sentry_sdk.tracing.trace()``.
     """
-    from sentry_sdk import get_current_span
-
     # Asynchronous case
     if inspect.iscoroutinefunction(func):
 
