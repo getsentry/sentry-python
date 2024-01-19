@@ -104,13 +104,23 @@ class Transport(ABC):
         callback=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
-        """Wait `timeout` seconds for the current events to be sent out."""
-        pass
+        """
+        Wait `timeout` seconds for the current events to be sent out.
+
+        The default implementation is a no-op, since this method may only be relevant to some transports.
+        Subclasses should override this method if necessary.
+        """
+        return None
 
     def kill(self):
         # type: () -> None
-        """Forcefully kills the transport."""
-        pass
+        """
+        Forcefully kills the transport.
+
+        The default implementation is a no-op, since this method may only be relevant to some transports.
+        Subclasses should override this method if necessary.
+        """
+        return None
 
     def record_lost_event(
         self,
