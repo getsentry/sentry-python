@@ -16,8 +16,8 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
     strip_string,
     AnnotatedValue,
-    EndpointType,
 )
+from sentry_sdk.consts import EndpointType
 
 
 try:
