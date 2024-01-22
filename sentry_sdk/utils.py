@@ -25,10 +25,9 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-import sentry_sdk.consts as consts
 from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -307,7 +306,7 @@ class Auth:
         self.client = client
 
     def get_api_url(
-        self, type=consts.EndpointType.ENVELOPE  # type: consts.EndpointType
+        self, type=EndpointType.ENVELOPE  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""
