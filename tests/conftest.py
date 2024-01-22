@@ -278,17 +278,19 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
 
         test_client = sentry_sdk.Hub.current.client
 
-        old_capture_event = test_client.transport.capture_event
+        old_capture_envelope = test_client.transport.capture_envelope
 
-        def append(event):
-            events_w.write(json.dumps(event).encode("utf-8"))
-            events_w.write(b"\n")
-            return old_capture_event(event)
+        def append(envelope):
+            event = envelope.get_event() or envelope.get_transaction_event()
+            if event is not None:
+                events_w.write(json.dumps(event).encode("utf-8"))
+                events_w.write(b"\n")
+            return old_capture_envelope(envelope)
 
         def flush(timeout=None, callback=None):
             events_w.write(b"flush\n")
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append)
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
         return EventStreamReader(events_r, events_w)
