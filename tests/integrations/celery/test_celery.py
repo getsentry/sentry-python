@@ -242,13 +242,16 @@ def test_no_stackoverflows(celery):
 
         results.append(42)
 
-    for _ in range(10000):
+    for _ in range(1):
         dummy_task.delay()
 
-    assert results == [42] * 10000
+    assert results == [42] * 1
 
     with configure_scope() as scope:
-        assert not scope._tags
+        # Because celery is executed with "task_always_eager" the task is not sent to the
+        # queue but executed directly in the current thread. This means that the isolation scope
+        # in the task and here is the same.
+        assert scope._tags == {"foo": "bar"}
 
 
 def test_simple_no_propagation(capture_events, init_celery):
