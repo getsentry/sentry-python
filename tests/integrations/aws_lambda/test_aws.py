@@ -43,7 +43,7 @@ import sentry_sdk
 import json
 import time
 
-from sentry_sdk.transport import HttpTransport
+from sentry_sdk.transport import Transport
 
 def truncate_data(data):
     # AWS Lambda truncates the log output to 4kb, which is small enough to miss
@@ -114,14 +114,10 @@ def envelope_processor(envelope):
     return truncate_data(item_json)
 
 
-class TestTransport(HttpTransport):
-    def _send_event(self, event):
-        event = event_processor(event)
-        print("\\nEVENT: {}\\n".format(json.dumps(event)))
-
-    def _send_envelope(self, envelope):
-        envelope = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+class TestTransport(Transport):
+    def capture_envelope(self, envelope):
+        envelope_item = envelope_processor(envelope)
+        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope_item)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -183,27 +179,23 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
         response["Payload"] = json.loads(response["Payload"].read().decode("utf-8"))
         del response["ResponseMetadata"]
 
-        events = []
-        envelopes = []
+        envelope_item = []
 
         for line in response["LogResult"]:
             print("AWS:", line)
-            if line.startswith(b"EVENT: "):
-                line = line[len(b"EVENT: ") :]
-                events.append(json.loads(line.decode("utf-8")))
-            elif line.startswith(b"ENVELOPE: "):
+            if line.startswith(b"ENVELOPE: "):
                 line = line[len(b"ENVELOPE: ") :]
-                envelopes.append(json.loads(line.decode("utf-8")))
+                envelope_item.append(json.loads(line.decode("utf-8")))
             else:
                 continue
 
-        return envelopes, events, response
+        return envelope_item, response
 
     return inner
 
 
 def test_basic(run_lambda_function):
-    _, events, response = run_lambda_function(
+    envelope_item, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -218,7 +210,7 @@ def test_basic(run_lambda_function):
 
     assert response["FunctionError"] == "Unhandled"
 
-    (event,) = events
+    (event,) = envelope_item
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
@@ -254,7 +246,7 @@ def test_initialization_order(run_lambda_function):
     as seen by AWS already runs. At this point at least draining the queue
     should work."""
 
-    _, events, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -266,7 +258,7 @@ def test_initialization_order(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
-    (event,) = events
+    (event,) = envelope_item
 
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
@@ -275,7 +267,7 @@ def test_initialization_order(run_lambda_function):
 
 
 def test_request_data(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -312,7 +304,7 @@ def test_request_data(run_lambda_function):
         """,
     )
 
-    (event,) = events
+    (event,) = envelope_item
 
     assert event["request"] == {
         "headers": {
@@ -327,7 +319,7 @@ def test_request_data(run_lambda_function):
 
 
 def test_init_error(run_lambda_function, lambda_runtime):
-    _, events, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -339,12 +331,12 @@ def test_init_error(run_lambda_function, lambda_runtime):
         syntax_check=False,
     )
 
-    (event,) = events
+    (event,) = envelope_item
     assert event["exception"]["values"][0]["value"] == "name 'func' is not defined"
 
 
 def test_timeout_error(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -359,7 +351,7 @@ def test_timeout_error(run_lambda_function):
         timeout=2,
     )
 
-    (event,) = events
+    (event,) = envelope_item
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ServerlessTimeoutWarning"
@@ -387,7 +379,7 @@ def test_timeout_error(run_lambda_function):
 
 
 def test_performance_no_error(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -400,7 +392,7 @@ def test_performance_no_error(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
-    (envelope,) = envelopes
+    (envelope,) = envelope_item
 
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "function.aws"
@@ -409,7 +401,7 @@ def test_performance_no_error(run_lambda_function):
 
 
 def test_performance_error(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -425,7 +417,7 @@ def test_performance_error(run_lambda_function):
     (
         error_event,
         transaction_event,
-    ) = envelopes
+    ) = envelope_item
 
     assert error_event["level"] == "error"
     (exception,) = error_event["exception"]["values"]
@@ -498,7 +490,7 @@ def test_non_dict_event(
     batch_size,
     DictionaryContaining,  # noqa:N803
 ):
-    envelopes, _, response = run_lambda_function(
+    envelope_item, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -516,7 +508,7 @@ def test_non_dict_event(
     (
         error_event,
         transaction_event,
-    ) = envelopes
+    ) = envelope_item
     assert error_event["level"] == "error"
     assert error_event["contexts"]["trace"]["op"] == "function.aws"
 
@@ -593,7 +585,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    _, _, response = run_lambda_function(
+    _, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(inspect.getsource(StringContaining))
         + dedent(inspect.getsource(DictionaryContaining))
@@ -673,7 +665,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         "test_dir.test_lambda.test_handler",
     ]:
         print("Testing Initial Handler ", initial_handler)
-        _, _, response = run_lambda_function(
+        _, response = run_lambda_function(
             dedent(
                 """
             import sentry_sdk
@@ -706,7 +698,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -720,7 +712,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
         payload=b'{"foo": "bar"}',
     )
 
-    (msg_event, error_event, transaction_event) = envelopes
+    (msg_event, error_event, transaction_event) = envelope_item
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -739,7 +731,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -753,7 +745,7 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
         payload=b'{"foo": "bar"}',
     )
 
-    (msg_event, error_event) = events
+    (msg_event, error_event) = envelope_item
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -781,7 +773,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
         }
     }
 
-    envelopes, _, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -795,7 +787,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
         payload=json.dumps(payload).encode(),
     )
 
-    (msg_event, error_event, transaction_event) = envelopes
+    (msg_event, error_event, transaction_event) = envelope_item
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -828,7 +820,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
         }
     }
 
-    _, events, _ = run_lambda_function(
+    envelope_item, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -842,7 +834,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
         payload=json.dumps(payload).encode(),
     )
 
-    (msg_event, error_event) = events
+    (msg_event, error_event) = envelope_item
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -858,7 +850,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
 
 
 def test_basic_with_eventbridge_source(run_lambda_function):
-    _, events, response = run_lambda_function(
+    envelope_item, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -873,7 +865,7 @@ def test_basic_with_eventbridge_source(run_lambda_function):
 
     assert response["FunctionError"] == "Unhandled"
 
-    (event,) = events
+    (event,) = envelope_item
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
