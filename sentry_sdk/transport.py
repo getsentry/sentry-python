@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-from abc import ABC, abstractmethod
 import io
 import warnings
 import urllib3
@@ -40,7 +39,7 @@ except ImportError:
     from urllib import getproxies  # type: ignore
 
 
-class Transport(ABC):
+class Transport:
     """Baseclass for all transports.
 
     A transport is used to send an event to sentry.
@@ -79,7 +78,6 @@ class Transport(ABC):
         envelope.add_event(event)
         self.capture_envelope(envelope)
 
-    @abstractmethod
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
@@ -91,7 +89,7 @@ class Transport(ABC):
         submitted to Sentry. We use it to send all event data (including errors,
         transactions, crons checkins, etc.) to Sentry.
         """
-        pass
+        raise NotImplementedError()
 
     def flush(
         self,
