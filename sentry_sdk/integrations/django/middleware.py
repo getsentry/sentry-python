@@ -38,7 +38,7 @@ def patch_django_middlewares():
     # type: () -> None
     from django.core.handlers import base
 
-    old_import_string = getattr(base, "import_string")
+    old_import_string = base.import_string
 
     def sentry_patched_import_string(dotted_path):
         # type: (str) -> Any
@@ -49,7 +49,7 @@ def patch_django_middlewares():
 
         return rv
 
-    setattr(base, "import_string", sentry_patched_import_string)
+    base.import_string = sentry_patched_import_string
 
     old_load_middleware = base.BaseHandler.load_middleware
 
