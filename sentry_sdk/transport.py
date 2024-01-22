@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
-from sentry_sdk.consts import EndpointType
+import sentry_sdk.consts as consts
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
@@ -248,7 +248,7 @@ class HttpTransport(Transport):
         self,
         body,  # type: bytes
         headers,  # type: Dict[str, str]
-        endpoint_type=EndpointType.ENVELOPE,  # type: EndpointType
+        endpoint_type=consts.EndpointType.ENVELOPE,  # type: consts.EndpointType
         envelope=None,  # type: Optional[Envelope]
     ):
         # type: (...) -> None
@@ -422,7 +422,7 @@ class HttpTransport(Transport):
         self._send_request(
             body.getvalue(),
             headers=headers,
-            endpoint_type=EndpointType.ENVELOPE,
+            endpoint_type=consts.EndpointType.ENVELOPE,
             envelope=envelope,
         )
         return None
