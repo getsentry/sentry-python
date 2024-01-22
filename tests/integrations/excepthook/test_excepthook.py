@@ -14,7 +14,8 @@ def test_excepthook(tmpdir):
 
     def capture_envelope(self, envelope):
         print("capture_envelope was called")
-        for event in envelope.events:
+        event = envelope.get_event()
+        if event is not None:
             print(event)
 
     transport.HttpTransport.capture_envelope = capture_envelope
@@ -50,7 +51,8 @@ def test_always_value_excepthook(tmpdir):
 
     def capture_envelope(self, envelope):
         print("capture_envelope was called")
-        for event in envelope.events:
+        event = envelope.get_event()
+        if event is not None:
             print(event)
 
     transport.HttpTransport.capture_envelope = capture_envelope

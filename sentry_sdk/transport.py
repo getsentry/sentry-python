@@ -553,7 +553,8 @@ class _FunctionTransport(Transport):
         # Since function transports expect to be called with an event, we need
         # to iterate over the envelope and call the function for each event, via
         # the deprecated capture_event method.
-        for event in envelope.events:
+        event = envelope.get_event()
+        if event is not None:
             self.capture_event(event)
 
 

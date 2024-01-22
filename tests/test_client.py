@@ -586,7 +586,7 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
 
     def capture_envelope(self, envelope):
         time.sleep(0.1)
-        event = next(envelope.events, dict())
+        event = envelope.get_event() or dict()
         message = event.get("message", "")
         print(message)
 
