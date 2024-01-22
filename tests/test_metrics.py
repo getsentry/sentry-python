@@ -1,15 +1,11 @@
 import sys
 import time
 import linecache
+from unittest import mock
 
 from sentry_sdk import Hub, metrics, push_scope, start_transaction
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def parse_metrics(bytes):

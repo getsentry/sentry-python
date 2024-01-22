@@ -1,9 +1,4 @@
-try:
-    # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    # python < 3.3
-    from mock import MagicMock
+from unittest.mock import MagicMock
 
 from sentry_sdk.integrations.opentelemetry.integration import OpenTelemetryIntegration
 

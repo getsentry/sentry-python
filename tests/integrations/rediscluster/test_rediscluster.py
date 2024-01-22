@@ -1,6 +1,6 @@
-import pytest
 from unittest import mock
 
+import pytest
 import rediscluster
 
 from sentry_sdk import capture_message

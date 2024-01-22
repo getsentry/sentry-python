@@ -6,23 +6,17 @@ import logging
 import os
 import re
 import threading
+from unittest import mock
 
 import pytest
 
-from sentry_sdk import last_event_id, capture_exception
+from sentry_sdk import last_event_id, capture_exception, capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.utils import parse_version
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
-from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
 )
+from sentry_sdk.utils import parse_version
 
 import starlette
 from starlette.authentication import (
