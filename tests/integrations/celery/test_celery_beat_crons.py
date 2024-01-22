@@ -1,8 +1,11 @@
 import datetime
-import sys
+from unittest import mock
+from unittest.mock import MagicMock
 
 import pytest
+from celery.schedules import crontab, schedule
 
+from sentry_sdk.crons import MonitorStatus
 from sentry_sdk.integrations.celery import (
     _get_headers,
     _get_humanized_interval,
@@ -12,15 +15,6 @@ from sentry_sdk.integrations.celery import (
     crons_task_failure,
     crons_task_retry,
 )
-from sentry_sdk.crons import MonitorStatus
-from celery.schedules import crontab, schedule
-
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
 
 
 def test_get_headers():
@@ -378,10 +372,6 @@ def test_get_monitor_config_timezone_in_app_conf():
     assert monitor_config["timezone"] == "Asia/Karachi"
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 0),
-    reason="no datetime.timezone for Python 2, so skipping this test.",
-)
 def test_get_monitor_config_timezone_in_celery_schedule():
     app = MagicMock()
     app.timezone = "Asia/Karachi"

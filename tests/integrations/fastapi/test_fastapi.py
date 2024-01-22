@@ -1,21 +1,17 @@
 import json
 import logging
 import threading
+from unittest import mock
 
 import pytest
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
 def fastapi_app_factory():

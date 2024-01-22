@@ -1,18 +1,12 @@
-import sys
-
-from werkzeug.test import Client
+from collections import Counter
+from unittest import mock
 
 import pytest
+from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from collections import Counter
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.fixture
@@ -418,9 +412,6 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
-)
 @mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_sent(
     sentry_init,
