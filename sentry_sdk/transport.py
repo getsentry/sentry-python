@@ -46,12 +46,6 @@ class Transport(ABC):
     A transport is used to send an event to sentry.
     """
 
-    # TODO: For the items without default implementations, we may wish to mark them as abstract methods,
-    #       or provide a default implementation. We could probably move implementations of some of the
-    #       methods (such as `record_lost_event`) from the HttpTransport class to this class.
-    #       However, marking methods as abstract methods is a breaking change, so we should consider
-    #       whether we would like to make the change for the SDK 2.0 release.
-
     parsed_dsn = None  # type: Optional[Dsn]
 
     def __init__(
