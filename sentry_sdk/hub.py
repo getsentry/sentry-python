@@ -111,8 +111,8 @@ class _InitGuard:
 def _check_python_deprecations():
     # type: () -> None
     # Since we're likely to deprecate Python versions in the future, I'm keeping
-    # this handy function around. Use this to output logger.warning()s if the user
-    # is on a Python version that's deprecated at that point in time.
+    # this handy function around. Use this to detect the Python version used and
+    # to output logger.warning()s if it's deprecated.
     pass
 
 
