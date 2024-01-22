@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import io
 import urllib3
 import certifi
@@ -35,7 +36,7 @@ except ImportError:
     from urllib import getproxies  # type: ignore
 
 
-class Transport:
+class Transport(ABC):
     """Baseclass for all transports.
 
     A transport is used to send an event to sentry.
@@ -63,6 +64,7 @@ class Transport:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
@@ -75,7 +77,7 @@ class Transport:
         regular "error" events should go through `capture_event` for backwards
         compat.
         """
-        raise NotImplementedError()
+        pass
 
     def flush(
         self,
