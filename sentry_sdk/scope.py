@@ -264,6 +264,8 @@ class Scope(object):
         """
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
+
+        .. versionadded:: 1.XX.0
         """
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
