@@ -168,10 +168,6 @@ class BaseClient:
         # type: (*Any, **Any) -> None
         return None
 
-    def __repr__(self):
-        # type: () -> str
-        return "<{} id={}>".format(self.__class__.__name__, id(self))
-
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
         return {"options": {}}
