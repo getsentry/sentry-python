@@ -1,12 +1,25 @@
+import pytest
+
 from sentry_sdk import (
     configure_scope,
     continue_trace,
     get_baggage,
+    get_client,
+    get_current_scope,
     get_current_span,
+    get_global_scope,
+    get_isolation_scope,
     get_traceparent,
+    is_initialized,
+    set_current_scope,
+    set_isolation_scope,
     start_transaction,
 )
+
+from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.hub import Hub
+from sentry_sdk.scope import Scope
+
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -113,3 +126,72 @@ def test_continue_trace(sentry_init):
         assert propagation_context["dynamic_sampling_context"] == {
             "trace_id": "566e3688a61d4bc888951642d6f14a19"
         }
+
+
+@pytest.mark.forked
+def test_is_initialized():
+    assert not is_initialized()
+
+    scope = Scope.get_global_scope()
+    scope.set_client(Client())
+    assert is_initialized()
+
+
+@pytest.mark.forked
+def test_get_client():
+    client = get_client()
+    assert client is not None
+    assert client.__class__ == NoopClient
+    assert not client.is_active()
+
+
+@pytest.mark.forked
+def test_get_current_scope():
+    scope = get_current_scope()
+    assert scope is not None
+    assert scope.__class__ == Scope
+    assert scope._type == "current"
+
+
+@pytest.mark.forked
+def test_get_isolation_scope():
+    scope = get_isolation_scope()
+    assert scope is not None
+    assert scope.__class__ == Scope
+    assert scope._type == "isolation"
+
+
+@pytest.mark.forked
+def test_get_global_scope():
+    scope = get_global_scope()
+    assert scope is not None
+    assert scope.__class__ == Scope
+    assert scope._type == "global"
+
+
+@pytest.mark.forked
+def test_set_current_scope():
+    scope = Scope(ty="test_something")
+    set_current_scope(scope)
+
+    current_scope = Scope.get_current_scope()
+    assert current_scope == scope
+    assert current_scope._type == "test_something"
+
+    isolation_scope = Scope.get_isolation_scope()
+    assert isolation_scope != scope
+    assert isolation_scope._type == "isolation"
+
+
+@pytest.mark.forked
+def test_set_isolation_scope():
+    scope = Scope(ty="test_more")
+    set_isolation_scope(scope)
+
+    current_scope = Scope.get_current_scope()
+    assert current_scope != scope
+    assert current_scope._type == "current"
+
+    isolation_scope = Scope.get_isolation_scope()
+    assert isolation_scope == scope
+    assert isolation_scope._type == "test_more"

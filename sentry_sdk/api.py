@@ -58,6 +58,13 @@ __all__ = [
     "get_traceparent",
     "get_baggage",
     "continue_trace",
+    "get_client",
+    "get_current_scope",
+    "get_global_scope",
+    "get_isolation_scope",
+    "is_initialized",
+    "set_current_scope",
+    "set_isolation_scope",
 ]
 
 

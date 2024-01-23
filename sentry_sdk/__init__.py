@@ -40,6 +40,13 @@ __all__ = [  # noqa
     "get_baggage",
     "continue_trace",
     "trace",
+    "get_client",
+    "get_current_scope",
+    "get_global_scope",
+    "get_isolation_scope",
+    "is_initialized",
+    "set_current_scope",
+    "set_isolation_scope",
 ]
 
 # Initialize the debug support after everything is loaded
