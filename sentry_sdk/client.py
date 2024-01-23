@@ -46,11 +46,12 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk.integrations import Integration
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.integrations import Integration
+    from sentry_sdk.metrics import MetricsAggregator
+    from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
-
+    from sentry_sdk.transport import Transport
 
 _client_init_debug = ContextVar("client_init_debug")
 
@@ -159,21 +160,17 @@ class NoopClient:
     """
 
     options = _get_options()  # type: Dict[str, Any]
-    metrics_aggregator = None  # type: Optional[Any]
-    monitor = None  # type: Optional[Any]
-    transport = None  # type: Optional[Any]
-
-    def __repr__(self):
-        # type: () -> str
-        return "<{} id={}>".format(self.__class__.__name__, id(self))
-
-    def should_send_default_pii(self):
-        # type: () -> bool
-        return False
+    metrics_aggregator = None  # type: Optional[MetricsAggregator]
+    monitor = None  # type: Optional[Monitor]
+    transport = None  # type: Optional[Transport]
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         return None
+
+    def __repr__(self):
+        # type: () -> str
+        return "<{} id={}>".format(self.__class__.__name__, id(self))
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -182,6 +179,15 @@ class NoopClient:
     def __setstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         pass
+
+    @property
+    def dsn(self):
+        # type: () -> Optional[str]
+        return None
+
+    def should_send_default_pii(self):
+        # type: () -> bool
+        return False
 
     def is_active(self):
         # type: () -> bool
@@ -192,11 +198,6 @@ class NoopClient:
         """
         return False
 
-    @property
-    def dsn(self):
-        # type: () -> Optional[str]
-        return None
-
     def capture_event(self, *args, **kwargs):
         # type: (*Any, **Any) -> Optional[str]
         return None
@@ -206,7 +207,7 @@ class NoopClient:
         return None
 
     def get_integration(self, *args, **kwargs):
-        # type: (*Any, **Any) -> Any
+        # type: (*Any, **Any) -> Optional[Integration]
         return None
 
     def close(self, *args, **kwargs):
