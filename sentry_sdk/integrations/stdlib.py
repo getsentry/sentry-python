@@ -2,8 +2,9 @@ import os
 import subprocess
 import sys
 import platform
-from sentry_sdk.consts import OP, SPANDATA
+from http.client import HTTPConnection
 
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
@@ -16,7 +17,6 @@ from sentry_sdk.utils import (
     safe_repr,
     parse_url,
 )
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,12 +27,6 @@ if TYPE_CHECKING:
     from typing import List
 
     from sentry_sdk._types import Event, Hint
-
-
-try:
-    from httplib import HTTPConnection  # type: ignore
-except ImportError:
-    from http.client import HTTPConnection
 
 
 _RUNTIME_CONTEXT = {
@@ -114,7 +108,7 @@ def _install_httplib():
                 )
                 self.putheader(key, value)
 
-        self._sentrysdk_span = span
+        self._sentrysdk_span = span  # type: ignore[attr-defined]
 
         return rv
 
@@ -133,8 +127,8 @@ def _install_httplib():
 
         return rv
 
-    HTTPConnection.putrequest = putrequest
-    HTTPConnection.getresponse = getresponse
+    HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
+    HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
 
 
 def _init_argument(args, kwargs, name, position, setdefault_callback=None):
