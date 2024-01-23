@@ -202,9 +202,7 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
-        self.client = (
-            NoopClient()
-        )  # type: Union[sentry_sdk.Client, sentry_sdk.client.NoopClient]
+        self.client = NoopClient()  # type: sentry_sdk.client.BaseClient
 
         if client is not None:
             self.set_client(client)
@@ -294,7 +292,7 @@ class Scope(object):
 
     @classmethod
     def get_client(cls):
-        # type: () -> Union[sentry_sdk.Client, sentry_sdk.client.NoopClient]
+        # type: () -> sentry_sdk.client.BaseClient
         """
         Returns the currently used :py:class:`sentry_sdk.Client`.
         This checks the current scope, the isolation scope and the global scope for a client.
@@ -316,7 +314,7 @@ class Scope(object):
         return NoopClient()
 
     def set_client(self, client=None):
-        # type: (Optional[sentry_sdk.Client]) -> None
+        # type: (Optional[sentry_sdk.client.BaseClient]) -> None
         """
         Sets the client for this scope.
         :param client: The client to use in this scope.

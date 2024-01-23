@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from typing import ContextManager
     from typing import Union
 
-    from sentry_sdk.client import Client, NoopClient
+    from sentry_sdk.client import BaseClient
     from sentry_sdk._types import (
         Event,
         Hint,
@@ -99,7 +99,7 @@ def is_initialized():
 
 @scopemethod
 def get_client():
-    # type: () -> Union[Client, NoopClient]
+    # type: () -> BaseClient
     return Scope.get_client()
 
 

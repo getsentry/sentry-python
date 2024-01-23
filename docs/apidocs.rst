@@ -11,10 +11,13 @@ API Docs
 .. autoclass:: sentry_sdk.Client
     :members:
 
-.. autoclass:: sentry_sdk.client._Client
+.. autoclass:: sentry_sdk.client.BaseClient
     :members:
 
 .. autoclass:: sentry_sdk.client.NoopClient
+    :members:
+
+.. autoclass:: sentry_sdk.client._Client
     :members:
 
 .. autoclass:: sentry_sdk.Transport

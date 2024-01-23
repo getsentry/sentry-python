@@ -152,9 +152,9 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class NoopClient:
+class BaseClient:
     """
-    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+    The basic definition of a client that is used for sending data to Sentry.
 
     .. versionadded:: 1.XX.0
     """
@@ -192,7 +192,7 @@ class NoopClient:
     def is_active(self):
         # type: () -> bool
         """
-        Returns whether the client is active (able to send data to Sentry)
+        Returns weither the client is active (able to send data to Sentry)
 
         .. versionadded:: 1.XX.0
         """
@@ -219,7 +219,7 @@ class NoopClient:
         return None
 
     def __enter__(self):
-        # type: () -> NoopClient
+        # type: () -> BaseClient
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -227,8 +227,19 @@ class NoopClient:
         return None
 
 
-class _Client(NoopClient):
-    """The client is internally responsible for capturing the events and
+class NoopClient(BaseClient):
+    """
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+
+    .. versionadded:: 1.XX.0
+    """
+
+    pass
+
+
+class _Client(BaseClient):
+    """
+    The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
@@ -382,7 +393,7 @@ class _Client(NoopClient):
     def is_active(self):
         # type: () -> bool
         """
-        Returns whether the client is active (able to send data to Sentry)
+        Returns weither the client is active (able to send data to Sentry)
 
         .. versionadded:: 1.XX.0
         """
@@ -654,7 +665,6 @@ class _Client(NoopClient):
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
-            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
