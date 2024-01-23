@@ -183,14 +183,6 @@ class NoopClient:
         # type: (*Any, **Any) -> None
         pass
 
-    def _setup_instrumentation(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        return None
-
-    def _init_impl(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        return None
-
     def is_active(self):
         # type: () -> bool
         """
@@ -203,26 +195,6 @@ class NoopClient:
     @property
     def dsn(self):
         # type: () -> Optional[str]
-        return None
-
-    def _prepare_event(self, *args, **kwargs):
-        # type: (*Any, **Any) -> Optional[Any]
-        return None
-
-    def _is_ignored_error(self, *args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        return True
-
-    def _should_capture(self, *args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        return False
-
-    def _should_sample_error(self, *args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        return False
-
-    def _update_session_from_event(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
         return None
 
     def capture_event(self, *args, **kwargs):
