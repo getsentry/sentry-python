@@ -99,28 +99,6 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-def _merge_scopes(base, scope_change, scope_kwargs):
-    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
-    if scope_change and scope_kwargs:
-        raise TypeError("cannot provide scope and kwargs")
-
-    if scope_change is not None:
-        final_scope = copy(base)
-        if callable(scope_change):
-            scope_change(final_scope)
-        else:
-            final_scope.update_from_scope(scope_change)
-
-    elif scope_kwargs:
-        final_scope = copy(base)
-        final_scope.update_from_kwargs(**scope_kwargs)
-
-    else:
-        final_scope = base
-
-    return final_scope
-
-
 def _copy_on_write(property_name):
     # type: (str) -> Callable[[Any], Any]
     """
@@ -189,12 +167,12 @@ class Scope(object):
         "_propagation_context",
         "client",
         "original_scope",
-        "_ty",
+        "_type",
     )
 
     def __init__(self, ty=None, client=None):
         # type: (Optional[str], Optional[sentry_sdk.Client]) -> None
-        self._ty = ty
+        self._type = ty
         self.original_scope = None  # type: Optional[Scope]
 
         self._event_processors = []  # type: List[EventProcessor]
@@ -216,48 +194,86 @@ class Scope(object):
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
     @classmethod
-    def get_current_scope(cls):
-        # type: () -> Scope
+    def get_current_scope(cls, should_create_scope=True):
+        # type: (bool) -> Scope
         """
         Returns the current scope.
+
+        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         current_scope = _current_scope.get()
-        if current_scope is None:
+        if current_scope is None and should_create_scope:
             current_scope = Scope(ty="current")
             _current_scope.set(current_scope)
 
         return current_scope
 
     @classmethod
-    def get_isolation_scope(cls):
-        # type: () -> Scope
+    def get_isolation_scope(cls, should_create_scope=True):
+        # type: (bool) -> Scope
         """
         Returns the isolation scope.
+
+        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         isolation_scope = _isolation_scope.get()
-        if isolation_scope is None:
+        if isolation_scope is None and should_create_scope:
             isolation_scope = Scope(ty="isolation")
             _isolation_scope.set(isolation_scope)
 
         return isolation_scope
 
     @classmethod
-    def get_global_scope(cls):
-        # type: () -> Scope
+    def get_global_scope(cls, should_create_scope=True):
+        # type: (bool) -> Scope
         """
         Returns the global scope.
+
+        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         global _global_scope
-        if _global_scope is None:
+        if _global_scope is None and should_create_scope:
             _global_scope = Scope(ty="global")
 
         return _global_scope
+
+    @classmethod
+    def _merge_scopes(cls, additional_scope=None, additional_scope_kwargs=None):
+        # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
+        """
+        Merges global, isolation and current scope into a new scope and
+        adds the given additional scope or additional scope kwargs to it.
+        """
+        if additional_scope and additional_scope_kwargs:
+            raise TypeError("cannot provide scope and kwargs")
+
+        global_scope = Scope.get_global_scope(should_create_scope=False)
+        final_scope = copy(global_scope) or Scope()
+
+        isolation_scope = Scope.get_isolation_scope(should_create_scope=False)
+        if isolation_scope is not None:
+            final_scope.update_from_scope(isolation_scope)
+
+        current_scope = Scope.get_current_scope(should_create_scope=False)
+        if current_scope is not None:
+            final_scope.update_from_scope(current_scope)
+
+        if additional_scope is not None:
+            if callable(additional_scope):
+                additional_scope(final_scope)
+            else:
+                final_scope.update_from_scope(additional_scope)
+
+        elif additional_scope_kwargs:
+            final_scope.update_from_kwargs(**additional_scope_kwargs)
+
+        return final_scope
 
     @classmethod
     def get_client(cls):
@@ -269,17 +285,17 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        client = Scope.get_current_scope().client
-        if client is not None:
-            return client
+        scope = Scope.get_current_scope(should_create_scope=False)
+        if scope and scope.client.is_active():
+            return scope.client
 
-        client = Scope.get_isolation_scope().client
-        if client is not None:
-            return client
+        scope = Scope.get_isolation_scope(should_create_scope=False)
+        if scope and scope.client.is_active():
+            return scope.client
 
-        client = Scope.get_global_scope().client
-        if client is not None:
-            return client
+        scope = Scope.get_global_scope(should_create_scope=False)
+        if scope:
+            return scope.client
 
         return NoopClient()
 
