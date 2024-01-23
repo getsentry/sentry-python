@@ -333,7 +333,7 @@ class Scope(object):
     def is_forked(self):
         # type: () -> bool
         """
-        Weither this scope is a fork of another scope.
+        Whether this scope is a fork of another scope.
 
         .. versionadded:: 1.XX.0
         """
