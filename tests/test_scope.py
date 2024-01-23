@@ -2,6 +2,7 @@ import copy
 import os
 import pytest
 from sentry_sdk import capture_exception
+from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.scope import Scope
 
 try:
@@ -157,3 +158,114 @@ def test_load_trace_data_from_env(env, excepted_value):
         s = Scope()
         incoming_trace_data = s._load_trace_data_from_env()
         assert incoming_trace_data == excepted_value
+
+
+@pytest.mark.forked
+def test_scope_client():
+    scope = Scope(ty="test_something")
+    assert scope._type == "test_something"
+    assert scope.client is not None
+    assert scope.client.__class__ == NoopClient
+
+    custom_client = Client()
+    scope = Scope(ty="test_more", client=custom_client)
+    assert scope._type == "test_more"
+    assert scope.client is not None
+    assert scope.client.__class__ == Client
+    assert scope.client == custom_client
+
+
+@pytest.mark.forked
+def test_get_current_scope():
+    scope = Scope.get_current_scope()
+    assert scope is not None
+    assert scope.__class__ == Scope
+    assert scope._type == "current"
+
+
+@pytest.mark.forked
+def test_get_isolation_scope():
+    scope = Scope.get_isolation_scope()
+    assert scope is not None
+    assert scope.__class__ == Scope
+    assert scope._type == "isolation"
+
+
+@pytest.mark.forked
+def test_get_global_scope():
+    scope = Scope.get_global_scope()
+    assert scope is not None
+    assert scope.__class__ == Scope
+    assert scope._type == "global"
+
+
+@pytest.mark.forked
+def test_get_client():
+    client = Scope.get_client()
+    assert client is not None
+    assert client.__class__ == NoopClient
+    assert not client.is_active()
+
+
+@pytest.mark.forked
+def test_set_client():
+    client1 = Client()
+    client2 = Client()
+    client3 = Client()
+
+    current_scope = Scope.get_current_scope()
+    isolation_scope = Scope.get_isolation_scope()
+    global_scope = Scope.get_global_scope()
+
+    current_scope.set_client(client1)
+    isolation_scope.set_client(client2)
+    global_scope.set_client(client3)
+
+    client = Scope.get_client()
+    assert client == client1
+
+    current_scope.set_client(None)
+    isolation_scope.set_client(client2)
+    global_scope.set_client(client3)
+
+    client = Scope.get_client()
+    assert client == client2
+
+    current_scope.set_client(None)
+    isolation_scope.set_client(None)
+    global_scope.set_client(client3)
+
+    client = Scope.get_client()
+    assert client == client3
+
+
+@pytest.mark.forked
+def test_is_forked():
+    scope = Scope()
+    assert not scope.is_forked
+
+
+@pytest.mark.forked
+def test_fork():
+    scope = Scope()
+    forked_scope = scope.fork()
+
+    assert forked_scope.is_forked
+    assert not scope.is_forked
+    assert scope != forked_scope
+    assert forked_scope.original_scope == scope
+
+
+@pytest.mark.forked
+def test_isolate():
+    isolation_scope_before = Scope.get_isolation_scope()
+
+    scope = Scope()
+    scope.isolate()
+
+    isolation_scope_after = Scope.get_isolation_scope()
+
+    assert isolation_scope_after != isolation_scope_before
+    assert isolation_scope_after.is_forked
+    assert isolation_scope_after.original_scope == isolation_scope_before
+    assert not scope.is_forked
