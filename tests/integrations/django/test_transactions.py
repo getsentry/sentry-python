@@ -1,10 +1,7 @@
+from unittest import mock
+
 import pytest
 import django
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 # django<2.0 has only `url` with regex based patterns.

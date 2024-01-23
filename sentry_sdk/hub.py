@@ -110,16 +110,10 @@ class _InitGuard:
 
 def _check_python_deprecations():
     # type: () -> None
-    version = sys.version_info[:2]
-
-    if version == (3, 4) or version == (3, 5):
-        logger.warning(
-            "sentry-sdk 2.0.0 will drop support for Python %s.",
-            "{}.{}".format(*version),
-        )
-        logger.warning(
-            "Please upgrade to the latest version to continue receiving upgrades and bugfixes."
-        )
+    # Since we're likely to deprecate Python versions in the future, I'm keeping
+    # this handy function around. Use this to detect the Python version used and
+    # to output logger.warning()s if it's deprecated.
+    pass
 
 
 def _init(*args, **kwargs):

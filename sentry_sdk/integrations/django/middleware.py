@@ -28,12 +28,6 @@ _import_string_should_wrap_middleware = ContextVar(
     "import_string_should_wrap_middleware"
 )
 
-if DJANGO_VERSION < (1, 7):
-    import_string_name = "import_by_path"
-else:
-    import_string_name = "import_string"
-
-
 if DJANGO_VERSION < (3, 1):
     _asgi_middleware_mixin_factory = lambda _: object
 else:
@@ -44,7 +38,7 @@ def patch_django_middlewares():
     # type: () -> None
     from django.core.handlers import base
 
-    old_import_string = getattr(base, import_string_name)
+    old_import_string = base.import_string
 
     def sentry_patched_import_string(dotted_path):
         # type: (str) -> Any
@@ -55,7 +49,7 @@ def patch_django_middlewares():
 
         return rv
 
-    setattr(base, import_string_name, sentry_patched_import_string)
+    base.import_string = sentry_patched_import_string
 
     old_load_middleware = base.BaseHandler.load_middleware
 

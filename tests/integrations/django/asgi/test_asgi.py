@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+from unittest import mock
 
 import django
 import pytest
@@ -14,10 +15,6 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 APPS = [channels_application]
 if django.VERSION >= (3, 0):

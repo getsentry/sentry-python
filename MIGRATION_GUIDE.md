@@ -8,6 +8,8 @@
 
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
+- Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
+- The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
 
 ## Removed
 
@@ -19,5 +21,6 @@
 - A number of compatibility utilities were removed from `sentry_sdk._compat`: the constants `PY2` and `PY33`; the functions `datetime_utcnow`, `utc_from_timestamp`, `implements_str`, `contextmanager`; and the aliases `text_type`, `string_types`, `number_types`, `int_types`, `iteritems`, `binary_sequence_types`.
 - The deprecated `with_locals` configuration option was removed. Use `include_local_variables` instead. See https://docs.sentry.io/platforms/python/configuration/options/#include-local-variables.
 - The deprecated `request_bodies` configuration option was removed. Use `max_request_body_size`. See https://docs.sentry.io/platforms/python/configuration/options/#max-request-body-size.
+- Removed `tracing_utils_py2.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 
 ## Deprecated
