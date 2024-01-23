@@ -57,7 +57,6 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         Type,
-        Union,
     )
 
     import sentry_sdk
@@ -194,51 +193,45 @@ class Scope(object):
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
     @classmethod
-    def get_current_scope(cls, should_create_scope=True):
-        # type: (bool) -> Scope
+    def get_current_scope(cls):
+        # type: () -> Scope
         """
         Returns the current scope.
-
-        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         current_scope = _current_scope.get()
-        if current_scope is None and should_create_scope:
+        if current_scope is None:
             current_scope = Scope(ty="current")
             _current_scope.set(current_scope)
 
         return current_scope
 
     @classmethod
-    def get_isolation_scope(cls, should_create_scope=True):
-        # type: (bool) -> Scope
+    def get_isolation_scope(cls):
+        # type: () -> Scope
         """
         Returns the isolation scope.
-
-        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         isolation_scope = _isolation_scope.get()
-        if isolation_scope is None and should_create_scope:
+        if isolation_scope is None:
             isolation_scope = Scope(ty="isolation")
             _isolation_scope.set(isolation_scope)
 
         return isolation_scope
 
     @classmethod
-    def get_global_scope(cls, should_create_scope=True):
-        # type: (bool) -> Scope
+    def get_global_scope(cls):
+        # type: () -> Scope
         """
         Returns the global scope.
-
-        :parm should_create_scope: If `True` a new scope will be created if no scope is available.
 
         .. versionadded:: 1.XX.0
         """
         global _global_scope
-        if _global_scope is None and should_create_scope:
+        if _global_scope is None:
             _global_scope = Scope(ty="global")
 
         return _global_scope
@@ -253,14 +246,16 @@ class Scope(object):
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
 
-        global_scope = Scope.get_global_scope(should_create_scope=False)
-        final_scope = copy(global_scope) or Scope()
+        global _global_scope
 
-        isolation_scope = Scope.get_isolation_scope(should_create_scope=False)
+        final_scope = copy(_global_scope) if _global_scope is not None else Scope()
+        final_scope._type = "merged"
+
+        isolation_scope = _isolation_scope.get()
         if isolation_scope is not None:
             final_scope.update_from_scope(isolation_scope)
 
-        current_scope = Scope.get_current_scope(should_create_scope=False)
+        current_scope = _current_scope.get()
         if current_scope is not None:
             final_scope.update_from_scope(current_scope)
 
@@ -285,17 +280,17 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        scope = Scope.get_current_scope(should_create_scope=False)
-        if scope and scope.client.is_active():
-            return scope.client
+        current_scope = _current_scope.get()
+        if current_scope is not None and current_scope.client.is_active():
+            return current_scope.client
 
-        scope = Scope.get_isolation_scope(should_create_scope=False)
-        if scope and scope.client.is_active():
-            return scope.client
+        isolation_scope = _isolation_scope.get()
+        if isolation_scope and isolation_scope.client.is_active():
+            return isolation_scope.client
 
-        scope = Scope.get_global_scope(should_create_scope=False)
-        if scope:
-            return scope.client
+        global _global_scope
+        if _global_scope is not None:
+            return _global_scope.client
 
         return NoopClient()
 
@@ -327,8 +322,10 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        self.original_scope = self
-        return copy(self)
+        forked_scope = copy(self)
+        forked_scope.original_scope = self
+
+        return forked_scope
 
     def isolate(self):
         # type: () -> None
@@ -1022,7 +1019,7 @@ class Scope(object):
         if client is None:
             return None
 
-        scope = _merge_scopes(self, scope, scope_kwargs)
+        scope = Scope._merge_scopes(scope, scope_kwargs)
 
         return client.capture_event(event=event, hint=hint, scope=scope)
 
