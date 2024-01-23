@@ -5,7 +5,7 @@
 ### Various fixes & improvements
 
 - Fix timestamp in transaction created by OTel (#2627) by @antonpirker
-- Fix relative path in DB query source (#2624) by @antonpirker
+- Fix relative path in DB query source  (#2624) by @antonpirker
 - Run more CI checks on 2.0 branch (#2625) by @sentrivana
 - Fix tracing `TypeError` for static and class methods (#2559) by @szokeasaurusrex
 - Fix missing `ctx` in Arq integration (#2600) by @ivanovart
@@ -60,8 +60,8 @@
 
 - Move installed modules code to utils (#2429) by @sentrivana
 
-  Note: We moved the internal function `_get_installed_modules` from `sentry_sdk.integrations.modules` to `sentry_sdk.utils`.
-  So if you use this function you have to update your imports
+    Note: We moved the internal function `_get_installed_modules` from `sentry_sdk.integrations.modules` to `sentry_sdk.utils`.
+    So if you use this function you have to update your imports
 
 - Add code locations for metrics (#2526) by @jan-auer
 - Add query source to DB spans (#2521) by @antonpirker
@@ -80,7 +80,7 @@
 - Flask: Test with Flask 3.0 (#2506) by @sentrivana
 - Celery: Do not create a span when task is triggered by Celery Beat (#2510) by @antonpirker
 - Redis: Ensure `RedisIntegration` is disabled, unless `redis` is installed (#2504) by @szokeasaurusrex
-- Quart: Fix Quart integration for Quart 0.19.4 (#2516) by @antonpirker
+- Quart: Fix Quart integration for Quart 0.19.4  (#2516) by @antonpirker
 - gRPC: Make async gRPC less noisy (#2507) by @jyggen
 
 ## 1.35.0
@@ -105,7 +105,6 @@
       ],
   )
   ```
-
   The old way still works, but we strongly encourage you to update your code to the way described above.
 
 - Python 3.12: Replace deprecated datetime functions (#2502) by @sentrivana
@@ -121,7 +120,6 @@
 ## 1.34.0
 
 ### Various fixes & improvements
-
 - Added Python 3.12 support (#2471, #2483)
 - Handle missing `connection_kwargs` in `patch_redis_client` (#2482) by @szokeasaurusrex
 - Run common test suite on Python 3.12 (#2479) by @sentrivana
@@ -160,7 +158,6 @@
 ### Various fixes & improvements
 
 - **New:** Error monitoring for some of the most popular Python GraphQL libraries:
-
   - Add [GQL GraphQL integration](https://docs.sentry.io/platforms/python/integrations/gql/) (#2368) by @szokeasaurusrex
 
     Usage:
@@ -294,7 +291,6 @@
   For more information, see the documentation for [Celery](https://docs.sentry.io//platforms/python/guides/celery/#distributed-traces) for more information.
 
   Usage:
-
   ```python
     import sentry_sdk
     from sentry_sdk.integrations.celery import CeleryIntegration
@@ -341,59 +337,59 @@
 - Context manager monitor (#2290) by @szokeasaurusrex
 - Set response status code in transaction `response` context. (#2312) by @antonpirker
 - Add missing context kwarg to `_sentry_task_factory` (#2267) by @JohnnyDeuss
-- In Postgres take the connection params from the connection (#2308) by @antonpirker
+- In Postgres take the connection params from the connection  (#2308) by @antonpirker
 - Experimental: Allow using OTel for performance instrumentation (#2272) by @sentrivana
 
-  This release includes experimental support for replacing Sentry's default
-  performance monitoring solution with one powered by OpenTelemetry without having
-  to do any manual setup.
+    This release includes experimental support for replacing Sentry's default
+    performance monitoring solution with one powered by OpenTelemetry without having
+    to do any manual setup.
 
-  Try it out by installing `pip install sentry-sdk[opentelemetry-experimental]` and
-  then initializing the SDK with:
+    Try it out by installing `pip install sentry-sdk[opentelemetry-experimental]` and
+    then initializing the SDK with:
 
-  ```python
-  sentry_sdk.init(
-      # ...your usual options...
-      _experiments={"otel_powered_performance": True},
-  )
-  ```
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        _experiments={"otel_powered_performance": True},
+    )
+    ```
 
-  This enables OpenTelemetry performance monitoring support for some of the most
-  popular frameworks and libraries (Flask, Django, FastAPI, requests...).
+    This enables OpenTelemetry performance monitoring support for some of the most
+    popular frameworks and libraries (Flask, Django, FastAPI, requests...).
 
-  We're looking forward to your feedback! Please let us know about your experience
-  in this discussion: https://github.com/getsentry/sentry/discussions/55023
+    We're looking forward to your feedback! Please let us know about your experience
+    in this discussion: https://github.com/getsentry/sentry/discussions/55023
 
-  **Important note:** Please note that this feature is experimental and in a
-  proof-of-concept stage and is not meant for production use. It may be changed or
-  removed at any point.
+    **Important note:** Please note that this feature is experimental and in a
+    proof-of-concept stage and is not meant for production use. It may be changed or
+    removed at any point.
 
 - Enable backpressure handling by default (#2298) by @sl0thentr0py
 
-  The SDK now dynamically downsamples transactions to reduce backpressure in high
-  throughput systems. It starts a new `Monitor` thread to perform some health checks
-  which decide to downsample (halved each time) in 10 second intervals till the system
-  is healthy again.
+    The SDK now dynamically downsamples transactions to reduce backpressure in high
+    throughput systems. It starts a new `Monitor` thread to perform some health checks
+    which decide to downsample (halved each time) in 10 second intervals till the system
+    is healthy again.
 
-  To disable this behavior, use:
+    To disable this behavior, use:
 
-  ```python
-  sentry_sdk.init(
-      # ...your usual options...
-      enable_backpressure_handling=False,
-  )
-  ```
+    ```python
+    sentry_sdk.init(
+        # ...your usual options...
+        enable_backpressure_handling=False,
+    )
+    ```
 
-  If your system serves heavy load, please let us know how this feature works for you!
+    If your system serves heavy load, please let us know how this feature works for you!
 
-  Check out the [documentation](https://docs.sentry.io/platforms/python/configuration/options/#enable-backpressure-handling) for more information.
+    Check out the [documentation](https://docs.sentry.io/platforms/python/configuration/options/#enable-backpressure-handling) for more information.
 
 - Stop recording spans for internal web requests to Sentry (#2297) by @szokeasaurusrex
 - Add test for `ThreadPoolExecutor` (#2259) by @gggritso
 - Add docstrings for `Scope.update_from_*` (#2311) by @sentrivana
 - Moved `is_sentry_url` to utils (#2304) by @szokeasaurusrex
 - Fix: arq attribute error on settings, support worker args (#2260) by @rossmacarthur
-- Fix: Exceptions include detail property for their value (#2193) by @nicolassanmar
+- Fix: Exceptions include detail property for their value  (#2193) by @nicolassanmar
 - build(deps): bump mypy from 1.4.1 to 1.5.1 (#2319) by @dependabot
 - build(deps): bump sphinx from 7.1.2 to 7.2.4 (#2322) by @dependabot
 - build(deps): bump sphinx from 7.0.1 to 7.1.2 (#2296) by @dependabot
@@ -468,7 +464,6 @@
 - Support for SQLAlchemy 2.0 (#2200) by @antonpirker
 - Add instrumentation of `aiohttp` client requests (#1761) by @md384
 - Add Django template tag for adding Sentry tracing information (#2222) by @antonpirker
-
   - By adding `{{ sentry_trace_meta }}` to your Django templates we will include Sentry trace information as a meta tag in the rendered HTML to allow your frontend to pick up and continue the trace started in the backend.
 
 - Update Flask HTML meta helper (#2203) by @antonpirker
