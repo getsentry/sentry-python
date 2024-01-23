@@ -909,10 +909,6 @@ class NoOpSpan(Span):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> NoOpSpan
-        return self.start_child(**kwargs)
-
     def to_traceparent(self):
         # type: () -> str
         return ""
