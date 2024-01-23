@@ -270,8 +270,6 @@ class Scope(object):
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
 
-        global _global_scope
-
         final_scope = copy(_global_scope) if _global_scope is not None else Scope()
         final_scope._type = "merged"
 
@@ -309,10 +307,9 @@ class Scope(object):
             return current_scope.client
 
         isolation_scope = _isolation_scope.get()
-        if isolation_scope and isolation_scope.client.is_active():
+        if isolation_scope is not None and isolation_scope.client.is_active():
             return isolation_scope.client
 
-        global _global_scope
         if _global_scope is not None:
             return _global_scope.client
 
