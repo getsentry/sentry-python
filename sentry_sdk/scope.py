@@ -1266,12 +1266,12 @@ class Scope(object):
         is_check_in = ty == "check_in"
 
         if not is_check_in:
-            global_scope = Scope.get_global_scope(should_create_scope=False)
-            isolation_scope = Scope.get_isolation_scope(should_create_scope=False)
-            current_scope = Scope.get_current_scope(should_create_scope=False)
+            global _global_scope
+            isolation_scope = _isolation_scope.get()
+            current_scope = _current_scope.get()
             event_processors = chain(
                 global_event_processors,
-                global_scope and global_scope._event_processors or [],
+                _global_scope and _global_scope._event_processors or [],
                 isolation_scope and isolation_scope._event_processors or [],
                 current_scope and current_scope._event_processors or [],
             )
