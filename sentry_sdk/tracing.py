@@ -263,14 +263,6 @@ class Span:
 
         return child
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> Span
-        """DEPRECATED: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead."""
-        logger.warning(
-            "Deprecated: use Span.start_child instead of Span.new_span. This will be removed in the future."
-        )
-        return self.start_child(**kwargs)
-
     @classmethod
     def continue_from_environ(
         cls,
