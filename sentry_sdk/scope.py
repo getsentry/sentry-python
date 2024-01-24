@@ -1449,9 +1449,14 @@ class Scope(object):
         )
 
 
-def _with_new_scope():
+@contextmanager
+def new_scope():
     # type: () -> Generator[Scope, None, None]
+    """
+    Context manager that forks the current scope and runs the wrapped code in it.
 
+    .. versionadded:: 1.XX.0
+    """
     current_scope = Scope.get_current_scope()
     forked_scope = current_scope.fork()
     token = _current_scope.set(forked_scope)
@@ -1465,20 +1470,14 @@ def _with_new_scope():
 
 
 @contextmanager
-def new_scope():
+def isolated_scope():
     # type: () -> Generator[Scope, None, None]
     """
-    Context manager that forks the current scope and runs the wrapped code in it.
+    Context manager that forks the current isolation scope
+    (and the related current scope) and runs the wrapped code in it.
 
     .. versionadded:: 1.XX.0
     """
-    ctx = copy_context()  # This does not exist in Python 2.7
-    return ctx.run(_with_new_scope)
-
-
-def _with_isolated_scope():
-    # type: () -> Generator[Scope, None, None]
-
     # fork current scope
     current_scope = Scope.get_current_scope()
     forked_current_scope = current_scope.fork()
@@ -1496,19 +1495,6 @@ def _with_isolated_scope():
         # restore original scopes
         _current_scope.reset(current_token)
         _isolation_scope.reset(isolation_token)
-
-
-@contextmanager
-def isolated_scope():
-    # type: () -> Generator[Scope, None, None]
-    """
-    Context manager that forks the current isolation scope
-    (and the related current scope) and runs the wrapped code in it.
-
-    .. versionadded:: 1.XX.0
-    """
-    ctx = copy_context()
-    return ctx.run(_with_isolated_scope)
 
 
 # Circular imports
