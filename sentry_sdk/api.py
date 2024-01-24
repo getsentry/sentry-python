@@ -3,7 +3,7 @@ import inspect
 from sentry_sdk import scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, new_scope, isolated_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
@@ -65,6 +65,8 @@ __all__ = [
     "is_initialized",
     "set_current_scope",
     "set_isolation_scope",
+    "new_scope",
+    "isolated_scope",
 ]
 
 

@@ -47,6 +47,8 @@ __all__ = [  # noqa
     "is_initialized",
     "set_current_scope",
     "set_isolation_scope",
+    "new_scope",
+    "isolated_scope",
 ]
 
 # Initialize the debug support after everything is loaded
