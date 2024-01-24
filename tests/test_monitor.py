@@ -1,12 +1,8 @@
 import random
+from unittest import mock
 
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.transport import Transport
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 class HealthyTestTransport(Transport):

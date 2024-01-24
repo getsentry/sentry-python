@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from django import VERSION as DJANGO_VERSION
@@ -107,6 +109,10 @@ def test_query_source(sentry_init, client, capture_events):
             assert data.get(SPANDATA.CODE_FILEPATH).endswith(
                 "tests/integrations/django/myapp/views.py"
             )
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
             assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
 
             break

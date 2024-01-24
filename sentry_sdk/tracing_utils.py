@@ -1,7 +1,10 @@
 import contextlib
+import inspect
+import os
 import re
 import sys
 from collections.abc import Mapping
+from functools import wraps
 from urllib.parse import quote, unquote
 
 import sentry_sdk
@@ -9,7 +12,9 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     Dsn,
+    logger,
     match_regex_list,
+    qualname_from_function,
     to_string,
     is_sentry_url,
     _is_external_source,
@@ -244,7 +249,10 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            in_app_path = filepath.replace(project_root, "")
+            if project_root is not None and filepath.startswith(project_root):
+                in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
+            else:
+                in_app_path = filepath
             span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
@@ -501,5 +509,76 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
+def start_child_span_decorator(func):
+    # type: (Any) -> Any
+    """
+    Decorator to add child spans for functions.
+
+    See also ``sentry_sdk.tracing.trace()``.
+    """
+    # Asynchronous case
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span(sentry_sdk.Hub.current)
+
+            if span is None:
+                logger.warning(
+                    "Can not create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return await func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return await func(*args, **kwargs)
+
+    # Synchronous case
+    else:
+
+        @wraps(func)
+        def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span(sentry_sdk.Hub.current)
+
+            if span is None:
+                logger.warning(
+                    "Can not create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return func(*args, **kwargs)
+
+    return func_with_tracing
+
+
+def get_current_span(hub=None):
+    # type: (Optional[sentry_sdk.Hub]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    if hub is None:
+        hub = sentry_sdk.Hub.current
+
+    current_span = hub.scope.span
+    return current_span
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span

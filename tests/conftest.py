@@ -3,6 +3,8 @@ import os
 import socket
 from threading import Thread
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from unittest import mock
 
 import pytest
 import jsonschema
@@ -16,22 +18,6 @@ try:
     import eventlet
 except ImportError:
     eventlet = None
-
-try:
-    # Python 2
-    import BaseHTTPServer
-
-    HTTPServer = BaseHTTPServer.HTTPServer
-    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
-except Exception:
-    # Python 3
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 import sentry_sdk
 from sentry_sdk.envelope import Envelope
@@ -600,7 +586,6 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         fake_start_child = None
 
     with mock.patch(
-        "sentry_sdk.tracing_utils_py3.get_current_span",
-        return_value=fake_transaction,
+        "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
     ):
         yield fake_start_child

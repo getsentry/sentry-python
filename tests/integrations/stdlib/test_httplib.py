@@ -1,26 +1,9 @@
 import random
+from http.client import HTTPConnection, HTTPSConnection
+from urllib.request import urlopen
+from unittest import mock
 
 import pytest
-
-try:
-    # py3
-    from urllib.request import urlopen
-except ImportError:
-    # py2
-    from urllib import urlopen
-
-try:
-    # py2
-    from httplib import HTTPConnection, HTTPSConnection
-except ImportError:
-    # py3
-    from http.client import HTTPConnection, HTTPSConnection
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
@@ -182,16 +165,14 @@ def test_outgoing_trace_headers(sentry_init, monkeypatch):
         )
         assert request_headers["sentry-trace"] == expected_sentry_trace
 
-        expected_outgoing_baggage_items = [
-            "sentry-trace_id=771a43a4192642f0b136d5159a501700",
-            "sentry-public_key=49d0f7386ad645858ae85020e393bef3",
-            "sentry-sample_rate=0.01337",
-            "sentry-user_id=Am%C3%A9lie",
-        ]
-
-        assert sorted(request_headers["baggage"].split(",")) == sorted(
-            expected_outgoing_baggage_items
+        expected_outgoing_baggage = (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Am%C3%A9lie"
         )
+
+        assert request_headers["baggage"] == expected_outgoing_baggage
 
 
 def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
@@ -225,17 +206,15 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
         )
         assert request_headers["sentry-trace"] == expected_sentry_trace
 
-        expected_outgoing_baggage_items = [
-            "sentry-trace_id=%s" % transaction.trace_id,
-            "sentry-sample_rate=0.5",
-            "sentry-sampled=%s" % "true" if transaction.sampled else "false",
-            "sentry-release=foo",
-            "sentry-environment=production",
-        ]
+        expected_outgoing_baggage = (
+            "sentry-trace_id=%s,"
+            "sentry-environment=production,"
+            "sentry-release=foo,"
+            "sentry-sample_rate=0.5,"
+            "sentry-sampled=%s"
+        ) % (transaction.trace_id, "true" if transaction.sampled else "false")
 
-        assert sorted(request_headers["baggage"].split(",")) == sorted(
-            expected_outgoing_baggage_items
-        )
+        assert request_headers["baggage"] == expected_outgoing_baggage
 
 
 @pytest.mark.parametrize(

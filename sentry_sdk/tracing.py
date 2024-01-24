@@ -10,14 +10,20 @@ from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from typing import Any
     from typing import Dict
     from typing import Iterator
     from typing import List
     from typing import Optional
+    from typing import overload
+    from typing import ParamSpec
     from typing import Tuple
     from typing import Union
+    from typing import TypeVar
+
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
@@ -980,8 +986,21 @@ class NoOpSpan(Span):
         pass
 
 
+if TYPE_CHECKING:
+
+    @overload
+    def trace(func=None):
+        # type: (None) -> Callable[[Callable[P, R]], Callable[P, R]]
+        pass
+
+    @overload
+    def trace(func):
+        # type: (Callable[P, R]) -> Callable[P, R]
+        pass
+
+
 def trace(func=None):
-    # type: (Any) -> Any
+    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.
@@ -999,7 +1018,7 @@ def trace(func=None):
         async def my_async_function():
             ...
     """
-    from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
+    from sentry_sdk.tracing_utils import start_child_span_decorator
 
     # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
     # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278

@@ -1,15 +1,10 @@
 import pytest
 import uuid
+from unittest import mock
 
 import sentry_sdk
-from sentry_sdk.crons import capture_checkin
-
 from sentry_sdk import Hub, configure_scope, set_level
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk.crons import capture_checkin
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")

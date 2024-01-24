@@ -1,8 +1,7 @@
-import sys
-
-import pytest
 import logging
 import warnings
+
+import pytest
 
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
@@ -78,7 +77,6 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
     assert event["extra"] == {"1": 1}
 
 
-@pytest.mark.xfail(sys.version_info[:2] == (3, 4), reason="buggy logging module")
 def test_logging_stack(sentry_init, capture_events):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()

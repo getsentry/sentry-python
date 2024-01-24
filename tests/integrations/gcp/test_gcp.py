@@ -12,10 +12,6 @@ import pytest
 import os.path
 import os
 
-pytestmark = pytest.mark.skipif(
-    not hasattr(tempfile, "TemporaryDirectory"), reason="need Python 3.2+"
-)
-
 
 FUNCTIONS_PRELUDE = """
 from unittest.mock import Mock
