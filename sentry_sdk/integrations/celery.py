@@ -110,8 +110,8 @@ class CeleryIntegration(Integration):
         from celery.app.task import Task  # type: ignore
         from celery import Celery  # type: ignore
 
-        Task.apply_async = _wrap_apply_async(Task.apply_async)
-        Celery.send_task = _wrap_apply_async(Celery.send_task)
+        Task.apply_async = _wrap_task_run(Task.apply_async)
+        Celery.send_task = _wrap_task_run(Celery.send_task)
 
         _patch_worker_exit()
 
@@ -146,7 +146,7 @@ class NoOpMgr:
         return None
 
 
-def _wrap_apply_async(f):
+def _wrap_task_run(f):
     # type: (F) -> F
     @wraps(f)
     def apply_async(*args, **kwargs):
@@ -172,10 +172,13 @@ def _wrap_apply_async(f):
         except (IndexError, TypeError):
             task_started_from_beat = False
 
-        task = args[0]
+        if isinstance(args[0], Task):
+            task_name = args[0].name
+        else:
+            task_name = args[1]
 
         span_mgr = (
-            hub.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            hub.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task_name)
             if not task_started_from_beat
             else NoOpMgr()
         )  # type: Union[Span, NoOpMgr]
