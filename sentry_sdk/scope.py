@@ -28,7 +28,6 @@ from sentry_sdk.tracing import (
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    copy_context,
     ContextVar,
     event_from_exception,
     exc_info_from_error,
