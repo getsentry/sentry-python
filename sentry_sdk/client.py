@@ -152,9 +152,9 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class NoopClient:
+class BaseClient:
     """
-    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+    The basic definition of a client that is used for sending data to Sentry.
 
     .. versionadded:: 1.XX.0
     """
@@ -167,10 +167,6 @@ class NoopClient:
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         return None
-
-    def __repr__(self):
-        # type: () -> str
-        return "<{} id={}>".format(self.__class__.__name__, id(self))
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -219,7 +215,7 @@ class NoopClient:
         return None
 
     def __enter__(self):
-        # type: () -> NoopClient
+        # type: () -> BaseClient
         return self
 
     def __exit__(self, exc_type, exc_value, tb):
@@ -227,8 +223,19 @@ class NoopClient:
         return None
 
 
-class _Client(NoopClient):
-    """The client is internally responsible for capturing the events and
+class NoopClient(BaseClient):
+    """
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+
+    .. versionadded:: 1.XX.0
+    """
+
+    pass
+
+
+class _Client(BaseClient):
+    """
+    The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
