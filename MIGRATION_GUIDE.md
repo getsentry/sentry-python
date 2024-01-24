@@ -8,6 +8,7 @@
 
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
+- `sentry_sdk.transport.Transport` is now an abstract base class, and therefore, it cannot be instantiated directly. Subclasses must implement the `capture_envelope` method.
 
 ## Removed
 
@@ -17,5 +18,10 @@
 - Removed support for Flask 0.\*.
 - `sentry_sdk._functools` was removed.
 - A number of compatibility utilities were removed from `sentry_sdk._compat`: the constants `PY2` and `PY33`; the functions `datetime_utcnow`, `utc_from_timestamp`, `implements_str`, `contextmanager`; and the aliases `text_type`, `string_types`, `number_types`, `int_types`, `iteritems`, `binary_sequence_types`.
+- Removed `sentry_sdk.utils.Auth.store_api_url`.
+- `sentry_sdk.utils.Auth.get_api_url`'s now accepts a `sentry_sdk.consts.EndpointType` enum instead of a string as its only parameter. We recommend omitting this argument when calling the function, since the parameter's default value is the only possible `sentry_sdk.consts.EndpointType` value. The parameter exists for future compatibility.
 
 ## Deprecated
+
+- Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
+- Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
