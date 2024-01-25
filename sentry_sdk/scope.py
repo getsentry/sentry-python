@@ -199,7 +199,7 @@ class Scope(object):
     )
 
     def __init__(self, ty=None, client=None):
-        # type: (Optional[str], Optional[sentry_sdk.Client]) -> None
+        # type: (Optional[ScopeType], Optional[sentry_sdk.Client]) -> None
         self._type = ty
         self.original_scope = None  # type: Optional[Scope]
 
