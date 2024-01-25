@@ -76,6 +76,8 @@ GROUPS = {
         "clickhouse_driver",
         "pymongo",
         "sqlalchemy",
+        "redis",
+        "rediscluster",
     ],
     "GraphQL": [
         "ariadne",
@@ -102,8 +104,6 @@ GROUPS = {
         "falcon",
         "pyramid",
         "quart",
-        "redis",
-        "rediscluster",
         "sanic",
         "starlite",
         "tornado",
