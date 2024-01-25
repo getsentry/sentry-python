@@ -46,6 +46,8 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
+    from sentry_sdk.integrations import Integration
+    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
@@ -235,12 +237,16 @@ class NoopClient(BaseClient):
 
 class _Client(BaseClient):
     """
-    The client is internally responsible for capturing the events and
-    forwarding them to sentry through the configured transport.  It takes
-    the client options as keyword arguments and optionally the DSN as first
-    argument.
+        The client is internally responsible for capturing the events and
+        forwarding them to sentry through the configured transport.  It takes
+        the client options as keyword arguments and optionally the DSN as first
+        argument.
 
-    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
+    <<<<<<< HEAD
+        Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
+    =======
+        Alias of :py:class:`Client`. (Was created for better intelisense support)
+    >>>>>>> master
     """
 
     def __init__(self, *args, **kwargs):
@@ -656,13 +662,17 @@ class _Client(BaseClient):
         # type: (...) -> Optional[str]
         """Captures an event.
 
-        :param event: A ready-made event that can be directly sent to Sentry.
+                :param event: A ready-made event that can be directly sent to Sentry.
 
-        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
+                :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+                :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+        <<<<<<< HEAD
+        =======
+                    The `scope` and `scope_kwargs` parameters are mutually exclusive.
+        >>>>>>> master
 
-        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
+                :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if disable_capture_event.get(False):
             return None
