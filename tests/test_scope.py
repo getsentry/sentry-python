@@ -11,21 +11,23 @@ except ImportError:
     import mock  # python < 3.3
 
 
-# def test_copying():
-#     s1 = Scope()
-#     s1.fingerprint = {}
-#     s1.set_tag("foo", "bar")
+@pytest.mark.forked
+def test_copying():
+    s1 = Scope()
+    s1.fingerprint = {}
+    s1.set_tag("foo", "bar")
 
-#     s2 = copy.copy(s1)
-#     assert "foo" in s2._tags
+    s2 = copy.copy(s1)
+    assert "foo" in s2._tags
 
-#     s1.set_tag("bam", "baz")
-#     assert "bam" in s1._tags
-#     assert "bam" not in s2._tags
+    s1.set_tag("bam", "baz")
+    assert "bam" in s1._tags
+    assert "bam" not in s2._tags
 
-#     assert s1._fingerprint is s2._fingerprint
+    assert s1._fingerprint is s2._fingerprint
 
 
+@pytest.mark.forked
 def test_merging(sentry_init, capture_events):
     sentry_init()
 
@@ -40,6 +42,7 @@ def test_merging(sentry_init, capture_events):
     assert event["user"] == {"id": "42"}
 
 
+@pytest.mark.forked
 def test_common_args():
     s = Scope()
     s.update_from_kwargs(
@@ -81,6 +84,7 @@ BAGGAGE_VALUE = (
 SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "env,excepted_value",
     [
