@@ -3,7 +3,7 @@ import os
 import pytest
 from sentry_sdk import capture_exception, new_scope, isolated_scope
 from sentry_sdk.client import Client, NoopClient
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, ScopeType
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -184,7 +184,7 @@ def test_get_current_scope():
     scope = Scope.get_current_scope()
     assert scope is not None
     assert scope.__class__ == Scope
-    assert scope._type == "current"
+    assert scope._type == ScopeType.CURRENT
 
 
 @pytest.mark.forked
@@ -192,7 +192,7 @@ def test_get_isolation_scope():
     scope = Scope.get_isolation_scope()
     assert scope is not None
     assert scope.__class__ == Scope
-    assert scope._type == "isolation"
+    assert scope._type == ScopeType.ISOLATION
 
 
 @pytest.mark.forked
@@ -200,7 +200,7 @@ def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
     assert scope.__class__ == Scope
-    assert scope._type == "global"
+    assert scope._type == ScopeType.GLOBAL
 
 
 # so it seem that when I comment out ONE test than everything is green,

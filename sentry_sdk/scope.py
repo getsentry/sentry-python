@@ -1,6 +1,7 @@
 from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
+from enum import Enum
 from itertools import chain
 import os
 import sys
@@ -69,6 +70,13 @@ _isolation_scope = ContextVar("isolation_scope", default=None)
 _current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
+
+
+class ScopeType(Enum):
+    CURRENT = "current"
+    ISOLATION = "isolation"
+    GLOBAL = "global"
+    MERGED = "merged"
 
 
 def add_global_event_processor(processor):
@@ -221,7 +229,7 @@ class Scope(object):
         """
         current_scope = _current_scope.get()
         if current_scope is None:
-            current_scope = Scope(ty="current")
+            current_scope = Scope(ty=ScopeType.CURRENT)
             _current_scope.set(current_scope)
 
         return current_scope
@@ -236,7 +244,7 @@ class Scope(object):
         """
         isolation_scope = _isolation_scope.get()
         if isolation_scope is None:
-            isolation_scope = Scope(ty="isolation")
+            isolation_scope = Scope(ty=ScopeType.ISOLATION)
             _isolation_scope.set(isolation_scope)
 
         return isolation_scope
@@ -251,7 +259,7 @@ class Scope(object):
         """
         global _global_scope
         if _global_scope is None:
-            _global_scope = Scope(ty="global")
+            _global_scope = Scope(ty=ScopeType.GLOBAL)
 
         return _global_scope
 
@@ -268,7 +276,7 @@ class Scope(object):
             raise TypeError("cannot provide scope and kwargs")
 
         final_scope = copy(_global_scope) if _global_scope is not None else Scope()
-        final_scope._type = "merged"
+        final_scope._type = ScopeType.MERGED
 
         isolation_scope = _isolation_scope.get()
         if isolation_scope is not None:
