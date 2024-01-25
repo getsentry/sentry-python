@@ -75,9 +75,9 @@ GROUPS = {
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
-        "sqlalchemy",
         "redis",
         "rediscluster",
+        "sqlalchemy",
     ],
     "GraphQL": [
         "ariadne",
