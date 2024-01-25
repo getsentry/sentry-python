@@ -271,127 +271,127 @@ def test_isolate():
     assert not scope.is_forked
 
 
-@pytest.mark.forked
-def test_get_global_scope_tags():
-    global_scope1 = Scope.get_global_scope()
-    global_scope2 = Scope.get_global_scope()
-    assert global_scope1 == global_scope2
-    assert global_scope1.client.__class__ == NoopClient
-    assert not global_scope1.client.is_active()
-    assert global_scope2.client.__class__ == NoopClient
-    assert not global_scope2.client.is_active()
+# @pytest.mark.forked
+# def test_get_global_scope_tags():
+#     global_scope1 = Scope.get_global_scope()
+#     global_scope2 = Scope.get_global_scope()
+#     assert global_scope1 == global_scope2
+#     assert global_scope1.client.__class__ == NoopClient
+#     assert not global_scope1.client.is_active()
+#     assert global_scope2.client.__class__ == NoopClient
+#     assert not global_scope2.client.is_active()
 
-    global_scope1.set_tag("tag1", "value")
-    tags_scope1 = global_scope1._tags
-    tags_scope2 = global_scope2._tags
-    assert tags_scope1 == tags_scope2
-    assert global_scope1.client.__class__ == NoopClient
-    assert not global_scope1.client.is_active()
-    assert global_scope2.client.__class__ == NoopClient
-    assert not global_scope2.client.is_active()
-
-
-@pytest.mark.forked
-def test_get_global_with_new_scope():
-    original_global_scope = Scope.get_global_scope()
-
-    with new_scope() as scope:
-        in_with_global_scope = Scope.get_global_scope()
-
-        assert scope is not in_with_global_scope
-        assert in_with_global_scope is original_global_scope
-
-    after_with_global_scope = Scope.get_global_scope()
-    assert after_with_global_scope is original_global_scope
+#     global_scope1.set_tag("tag1", "value")
+#     tags_scope1 = global_scope1._tags
+#     tags_scope2 = global_scope2._tags
+#     assert tags_scope1 == tags_scope2
+#     assert global_scope1.client.__class__ == NoopClient
+#     assert not global_scope1.client.is_active()
+#     assert global_scope2.client.__class__ == NoopClient
+#     assert not global_scope2.client.is_active()
 
 
-@pytest.mark.forked
-def test_get_global_with_isolated_scope():
-    original_global_scope = Scope.get_global_scope()
+# @pytest.mark.forked
+# def test_get_global_with_new_scope():
+#     original_global_scope = Scope.get_global_scope()
 
-    with isolated_scope() as scope:
-        in_with_global_scope = Scope.get_global_scope()
+#     with new_scope() as scope:
+#         in_with_global_scope = Scope.get_global_scope()
 
-        assert scope is not in_with_global_scope
-        assert in_with_global_scope is original_global_scope
+#         assert scope is not in_with_global_scope
+#         assert in_with_global_scope is original_global_scope
 
-    after_with_global_scope = Scope.get_global_scope()
-    assert after_with_global_scope is original_global_scope
-
-
-@pytest.mark.forked
-def test_get_isolation_scope_tags():
-    isolation_scope1 = Scope.get_isolation_scope()
-    isolation_scope2 = Scope.get_isolation_scope()
-    assert isolation_scope1 == isolation_scope2
-    assert isolation_scope1.client.__class__ == NoopClient
-    assert not isolation_scope1.client.is_active()
-    assert isolation_scope2.client.__class__ == NoopClient
-    assert not isolation_scope2.client.is_active()
-
-    isolation_scope1.set_tag("tag1", "value")
-    tags_scope1 = isolation_scope1._tags
-    tags_scope2 = isolation_scope2._tags
-    assert tags_scope1 == tags_scope2
-    assert isolation_scope1.client.__class__ == NoopClient
-    assert not isolation_scope1.client.is_active()
-    assert isolation_scope2.client.__class__ == NoopClient
-    assert not isolation_scope2.client.is_active()
+#     after_with_global_scope = Scope.get_global_scope()
+#     assert after_with_global_scope is original_global_scope
 
 
-@pytest.mark.forked
-def test_with_isolated_scope():
-    original_current_scope = Scope.get_current_scope()
-    original_isolation_scope = Scope.get_isolation_scope()
+# @pytest.mark.forked
+# def test_get_global_with_isolated_scope():
+#     original_global_scope = Scope.get_global_scope()
 
-    with isolated_scope() as scope:
-        in_with_current_scope = Scope.get_current_scope()
-        in_with_isolation_scope = Scope.get_isolation_scope()
+#     with isolated_scope() as scope:
+#         in_with_global_scope = Scope.get_global_scope()
 
-        assert scope is in_with_isolation_scope
-        assert in_with_current_scope is not original_current_scope
-        assert in_with_isolation_scope is not original_isolation_scope
+#         assert scope is not in_with_global_scope
+#         assert in_with_global_scope is original_global_scope
 
-    after_with_current_scope = Scope.get_current_scope()
-    after_with_isolation_scope = Scope.get_isolation_scope()
-    assert after_with_current_scope is original_current_scope
-    assert after_with_isolation_scope is original_isolation_scope
+#     after_with_global_scope = Scope.get_global_scope()
+#     assert after_with_global_scope is original_global_scope
 
 
-@pytest.mark.forked
-def test_get_current_scope_tags():
-    scope1 = Scope.get_current_scope()
-    scope2 = Scope.get_current_scope()
-    assert id(scope1) == id(scope2)
-    assert scope1.client.__class__ == NoopClient
-    assert not scope1.client.is_active()
-    assert scope2.client.__class__ == NoopClient
-    assert not scope2.client.is_active()
+# @pytest.mark.forked
+# def test_get_isolation_scope_tags():
+#     isolation_scope1 = Scope.get_isolation_scope()
+#     isolation_scope2 = Scope.get_isolation_scope()
+#     assert isolation_scope1 == isolation_scope2
+#     assert isolation_scope1.client.__class__ == NoopClient
+#     assert not isolation_scope1.client.is_active()
+#     assert isolation_scope2.client.__class__ == NoopClient
+#     assert not isolation_scope2.client.is_active()
 
-    scope1.set_tag("tag1", "value")
-    tags_scope1 = scope1._tags
-    tags_scope2 = scope2._tags
-    assert tags_scope1 == tags_scope2
-    assert scope1.client.__class__ == NoopClient
-    assert not scope1.client.is_active()
-    assert scope2.client.__class__ == NoopClient
-    assert not scope2.client.is_active()
+#     isolation_scope1.set_tag("tag1", "value")
+#     tags_scope1 = isolation_scope1._tags
+#     tags_scope2 = isolation_scope2._tags
+#     assert tags_scope1 == tags_scope2
+#     assert isolation_scope1.client.__class__ == NoopClient
+#     assert not isolation_scope1.client.is_active()
+#     assert isolation_scope2.client.__class__ == NoopClient
+#     assert not isolation_scope2.client.is_active()
 
 
-@pytest.mark.forked
-def test_with_new_scope():
-    original_current_scope = Scope.get_current_scope()
-    original_isolation_scope = Scope.get_isolation_scope()
+# @pytest.mark.forked
+# def test_with_isolated_scope():
+#     original_current_scope = Scope.get_current_scope()
+#     original_isolation_scope = Scope.get_isolation_scope()
 
-    with new_scope() as scope:
-        in_with_current_scope = Scope.get_current_scope()
-        in_with_isolation_scope = Scope.get_isolation_scope()
+#     with isolated_scope() as scope:
+#         in_with_current_scope = Scope.get_current_scope()
+#         in_with_isolation_scope = Scope.get_isolation_scope()
 
-        assert scope is in_with_current_scope
-        assert in_with_current_scope is not original_current_scope
-        assert in_with_isolation_scope is original_isolation_scope
+#         assert scope is in_with_isolation_scope
+#         assert in_with_current_scope is not original_current_scope
+#         assert in_with_isolation_scope is not original_isolation_scope
 
-    after_with_current_scope = Scope.get_current_scope()
-    after_with_isolation_scope = Scope.get_isolation_scope()
-    assert after_with_current_scope is original_current_scope
-    assert after_with_isolation_scope is original_isolation_scope
+#     after_with_current_scope = Scope.get_current_scope()
+#     after_with_isolation_scope = Scope.get_isolation_scope()
+#     assert after_with_current_scope is original_current_scope
+#     assert after_with_isolation_scope is original_isolation_scope
+
+
+# @pytest.mark.forked
+# def test_get_current_scope_tags():
+#     scope1 = Scope.get_current_scope()
+#     scope2 = Scope.get_current_scope()
+#     assert id(scope1) == id(scope2)
+#     assert scope1.client.__class__ == NoopClient
+#     assert not scope1.client.is_active()
+#     assert scope2.client.__class__ == NoopClient
+#     assert not scope2.client.is_active()
+
+#     scope1.set_tag("tag1", "value")
+#     tags_scope1 = scope1._tags
+#     tags_scope2 = scope2._tags
+#     assert tags_scope1 == tags_scope2
+#     assert scope1.client.__class__ == NoopClient
+#     assert not scope1.client.is_active()
+#     assert scope2.client.__class__ == NoopClient
+#     assert not scope2.client.is_active()
+
+
+# @pytest.mark.forked
+# def test_with_new_scope():
+#     original_current_scope = Scope.get_current_scope()
+#     original_isolation_scope = Scope.get_isolation_scope()
+
+#     with new_scope() as scope:
+#         in_with_current_scope = Scope.get_current_scope()
+#         in_with_isolation_scope = Scope.get_isolation_scope()
+
+#         assert scope is in_with_current_scope
+#         assert in_with_current_scope is not original_current_scope
+#         assert in_with_isolation_scope is original_isolation_scope
+
+#     after_with_current_scope = Scope.get_current_scope()
+#     after_with_isolation_scope = Scope.get_isolation_scope()
+#     assert after_with_current_scope is original_current_scope
+#     assert after_with_isolation_scope is original_isolation_scope

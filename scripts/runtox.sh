@@ -29,10 +29,10 @@ export TOX_PARALLEL_NO_SPINNER=1
 
 if $excludelatest; then
     echo "Excluding latest"
-    ENV="$($TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest' | tr $'\n' ',')"
+    ENV="$(python -m $TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest' | tr $'\n' ',')"
 else
     echo "Including latest"
-    ENV="$($TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
+    ENV="$(python -m $TOXPATH -l | grep -- "$searchstring" | tr $'\n' ',')"
 fi
 
 if [ -z "${ENV}" ]; then
@@ -40,4 +40,4 @@ if [ -z "${ENV}" ]; then
     exit 0
 fi
 
-exec $TOXPATH -vv -e "$ENV" -- "${@:2}"
+exec python -m $TOXPATH -vv -e "$ENV" -- "${@:2}"
