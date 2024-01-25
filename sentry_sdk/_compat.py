@@ -34,12 +34,15 @@ if PY2:
     binary_sequence_types = (bytearray, memoryview)
 
     def datetime_utcnow():
+        # type: () -> datetime
         return datetime.utcnow()
 
     def utc_from_timestamp(timestamp):
+        # type: (float) -> datetime
         return datetime.utcfromtimestamp(timestamp)
 
     def duration_in_milliseconds(delta):
+        # type: (timedelta) -> int
         seconds = delta.days * 24 * 60 * 60 + delta.seconds
         milliseconds = seconds * 1000 + delta.microseconds / 1000
         return milliseconds
@@ -109,6 +112,7 @@ else:
         return datetime.fromtimestamp(timestamp, timezone.utc)
 
     def duration_in_milliseconds(delta):
+        # type: (timedelta) -> float
         return delta / timedelta(milliseconds=1)
 
     def implements_str(x):
