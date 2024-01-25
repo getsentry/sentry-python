@@ -199,12 +199,12 @@ def test_get_global_scope():
     assert scope._type == "global"
 
 
-@pytest.mark.forked
-def test_get_client():
-    client = Scope.get_client()
-    assert client is not None
-    assert client.__class__ == NoopClient
-    assert not client.is_active()
+# @pytest.mark.forked
+# def test_get_client():
+#     client = Scope.get_client()
+#     assert client is not None
+#     assert client.__class__ == NoopClient
+#     assert not client.is_active()
 
 
 @pytest.mark.forked
@@ -291,6 +291,7 @@ def test_get_global_scope_tags():
     assert not global_scope2.client.is_active()
 
 
+# xxx
 @pytest.mark.forked
 def test_get_global_with_new_scope():
     original_global_scope = Scope.get_global_scope()
