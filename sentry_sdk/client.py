@@ -237,16 +237,12 @@ class NoopClient(BaseClient):
 
 class _Client(BaseClient):
     """
-        The client is internally responsible for capturing the events and
-        forwarding them to sentry through the configured transport.  It takes
-        the client options as keyword arguments and optionally the DSN as first
-        argument.
+    The client is internally responsible for capturing the events and
+    forwarding them to sentry through the configured transport.  It takes
+    the client options as keyword arguments and optionally the DSN as first
+    argument.
 
-    <<<<<<< HEAD
-        Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
-    =======
-        Alias of :py:class:`Client`. (Was created for better intelisense support)
-    >>>>>>> master
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
