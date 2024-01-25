@@ -2,6 +2,7 @@ import contextlib
 import os
 import re
 import sys
+from datetime import timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -186,7 +187,7 @@ def add_query_source(hub, span):
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
-    slow_query = duration.microseconds > threshold * 1000
+    slow_query = (duration / timedelta(milliseconds=1)) > threshold
 
     if not slow_query:
         return
