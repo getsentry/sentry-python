@@ -291,32 +291,32 @@ def test_isolate():
 #     assert not global_scope2.client.is_active()
 
 
-# @pytest.mark.forked
-# def test_get_global_with_new_scope():
-#     original_global_scope = Scope.get_global_scope()
+@pytest.mark.forked
+def test_get_global_with_new_scope():
+    original_global_scope = Scope.get_global_scope()
 
-#     with new_scope() as scope:
-#         in_with_global_scope = Scope.get_global_scope()
+    with new_scope() as scope:
+        in_with_global_scope = Scope.get_global_scope()
 
-#         assert scope is not in_with_global_scope
-#         assert in_with_global_scope is original_global_scope
+        assert scope is not in_with_global_scope
+        assert in_with_global_scope is original_global_scope
 
-#     after_with_global_scope = Scope.get_global_scope()
-#     assert after_with_global_scope is original_global_scope
+    after_with_global_scope = Scope.get_global_scope()
+    assert after_with_global_scope is original_global_scope
 
 
-# @pytest.mark.forked
-# def test_get_global_with_isolated_scope():
-#     original_global_scope = Scope.get_global_scope()
+@pytest.mark.forked
+def test_get_global_with_isolated_scope():
+    original_global_scope = Scope.get_global_scope()
 
-#     with isolated_scope() as scope:
-#         in_with_global_scope = Scope.get_global_scope()
+    with isolated_scope() as scope:
+        in_with_global_scope = Scope.get_global_scope()
 
-#         assert scope is not in_with_global_scope
-#         assert in_with_global_scope is original_global_scope
+        assert scope is not in_with_global_scope
+        assert in_with_global_scope is original_global_scope
 
-#     after_with_global_scope = Scope.get_global_scope()
-#     assert after_with_global_scope is original_global_scope
+    after_with_global_scope = Scope.get_global_scope()
+    assert after_with_global_scope is original_global_scope
 
 
 @pytest.mark.forked
