@@ -43,7 +43,10 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
     from typing import Sequence
+    from typing import Type
+    from typing import Union
 
+    from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
@@ -153,6 +156,8 @@ class _Client(object):
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
+
+    Alias of :py:class:`Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
@@ -563,8 +568,8 @@ class _Client(object):
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param scope: An optional scope to use for determining whether this event
-            should be captured.
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
@@ -666,6 +671,22 @@ class _Client(object):
             logger.info("Discarded session update because of missing release")
         else:
             self.session_flusher.add_session(session)
+
+    def get_integration(
+        self, name_or_class  # type: Union[str, Type[Integration]]
+    ):
+        # type: (...) -> Any
+        """Returns the integration for this client by name or class.
+        If the client does not have that integration then `None` is returned.
+        """
+        if isinstance(name_or_class, str):
+            integration_name = name_or_class
+        elif name_or_class.identifier is not None:
+            integration_name = name_or_class.identifier
+        else:
+            raise ValueError("Integration has no name")
+
+        return self.integrations.get(integration_name)
 
     def close(
         self,

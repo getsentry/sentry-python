@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -1248,24 +1249,49 @@ def _make_threadlocal_contextvars(local):
     class ContextVar(object):
         # Super-limited impl of ContextVar
 
-        def __init__(self, name):
-            # type: (str) -> None
+        def __init__(self, name, default=None):
+            # type: (str, Any) -> None
             self._name = name
+            self._default = default
             self._local = local()
+            self._original_local = local()
 
-        def get(self, default):
+        def get(self, default=None):
             # type: (Any) -> Any
-            return getattr(self._local, "value", default)
+            return getattr(self._local, "value", default or self._default)
 
         def set(self, value):
-            # type: (Any) -> None
+            # type: (Any) -> Any
+            token = str(random.getrandbits(64))
+            original_value = self.get()
+            setattr(self._original_local, token, original_value)
             self._local.value = value
+            return token
+
+        def reset(self, token):
+            # type: (Any) -> None
+            self._local.value = getattr(self._original_local, token)
+            del self._original_local[token]
 
     return ContextVar
 
 
+def _make_noop_copy_context():
+    # type: () -> Callable[[], Any]
+    class NoOpContext:
+        def run(self, func, *args, **kwargs):
+            # type: (Callable[..., Any], *Any, **Any) -> Any
+            return func(*args, **kwargs)
+
+    def copy_context():
+        # type: () -> NoOpContext
+        return NoOpContext()
+
+    return copy_context
+
+
 def _get_contextvars():
-    # type: () -> Tuple[bool, type]
+    # type: () -> Tuple[bool, type, Callable[[], Any]]
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1281,17 +1307,17 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
 
@@ -1299,10 +1325,10 @@ def _get_contextvars():
 
     from threading import local
 
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(local), _make_noop_copy_context()
 
 
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+HAS_REAL_CONTEXTVARS, ContextVar, copy_context = _get_contextvars()
 
 CONTEXTVARS_ERROR_MESSAGE = """
 
