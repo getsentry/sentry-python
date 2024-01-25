@@ -9,6 +9,7 @@ from sentry_sdk.attachments import Attachment
 from sentry_sdk.tracing_utils import (
     Baggage,
     extract_sentrytrace_data,
+    has_tracing_enabled,
     normalize_incoming_data,
 )
 from sentry_sdk.tracing import (
@@ -611,7 +612,7 @@ class Scope:
 
         # Add "trace" context
         if contexts.get("trace") is None:
-            if self._span is not None:
+            if has_tracing_enabled(options) and self._span is not None:
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
