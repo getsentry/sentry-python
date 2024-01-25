@@ -658,17 +658,13 @@ class _Client(BaseClient):
         # type: (...) -> Optional[str]
         """Captures an event.
 
-                :param event: A ready-made event that can be directly sent to Sentry.
+        :param event: A ready-made event that can be directly sent to Sentry.
 
-                :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
+        :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-                :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
-        <<<<<<< HEAD
-        =======
-                    The `scope` and `scope_kwargs` parameters are mutually exclusive.
-        >>>>>>> master
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
 
-                :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
+        :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
         if disable_capture_event.get(False):
             return None
