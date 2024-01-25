@@ -203,10 +203,6 @@ def test_get_global_scope():
     assert scope._type == ScopeType.GLOBAL
 
 
-# so it seem that when I comment out ONE test than everything is green,
-# and it does not matter which test I comment out
-
-
 @pytest.mark.forked
 def test_get_client():
     client = Scope.get_client()
@@ -292,7 +288,7 @@ def test_get_global_scope_tags():
     global_scope1.set_tag("tag1", "value")
     tags_scope1 = global_scope1._tags
     tags_scope2 = global_scope2._tags
-    assert tags_scope1 == tags_scope2
+    assert tags_scope1 == tags_scope2 == {"tag1": "value"}
     assert global_scope1.client.__class__ == NoopClient
     assert not global_scope1.client.is_active()
     assert global_scope2.client.__class__ == NoopClient
@@ -341,7 +337,7 @@ def test_get_isolation_scope_tags():
     isolation_scope1.set_tag("tag1", "value")
     tags_scope1 = isolation_scope1._tags
     tags_scope2 = isolation_scope2._tags
-    assert tags_scope1 == tags_scope2
+    assert tags_scope1 == tags_scope2 == {"tag1": "value"}
     assert isolation_scope1.client.__class__ == NoopClient
     assert not isolation_scope1.client.is_active()
     assert isolation_scope2.client.__class__ == NoopClient
@@ -380,7 +376,7 @@ def test_get_current_scope_tags():
     scope1.set_tag("tag1", "value")
     tags_scope1 = scope1._tags
     tags_scope2 = scope2._tags
-    assert tags_scope1 == tags_scope2
+    assert tags_scope1 == tags_scope2 == {"tag1": "value"}
     assert scope1.client.__class__ == NoopClient
     assert not scope1.client.is_active()
     assert scope2.client.__class__ == NoopClient
