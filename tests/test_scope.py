@@ -271,24 +271,24 @@ def test_isolate():
     assert not scope.is_forked
 
 
-# @pytest.mark.forked
-# def test_get_global_scope_tags():
-#     global_scope1 = Scope.get_global_scope()
-#     global_scope2 = Scope.get_global_scope()
-#     assert global_scope1 == global_scope2
-#     assert global_scope1.client.__class__ == NoopClient
-#     assert not global_scope1.client.is_active()
-#     assert global_scope2.client.__class__ == NoopClient
-#     assert not global_scope2.client.is_active()
+@pytest.mark.forked
+def test_get_global_scope_tags():
+    global_scope1 = Scope.get_global_scope()
+    global_scope2 = Scope.get_global_scope()
+    assert global_scope1 == global_scope2
+    assert global_scope1.client.__class__ == NoopClient
+    assert not global_scope1.client.is_active()
+    assert global_scope2.client.__class__ == NoopClient
+    assert not global_scope2.client.is_active()
 
-#     global_scope1.set_tag("tag1", "value")
-#     tags_scope1 = global_scope1._tags
-#     tags_scope2 = global_scope2._tags
-#     assert tags_scope1 == tags_scope2
-#     assert global_scope1.client.__class__ == NoopClient
-#     assert not global_scope1.client.is_active()
-#     assert global_scope2.client.__class__ == NoopClient
-#     assert not global_scope2.client.is_active()
+    global_scope1.set_tag("tag1", "value")
+    tags_scope1 = global_scope1._tags
+    tags_scope2 = global_scope2._tags
+    assert tags_scope1 == tags_scope2
+    assert global_scope1.client.__class__ == NoopClient
+    assert not global_scope1.client.is_active()
+    assert global_scope2.client.__class__ == NoopClient
+    assert not global_scope2.client.is_active()
 
 
 # @pytest.mark.forked
