@@ -75,6 +75,8 @@ GROUPS = {
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
+        "redis",
+        "rediscluster",
         "sqlalchemy",
     ],
     "GraphQL": [
@@ -102,8 +104,6 @@ GROUPS = {
         "falcon",
         "pyramid",
         "quart",
-        "redis",
-        "rediscluster",
         "sanic",
         "starlite",
         "tornado",

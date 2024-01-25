@@ -3,7 +3,7 @@ import inspect
 from sentry_sdk import scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, new_scope, isolated_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
@@ -38,33 +38,35 @@ else:
 
 # When changing this, update __all__ in __init__.py too
 __all__ = [
-    "capture_event",
-    "capture_message",
-    "capture_exception",
     "add_breadcrumb",
+    "capture_event",
+    "capture_exception",
+    "capture_message",
     "configure_scope",
-    "push_scope",
-    "flush",
-    "last_event_id",
-    "start_span",
-    "start_transaction",
-    "set_tag",
-    "set_context",
-    "set_extra",
-    "set_user",
-    "set_level",
-    "set_measurement",
-    "get_current_span",
-    "get_traceparent",
-    "get_baggage",
     "continue_trace",
+    "flush",
+    "get_baggage",
     "get_client",
     "get_current_scope",
+    "get_current_span",
     "get_global_scope",
     "get_isolation_scope",
+    "get_traceparent",
     "is_initialized",
+    "isolated_scope",
+    "last_event_id",
+    "new_scope",
+    "push_scope",
+    "set_context",
     "set_current_scope",
+    "set_extra",
     "set_isolation_scope",
+    "set_level",
+    "set_measurement",
+    "set_tag",
+    "set_user",
+    "start_span",
+    "start_transaction",
 ]
 
 
