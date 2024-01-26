@@ -1,4 +1,4 @@
-from copy import copy, deepcopy
+from copy import copy
 from collections import deque
 from contextlib import contextmanager
 from enum import Enum
