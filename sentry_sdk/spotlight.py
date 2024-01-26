@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import urllib3
 
@@ -13,14 +15,12 @@ from sentry_sdk.envelope import Envelope
 
 
 class SpotlightClient:
-    def __init__(self, url):
-        # type: (str) -> None
+    def __init__(self, url: str) -> None:
         self.url = url
         self.http = urllib3.PoolManager()
         self.tries = 0
 
-    def capture_envelope(self, envelope):
-        # type: (Envelope) -> None
+    def capture_envelope(self, envelope: Envelope) -> None:
         if self.tries > 3:
             logger.warning(
                 "Too many errors sending to Spotlight, stop sending events there."
@@ -43,9 +43,7 @@ class SpotlightClient:
             logger.warning(str(e))
 
 
-def setup_spotlight(options):
-    # type: (Dict[str, Any]) -> Optional[SpotlightClient]
-
+def setup_spotlight(options: Dict[str, Any]) -> Optional[SpotlightClient]:
     url = options.get("spotlight")
 
     if isinstance(url, str):

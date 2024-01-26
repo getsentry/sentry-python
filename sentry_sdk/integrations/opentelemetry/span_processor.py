@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 from opentelemetry.context import get_value  # type: ignore
@@ -36,8 +38,9 @@ if TYPE_CHECKING:
 OPEN_TELEMETRY_CONTEXT = "otel"
 
 
-def link_trace_context_to_error_event(event, otel_span_map):
-    # type: (Event, Dict[str, Union[Transaction, SentrySpan]]) -> Event
+def link_trace_context_to_error_event(
+    event: Event, otel_span_map: Dict[str, Union[Transaction, SentrySpan]]
+) -> Event:
     hub = Hub.current
     if not hub:
         return event
@@ -75,24 +78,22 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     """
 
     # The mapping from otel span ids to sentry spans
-    otel_span_map = {}  # type: Dict[str, Union[Transaction, SentrySpan]]
+    otel_span_map: Dict[str, Union[Transaction, SentrySpan]] = {}
 
-    def __new__(cls):
-        # type: () -> SentrySpanProcessor
+    def __new__(cls) -> SentrySpanProcessor:
         if not hasattr(cls, "instance"):
             cls.instance = super(SentrySpanProcessor, cls).__new__(cls)
 
         return cls.instance
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self) -> None:
         @add_global_event_processor
-        def global_event_processor(event, hint):
-            # type: (Event, Hint) -> Event
+        def global_event_processor(event: Event, hint: Hint) -> Event:
             return link_trace_context_to_error_event(event, self.otel_span_map)
 
-    def on_start(self, otel_span, parent_context=None):
-        # type: (OTelSpan, Optional[SpanContext]) -> None
+    def on_start(
+        self, otel_span: OTelSpan, parent_context: Optional[SpanContext] = None
+    ) -> None:
         hub = Hub.current
         if not hub:
             return
@@ -146,8 +147,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
 
-    def on_end(self, otel_span):
-        # type: (OTelSpan) -> None
+    def on_end(self, otel_span: OTelSpan) -> None:
         hub = Hub.current
         if not hub:
             return
@@ -182,8 +182,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9, timezone.utc)
         )
 
-    def _is_sentry_span(self, hub, otel_span):
-        # type: (Hub, OTelSpan) -> bool
+    def _is_sentry_span(self, hub: Hub, otel_span: OTelSpan) -> bool:
         """
         Break infinite loop:
         HTTP requests to Sentry are caught by OTel and send again to Sentry.
@@ -196,8 +195,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         return False
 
-    def _get_otel_context(self, otel_span):
-        # type: (OTelSpan) -> Dict[str, Any]
+    def _get_otel_context(self, otel_span: OTelSpan) -> Dict[str, Any]:
         """
         Returns the OTel context for Sentry.
         See: https://develop.sentry.dev/sdk/performance/opentelemetry/#step-5-add-opentelemetry-context
@@ -212,8 +210,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         return ctx
 
-    def _get_trace_data(self, otel_span, parent_context):
-        # type: (OTelSpan, SpanContext) -> Dict[str, Any]
+    def _get_trace_data(
+        self, otel_span: OTelSpan, parent_context: SpanContext
+    ) -> Dict[str, Any]:
         """
         Extracts tracing information from one OTel span and its parent OTel context.
         """
@@ -241,8 +240,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         return trace_data
 
-    def _update_span_with_otel_status(self, sentry_span, otel_span):
-        # type: (SentrySpan, OTelSpan) -> None
+    def _update_span_with_otel_status(
+        self, sentry_span: SentrySpan, otel_span: OTelSpan
+    ) -> None:
         """
         Set the Sentry span status from the OTel span
         """
@@ -255,8 +255,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_span.set_status("internal_error")
 
-    def _update_span_with_otel_data(self, sentry_span, otel_span):
-        # type: (SentrySpan, OTelSpan) -> None
+    def _update_span_with_otel_data(
+        self, sentry_span: SentrySpan, otel_span: OTelSpan
+    ) -> None:
         """
         Convert OTel span data and update the Sentry span with it.
         This should eventually happen on the server when ingesting the spans.
@@ -314,8 +315,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         sentry_span.op = op
         sentry_span.description = description
 
-    def _update_transaction_with_otel_data(self, sentry_span, otel_span):
-        # type: (SentrySpan, OTelSpan) -> None
+    def _update_transaction_with_otel_data(
+        self, sentry_span: SentrySpan, otel_span: OTelSpan
+    ) -> None:
         http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD)
 
         if http_method:

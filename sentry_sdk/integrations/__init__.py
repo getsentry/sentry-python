@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from threading import Lock
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -16,20 +18,19 @@ if TYPE_CHECKING:
 _installer_lock = Lock()
 
 # Set of all integration identifiers we have attempted to install
-_processed_integrations = set()  # type: Set[str]
+_processed_integrations: Set[str] = set()
 
 # Set of all integration identifiers we have actually installed
-_installed_integrations = set()  # type: Set[str]
+_installed_integrations: Set[str] = set()
 
 
 def _generate_default_integrations_iterator(
-    integrations,  # type: List[str]
-    auto_enabling_integrations,  # type: List[str]
-):
-    # type: (...) -> Callable[[bool], Iterator[Type[Integration]]]
-
-    def iter_default_integrations(with_auto_enabling_integrations):
-        # type: (bool) -> Iterator[Type[Integration]]
+    integrations: List[str],
+    auto_enabling_integrations: List[str],
+) -> Callable[[bool], Iterator[Type[Integration]]]:
+    def iter_default_integrations(
+        with_auto_enabling_integrations: bool,
+    ) -> Iterator[Type[Integration]]:
         """Returns an iterator of the default integration classes:"""
         from importlib import import_module
 
@@ -95,9 +96,10 @@ del _generate_default_integrations_iterator
 
 
 def setup_integrations(
-    integrations, with_defaults=True, with_auto_enabling_integrations=False
-):
-    # type: (List[Integration], bool, bool) -> Dict[str, Integration]
+    integrations: List[Integration],
+    with_defaults: bool = True,
+    with_auto_enabling_integrations: bool = False,
+) -> Dict[str, Integration]:
     """
     Given a list of integration instances, this installs them all.
 
@@ -184,12 +186,11 @@ class Integration:
     install = None
     """Legacy method, do not implement."""
 
-    identifier = None  # type: str
+    identifier: str = None
     """String unique ID of integration type"""
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         Initialize the integration.
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
@@ -16,11 +18,9 @@ class ModulesIntegration(Integration):
     identifier = "modules"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def processor(event, hint):
-            # type: (Event, Any) -> Dict[str, Any]
+        def processor(event: Event, hint: Any) -> Dict[str, Any]:
             if event.get("type") == "transaction":
                 return event
 

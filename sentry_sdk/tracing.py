@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 import random
 from datetime import datetime, timedelta, timezone
@@ -65,18 +67,16 @@ class _SpanRecorder:
 
     __slots__ = ("maxlen", "spans")
 
-    def __init__(self, maxlen):
-        # type: (int) -> None
+    def __init__(self, maxlen: int) -> None:
         # FIXME: this is `maxlen - 1` only to preserve historical behavior
         # enforced by tests.
         # Either this should be changed to `maxlen` or the JS SDK implementation
         # should be changed to match a consistent interpretation of what maxlen
         # limits: either transaction+spans or only child spans.
         self.maxlen = maxlen - 1
-        self.spans = []  # type: List[Span]
+        self.spans: List[Span] = []
 
-    def add(self, span):
-        # type: (Span) -> None
+    def add(self, span: Span) -> None:
         if len(self.spans) > self.maxlen:
             span._span_recorder = None
         else:
@@ -108,8 +108,7 @@ class Span:
         "_local_aggregator",
     )
 
-    def __new__(cls, **kwargs):
-        # type: (**Any) -> Any
+    def __new__(cls, **kwargs: Any) -> Any:
         """
         Backwards-compatible implementation of Span and Transaction
         creation.
@@ -124,20 +123,19 @@ class Span:
 
     def __init__(
         self,
-        trace_id=None,  # type: Optional[str]
-        span_id=None,  # type: Optional[str]
-        parent_span_id=None,  # type: Optional[str]
-        same_process_as_parent=True,  # type: bool
-        sampled=None,  # type: Optional[bool]
-        op=None,  # type: Optional[str]
-        description=None,  # type: Optional[str]
-        hub=None,  # type: Optional[sentry_sdk.Hub]
-        status=None,  # type: Optional[str]
-        transaction=None,  # type: Optional[str] # deprecated
-        containing_transaction=None,  # type: Optional[Transaction]
-        start_timestamp=None,  # type: Optional[Union[datetime, float]]
-    ):
-        # type: (...) -> None
+        trace_id: Optional[str] = None,
+        span_id: Optional[str] = None,
+        parent_span_id: Optional[str] = None,
+        same_process_as_parent: bool = True,
+        sampled: Optional[bool] = None,
+        op: Optional[str] = None,
+        description: Optional[str] = None,
+        hub: Optional[sentry_sdk.Hub] = None,
+        status: Optional[str] = None,
+        transaction: Optional[str] = None,  # deprecated
+        containing_transaction: Optional[Transaction] = None,
+        start_timestamp: Optional[Union[datetime, float]] = None,
+    ) -> None:
         self.trace_id = trace_id or uuid.uuid4().hex
         self.span_id = span_id or uuid.uuid4().hex[16:]
         self.parent_span_id = parent_span_id
@@ -147,8 +145,8 @@ class Span:
         self.description = description
         self.status = status
         self.hub = hub
-        self._tags = {}  # type: Dict[str, str]
-        self._data = {}  # type: Dict[str, Any]
+        self._tags: Dict[str, str] = {}
+        self._data: Dict[str, Any] = {}
         self._containing_transaction = containing_transaction
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
@@ -163,27 +161,24 @@ class Span:
             pass
 
         #: End timestamp of span
-        self.timestamp = None  # type: Optional[datetime]
+        self.timestamp: Optional[datetime] = None
 
-        self._span_recorder = None  # type: Optional[_SpanRecorder]
-        self._local_aggregator = None  # type: Optional[LocalAggregator]
+        self._span_recorder: Optional[_SpanRecorder] = None
+        self._local_aggregator: Optional[LocalAggregator] = None
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
-    def init_span_recorder(self, maxlen):
-        # type: (int) -> None
+    def init_span_recorder(self, maxlen: int) -> None:
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
 
-    def _get_local_aggregator(self):
-        # type: (...) -> LocalAggregator
+    def _get_local_aggregator(self) -> LocalAggregator:
         rv = self._local_aggregator
         if rv is None:
             rv = self._local_aggregator = LocalAggregator()
         return rv
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return (
             "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
             % (
@@ -197,8 +192,7 @@ class Span:
             )
         )
 
-    def __enter__(self):
-        # type: () -> Span
+    def __enter__(self) -> Span:
         hub = self.hub or sentry_sdk.Hub.current
 
         _, scope = hub._stack[-1]
@@ -207,8 +201,9 @@ class Span:
         self._context_manager_state = (hub, scope, old_span)
         return self
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+    def __exit__(
+        self, ty: Optional[Any], value: Optional[Any], tb: Optional[Any]
+    ) -> None:
         if value is not None:
             self.set_status("internal_error")
 
@@ -219,8 +214,7 @@ class Span:
         scope.span = old_span
 
     @property
-    def containing_transaction(self):
-        # type: () -> Optional[Transaction]
+    def containing_transaction(self) -> Optional[Transaction]:
         """The ``Transaction`` that this span belongs to.
         The ``Transaction`` is the root of the span tree,
         so one could also think of this ``Transaction`` as the "root span"."""
@@ -230,8 +224,9 @@ class Span:
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> Span
+    def start_child(
+        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: Any
+    ) -> Span:
         """
         Start a sub-span from the current span or transaction.
 
@@ -252,7 +247,7 @@ class Span:
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs
+            **kwargs,
         )
 
         span_recorder = (
@@ -263,8 +258,7 @@ class Span:
 
         return child
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> Span
+    def new_span(self, **kwargs: Any) -> Span:
         """DEPRECATED: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead."""
         logger.warning(
             "Deprecated: use Span.start_child instead of Span.new_span. This will be removed in the future."
@@ -273,11 +267,8 @@ class Span:
 
     @classmethod
     def continue_from_environ(
-        cls,
-        environ,  # type: Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Transaction
+        cls, environ: Mapping[str, str], **kwargs: Any
+    ) -> Transaction:
         """
         Create a Transaction with the given params, then add in data pulled from
         the ``sentry-trace`` and ``baggage`` headers from the environ (if any)
@@ -299,11 +290,8 @@ class Span:
 
     @classmethod
     def continue_from_headers(
-        cls,
-        headers,  # type: Mapping[str, str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Transaction
+        cls, headers: Mapping[str, str], **kwargs: Any
+    ) -> Transaction:
         """
         Create a transaction with the given params (including any data pulled from
         the ``sentry-trace`` and ``baggage`` headers).
@@ -339,8 +327,7 @@ class Span:
 
         return transaction
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
+    def iter_headers(self) -> Iterator[Tuple[str, str]]:
         """
         Creates a generator which returns the span's ``sentry-trace`` and ``baggage`` headers.
         If the span's containing transaction doesn't yet have a ``baggage`` value,
@@ -355,11 +342,8 @@ class Span:
 
     @classmethod
     def from_traceparent(
-        cls,
-        traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> Optional[Transaction]
+        cls, traceparent: Optional[str], **kwargs: Any
+    ) -> Optional[Transaction]:
         """
         DEPRECATED: Use :py:meth:`sentry_sdk.tracing.Span.continue_from_headers`.
 
@@ -378,8 +362,7 @@ class Span:
             {SENTRY_TRACE_HEADER_NAME: traceparent}, **kwargs
         )
 
-    def to_traceparent(self):
-        # type: () -> str
+    def to_traceparent(self) -> str:
         if self.sampled is True:
             sampled = "1"
         elif self.sampled is False:
@@ -393,8 +376,7 @@ class Span:
 
         return traceparent
 
-    def to_baggage(self):
-        # type: () -> Optional[Baggage]
+    def to_baggage(self) -> Optional[Baggage]:
         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`
         associated with this ``Span``, if any. (Taken from the root of the span tree.)
         """
@@ -402,20 +384,16 @@ class Span:
             return self.containing_transaction.get_baggage()
         return None
 
-    def set_tag(self, key, value):
-        # type: (str, Any) -> None
+    def set_tag(self, key: str, value: Any) -> None:
         self._tags[key] = value
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
+    def set_data(self, key: str, value: Any) -> None:
         self._data[key] = value
 
-    def set_status(self, value):
-        # type: (str) -> None
+    def set_status(self, value: str) -> None:
         self.status = value
 
-    def set_http_status(self, http_status):
-        # type: (int) -> None
+    def set_http_status(self, http_status: int) -> None:
         self.set_tag(
             "http.status_code", str(http_status)
         )  # we keep this for backwards compatability
@@ -450,12 +428,14 @@ class Span:
         else:
             self.set_status("unknown_error")
 
-    def is_success(self):
-        # type: () -> bool
+    def is_success(self) -> bool:
         return self.status == "ok"
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
+    def finish(
+        self,
+        hub: Optional[sentry_sdk.Hub] = None,
+        end_timestamp: Optional[Union[float, datetime]] = None,
+    ) -> Optional[str]:
         # Note: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
         # to incompatible return types for Span.finish and Transaction.finish.
         """Sets the end timestamp of the span.
@@ -494,11 +474,10 @@ class Span:
 
         return None
 
-    def to_json(self):
-        # type: () -> Dict[str, Any]
+    def to_json(self) -> Dict[str, Any]:
         """Returns a JSON-compatible representation of the span."""
 
-        rv = {
+        rv: Dict[str, Any] = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
@@ -507,7 +486,7 @@ class Span:
             "description": self.description,
             "start_timestamp": self.start_timestamp,
             "timestamp": self.timestamp,
-        }  # type: Dict[str, Any]
+        }
 
         if self.status:
             self._tags["status"] = self.status
@@ -527,15 +506,14 @@ class Span:
 
         return rv
 
-    def get_trace_context(self):
-        # type: () -> Any
-        rv = {
+    def get_trace_context(self) -> Any:
+        rv: Dict[str, Any] = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
-        }  # type: Dict[str, Any]
+        }
         if self.status:
             rv["status"] = self.status
 
@@ -565,13 +543,12 @@ class Transaction(Span):
 
     def __init__(
         self,
-        name="",  # type: str
-        parent_sampled=None,  # type: Optional[bool]
-        baggage=None,  # type: Optional[Baggage]
-        source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs  # type: Any
-    ):
-        # type: (...) -> None
+        name: str = "",
+        parent_sampled: Optional[bool] = None,
+        baggage: Optional[Baggage] = None,
+        source: str = TRANSACTION_SOURCE_CUSTOM,
+        **kwargs: Any,
+    ) -> None:
         """Constructs a new Transaction.
 
         :param name: Identifier of the transaction.
@@ -599,15 +576,14 @@ class Transaction(Span):
 
         self.name = name
         self.source = source
-        self.sample_rate = None  # type: Optional[float]
+        self.sample_rate: Optional[float] = None
         self.parent_sampled = parent_sampled
-        self._measurements = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Any]
-        self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
+        self._measurements: Dict[str, Any] = {}
+        self._contexts: Dict[str, Any] = {}
+        self._profile: Optional[sentry_sdk.profiler.Profile] = None
         self._baggage = baggage
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return (
             "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r)>"
             % (
@@ -622,8 +598,7 @@ class Transaction(Span):
             )
         )
 
-    def __enter__(self):
-        # type: () -> Transaction
+    def __enter__(self) -> Transaction:
         super(Transaction, self).__enter__()
 
         if self._profile is not None:
@@ -631,16 +606,16 @@ class Transaction(Span):
 
         return self
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+    def __exit__(
+        self, ty: Optional[Any], value: Optional[Any], tb: Optional[Any]
+    ) -> None:
         if self._profile is not None:
             self._profile.__exit__(ty, value, tb)
 
         super(Transaction, self).__exit__(ty, value, tb)
 
     @property
-    def containing_transaction(self):
-        # type: () -> Transaction
+    def containing_transaction(self) -> Transaction:
         """The root element of the span tree.
         In the case of a transaction it is the transaction itself.
         """
@@ -650,8 +625,11 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
+    def finish(
+        self,
+        hub: Optional[sentry_sdk.Hub] = None,
+        end_timestamp: Optional[Union[float, datetime]] = None,
+    ) -> Optional[str]:
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
 
@@ -723,7 +701,7 @@ class Transaction(Span):
         contexts.update(self._contexts)
         contexts.update({"trace": self.get_trace_context()})
 
-        event = {
+        event: Event = {
             "type": "transaction",
             "transaction": self.name,
             "transaction_info": {"source": self.source},
@@ -732,7 +710,7 @@ class Transaction(Span):
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
-        }  # type: Event
+        }
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
@@ -749,12 +727,12 @@ class Transaction(Span):
 
         return hub.capture_event(event)
 
-    def set_measurement(self, name, value, unit=""):
-        # type: (str, float, MeasurementUnit) -> None
+    def set_measurement(
+        self, name: str, value: float, unit: MeasurementUnit = ""
+    ) -> None:
         self._measurements[name] = {"value": value, "unit": unit}
 
-    def set_context(self, key, value):
-        # type: (str, Any) -> None
+    def set_context(self, key: str, value: Any) -> None:
         """Sets a context. Transactions can have multiple contexts
         and they should follow the format described in the "Contexts Interface"
         documentation.
@@ -764,16 +742,14 @@ class Transaction(Span):
         """
         self._contexts[key] = value
 
-    def set_http_status(self, http_status):
-        # type: (int) -> None
+    def set_http_status(self, http_status: int) -> None:
         """Sets the status of the Transaction according to the given HTTP status.
 
         :param http_status: The HTTP status code."""
         super(Transaction, self).set_http_status(http_status)
         self.set_context("response", {"status_code": http_status})
 
-    def to_json(self):
-        # type: () -> Dict[str, Any]
+    def to_json(self) -> Dict[str, Any]:
         """Returns a JSON-compatible representation of the transaction."""
         rv = super(Transaction, self).to_json()
 
@@ -783,8 +759,7 @@ class Transaction(Span):
 
         return rv
 
-    def get_baggage(self):
-        # type: () -> Baggage
+    def get_baggage(self) -> Baggage:
         """Returns the :py:class:`~sentry_sdk.tracing_utils.Baggage`
         associated with the Transaction.
 
@@ -796,8 +771,7 @@ class Transaction(Span):
 
         return self._baggage
 
-    def _set_initial_sampling_decision(self, sampling_context):
-        # type: (SamplingContext) -> None
+    def _set_initial_sampling_decision(self, sampling_context: SamplingContext) -> None:
         """
         Sets the transaction's sampling decision, according to the following
         precedence rules:
@@ -904,103 +878,90 @@ class Transaction(Span):
 
 
 class NoOpSpan(Span):
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
     @property
-    def containing_transaction(self):
-        # type: () -> Optional[Transaction]
+    def containing_transaction(self) -> Optional[Transaction]:
         return None
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> NoOpSpan
+    def start_child(
+        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: Any
+    ) -> NoOpSpan:
         return NoOpSpan()
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> NoOpSpan
+    def new_span(self, **kwargs: Any) -> NoOpSpan:
         return self.start_child(**kwargs)
 
-    def to_traceparent(self):
-        # type: () -> str
+    def to_traceparent(self) -> str:
         return ""
 
-    def to_baggage(self):
-        # type: () -> Optional[Baggage]
+    def to_baggage(self) -> Optional[Baggage]:
         return None
 
-    def get_baggage(self):
-        # type: () -> Optional[Baggage]
+    def get_baggage(self) -> Optional[Baggage]:
         return None
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
+    def iter_headers(self) -> Iterator[Tuple[str, str]]:
         return iter(())
 
-    def set_tag(self, key, value):
-        # type: (str, Any) -> None
+    def set_tag(self, key: str, value: Any) -> None:
         pass
 
-    def set_data(self, key, value):
-        # type: (str, Any) -> None
+    def set_data(self, key: str, value: Any) -> None:
         pass
 
-    def set_status(self, value):
-        # type: (str) -> None
+    def set_status(self, value: str) -> None:
         pass
 
-    def set_http_status(self, http_status):
-        # type: (int) -> None
+    def set_http_status(self, http_status: int) -> None:
         pass
 
-    def is_success(self):
-        # type: () -> bool
+    def is_success(self) -> bool:
         return True
 
-    def to_json(self):
-        # type: () -> Dict[str, Any]
+    def to_json(self) -> Dict[str, Any]:
         return {}
 
-    def get_trace_context(self):
-        # type: () -> Any
+    def get_trace_context(self) -> Any:
         return {}
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
+    def finish(
+        self,
+        hub: Optional[sentry_sdk.Hub] = None,
+        end_timestamp: Optional[Union[float, datetime]] = None,
+    ) -> Optional[str]:
         pass
 
-    def set_measurement(self, name, value, unit=""):
-        # type: (str, float, MeasurementUnit) -> None
+    def set_measurement(
+        self, name: str, value: float, unit: MeasurementUnit = ""
+    ) -> None:
         pass
 
-    def set_context(self, key, value):
-        # type: (str, Any) -> None
+    def set_context(self, key: str, value: Any) -> None:
         pass
 
-    def init_span_recorder(self, maxlen):
-        # type: (int) -> None
+    def init_span_recorder(self, maxlen: int) -> None:
         pass
 
-    def _set_initial_sampling_decision(self, sampling_context):
-        # type: (SamplingContext) -> None
+    def _set_initial_sampling_decision(self, sampling_context: SamplingContext) -> None:
         pass
 
 
 if TYPE_CHECKING:
 
     @overload
-    def trace(func=None):
-        # type: (None) -> Callable[[Callable[P, R]], Callable[P, R]]
+    def trace(func: None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
         pass
 
     @overload
-    def trace(func):
-        # type: (Callable[P, R]) -> Callable[P, R]
+    def trace(func: Callable[P, R]) -> Callable[P, R]:
         pass
 
 
-def trace(func=None):
-    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
+def trace(
+    func: Optional[Callable[P, R]] = None
+) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]:
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.

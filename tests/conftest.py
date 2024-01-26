@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import socket
@@ -614,8 +616,9 @@ def werkzeug_set_cookie(client, servername, key, value):
 
 
 @contextmanager
-def patch_start_tracing_child(fake_transaction_is_none=False):
-    # type: (bool) -> Iterator[Optional[mock.MagicMock]]
+def patch_start_tracing_child(
+    fake_transaction_is_none: bool = False,
+) -> Iterator[Optional[mock.MagicMock]]:
     if not fake_transaction_is_none:
         fake_transaction = mock.MagicMock()
         fake_start_child = mock.MagicMock()

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.hub import Hub, init
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport

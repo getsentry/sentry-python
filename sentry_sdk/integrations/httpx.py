@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -28,8 +30,7 @@ class HttpxIntegration(Integration):
     identifier = "httpx"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         httpx has its own transport layer and can be customized when needed,
         so patch Client.send and AsyncClient.send to support both synchronous and async interfaces.
@@ -38,12 +39,10 @@ class HttpxIntegration(Integration):
         _install_httpx_async_client()
 
 
-def _install_httpx_client():
-    # type: () -> None
+def _install_httpx_client() -> None:
     real_send = Client.send
 
-    def send(self, request, **kwargs):
-        # type: (Client, Request, **Any) -> Response
+    def send(self: Client, request: Request, **kwargs: Any) -> Response:
         hub = Hub.current
         if hub.get_integration(HttpxIntegration) is None:
             return real_send(self, request, **kwargs)
@@ -91,12 +90,10 @@ def _install_httpx_client():
     Client.send = send
 
 
-def _install_httpx_async_client():
-    # type: () -> None
+def _install_httpx_async_client() -> None:
     real_send = AsyncClient.send
 
-    async def send(self, request, **kwargs):
-        # type: (AsyncClient, Request, **Any) -> Response
+    async def send(self: AsyncClient, request: Request, **kwargs: Any) -> Response:
         hub = Hub.current
         if hub.get_integration(HttpxIntegration) is None:
             return await real_send(self, request, **kwargs)

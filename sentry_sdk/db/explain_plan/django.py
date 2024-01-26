@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.consts import TYPE_CHECKING
 from sentry_sdk.db.explain_plan import cache_statement, should_run_explain_plan
 
@@ -9,9 +11,13 @@ if TYPE_CHECKING:
 
 
 def attach_explain_plan_to_span(
-    span, connection, statement, parameters, mogrify, options
-):
-    # type: (Span, Any, str, Any, Callable[[str, Any], bytes], dict[str, Any]) -> None
+    span: Span,
+    connection: Any,
+    statement: str,
+    parameters: Any,
+    mogrify: Callable[[str, Any], bytes],
+    options: dict[str, Any],
+) -> None:
     """
     Run EXPLAIN or EXPLAIN ANALYZE on the given statement and attach the explain plan to the span data.
 

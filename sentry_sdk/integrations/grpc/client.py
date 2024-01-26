@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
@@ -21,8 +23,12 @@ class ClientInterceptor(
 ):
     _is_intercepted = False
 
-    def intercept_unary_unary(self, continuation, client_call_details, request):
-        # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], _UnaryOutcome], ClientCallDetails, Message) -> _UnaryOutcome
+    def intercept_unary_unary(
+        self: ClientInterceptor,
+        continuation: Callable[[ClientCallDetails, Message], _UnaryOutcome],
+        client_call_details: ClientCallDetails,
+        request: Message,
+    ) -> _UnaryOutcome:
         hub = Hub.current
         method = client_call_details.method
 
@@ -41,8 +47,14 @@ class ClientInterceptor(
 
             return response
 
-    def intercept_unary_stream(self, continuation, client_call_details, request):
-        # type: (ClientInterceptor, Callable[[ClientCallDetails, Message], Union[Iterable[Any], UnaryStreamCall]], ClientCallDetails, Message) -> Union[Iterator[Message], Call]
+    def intercept_unary_stream(
+        self: ClientInterceptor,
+        continuation: Callable[
+            [ClientCallDetails, Message], Union[Iterable[Any], UnaryStreamCall]
+        ],
+        client_call_details: ClientCallDetails,
+        request: Message,
+    ) -> Union[Iterator[Message], Call]:
         hub = Hub.current
         method = client_call_details.method
 
@@ -56,17 +68,16 @@ class ClientInterceptor(
                 client_call_details, hub
             )
 
-            response = continuation(
-                client_call_details, request
-            )  # type: UnaryStreamCall
+            response: UnaryStreamCall = continuation(client_call_details, request)
             # Setting code on unary-stream leads to execution getting stuck
             # span.set_data("code", response.code().name)
 
             return response
 
     @staticmethod
-    def _update_client_call_details_metadata_from_hub(client_call_details, hub):
-        # type: (ClientCallDetails, Hub) -> ClientCallDetails
+    def _update_client_call_details_metadata_from_hub(
+        client_call_details: ClientCallDetails, hub: Hub
+    ) -> ClientCallDetails:
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )

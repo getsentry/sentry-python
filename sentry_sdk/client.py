@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import uuid
 import random
@@ -62,10 +64,9 @@ SDK_INFO = {
 }
 
 
-def _get_options(*args, **kwargs):
-    # type: (*Optional[str], **Any) -> Dict[str, Any]
+def _get_options(*args: Optional[str], **kwargs: Any) -> Dict[str, Any]:
     if args and (isinstance(args[0], (bytes, str)) or args[0] is None):
-        dsn = args[0]  # type: Optional[str]
+        dsn: Optional[str] = args[0]
         args = args[1:]
     else:
         dsn = None
@@ -160,23 +161,21 @@ class _Client:
     Alias of :py:class:`Client`. (Was created for better intelisense support)
     """
 
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.options: Dict[str, Any] = get_options(*args, **kwargs)
 
         self._init_impl()
 
-    def __getstate__(self):
-        # type: () -> Any
+    def __getstate__(self) -> Any:
         return {"options": self.options}
 
-    def __setstate__(self, state):
-        # type: (Any) -> None
+    def __setstate__(self, state: Any) -> None:
         self.options = state["options"]
         self._init_impl()
 
-    def _setup_instrumentation(self, functions_to_trace):
-        # type: (Sequence[Dict[str, str]]) -> None
+    def _setup_instrumentation(
+        self, functions_to_trace: Sequence[Dict[str, str]]
+    ) -> None:
         """
         Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.
         """
@@ -227,12 +226,10 @@ class _Client:
                     e,
                 )
 
-    def _init_impl(self):
-        # type: () -> None
+    def _init_impl(self) -> None:
         old_debug = _client_init_debug.get(False)
 
-        def _capture_envelope(envelope):
-            # type: (Envelope) -> None
+        def _capture_envelope(envelope: Envelope) -> None:
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
@@ -247,7 +244,7 @@ class _Client:
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+            self.metrics_aggregator: Optional[MetricsAggregator] = None
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics"):
                 from sentry_sdk.metrics import MetricsAggregator
@@ -304,19 +301,16 @@ class _Client:
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
 
     @property
-    def dsn(self):
-        # type: () -> Optional[str]
+    def dsn(self) -> Optional[str]:
         """Returns the configured DSN as string."""
         return self.options["dsn"]
 
     def _prepare_event(
         self,
-        event,  # type: Event
-        hint,  # type: Hint
-        scope,  # type: Optional[Scope]
-    ):
-        # type: (...) -> Optional[Event]
-
+        event: Event,
+        hint: Hint,
+        scope: Optional[Scope],
+    ) -> Optional[Event]:
         if event.get("timestamp") is None:
             event["timestamp"] = datetime.now(timezone.utc)
 
@@ -427,8 +421,7 @@ class _Client:
 
         return event
 
-    def _is_ignored_error(self, event, hint):
-        # type: (Event, Hint) -> bool
+    def _is_ignored_error(self, event: Event, hint: Hint) -> bool:
         exc_info = hint.get("exc_info")
         if exc_info is None:
             return False
@@ -451,11 +444,10 @@ class _Client:
 
     def _should_capture(
         self,
-        event,  # type: Event
-        hint,  # type: Hint
-        scope=None,  # type: Optional[Scope]
-    ):
-        # type: (...) -> bool
+        event: Event,
+        hint: Hint,
+        scope: Optional[Scope] = None,
+    ) -> bool:
         # Transactions are sampled independent of error events.
         is_transaction = event.get("type") == "transaction"
         if is_transaction:
@@ -473,10 +465,9 @@ class _Client:
 
     def _should_sample_error(
         self,
-        event,  # type: Event
-        hint,  # type: Hint
-    ):
-        # type: (...) -> bool
+        event: Event,
+        hint: Hint,
+    ) -> bool:
         error_sampler = self.options.get("error_sampler", None)
 
         if callable(error_sampler):
@@ -521,11 +512,9 @@ class _Client:
 
     def _update_session_from_event(
         self,
-        session,  # type: Session
-        event,  # type: Event
-    ):
-        # type: (...) -> None
-
+        session: Session,
+        event: Event,
+    ) -> None:
         crashed = False
         errored = False
         user_agent = None
@@ -557,11 +546,10 @@ class _Client:
 
     def capture_event(
         self,
-        event,  # type: Event
-        hint=None,  # type: Optional[Hint]
-        scope=None,  # type: Optional[Scope]
-    ):
-        # type: (...) -> Optional[str]
+        event: Event,
+        hint: Optional[Hint] = None,
+        scope: Optional[Scope] = None,
+    ) -> Optional[str]:
         """Captures an event.
 
         :param event: A ready-made event that can be directly sent to Sentry.
@@ -579,7 +567,7 @@ class _Client:
         if hint is None:
             hint = {}
         event_id = event.get("event_id")
-        hint = dict(hint or ())  # type: Hint
+        hint: Hint = dict(hint or ())
 
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
@@ -663,19 +651,13 @@ class _Client:
 
         return event_id
 
-    def capture_session(
-        self, session  # type: Session
-    ):
-        # type: (...) -> None
+    def capture_session(self, session: Session) -> None:
         if not session.release:
             logger.info("Discarded session update because of missing release")
         else:
             self.session_flusher.add_session(session)
 
-    def get_integration(
-        self, name_or_class  # type: Union[str, Type[Integration]]
-    ):
-        # type: (...) -> Any
+    def get_integration(self, name_or_class: Union[str, Type[Integration]]) -> Any:
         """Returns the integration for this client by name or class.
         If the client does not have that integration then `None` is returned.
         """
@@ -690,10 +672,9 @@ class _Client:
 
     def close(
         self,
-        timeout=None,  # type: Optional[float]
-        callback=None,  # type: Optional[Callable[[int, float], None]]
-    ):
-        # type: (...) -> None
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
         """
         Close the client and shut down the transport. Arguments have the same
         semantics as :py:meth:`Client.flush`.
@@ -710,10 +691,9 @@ class _Client:
 
     def flush(
         self,
-        timeout=None,  # type: Optional[float]
-        callback=None,  # type: Optional[Callable[[int, float], None]]
-    ):
-        # type: (...) -> None
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
         """
         Wait for the current events to be sent.
 
@@ -729,12 +709,10 @@ class _Client:
                 self.metrics_aggregator.flush()
             self.transport.flush(timeout=timeout, callback=callback)
 
-    def __enter__(self):
-        # type: () -> _Client
+    def __enter__(self) -> _Client:
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: Any, exc_value: Any, tb: Any) -> None:
         self.close()
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import (
@@ -25,8 +27,7 @@ class GrapheneIntegration(Integration):
     identifier = "graphene"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = package_version("graphene")
 
         if version is None:
@@ -38,13 +39,13 @@ class GrapheneIntegration(Integration):
         _patch_graphql()
 
 
-def _patch_graphql():
-    # type: () -> None
+def _patch_graphql() -> None:
     old_graphql_sync = graphene_schema.graphql_sync
     old_graphql_async = graphene_schema.graphql
 
-    def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
-        # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
+    def _sentry_patched_graphql_sync(
+        schema: GraphQLSchema, source: Union[str, Source], *args: Any, **kwargs: Any
+    ) -> ExecutionResult:
         hub = Hub.current
         integration = hub.get_integration(GrapheneIntegration)
         if integration is None:
@@ -69,8 +70,9 @@ def _patch_graphql():
 
         return result
 
-    async def _sentry_patched_graphql_async(schema, source, *args, **kwargs):
-        # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
+    async def _sentry_patched_graphql_async(
+        schema: GraphQLSchema, source: Union[str, Source], *args: Any, **kwargs: Any
+    ) -> ExecutionResult:
         hub = Hub.current
         integration = hub.get_integration(GrapheneIntegration)
         if integration is None:
@@ -99,8 +101,7 @@ def _patch_graphql():
     graphene_schema.graphql = _sentry_patched_graphql_async
 
 
-def _event_processor(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _event_processor(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
     if _should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"

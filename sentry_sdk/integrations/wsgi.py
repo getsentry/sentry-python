@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from functools import partial
 
@@ -34,21 +36,18 @@ if TYPE_CHECKING:
     WsgiExcInfo = TypeVar("WsgiExcInfo")
 
     class StartResponse(Protocol):
-        def __call__(self, status, response_headers, exc_info=None):  # type: ignore
-            # type: (str, WsgiResponseHeaders, Optional[WsgiExcInfo]) -> WsgiResponseIter
+        def __call__(self, status: str, response_headers: WsgiResponseHeaders, exc_info: Optional[WsgiExcInfo] = None) -> WsgiResponseIter:  # type: ignore
             pass
 
 
 _wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
 
 
-def wsgi_decoding_dance(s, charset="utf-8", errors="replace"):
-    # type: (str, str, str) -> str
+def wsgi_decoding_dance(s: str, charset: str = "utf-8", errors: str = "replace") -> str:
     return s.encode("latin1").decode(charset, errors)
 
 
-def get_request_url(environ, use_x_forwarded_for=False):
-    # type: (Dict[str, str], bool) -> str
+def get_request_url(environ: Dict[str, str], use_x_forwarded_for: bool = False) -> str:
     """Return the absolute URL without query string for the given WSGI
     environment."""
     return "%s://%s/%s" % (
@@ -61,13 +60,17 @@ def get_request_url(environ, use_x_forwarded_for=False):
 class SentryWsgiMiddleware:
     __slots__ = ("app", "use_x_forwarded_for")
 
-    def __init__(self, app, use_x_forwarded_for=False):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool) -> None
+    def __init__(
+        self,
+        app: Callable[[Dict[str, str], Callable[..., Any]], Any],
+        use_x_forwarded_for: bool = False,
+    ) -> None:
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
 
-    def __call__(self, environ, start_response):
-        # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+    def __call__(
+        self, environ: Dict[str, str], start_response: Callable[..., Any]
+    ) -> _ScopedResponse:
         if _wsgi_middleware_applied.get(False):
             return self.app(environ, start_response)
 
@@ -112,13 +115,12 @@ class SentryWsgiMiddleware:
 
 
 def _sentry_start_response(  # type: ignore
-    old_start_response,  # type: StartResponse
-    transaction,  # type: Transaction
-    status,  # type: str
-    response_headers,  # type: WsgiResponseHeaders
-    exc_info=None,  # type: Optional[WsgiExcInfo]
-):
-    # type: (...) -> WsgiResponseIter
+    old_start_response: StartResponse,
+    transaction: Transaction,
+    status: str,
+    response_headers: WsgiResponseHeaders,
+    exc_info: Optional[WsgiExcInfo] = None,
+) -> WsgiResponseIter:
     with capture_internal_exceptions():
         status_int = int(status.split(" ", 1)[0])
         transaction.set_http_status(status_int)
@@ -132,8 +134,7 @@ def _sentry_start_response(  # type: ignore
         return old_start_response(status, response_headers, exc_info)
 
 
-def _get_environ(environ):
-    # type: (Dict[str, str]) -> Iterator[Tuple[str, str]]
+def _get_environ(environ: Dict[str, str]) -> Iterator[Tuple[str, str]]:
     """
     Returns our explicitly included environment variables we want to
     capture (server name, port and remote addr if pii is enabled).
@@ -149,8 +150,7 @@ def _get_environ(environ):
             yield key, environ[key]
 
 
-def get_client_ip(environ):
-    # type: (Dict[str, str]) -> Optional[Any]
+def get_client_ip(environ: Dict[str, str]) -> Optional[Any]:
     """
     Infer the user IP address from various headers. This cannot be used in
     security sensitive situations since the value may be forged from a client,
@@ -169,8 +169,7 @@ def get_client_ip(environ):
     return environ.get("REMOTE_ADDR")
 
 
-def _capture_exception(hub):
-    # type: (Hub) -> ExcInfo
+def _capture_exception(hub: Hub) -> ExcInfo:
     exc_info = sys.exc_info()
 
     # Check client here as it might have been unset while streaming response
@@ -193,13 +192,11 @@ def _capture_exception(hub):
 class _ScopedResponse:
     __slots__ = ("_response", "_hub")
 
-    def __init__(self, hub, response):
-        # type: (Hub, Iterator[bytes]) -> None
+    def __init__(self, hub: Hub, response: Iterator[bytes]) -> None:
         self._hub = hub
         self._response = response
 
-    def __iter__(self):
-        # type: () -> Iterator[bytes]
+    def __iter__(self) -> Iterator[bytes]:
         iterator = iter(self._response)
 
         while True:
@@ -213,8 +210,7 @@ class _ScopedResponse:
 
             yield chunk
 
-    def close(self):
-        # type: () -> None
+    def close(self) -> None:
         with self._hub:
             try:
                 self._response.close()  # type: ignore
@@ -224,8 +220,9 @@ class _ScopedResponse:
                 reraise(*_capture_exception(self._hub))
 
 
-def _make_wsgi_event_processor(environ, use_x_forwarded_for):
-    # type: (Dict[str, str], bool) -> EventProcessor
+def _make_wsgi_event_processor(
+    environ: Dict[str, str], use_x_forwarded_for: bool
+) -> EventProcessor:
     # It's a bit unfortunate that we have to extract and parse the request data
     # from the environ so eagerly, but there are a few good reasons for this.
     #
@@ -245,8 +242,7 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
     env = dict(_get_environ(environ))
     headers = _filter_headers(dict(_get_headers(environ)))
 
-    def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+    def event_processor(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})

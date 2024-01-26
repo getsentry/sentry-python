@@ -1193,12 +1193,11 @@ def test_debug_option(
 class IssuesSamplerTestConfig:
     def __init__(
         self,
-        expected_events,
-        sampler_function=None,
-        sample_rate=None,
-        exception_to_raise=Exception,
-    ):
-        # type: (int, Optional[Callable[[Event], Union[float, bool]]], Optional[float], type[Exception]) -> None
+        expected_events: int,
+        sampler_function: Optional[Callable[[Event], Union[float, bool]]] = None,
+        sample_rate: Optional[float] = None,
+        exception_to_raise: type[Exception] = Exception,
+    ) -> None:
         self.sampler_function_mock = (
             None
             if sampler_function is None
@@ -1208,14 +1207,12 @@ class IssuesSamplerTestConfig:
         self.sample_rate = sample_rate
         self.exception_to_raise = exception_to_raise
 
-    def init_sdk(self, sentry_init):
-        # type: (Callable[[*Any], None]) -> None
+    def init_sdk(self, sentry_init: Callable[[*Any], None]) -> None:
         sentry_init(
             error_sampler=self.sampler_function_mock, sample_rate=self.sample_rate
         )
 
-    def raise_exception(self):
-        # type: () -> None
+    def raise_exception(self) -> None:
         raise self.exception_to_raise()
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk import Hub
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -19,12 +21,9 @@ class ExecutingIntegration(Integration):
     identifier = "executing"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         @add_global_event_processor
-        def add_executing_info(event, hint):
-            # type: (Event, Optional[Hint]) -> Optional[Event]
+        def add_executing_info(event: Event, hint: Optional[Hint]) -> Optional[Event]:
             if Hub.current.get_integration(ExecutingIntegration) is None:
                 return event
 

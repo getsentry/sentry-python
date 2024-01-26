@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import _should_send_default_pii
@@ -124,7 +126,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
 
 def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
-        instance = args[0]  # type: clickhouse_driver.client.Client
+        instance: clickhouse_driver.client.Client = args[0]
         data = args[2]
         span = instance.connection._sentry_span
 

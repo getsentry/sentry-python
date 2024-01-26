@@ -20,8 +20,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
 
 
-def get_name(coro):
-    # type: (Any) -> str
+def get_name(coro: Any) -> str:
     return (
         getattr(coro, "__qualname__", None)
         or getattr(coro, "__name__", None)
@@ -29,18 +28,18 @@ def get_name(coro):
     )
 
 
-def patch_asyncio():
-    # type: () -> None
+def patch_asyncio() -> None:
     orig_task_factory = None
     try:
         loop = asyncio.get_running_loop()
         orig_task_factory = loop.get_task_factory()
 
-        def _sentry_task_factory(loop, coro, **kwargs):
-            # type: (asyncio.AbstractEventLoop, Coroutine[Any, Any, Any], Any) -> asyncio.Future[Any]
-
-            async def _coro_creating_hub_and_span():
-                # type: () -> Any
+        def _sentry_task_factory(
+            loop: asyncio.AbstractEventLoop,
+            coro: Coroutine[Any, Any, Any],
+            **kwargs: Any
+        ) -> asyncio.Future[Any]:
+            async def _coro_creating_hub_and_span() -> Any:
                 hub = Hub(Hub.current)
                 result = None
 
@@ -76,14 +75,13 @@ def patch_asyncio():
         pass
 
 
-def _capture_exception(hub):
-    # type: (Hub) -> ExcInfo
+def _capture_exception(hub: Hub) -> ExcInfo:
     exc_info = sys.exc_info()
 
     integration = hub.get_integration(AsyncioIntegration)
     if integration is not None:
         # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+        client: Any = hub.client
 
         event, hint = event_from_exception(
             exc_info,
@@ -99,6 +97,5 @@ class AsyncioIntegration(Integration):
     identifier = "asyncio"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         patch_asyncio()

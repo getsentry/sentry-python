@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import io
 import re
@@ -67,8 +69,7 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 )
 
 
-def get_code_location(stacklevel):
-    # type: (int) -> Optional[Dict[str, Any]]
+def get_code_location(stacklevel: int) -> Optional[Dict[str, Any]]:
     try:
         frm = sys._getframe(stacklevel)
     except Exception:
@@ -80,8 +81,7 @@ def get_code_location(stacklevel):
 
 
 @contextmanager
-def recursion_protection():
-    # type: () -> Generator[bool, None, None]
+def recursion_protection() -> Generator[bool, None, None]:
     """Enters recursion protection and returns the old flag."""
     try:
         in_metrics = _thread_local.in_metrics
@@ -94,15 +94,13 @@ def recursion_protection():
         _thread_local.in_metrics = in_metrics
 
 
-def metrics_noop(func):
-    # type: (Any) -> Any
+def metrics_noop(func: Any) -> Any:
     """Convenient decorator that uses `recursion_protection` to
     make a function a noop.
     """
 
     @wraps(func)
-    def new_func(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def new_func(*args: Any, **kwargs: Any) -> Any:
         with recursion_protection() as in_metrics:
             if not in_metrics:
                 return func(*args, **kwargs)
@@ -114,43 +112,30 @@ class Metric:
     __slots__ = ()
 
     @property
-    def weight(self):
-        # type: (...) -> int
+    def weight(self) -> int:
         raise NotImplementedError()
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def add(self, value: MetricValue) -> None:
         raise NotImplementedError()
 
-    def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
+    def serialize_value(self) -> Iterable[FlushedMetricValue]:
         raise NotImplementedError()
 
 
 class CounterMetric(Metric):
     __slots__ = ("value",)
 
-    def __init__(
-        self, first  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def __init__(self, first: MetricValue) -> None:
         self.value = float(first)
 
     @property
-    def weight(self):
-        # type: (...) -> int
+    def weight(self) -> int:
         return 1
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def add(self, value: MetricValue) -> None:
         self.value += float(value)
 
-    def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
+    def serialize_value(self) -> Iterable[FlushedMetricValue]:
         return (self.value,)
 
 
@@ -163,10 +148,7 @@ class GaugeMetric(Metric):
         "count",
     )
 
-    def __init__(
-        self, first  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def __init__(self, first: MetricValue) -> None:
         first = float(first)
         self.last = first
         self.min = first
@@ -175,15 +157,11 @@ class GaugeMetric(Metric):
         self.count = 1
 
     @property
-    def weight(self):
-        # type: (...) -> int
+    def weight(self) -> int:
         # Number of elements.
         return 5
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def add(self, value: MetricValue) -> None:
         value = float(value)
         self.last = value
         self.min = min(self.min, value)
@@ -191,8 +169,7 @@ class GaugeMetric(Metric):
         self.sum += value
         self.count += 1
 
-    def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
+    def serialize_value(self) -> Iterable[FlushedMetricValue]:
         return (
             self.last,
             self.min,
@@ -205,52 +182,36 @@ class GaugeMetric(Metric):
 class DistributionMetric(Metric):
     __slots__ = ("value",)
 
-    def __init__(
-        self, first  # type: MetricValue
-    ):
+    def __init__(self, first: MetricValue):
         # type(...) -> None
         self.value = [float(first)]
 
     @property
-    def weight(self):
-        # type: (...) -> int
+    def weight(self) -> int:
         return len(self.value)
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def add(self, value: MetricValue) -> None:
         self.value.append(float(value))
 
-    def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
+    def serialize_value(self) -> Iterable[FlushedMetricValue]:
         return self.value
 
 
 class SetMetric(Metric):
     __slots__ = ("value",)
 
-    def __init__(
-        self, first  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def __init__(self, first: MetricValue) -> None:
         self.value = {first}
 
     @property
-    def weight(self):
-        # type: (...) -> int
+    def weight(self) -> int:
         return len(self.value)
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
+    def add(self, value: MetricValue) -> None:
         self.value.add(value)
 
-    def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
-        def _hash(x):
-            # type: (MetricValue) -> int
+    def serialize_value(self) -> Iterable[FlushedMetricValue]:
+        def _hash(x: MetricValue) -> int:
             if isinstance(x, str):
                 return zlib.crc32(x.encode("utf-8")) & 0xFFFFFFFF
             return int(x)
@@ -258,8 +219,9 @@ class SetMetric(Metric):
         return (_hash(value) for value in self.value)
 
 
-def _encode_metrics(flushable_buckets):
-    # type: (Iterable[Tuple[int, Dict[BucketKey, Metric]]]) -> bytes
+def _encode_metrics(
+    flushable_buckets: Iterable[Tuple[int, Dict[BucketKey, Metric]]]
+) -> bytes:
     out = io.BytesIO()
     _write = out.write
 
@@ -305,9 +267,10 @@ def _encode_metrics(flushable_buckets):
     return out.getvalue()
 
 
-def _encode_locations(timestamp, code_locations):
-    # type: (int, Iterable[Tuple[MetricMetaKey, Dict[str, Any]]]) -> bytes
-    mapping = {}  # type: Dict[str, List[Any]]
+def _encode_locations(
+    timestamp: int, code_locations: Iterable[Tuple[MetricMetaKey, Dict[str, Any]]]
+) -> bytes:
+    mapping: Dict[str, List[Any]] = {}
 
     for key, loc in code_locations:
         metric_type, name, unit = key
@@ -342,21 +305,19 @@ TIMING_FUNCTIONS = {
 class LocalAggregator:
     __slots__ = ("_measurements",)
 
-    def __init__(self):
-        # type: (...) -> None
-        self._measurements = (
-            {}
-        )  # type: Dict[Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]]
+    def __init__(self) -> None:
+        self._measurements: Dict[
+            Tuple[str, MetricTagsInternal], Tuple[float, float, int, float]
+        ] = {}
 
     def add(
         self,
-        ty,  # type: MetricType
-        key,  # type: str
-        value,  # type: float
-        unit,  # type: MeasurementUnit
-        tags,  # type: MetricTagsInternal
-    ):
-        # type: (...) -> None
+        ty: MetricType,
+        key: str,
+        value: float,
+        unit: MeasurementUnit,
+        tags: MetricTagsInternal,
+    ) -> None:
         export_key = "%s:%s@%s" % (ty, key, unit)
         bucket_key = (export_key, tags)
 
@@ -372,9 +333,8 @@ class LocalAggregator:
             v_count = 1
         self._measurements[bucket_key] = (v_min, v_max, v_count, v_sum)
 
-    def to_json(self):
-        # type: (...) -> Dict[str, Any]
-        rv = {}  # type: Any
+    def to_json(self) -> Dict[str, Any]:
+        rv: Any = {}
         for (export_key, tags), (
             v_min,
             v_max,
@@ -400,14 +360,13 @@ class MetricsAggregator:
 
     def __init__(
         self,
-        capture_func,  # type: Callable[[Envelope], None]
-        enable_code_locations=False,  # type: bool
-    ):
-        # type: (...) -> None
-        self.buckets = {}  # type: Dict[int, Any]
+        capture_func: Callable[[Envelope], None],
+        enable_code_locations: bool = False,
+    ) -> None:
+        self.buckets: Dict[int, Any] = {}
         self._enable_code_locations = enable_code_locations
-        self._seen_locations = _set()  # type: Set[Tuple[int, MetricMetaKey]]
-        self._pending_locations = {}  # type: Dict[int, List[Tuple[MetricMetaKey, Any]]]
+        self._seen_locations: Set[Tuple[int, MetricMetaKey]] = _set()
+        self._pending_locations: Dict[int, List[Tuple[MetricMetaKey, Any]]] = {}
         self._buckets_total_weight = 0
         self._capture_func = capture_func
         self._lock = Lock()
@@ -423,12 +382,11 @@ class MetricsAggregator:
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Thread]
-        self._flusher_pid = None  # type: Optional[int]
+        self._flusher: Optional[Thread] = None
+        self._flusher_pid: Optional[int] = None
         self._ensure_thread()
 
-    def _ensure_thread(self):
-        # type: (...) -> bool
+    def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
         This ensures that our process actually has that thread running.
         """
@@ -450,24 +408,21 @@ class MetricsAggregator:
                 return False
         return True
 
-    def _flush_loop(self):
-        # type: (...) -> None
+    def _flush_loop(self) -> None:
         _thread_local.in_metrics = True
         while self._running or self._force_flush:
             self._flush()
             if self._running:
                 self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
 
-    def _flush(self):
-        # type: (...) -> None
+    def _flush(self) -> None:
         self._emit(self._flushable_buckets(), self._flushable_locations())
 
-    def _flushable_buckets(self):
-        # type: (...) -> (Iterable[Tuple[int, Dict[BucketKey, Metric]]])
+    def _flushable_buckets(self) -> Iterable[Tuple[int, Dict[BucketKey, Metric]]]:
         with self._lock:
             force_flush = self._force_flush
             cutoff = time.time() - self.ROLLUP_IN_SECONDS - self._flush_shift
-            flushable_buckets = ()  # type: Iterable[Tuple[int, Dict[BucketKey, Metric]]]
+            flushable_buckets: Iterable[Tuple[int, Dict[BucketKey, Metric]]] = ()
             weight_to_remove = 0
 
             if force_flush:
@@ -492,8 +447,9 @@ class MetricsAggregator:
 
         return flushable_buckets
 
-    def _flushable_locations(self):
-        # type: (...) -> Dict[int, List[Tuple[MetricMetaKey, Dict[str, Any]]]]
+    def _flushable_locations(
+        self,
+    ) -> Dict[int, List[Tuple[MetricMetaKey, Dict[str, Any]]]]:
         with self._lock:
             locations = self._pending_locations
             self._pending_locations = {}
@@ -502,16 +458,15 @@ class MetricsAggregator:
     @metrics_noop
     def add(
         self,
-        ty,  # type: MetricType
-        key,  # type: str
-        value,  # type: MetricValue
-        unit,  # type: MeasurementUnit
-        tags,  # type: Optional[MetricTags]
-        timestamp=None,  # type: Optional[Union[float, datetime]]
-        local_aggregator=None,  # type: Optional[LocalAggregator]
-        stacklevel=0,  # type: Optional[int]
-    ):
-        # type: (...) -> None
+        ty: MetricType,
+        key: str,
+        value: MetricValue,
+        unit: MeasurementUnit,
+        tags: Optional[MetricTags],
+        timestamp: Optional[Union[float, datetime]] = None,
+        local_aggregator: Optional[LocalAggregator] = None,
+        stacklevel: Optional[int] = 0,
+    ) -> None:
         if not self._ensure_thread() or self._flusher is None:
             return None
 
@@ -555,13 +510,12 @@ class MetricsAggregator:
 
     def record_code_location(
         self,
-        ty,  # type: MetricType
-        key,  # type: str
-        unit,  # type: MeasurementUnit
-        stacklevel,  # type: int
-        timestamp=None,  # type: Optional[float]
-    ):
-        # type: (...) -> None
+        ty: MetricType,
+        key: str,
+        unit: MeasurementUnit,
+        stacklevel: int,
+        timestamp: Optional[float] = None,
+    ) -> None:
         if not self._enable_code_locations:
             return
         if timestamp is None:
@@ -585,12 +539,11 @@ class MetricsAggregator:
     @metrics_noop
     def need_code_loation(
         self,
-        ty,  # type: MetricType
-        key,  # type: str
-        unit,  # type: MeasurementUnit
-        timestamp,  # type: float
-    ):
-        # type: (...) -> bool
+        ty: MetricType,
+        key: str,
+        unit: MeasurementUnit,
+        timestamp: float,
+    ) -> bool:
         if self._enable_code_locations:
             return False
         meta_key = (ty, key, unit)
@@ -600,8 +553,7 @@ class MetricsAggregator:
         start_of_day = int(to_timestamp(start_of_day))
         return (start_of_day, meta_key) not in self._seen_locations
 
-    def kill(self):
-        # type: (...) -> None
+    def kill(self) -> None:
         if self._flusher is None:
             return
 
@@ -611,13 +563,11 @@ class MetricsAggregator:
         self._flusher = None
 
     @metrics_noop
-    def flush(self):
-        # type: (...) -> None
+    def flush(self) -> None:
         self._force_flush = True
         self._flush()
 
-    def _consider_force_flush(self):
-        # type: (...) -> None
+    def _consider_force_flush(self) -> None:
         # It's important to acquire a lock around this method, since it will touch shared data structures.
         total_weight = len(self.buckets) + self._buckets_total_weight
         if total_weight >= self.MAX_WEIGHT:
@@ -626,10 +576,9 @@ class MetricsAggregator:
 
     def _emit(
         self,
-        flushable_buckets,  # type: (Iterable[Tuple[int, Dict[BucketKey, Metric]]])
-        code_locations,  # type: Dict[int, List[Tuple[MetricMetaKey, Dict[str, Any]]]]
-    ):
-        # type: (...) -> Optional[Envelope]
+        flushable_buckets: Iterable[Tuple[int, Dict[BucketKey, Metric]]],
+        code_locations: Dict[int, List[Tuple[MetricMetaKey, Dict[str, Any]]]],
+    ) -> Optional[Envelope]:
         envelope = Envelope()
 
         if flushable_buckets:
@@ -647,9 +596,8 @@ class MetricsAggregator:
 
 
 def _serialize_tags(
-    tags,  # type: Optional[MetricTags]
-):
-    # type: (...) -> MetricTagsInternal
+    tags: Optional[MetricTags],
+) -> MetricTagsInternal:
     if not tags:
         return ()
 
@@ -668,9 +616,8 @@ def _serialize_tags(
     return tuple(sorted(rv))
 
 
-def _tags_to_dict(tags):
-    # type: (MetricTagsInternal) -> Dict[str, Any]
-    rv = {}  # type: Dict[str, Any]
+def _tags_to_dict(tags: MetricTagsInternal) -> Dict[str, Any]:
+    rv: Dict[str, Any] = {}
     for tag_name, tag_value in tags:
         old_value = rv.get(tag_name)
         if old_value is not None:
@@ -683,8 +630,7 @@ def _tags_to_dict(tags):
     return rv
 
 
-def _get_aggregator():
-    # type: () -> Optional[MetricsAggregator]
+def _get_aggregator() -> Optional[MetricsAggregator]:
     hub = sentry_sdk.Hub.current
     client = hub.client
     return (
@@ -694,8 +640,11 @@ def _get_aggregator():
     )
 
 
-def _get_aggregator_and_update_tags(key, tags):
-    # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
+def _get_aggregator_and_update_tags(
+    key: str, tags: Optional[MetricTags]
+) -> Tuple[
+    Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]
+]:
     hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
@@ -703,7 +652,7 @@ def _get_aggregator_and_update_tags(key, tags):
 
     experiments = client.options.get("_experiments", {})
 
-    updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
+    updated_tags: Dict[str, MetricTagValue] = dict(tags or ())
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
@@ -739,14 +688,13 @@ def _get_aggregator_and_update_tags(key, tags):
 
 
 def incr(
-    key,  # type: str
-    value=1.0,  # type: float
-    unit="none",  # type: MeasurementUnit
-    tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=0,  # type: int
-):
-    # type: (...) -> None
+    key: str,
+    value: float = 1.0,
+    unit: MeasurementUnit = "none",
+    tags: Optional[MetricTags] = None,
+    timestamp: Optional[Union[float, datetime]] = None,
+    stacklevel: int = 0,
+) -> None:
     """Increments a counter."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
@@ -758,32 +706,29 @@ def incr(
 class _Timing:
     def __init__(
         self,
-        key,  # type: str
-        tags,  # type: Optional[MetricTags]
-        timestamp,  # type: Optional[Union[float, datetime]]
-        value,  # type: Optional[float]
-        unit,  # type: DurationUnit
-        stacklevel,  # type: int
-    ):
-        # type: (...) -> None
+        key: str,
+        tags: Optional[MetricTags],
+        timestamp: Optional[Union[float, datetime]],
+        value: Optional[float],
+        unit: DurationUnit,
+        stacklevel: int,
+    ) -> None:
         self.key = key
         self.tags = tags
         self.timestamp = timestamp
         self.value = value
         self.unit = unit
-        self.entered = None  # type: Optional[float]
-        self._span = None  # type: Optional[sentry_sdk.tracing.Span]
+        self.entered: Optional[float] = None
+        self._span: Optional[sentry_sdk.tracing.Span] = None
         self.stacklevel = stacklevel
 
-    def _validate_invocation(self, context):
-        # type: (str) -> None
+    def _validate_invocation(self, context: str) -> None:
         if self.value is not None:
             raise TypeError(
                 "cannot use timing as %s when a value is provided" % context
             )
 
-    def __enter__(self):
-        # type: (...) -> _Timing
+    def __enter__(self) -> _Timing:
         self.entered = TIMING_FUNCTIONS[self.unit]()
         self._validate_invocation("context-manager")
         self._span = sentry_sdk.start_span(op="metric.timing", description=self.key)
@@ -801,8 +746,7 @@ class _Timing:
 
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: Any, exc_value: Any, tb: Any) -> None:
         assert self._span, "did not enter"
         aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
             self.key, self.tags
@@ -823,13 +767,11 @@ class _Timing:
         self._span.__exit__(exc_type, exc_value, tb)
         self._span = None
 
-    def __call__(self, f):
-        # type: (Any) -> Any
+    def __call__(self, f: Any) -> Any:
         self._validate_invocation("decorator")
 
         @wraps(f)
-        def timed_func(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
+        def timed_func(*args: Any, **kwargs: Any) -> Any:
             with timing(
                 key=self.key,
                 tags=self.tags,
@@ -843,14 +785,13 @@ class _Timing:
 
 
 def timing(
-    key,  # type: str
-    value=None,  # type: Optional[float]
-    unit="second",  # type: DurationUnit
-    tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=0,  # type: int
-):
-    # type: (...) -> _Timing
+    key: str,
+    value: Optional[float] = None,
+    unit: DurationUnit = "second",
+    tags: Optional[MetricTags] = None,
+    timestamp: Optional[Union[float, datetime]] = None,
+    stacklevel: int = 0,
+) -> _Timing:
     """Emits a distribution with the time it takes to run the given code block.
 
     This method supports three forms of invocation:
@@ -869,14 +810,13 @@ def timing(
 
 
 def distribution(
-    key,  # type: str
-    value,  # type: float
-    unit="none",  # type: MeasurementUnit
-    tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=0,  # type: int
-):
-    # type: (...) -> None
+    key: str,
+    value: float,
+    unit: MeasurementUnit = "none",
+    tags: Optional[MetricTags] = None,
+    timestamp: Optional[Union[float, datetime]] = None,
+    stacklevel: int = 0,
+) -> None:
     """Emits a distribution."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
@@ -886,14 +826,13 @@ def distribution(
 
 
 def set(
-    key,  # type: str
-    value,  # type: MetricValue
-    unit="none",  # type: MeasurementUnit
-    tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=0,  # type: int
-):
-    # type: (...) -> None
+    key: str,
+    value: MetricValue,
+    unit: MeasurementUnit = "none",
+    tags: Optional[MetricTags] = None,
+    timestamp: Optional[Union[float, datetime]] = None,
+    stacklevel: int = 0,
+) -> None:
     """Emits a set."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:
@@ -903,14 +842,13 @@ def set(
 
 
 def gauge(
-    key,  # type: str
-    value,  # type: float
-    unit="none",  # type: MeasurementUnit
-    tags=None,  # type: Optional[MetricTags]
-    timestamp=None,  # type: Optional[Union[float, datetime]]
-    stacklevel=0,  # type: int
-):
-    # type: (...) -> None
+    key: str,
+    value: float,
+    unit: MeasurementUnit = "none",
+    tags: Optional[MetricTags] = None,
+    timestamp: Optional[Union[float, datetime]] = None,
+    stacklevel: int = 0,
+) -> None:
     """Emits a gauge."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
     if aggregator is not None:

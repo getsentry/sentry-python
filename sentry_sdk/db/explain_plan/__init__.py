@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 
 from sentry_sdk.consts import TYPE_CHECKING
@@ -11,8 +13,7 @@ EXPLAIN_CACHE_SIZE = 50
 EXPLAIN_CACHE_TIMEOUT_SECONDS = 60 * 60 * 24
 
 
-def cache_statement(statement, options):
-    # type: (str, dict[str, Any]) -> None
+def cache_statement(statement: str, options: dict[str, Any]) -> None:
     global EXPLAIN_CACHE
 
     now = datetime.now(timezone.utc)
@@ -24,8 +25,7 @@ def cache_statement(statement, options):
     EXPLAIN_CACHE[hash(statement)] = expiration_time
 
 
-def remove_expired_cache_items():
-    # type: () -> None
+def remove_expired_cache_items() -> None:
     """
     Remove expired cache items from the cache.
     """
@@ -39,8 +39,7 @@ def remove_expired_cache_items():
             del EXPLAIN_CACHE[key]
 
 
-def should_run_explain_plan(statement, options):
-    # type: (str, dict[str, Any]) -> bool
+def should_run_explain_plan(statement: str, options: dict[str, Any]) -> bool:
     """
     Check cache if the explain plan for the given statement should be run.
     """
