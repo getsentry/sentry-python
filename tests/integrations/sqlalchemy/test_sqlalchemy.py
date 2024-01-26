@@ -371,7 +371,7 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        class fake_record_sql_queries:
+        class fake_record_sql_queries:  # noqa: N801
             def __init__(self, *args, **kwargs):
                 with record_sql_queries(*args, **kwargs) as span:
                     self.span = span
@@ -435,7 +435,7 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        class fake_record_sql_queries:
+        class fake_record_sql_queries:  # noqa: N801
             def __init__(self, *args, **kwargs):
                 with record_sql_queries(*args, **kwargs) as span:
                     self.span = span
