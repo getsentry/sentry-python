@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 
 from django.template import TemplateSyntaxError
@@ -87,7 +89,7 @@ def patch_templates() -> None:
         template_name: str,
         context: Optional[Dict[str, Any]] = None,
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> django.http.HttpResponse:
         hub = Hub.current
         if hub.get_integration(DjangoIntegration) is None:

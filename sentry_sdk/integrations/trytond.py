@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sentry_sdk.hub
 import sentry_sdk.utils
 import sentry_sdk.integrations

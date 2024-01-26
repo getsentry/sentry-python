@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from opentelemetry import trace  # type: ignore
 from opentelemetry.context import (  # type: ignore
     Context,

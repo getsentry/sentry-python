@@ -2,6 +2,8 @@
 Create spans from Django middleware invocations
 """
 
+from __future__ import annotations
+
 from functools import wraps
 
 from django import VERSION as DJANGO_VERSION
@@ -120,7 +122,7 @@ def _wrap_middleware(middleware: Any, middleware_name: str) -> Any:
             self,
             get_response: Optional[Callable[..., Any]] = None,
             *args: Any,
-            **kwargs: Any
+            **kwargs: Any,
         ) -> None:
             if get_response:
                 self._inner = middleware(get_response, *args, **kwargs)

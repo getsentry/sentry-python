@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import socket
 from sentry_sdk import Hub
-from sentry_sdk._types import MYPY
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 
-if MYPY:
+if TYPE_CHECKING:
     from socket import AddressFamily, SocketKind
     from typing import Tuple, Optional, Union, List
 

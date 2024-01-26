@@ -6,6 +6,8 @@ Since this file contains `async def` it is conditionally imported in
 `django.core.handlers.asgi`.
 """
 
+from __future__ import annotations
+
 import asyncio
 import functools
 

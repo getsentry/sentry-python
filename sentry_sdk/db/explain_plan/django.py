@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.consts import TYPE_CHECKING
 from sentry_sdk.db.explain_plan import cache_statement, should_run_explain_plan
 

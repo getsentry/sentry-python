@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis import (

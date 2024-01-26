@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import urllib
 
 from sentry_sdk.hub import _should_send_default_pii

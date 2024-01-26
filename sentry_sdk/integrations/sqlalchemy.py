@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
@@ -48,7 +50,7 @@ def _before_cursor_execute(
     parameters: Any,
     context: Any,
     executemany: bool,
-    *args: Any
+    *args: Any,
 ) -> None:
     hub = Hub.current
     if hub.get_integration(SqlalchemyIntegration) is None:

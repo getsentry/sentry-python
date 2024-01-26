@@ -32,6 +32,8 @@ THIS SOFTWARE AND DOCUMENTATION, EVEN IF ADVISED OF THE POSSIBILITY OF
 SUCH DAMAGE.
 """
 
+from __future__ import annotations
+
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:

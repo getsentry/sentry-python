@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     AnnotatedValue,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from importlib import import_module
 
 from sentry_sdk.hub import Hub, _should_send_default_pii

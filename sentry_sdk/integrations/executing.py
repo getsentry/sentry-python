@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk import Hub
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 
 from sentry_sdk._types import TYPE_CHECKING

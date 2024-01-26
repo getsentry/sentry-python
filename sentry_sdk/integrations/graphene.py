@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import (

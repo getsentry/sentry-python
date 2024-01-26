@@ -4,6 +4,8 @@ are experimental and not suitable for production use. They may be changed or
 removed at any time without prior notice.
 """
 
+from __future__ import annotations
+
 import sys
 from importlib import import_module
 

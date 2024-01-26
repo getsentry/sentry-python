@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration

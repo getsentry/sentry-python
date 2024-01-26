@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import functools
 
 from sentry_sdk.consts import OP

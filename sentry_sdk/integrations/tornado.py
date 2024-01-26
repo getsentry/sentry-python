@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import weakref
 import contextlib
 from inspect import iscoroutinefunction
@@ -94,7 +96,7 @@ class TornadoIntegration(Integration):
             value: BaseException,
             tb: Any,
             *args: Any,
-            **kwargs: Any
+            **kwargs: Any,
         ) -> Optional[Any]:
             _capture_exception(ty, value, tb)
             return old_log_exception(self, ty, value, tb, *args, **kwargs)

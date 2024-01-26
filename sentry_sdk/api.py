@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 
 from sentry_sdk import tracing_utils
@@ -80,7 +82,7 @@ def capture_event(
     event: Event,
     hint: Optional[Hint] = None,
     scope: Optional[Any] = None,
-    **scope_kwargs: Any
+    **scope_kwargs: Any,
 ) -> Optional[str]:
     return Hub.current.capture_event(event, hint, scope=scope, **scope_kwargs)
 
@@ -90,7 +92,7 @@ def capture_message(
     message: str,
     level: Optional[str] = None,
     scope: Optional[Any] = None,
-    **scope_kwargs: Any
+    **scope_kwargs: Any,
 ) -> Optional[str]:
     return Hub.current.capture_message(message, level, scope=scope, **scope_kwargs)
 
@@ -99,7 +101,7 @@ def capture_message(
 def capture_exception(
     error: Optional[Union[BaseException, ExcInfo]] = None,
     scope: Optional[Any] = None,
-    **scope_kwargs: Any
+    **scope_kwargs: Any,
 ) -> Optional[str]:
     return Hub.current.capture_exception(error, scope=scope, **scope_kwargs)
 
@@ -108,7 +110,7 @@ def capture_exception(
 def add_breadcrumb(
     crumb: Optional[Breadcrumb] = None,
     hint: Optional[BreadcrumbHint] = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> None:
     return Hub.current.add_breadcrumb(crumb, hint, **kwargs)
 

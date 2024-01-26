@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import

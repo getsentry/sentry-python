@@ -5,6 +5,8 @@ Despite being called "legacy" in some places this resolver is very much still
 in use.
 """
 
+from __future__ import annotations
+
 import re
 
 from sentry_sdk._types import TYPE_CHECKING
