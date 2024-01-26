@@ -14,6 +14,7 @@ If the parameter `--fail-on-changes` is set, the script will raise a RuntimeErro
 files have been changed by the scripts execution. This is used in CI to check if the yaml files
 represent the current tox.ini file. (And if not the CI run fails.)
 """
+
 import configparser
 import hashlib
 import sys
@@ -75,6 +76,8 @@ GROUPS = {
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
+        "redis",
+        "rediscluster",
         "sqlalchemy",
     ],
     "GraphQL": [
@@ -102,8 +105,6 @@ GROUPS = {
         "falcon",
         "pyramid",
         "quart",
-        "redis",
-        "rediscluster",
         "sanic",
         "starlite",
         "tornado",
