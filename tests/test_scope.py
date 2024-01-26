@@ -4,7 +4,6 @@ import pytest
 from sentry_sdk import capture_exception, new_scope, isolated_scope
 from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.scope import Scope, ScopeType
-from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from unittest import mock  # python 3.3 and above
