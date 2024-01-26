@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from typing import Iterator
     from typing import List
     from typing import Optional
+    from typing import ParamSpec
     from typing import Tuple
     from typing import TypeVar
     from typing import Union
@@ -60,6 +61,9 @@ if TYPE_CHECKING:
     )
 
     import sentry_sdk
+
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
     F = TypeVar("F", bound=Callable[..., Any])
     T = TypeVar("T")
@@ -106,7 +110,7 @@ def _disable_capture(fn):
 
 
 def _copy_on_write(property_name):
-    # type: (str) -> Callable[[Any], Any]
+    # type: (str) -> Callable[[Callable[P, R]], Callable[P, R]]
     """
     Decorator that implements copy-on-write on a property of the Scope.
 
@@ -114,12 +118,10 @@ def _copy_on_write(property_name):
     """
 
     def decorator(func):
-        # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
-        @wraps(func)
+        # type: (Callable[P, R]) -> Callable[P, R]
         def wrapper(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             self = args[0]
-
             same_property_different_scope = self.is_forked and id(
                 getattr(self, property_name)
             ) == id(getattr(self.original_scope, property_name))
@@ -438,7 +440,7 @@ class Scope(object):
                     self._propagation_context,
                 )
 
-        if self._propagation_context is None and self._type != "current":
+        if self._propagation_context is None and self._type != ScopeType.CURRENT:
             self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
