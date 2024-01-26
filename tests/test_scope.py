@@ -4,6 +4,7 @@ import pytest
 from sentry_sdk import capture_exception, new_scope, isolated_scope
 from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.scope import Scope, ScopeType
+from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -295,7 +296,6 @@ def test_get_global_scope_tags():
     assert not global_scope2.client.is_active()
 
 
-# xxx
 @pytest.mark.forked
 def test_get_global_with_new_scope():
     original_global_scope = Scope.get_global_scope()
@@ -400,3 +400,31 @@ def test_with_new_scope():
     after_with_isolation_scope = Scope.get_isolation_scope()
     assert after_with_current_scope is original_current_scope
     assert after_with_isolation_scope is original_isolation_scope
+
+
+@pytest.mark.forked
+def test_fork_copy_on_write_set_tag():
+    original_scope = Scope()
+    original_scope.set_tag("scope", 0)
+
+    forked_scope = original_scope.fork()
+    assert id(original_scope._tags) == id(forked_scope._tags)
+
+    forked_scope.set_tag("scope", 1)
+    assert id(original_scope._tags) != id(forked_scope._tags)
+    assert original_scope._tags == {"scope": 0}
+    assert forked_scope._tags == {"scope": 1}
+
+
+@pytest.mark.forked
+def test_fork_copy_on_write_remove_tag():
+    original_scope = Scope()
+    original_scope.set_tag("scope", 0)
+
+    forked_scope = original_scope.fork()
+    assert id(original_scope._tags) == id(forked_scope._tags)
+
+    forked_scope.remove_tag("scope")
+    assert id(original_scope._tags) != id(forked_scope._tags)
+    assert original_scope._tags == {"scope": 0}
+    assert forked_scope._tags == {}

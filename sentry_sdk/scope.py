@@ -199,6 +199,81 @@ class Scope(object):
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
+    def __copy__(self):
+        # type: () -> Scope
+        """
+        Returns a copy of this scope.
+        This also creates a copy of all referenced data structures.
+        """
+        rv = object.__new__(self.__class__)  # type: Scope
+
+        rv._level = self._level
+        rv._name = self._name
+        rv._fingerprint = self._fingerprint
+        rv._transaction = self._transaction
+        rv._transaction_info = dict(self._transaction_info)
+        rv._user = self._user
+
+        rv._tags = dict(self._tags)
+        rv._contexts = dict(self._contexts)
+        rv._extras = dict(self._extras)
+
+        rv._breadcrumbs = copy(self._breadcrumbs)
+        rv._event_processors = list(self._event_processors)
+        rv._error_processors = list(self._error_processors)
+        rv._propagation_context = self._propagation_context
+
+        rv._should_capture = self._should_capture
+        rv._span = self._span
+        rv._session = self._session
+        rv._force_auto_session_tracking = self._force_auto_session_tracking
+        rv._attachments = list(self._attachments)
+
+        rv._profile = self._profile
+
+        return rv
+
+    def _fork(self):
+        # type: () -> Scope
+        """
+        Returns a fork of this scope.
+        This creates a shallow copy of the scope and sets the original scope to this scope.
+
+        This is our own implementation of a shallow copy because we have an existing __copy__() function
+        what we will not tour for backward compatibility reasons.
+
+        .. versionadded:: 1.XX.0
+        """
+        forked_scope = object.__new__(self.__class__)  # type: Scope
+
+        forked_scope._level = self._level
+        forked_scope._name = self._name
+        forked_scope._fingerprint = self._fingerprint
+        forked_scope._transaction = self._transaction
+        forked_scope._transaction_info = self._transaction_info
+        forked_scope._user = self._user
+
+        forked_scope._tags = self._tags
+        forked_scope._contexts = self._contexts
+        forked_scope._extras = self._extras
+
+        forked_scope._breadcrumbs = self._breadcrumbs
+        forked_scope._event_processors = self._event_processors
+        forked_scope._error_processors = self._error_processors
+        forked_scope._propagation_context = self._propagation_context
+
+        forked_scope._should_capture = self._should_capture
+        forked_scope._span = self._span
+        forked_scope._session = self._session
+        forked_scope._force_auto_session_tracking = self._force_auto_session_tracking
+        forked_scope._attachments = self._attachments
+
+        forked_scope._profile = self._profile
+
+        forked_scope.original_scope = self
+
+        return forked_scope
+
     @classmethod
     def get_current_scope(cls):
         # type: () -> Scope
@@ -328,10 +403,7 @@ class Scope(object):
 
         .. versionadded:: 1.XX.0
         """
-        forked_scope = copy(self)
-        forked_scope.original_scope = self
-
-        return forked_scope
+        return self._fork()
 
     def isolate(self):
         # type: () -> None
@@ -725,6 +797,7 @@ class Scope(object):
 
         self._profile = profile
 
+    @_copy_on_write("_tags")
     def set_tag(
         self,
         key,  # type: str
@@ -734,6 +807,7 @@ class Scope(object):
         """Sets a tag for a key to a specific value."""
         self._tags[key] = value
 
+    @_copy_on_write("_tags")
     def remove_tag(
         self, key  # type: str
     ):
@@ -1397,36 +1471,6 @@ class Scope(object):
             self._tags.update(tags)
         if fingerprint is not None:
             self._fingerprint = fingerprint
-
-    def __copy__(self):
-        # type: () -> Scope
-        rv = object.__new__(self.__class__)  # type: Scope
-
-        rv._level = self._level
-        rv._name = self._name
-        rv._fingerprint = self._fingerprint
-        rv._transaction = self._transaction
-        rv._transaction_info = dict(self._transaction_info)
-        rv._user = self._user
-
-        rv._tags = dict(self._tags)
-        rv._contexts = dict(self._contexts)
-        rv._extras = dict(self._extras)
-
-        rv._breadcrumbs = copy(self._breadcrumbs)
-        rv._event_processors = list(self._event_processors)
-        rv._error_processors = list(self._error_processors)
-        rv._propagation_context = self._propagation_context
-
-        rv._should_capture = self._should_capture
-        rv._span = self._span
-        rv._session = self._session
-        rv._force_auto_session_tracking = self._force_auto_session_tracking
-        rv._attachments = list(self._attachments)
-
-        rv._profile = self._profile
-
-        return rv
 
     def __repr__(self):
         # type: () -> str
