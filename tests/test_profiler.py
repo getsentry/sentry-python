@@ -393,9 +393,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().instance_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrame.instance_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrame.instance_method_wrapped.<locals>.wrapped"
+            ),
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -405,9 +407,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().class_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrame.class_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrame.class_method_wrapped.<locals>.wrapped"
+            ),
             id="class_method_wrapped",
         ),
         pytest.param(
@@ -422,9 +426,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_instance_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped"
+            ),
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -434,16 +440,20 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_class_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped"
+            ),
             id="inherited_class_method_wrapped",
         ),
         pytest.param(
             GetFrame().inherited_static_method(),
-            "inherited_static_method"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_static_method",
+            (
+                "inherited_static_method"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_static_method"
+            ),
             id="inherited_static_method",
         ),
     ],

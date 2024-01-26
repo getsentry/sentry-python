@@ -544,9 +544,9 @@ class Span(object):
             rv["status"] = self.status
 
         if self.containing_transaction:
-            rv[
-                "dynamic_sampling_context"
-            ] = self.containing_transaction.get_baggage().dynamic_sampling_context()
+            rv["dynamic_sampling_context"] = (
+                self.containing_transaction.get_baggage().dynamic_sampling_context()
+            )
 
         return rv
 
