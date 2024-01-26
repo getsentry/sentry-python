@@ -42,9 +42,9 @@ if PY2:
         return datetime.utcfromtimestamp(timestamp)
 
     def duration_in_milliseconds(delta):
-        # type: (timedelta) -> int
+        # type: (timedelta) -> float
         seconds = delta.days * 24 * 60 * 60 + delta.seconds
-        milliseconds = seconds * 1000 + delta.microseconds / 1000
+        milliseconds = seconds * 1000 + float(delta.microseconds) / 1000
         return milliseconds
 
     def implements_str(cls):

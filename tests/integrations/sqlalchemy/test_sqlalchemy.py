@@ -15,7 +15,6 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
-from sentry_sdk._compat import contextmanager
 
 try:
     from unittest import mock
@@ -372,13 +371,19 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        @contextmanager
-        def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
+        class fake_record_sql_queries:
+            def __init__(self, *args, **kwargs):
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+
+                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
+
+            def __enter__(self):
+                return self.span
+
+            def __exit__(self, type, value, traceback):
                 pass
-            span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime(2024, 1, 1, microsecond=99999)
-            yield span
 
         with mock.patch(
             "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
@@ -430,13 +435,19 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
         bob = Person(name="Bob")
         session.add(bob)
 
-        @contextmanager
-        def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
+        class fake_record_sql_queries:
+            def __init__(self, *args, **kwargs):
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+
+                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
+
+            def __enter__(self):
+                return self.span
+
+            def __exit__(self, type, value, traceback):
                 pass
-            span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime(2024, 1, 1, microsecond=100001)
-            yield span
 
         with mock.patch(
             "sentry_sdk.integrations.sqlalchemy.record_sql_queries",

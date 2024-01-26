@@ -599,10 +599,11 @@ def test_default_release_empty_string():
 @pytest.mark.parametrize(
     "timedelta,expected_milliseconds",
     [
-        [timedelta(milliseconds=132), 132],
-        [timedelta(hours=1, milliseconds=132), 60 * 60 * 1000 + 132],
-        [timedelta(days=10), 10 * 24 * 60 * 60 * 1000],
+        [timedelta(milliseconds=132), 132.0],
+        [timedelta(hours=1, milliseconds=132), float(60 * 60 * 1000 + 132)],
+        [timedelta(days=10), float(10 * 24 * 60 * 60 * 1000)],
+        [timedelta(microseconds=100), 0.1],
     ],
 )
 def test_duration_in_milliseconds(timedelta, expected_milliseconds):
-    assert int(duration_in_milliseconds(timedelta)) == expected_milliseconds
+    assert duration_in_milliseconds(timedelta) == expected_milliseconds
