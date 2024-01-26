@@ -127,39 +127,6 @@ def _merge_scopes(base, scope_change, scope_kwargs):
     return final_scope
 
 
-def _copy_on_write(property_name):
-    # type: (str) -> Callable[[Any], Any]
-    """
-    Decorator that implements copy-on-write on a property of the Scope.
-
-    .. versionadded:: 1.XX.0
-    """
-
-    def decorator(func):
-        # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-            self = args[0]
-
-            same_property_different_scope = self.is_forked and id(
-                getattr(self, property_name)
-            ) == id(getattr(self.original_scope, property_name))
-
-            if same_property_different_scope:
-                setattr(
-                    self,
-                    property_name,
-                    deepcopy(getattr(self.original_scope, property_name)),
-                )
-
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
 class Scope(object):
     """The scope holds extra information that should be sent with all
     events that belong to it.
