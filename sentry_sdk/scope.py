@@ -270,9 +270,9 @@ class Scope(object):
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context[
-                "dynamic_sampling_context"
-            ] = baggage.dynamic_sampling_context()
+            self._propagation_context["dynamic_sampling_context"] = (
+                baggage.dynamic_sampling_context()
+            )
 
         return self._propagation_context["dynamic_sampling_context"]
 

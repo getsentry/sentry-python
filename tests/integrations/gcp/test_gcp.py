@@ -2,6 +2,7 @@
 # GCP Cloud Functions unit tests
 
 """
+
 import json
 from textwrap import dedent
 import tempfile
