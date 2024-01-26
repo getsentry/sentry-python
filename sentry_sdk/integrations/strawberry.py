@@ -8,7 +8,7 @@ except ImportError:
     # was added in 3.8, so this check is technically not needed, but since this
     # is an auto-enabling integration, we might get to executing this import in
     # lower Python versions, so we need to deal with it.
-    cached_property = None
+    cached_property = None  # type: ignore
 
 from sentry_sdk import configure_scope, start_span
 from sentry_sdk.consts import OP

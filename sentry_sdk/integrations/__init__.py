@@ -70,7 +70,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.ariadne.AriadneIntegration",
     "sentry_sdk.integrations.arq.ArqIntegration",
-    "sentry_sdk.integrations.asyncpg.AsyncpgIntegration",
+    "sentry_sdk.integrations.asyncpg.AsyncPGIntegration",
     "sentry_sdk.integrations.boto3.Boto3Integration",
     "sentry_sdk.integrations.bottle.BottleIntegration",
     "sentry_sdk.integrations.celery.CeleryIntegration",
