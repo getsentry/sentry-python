@@ -53,6 +53,7 @@ if TYPE_CHECKING:
     from sentry_sdk.session import Session
     from sentry_sdk.transport import Transport
 
+
 _client_init_debug = ContextVar("client_init_debug")
 
 

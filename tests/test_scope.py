@@ -3,7 +3,7 @@ import os
 import pytest
 from sentry_sdk import capture_exception, new_scope, isolated_scope
 from sentry_sdk.client import Client, NoopClient
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, ScopeType
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -11,6 +11,7 @@ except ImportError:
     import mock  # python < 3.3
 
 
+@pytest.mark.forked
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -26,6 +27,7 @@ def test_copying():
     assert s1._fingerprint is s2._fingerprint
 
 
+@pytest.mark.forked
 def test_merging(sentry_init, capture_events):
     sentry_init()
 
@@ -40,6 +42,7 @@ def test_merging(sentry_init, capture_events):
     assert event["user"] == {"id": "42"}
 
 
+@pytest.mark.forked
 def test_common_args():
     s = Scope()
     s.update_from_kwargs(
@@ -81,6 +84,7 @@ BAGGAGE_VALUE = (
 SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize(
     "env,excepted_value",
     [
@@ -180,7 +184,7 @@ def test_get_current_scope():
     scope = Scope.get_current_scope()
     assert scope is not None
     assert scope.__class__ == Scope
-    assert scope._type == "current"
+    assert scope._type == ScopeType.CURRENT
 
 
 @pytest.mark.forked
@@ -188,7 +192,7 @@ def test_get_isolation_scope():
     scope = Scope.get_isolation_scope()
     assert scope is not None
     assert scope.__class__ == Scope
-    assert scope._type == "isolation"
+    assert scope._type == ScopeType.ISOLATION
 
 
 @pytest.mark.forked
@@ -196,7 +200,7 @@ def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
     assert scope.__class__ == Scope
-    assert scope._type == "global"
+    assert scope._type == ScopeType.GLOBAL
 
 
 @pytest.mark.forked
@@ -284,13 +288,14 @@ def test_get_global_scope_tags():
     global_scope1.set_tag("tag1", "value")
     tags_scope1 = global_scope1._tags
     tags_scope2 = global_scope2._tags
-    assert tags_scope1 == tags_scope2
+    assert tags_scope1 == tags_scope2 == {"tag1": "value"}
     assert global_scope1.client.__class__ == NoopClient
     assert not global_scope1.client.is_active()
     assert global_scope2.client.__class__ == NoopClient
     assert not global_scope2.client.is_active()
 
 
+# xxx
 @pytest.mark.forked
 def test_get_global_with_new_scope():
     original_global_scope = Scope.get_global_scope()
@@ -332,7 +337,7 @@ def test_get_isolation_scope_tags():
     isolation_scope1.set_tag("tag1", "value")
     tags_scope1 = isolation_scope1._tags
     tags_scope2 = isolation_scope2._tags
-    assert tags_scope1 == tags_scope2
+    assert tags_scope1 == tags_scope2 == {"tag1": "value"}
     assert isolation_scope1.client.__class__ == NoopClient
     assert not isolation_scope1.client.is_active()
     assert isolation_scope2.client.__class__ == NoopClient
@@ -371,7 +376,7 @@ def test_get_current_scope_tags():
     scope1.set_tag("tag1", "value")
     tags_scope1 = scope1._tags
     tags_scope2 = scope2._tags
-    assert tags_scope1 == tags_scope2
+    assert tags_scope1 == tags_scope2 == {"tag1": "value"}
     assert scope1.client.__class__ == NoopClient
     assert not scope1.client.is_active()
     assert scope2.client.__class__ == NoopClient
