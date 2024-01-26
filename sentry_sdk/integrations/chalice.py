@@ -13,14 +13,6 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import TypeVar
-    from typing import Callable
-
-    F = TypeVar("F", bound=Callable[..., Any])
-
 try:
     import chalice  # type: ignore
     from chalice import __version__ as CHALICE_VERSION
@@ -28,6 +20,14 @@ try:
     from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
 except ImportError:
     raise DidNotEnable("Chalice is not installed")
+
+if TYPE_CHECKING:
+    from typing import Any
+    from typing import Dict
+    from typing import TypeVar
+    from typing import Callable
+
+    F = TypeVar("F", bound=Callable[..., Any])
 
 
 class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore

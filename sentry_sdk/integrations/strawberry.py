@@ -1,6 +1,15 @@
 import hashlib
-from functools import cached_property
 from inspect import isawaitable
+
+try:
+    from functools import cached_property
+except ImportError:
+    # The strawberry integration requires Python 3.8+. functools.cached_property
+    # was added in 3.8, so this check is technically not needed, but since this
+    # is an auto-enabling integration, we might get to executing this import in
+    # lower Python versions, so we need to deal with it.
+    cached_property = None
+
 from sentry_sdk import configure_scope, start_span
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
