@@ -31,8 +31,7 @@ class BeamIntegration(Integration):
     identifier = "beam"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
 
         ignore_logger("root")
@@ -48,8 +47,7 @@ class BeamIntegration(Integration):
 
         old_init = ParDo.__init__
 
-        def sentry_init_pardo(self, fn, *args, **kwargs):
-            # type: (ParDo, Any, *Any, **Any) -> Any
+        def sentry_init_pardo(self: ParDo, fn: Any, *args: Any, **kwargs: Any) -> Any:
             # Do not monkey patch init twice
             if not getattr(self, "_sentry_is_patched", False):
                 for func_name in function_patches:
@@ -75,14 +73,11 @@ class BeamIntegration(Integration):
         ParDo.__init__ = sentry_init_pardo
 
 
-def _wrap_inspect_call(cls, func_name):
-    # type: (Any, Any) -> Any
-
+def _wrap_inspect_call(cls: Any, func_name: Any) -> Any:
     if not hasattr(cls, func_name):
         return None
 
-    def _inspect(self):
-        # type: (Any) -> Any
+    def _inspect(self: Any) -> Any:
         """
         Inspect function overrides the way Beam gets argspec.
         """
@@ -109,8 +104,7 @@ def _wrap_inspect_call(cls, func_name):
     return _inspect
 
 
-def _wrap_task_call(func):
-    # type: (F) -> F
+def _wrap_task_call(func: F) -> F:
     """
     Wrap task call with a try catch to get exceptions.
     Pass the client on to raise_exception so it can get rebinded.
@@ -118,8 +112,7 @@ def _wrap_task_call(func):
     client = Hub.current.client
 
     @wraps(func)
-    def _inner(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _inner(*args: Any, **kwargs: Any) -> Any:
         try:
             gen = func(*args, **kwargs)
         except Exception:
@@ -133,8 +126,7 @@ def _wrap_task_call(func):
     return _inner  # type: ignore
 
 
-def _capture_exception(exc_info, hub):
-    # type: (ExcInfo, Hub) -> None
+def _capture_exception(exc_info: ExcInfo, hub: Hub) -> None:
     """
     Send Beam exception to Sentry.
     """
@@ -154,8 +146,7 @@ def _capture_exception(exc_info, hub):
     hub.capture_event(event, hint=hint)
 
 
-def raise_exception(client):
-    # type: (Optional[Client]) -> None
+def raise_exception(client: Optional[Client]) -> None:
     """
     Raise an exception. If the client is not in the hub, rebind it.
     """
@@ -168,8 +159,7 @@ def raise_exception(client):
     reraise(*exc_info)
 
 
-def _wrap_generator_call(gen, client):
-    # type: (Iterator[T], Optional[Client]) -> Iterator[T]
+def _wrap_generator_call(gen: Iterator[T], client: Optional[Client]) -> Iterator[T]:
     """
     Wrap the generator to handle any failures.
     """

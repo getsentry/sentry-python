@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import inspect
 import os
@@ -55,23 +57,19 @@ base64_stripped = (
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: Mapping[str, str]
-        prefix="HTTP_",  # type: str
-    ):
-        # type: (...) -> None
+        environ: Mapping[str, str],
+        prefix: str = "HTTP_",
+    ) -> None:
         self.environ = environ
         self.prefix = prefix
 
-    def __getitem__(self, key):
-        # type: (str) -> Optional[Any]
+    def __getitem__(self, key: str) -> Optional[Any]:
         return self.environ[self.prefix + key.replace("-", "_").upper()]
 
-    def __len__(self):
-        # type: () -> int
+    def __len__(self) -> int:
         return sum(1 for _ in iter(self))
 
-    def __iter__(self):
-        # type: () -> Generator[str, None, None]
+    def __iter__(self) -> Generator[str, None, None]:
         for k in self.environ:
             if not isinstance(k, str):
                 continue
@@ -83,8 +81,7 @@ class EnvironHeaders(Mapping):  # type: ignore
             yield k[len(self.prefix) :]
 
 
-def has_tracing_enabled(options):
-    # type: (Optional[Dict[str, Any]]) -> bool
+def has_tracing_enabled(options: Optional[Dict[str, Any]]) -> bool:
     """
     Returns True if either traces_sample_rate or traces_sampler is
     defined and enable_tracing is set and not false.
@@ -103,16 +100,14 @@ def has_tracing_enabled(options):
 
 @contextlib.contextmanager
 def record_sql_queries(
-    hub,  # type: sentry_sdk.Hub
-    cursor,  # type: Any
-    query,  # type: Any
-    params_list,  # type:  Any
-    paramstyle,  # type: Optional[str]
-    executemany,  # type: bool
-    record_cursor_repr=False,  # type: bool
-):
-    # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
-
+    hub: sentry_sdk.Hub,
+    cursor: Any,
+    query: Any,
+    params_list: Any,
+    paramstyle: Optional[str],
+    executemany: bool,
+    record_cursor_repr: bool = False,
+) -> Generator[sentry_sdk.tracing.Span, None, None]:
     # TODO: Bring back capturing of params by default
     if hub.client and hub.client.options["_experiments"].get(
         "record_sql_params", False
@@ -147,8 +142,9 @@ def record_sql_queries(
         yield span
 
 
-def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def maybe_create_breadcrumbs_from_span(
+    hub: sentry_sdk.Hub, span: sentry_sdk.tracing.Span
+) -> None:
     if span.op == OP.DB_REDIS:
         hub.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
@@ -164,8 +160,7 @@ def maybe_create_breadcrumbs_from_span(hub, span):
         )
 
 
-def add_query_source(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def add_query_source(hub: sentry_sdk.Hub, span: sentry_sdk.tracing.Span) -> None:
     """
     Adds OTel compatible source code information to the span
     """
@@ -192,7 +187,7 @@ def add_query_source(hub, span):
     in_app_exclude = client.options.get("in_app_exclude")
 
     # Find the correct frame
-    frame = sys._getframe()  # type: Union[FrameType, None]
+    frame: Union[FrameType, None] = sys._getframe()
     while frame is not None:
         try:
             abs_path = frame.f_code.co_filename
@@ -200,7 +195,7 @@ def add_query_source(hub, span):
             abs_path = ""
 
         try:
-            namespace = frame.f_globals.get("__name__")  # type: Optional[str]
+            namespace: Optional[str] = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
 
@@ -264,8 +259,9 @@ def add_query_source(hub, span):
             span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def extract_sentrytrace_data(header):
-    # type: (Optional[str]) -> Optional[Dict[str, Union[str, bool, None]]]
+def extract_sentrytrace_data(
+    header: Optional[str],
+) -> Optional[Dict[str, Union[str, bool, None]]]:
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """
@@ -296,9 +292,7 @@ def extract_sentrytrace_data(header):
     }
 
 
-def _format_sql(cursor, sql):
-    # type: (Any, str) -> Optional[str]
-
+def _format_sql(cursor: Any, sql: str) -> Optional[str]:
     real_sql = None
 
     # If we're using psycopg2, it could be that we're
@@ -328,17 +322,16 @@ class Baggage:
 
     def __init__(
         self,
-        sentry_items,  # type: Dict[str, str]
-        third_party_items="",  # type: str
-        mutable=True,  # type: bool
+        sentry_items: Dict[str, str],
+        third_party_items: str = "",
+        mutable: bool = True,
     ):
         self.sentry_items = sentry_items
         self.third_party_items = third_party_items
         self.mutable = mutable
 
     @classmethod
-    def from_incoming_header(cls, header):
-        # type: (Optional[str]) -> Baggage
+    def from_incoming_header(cls, header: Optional[str]) -> Baggage:
         """
         freeze if incoming header already has sentry baggage
         """
@@ -364,10 +357,8 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def from_options(cls, scope):
-        # type: (sentry_sdk.scope.Scope) -> Optional[Baggage]
-
-        sentry_items = {}  # type: Dict[str, str]
+    def from_options(cls, scope: sentry_sdk.scope.Scope) -> Optional[Baggage]:
+        sentry_items: Dict[str, str] = {}
         third_party_items = ""
         mutable = False
 
@@ -401,15 +392,16 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def populate_from_transaction(cls, transaction):
-        # type: (sentry_sdk.tracing.Transaction) -> Baggage
+    def populate_from_transaction(
+        cls, transaction: sentry_sdk.tracing.Transaction
+    ) -> Baggage:
         """
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
         hub = transaction.hub or sentry_sdk.Hub.current
         client = hub.client
-        sentry_items = {}  # type: Dict[str, str]
+        sentry_items: Dict[str, str] = {}
 
         if not client:
             return Baggage(sentry_items)
@@ -451,12 +443,10 @@ class Baggage:
 
         return Baggage(sentry_items, mutable=False)
 
-    def freeze(self):
-        # type: () -> None
+    def freeze(self) -> None:
         self.mutable = False
 
-    def dynamic_sampling_context(self):
-        # type: () -> Dict[str, str]
+    def dynamic_sampling_context(self) -> Dict[str, str]:
         header = {}
 
         for key, item in self.sentry_items.items():
@@ -464,8 +454,7 @@ class Baggage:
 
         return header
 
-    def serialize(self, include_third_party=False):
-        # type: (bool) -> str
+    def serialize(self, include_third_party: bool = False) -> str:
         items = []
 
         for key, val in self.sentry_items.items():
@@ -479,12 +468,11 @@ class Baggage:
         return ",".join(items)
 
 
-def should_propagate_trace(hub, url):
-    # type: (sentry_sdk.Hub, str) -> bool
+def should_propagate_trace(hub: sentry_sdk.Hub, url: str) -> bool:
     """
     Returns True if url matches trace_propagation_targets configured in the given hub. Otherwise, returns False.
     """
-    client = hub.client  # type: Any
+    client: Any = hub.client
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
     if is_sentry_url(hub, url):
@@ -493,8 +481,7 @@ def should_propagate_trace(hub, url):
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
 
 
-def normalize_incoming_data(incoming_data):
-    # type: (Dict[str, Any]) -> Dict[str, Any]
+def normalize_incoming_data(incoming_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalizes incoming data so the keys are all lowercase with dashes instead of underscores and stripped from known prefixes.
     """
@@ -509,8 +496,7 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
-def start_child_span_decorator(func):
-    # type: (Any) -> Any
+def start_child_span_decorator(func: Any) -> Any:
     """
     Decorator to add child spans for functions.
 
@@ -520,9 +506,7 @@ def start_child_span_decorator(func):
     if inspect.iscoroutinefunction(func):
 
         @wraps(func)
-        async def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
+        async def func_with_tracing(*args: Any, **kwargs: Any) -> Any:
             span = get_current_span(sentry_sdk.Hub.current)
 
             if span is None:
@@ -543,9 +527,7 @@ def start_child_span_decorator(func):
     else:
 
         @wraps(func)
-        def func_with_tracing(*args, **kwargs):
-            # type: (*Any, **Any) -> Any
-
+        def func_with_tracing(*args: Any, **kwargs: Any) -> Any:
             span = get_current_span(sentry_sdk.Hub.current)
 
             if span is None:
@@ -565,8 +547,7 @@ def start_child_span_decorator(func):
     return func_with_tracing
 
 
-def get_current_span(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Optional[Span]
+def get_current_span(hub: Optional[sentry_sdk.Hub] = None) -> Optional[Span]:
     """
     Returns the currently active span if there is one running, otherwise `None`
     """

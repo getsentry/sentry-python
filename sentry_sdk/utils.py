@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import json
 import linecache
@@ -62,20 +64,17 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 
 
-def json_dumps(data):
-    # type: (Any) -> bytes
+def json_dumps(data: Any) -> bytes:
     """Serialize data into a compact JSON representation encoded as UTF-8."""
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
-def _get_debug_hub():
-    # type: () -> Optional[sentry_sdk.Hub]
+def _get_debug_hub() -> Optional[sentry_sdk.Hub]:
     # This function is replaced by debug.py
     pass
 
 
-def get_git_revision():
-    # type: () -> Optional[str]
+def get_git_revision() -> Optional[str]:
     try:
         with open(os.path.devnull, "w+") as null:
             revision = (
@@ -95,8 +94,7 @@ def get_git_revision():
     return revision
 
 
-def get_default_release():
-    # type: () -> Optional[str]
+def get_default_release() -> Optional[str]:
     """Try to guess a default release."""
     release = os.environ.get("SENTRY_RELEASE")
     if release:
@@ -119,8 +117,7 @@ def get_default_release():
     return None
 
 
-def get_sdk_name(installed_integrations):
-    # type: (List[str]) -> str
+def get_sdk_name(installed_integrations: List[str]) -> str:
     """Return the SDK name including the name of the used web framework."""
 
     # Note: I can not use for example sentry_sdk.integrations.django.DjangoIntegration.identifier
@@ -156,12 +153,15 @@ def get_sdk_name(installed_integrations):
 class CaptureInternalException:
     __slots__ = ()
 
-    def __enter__(self):
-        # type: () -> ContextManager[Any]
+    def __enter__(self) -> ContextManager[Any]:
         return self
 
-    def __exit__(self, ty, value, tb):
-        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> bool
+    def __exit__(
+        self,
+        ty: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> bool:
         if ty is not None and value is not None:
             capture_internal_exception((ty, value, tb))
 
@@ -171,30 +171,27 @@ class CaptureInternalException:
 _CAPTURE_INTERNAL_EXCEPTION = CaptureInternalException()
 
 
-def capture_internal_exceptions():
-    # type: () -> ContextManager[Any]
+def capture_internal_exceptions() -> ContextManager[Any]:
     return _CAPTURE_INTERNAL_EXCEPTION
 
 
-def capture_internal_exception(exc_info):
-    # type: (ExcInfo) -> None
+def capture_internal_exception(exc_info: ExcInfo) -> None:
     hub = _get_debug_hub()
     if hub is not None:
         hub._capture_internal_exception(exc_info)
 
 
-def to_timestamp(value):
-    # type: (datetime) -> float
+def to_timestamp(value: datetime) -> float:
     return (value - epoch).total_seconds()
 
 
-def format_timestamp(value):
-    # type: (datetime) -> str
+def format_timestamp(value: datetime) -> str:
     return value.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
-def event_hint_with_exc_info(exc_info=None):
-    # type: (Optional[ExcInfo]) -> Dict[str, Optional[ExcInfo]]
+def event_hint_with_exc_info(
+    exc_info: Optional[ExcInfo] = None,
+) -> Dict[str, Optional[ExcInfo]]:
     """Creates a hint with the exc info filled in."""
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -212,8 +209,7 @@ class BadDsn(ValueError):
 class Dsn:
     """Represents a DSN."""
 
-    def __init__(self, value):
-        # type: (Union[Dsn, str]) -> None
+    def __init__(self, value: Union[Dsn, str]) -> None:
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
@@ -229,7 +225,7 @@ class Dsn:
         self.host = parts.hostname
 
         if parts.port is None:
-            self.port = self.scheme == "https" and 443 or 80  # type: int
+            self.port: int = self.scheme == "https" and 443 or 80
         else:
             self.port = parts.port
 
@@ -249,16 +245,14 @@ class Dsn:
         self.path = "/".join(path) + "/"
 
     @property
-    def netloc(self):
-        # type: () -> str
+    def netloc(self) -> str:
         """The netloc part of a DSN."""
         rv = self.host
         if (self.scheme, self.port) not in (("http", 80), ("https", 443)):
             rv = "%s:%s" % (rv, self.port)
         return rv
 
-    def to_auth(self, client=None):
-        # type: (Optional[Any]) -> Auth
+    def to_auth(self, client: Optional[Any] = None) -> Auth:
         """Returns the auth info object for this dsn."""
         return Auth(
             scheme=self.scheme,
@@ -270,8 +264,7 @@ class Dsn:
             client=client,
         )
 
-    def __str__(self):
-        # type: () -> str
+    def __str__(self) -> str:
         return "%s://%s%s@%s%s%s" % (
             self.scheme,
             self.public_key,
@@ -287,16 +280,15 @@ class Auth:
 
     def __init__(
         self,
-        scheme,
-        host,
-        project_id,
-        public_key,
-        secret_key=None,
-        version=7,
-        client=None,
-        path="/",
-    ):
-        # type: (str, str, str, str, Optional[str], int, Optional[Any], str) -> None
+        scheme: str,
+        host: str,
+        project_id: str,
+        public_key: str,
+        secret_key: Optional[str] = None,
+        version: int = 7,
+        client: Optional[Any] = None,
+        path: str = "/",
+    ) -> None:
         self.scheme = scheme
         self.host = host
         self.path = path
@@ -307,18 +299,14 @@ class Auth:
         self.client = client
 
     @property
-    def store_api_url(self):
-        # type: () -> str
+    def store_api_url(self) -> str:
         """Returns the API url for storing events.
 
         Deprecated: use get_api_url instead.
         """
         return self.get_api_url(type="store")
 
-    def get_api_url(
-        self, type="store"  # type: EndpointType
-    ):
-        # type: (...) -> str
+    def get_api_url(self, type: EndpointType = "store") -> str:
         """Returns the API url for storing events."""
         return "%s://%s%sapi/%s/%s/" % (
             self.scheme,
@@ -328,8 +316,7 @@ class Auth:
             type,
         )
 
-    def to_header(self):
-        # type: () -> str
+    def to_header(self) -> str:
         """Returns the auth header a string."""
         rv = [("sentry_key", self.public_key), ("sentry_version", self.version)]
         if self.client is not None:
@@ -349,14 +336,12 @@ class AnnotatedValue:
 
     __slots__ = ("value", "metadata")
 
-    def __init__(self, value, metadata):
-        # type: (Optional[Any], Dict[str, Any]) -> None
+    def __init__(self, value: Optional[Any], metadata: Dict[str, Any]) -> None:
         self.value = value
         self.metadata = metadata
 
     @classmethod
-    def removed_because_raw_data(cls):
-        # type: () -> AnnotatedValue
+    def removed_because_raw_data(cls) -> AnnotatedValue:
         """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
         return AnnotatedValue(
             value="",
@@ -371,8 +356,7 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def removed_because_over_size_limit(cls):
-        # type: () -> AnnotatedValue
+    def removed_because_over_size_limit(cls) -> AnnotatedValue:
         """The actual value was removed because the size of the field exceeded the configured maximum size (specified with the max_request_body_size sdk option)"""
         return AnnotatedValue(
             value="",
@@ -387,8 +371,7 @@ class AnnotatedValue:
         )
 
     @classmethod
-    def substituted_because_contains_sensitive_data(cls):
-        # type: () -> AnnotatedValue
+    def substituted_because_contains_sensitive_data(cls) -> AnnotatedValue:
         """The actual value was removed because it contained sensitive information."""
         return AnnotatedValue(
             value=SENSITIVE_DATA_SUBSTITUTE,
@@ -410,21 +393,18 @@ if TYPE_CHECKING:
     Annotated = Union[AnnotatedValue, T]
 
 
-def get_type_name(cls):
-    # type: (Optional[type]) -> Optional[str]
+def get_type_name(cls: Optional[type]) -> Optional[str]:
     return getattr(cls, "__qualname__", None) or getattr(cls, "__name__", None)
 
 
-def get_type_module(cls):
-    # type: (Optional[type]) -> Optional[str]
+def get_type_module(cls: Optional[type]) -> Optional[str]:
     mod = getattr(cls, "__module__", None)
     if mod not in (None, "builtins", "__builtins__"):
         return mod
     return None
 
 
-def should_hide_frame(frame):
-    # type: (FrameType) -> bool
+def should_hide_frame(frame: FrameType) -> bool:
     try:
         mod = frame.f_globals["__name__"]
         if mod.startswith("sentry_sdk."):
@@ -442,9 +422,8 @@ def should_hide_frame(frame):
     return False
 
 
-def iter_stacks(tb):
-    # type: (Optional[TracebackType]) -> Iterator[TracebackType]
-    tb_ = tb  # type: Optional[TracebackType]
+def iter_stacks(tb: Optional[TracebackType]) -> Iterator[TracebackType]:
+    tb_: Optional[TracebackType] = tb
     while tb_ is not None:
         if not should_hide_frame(tb_.tb_frame):
             yield tb_
@@ -452,18 +431,17 @@ def iter_stacks(tb):
 
 
 def get_lines_from_file(
-    filename,  # type: str
-    lineno,  # type: int
-    max_length=None,  # type: Optional[int]
-    loader=None,  # type: Optional[Any]
-    module=None,  # type: Optional[str]
-):
-    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
+    filename: str,
+    lineno: int,
+    max_length: Optional[int] = None,
+    loader: Optional[Any] = None,
+    module: Optional[str] = None,
+) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]:
     context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
         try:
-            source_str = loader.get_source(module)  # type: Optional[str]
+            source_str: Optional[str] = loader.get_source(module)
         except (ImportError, IOError):
             source_str = None
         if source_str is not None:
@@ -498,13 +476,12 @@ def get_lines_from_file(
 
 
 def get_source_context(
-    frame,  # type: FrameType
-    tb_lineno,  # type: int
-    max_value_length=None,  # type: Optional[int]
-):
-    # type: (...) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]
+    frame: FrameType,
+    tb_lineno: int,
+    max_value_length: Optional[int] = None,
+) -> Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]:
     try:
-        abs_path = frame.f_code.co_filename  # type: Optional[str]
+        abs_path: Optional[str] = frame.f_code.co_filename
     except Exception:
         abs_path = None
     try:
@@ -523,24 +500,23 @@ def get_source_context(
     return [], None, []
 
 
-def safe_str(value):
-    # type: (Any) -> str
+def safe_str(value: Any) -> str:
     try:
         return str(value)
     except Exception:
         return safe_repr(value)
 
 
-def safe_repr(value):
-    # type: (Any) -> str
+def safe_repr(value: Any) -> str:
     try:
         return repr(value)
     except Exception:
         return "<broken repr>"
 
 
-def filename_for_module(module, abs_path):
-    # type: (Optional[str], Optional[str]) -> Optional[str]
+def filename_for_module(
+    module: Optional[str], abs_path: Optional[str]
+) -> Optional[str]:
     if not abs_path or not module:
         return abs_path
 
@@ -564,13 +540,12 @@ def filename_for_module(module, abs_path):
 
 
 def serialize_frame(
-    frame,
-    tb_lineno=None,
-    include_local_variables=True,
-    include_source_context=True,
-    max_value_length=None,
-):
-    # type: (FrameType, Optional[int], bool, bool, Optional[int]) -> Dict[str, Any]
+    frame: FrameType,
+    tb_lineno: Optional[int] = None,
+    include_local_variables: bool = True,
+    include_source_context: bool = True,
+    max_value_length: Optional[int] = None,
+) -> Dict[str, Any]:
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -586,13 +561,13 @@ def serialize_frame(
     if tb_lineno is None:
         tb_lineno = frame.f_lineno
 
-    rv = {
+    rv: Dict[str, Any] = {
         "filename": filename_for_module(module, abs_path) or None,
         "abs_path": os.path.abspath(abs_path) if abs_path else None,
         "function": function or "<unknown>",
         "module": module,
         "lineno": tb_lineno,
-    }  # type: Dict[str, Any]
+    }
 
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
@@ -606,15 +581,14 @@ def serialize_frame(
 
 
 def current_stacktrace(
-    include_local_variables=True,  # type: bool
-    include_source_context=True,  # type: bool
-    max_value_length=None,  # type: Optional[int]
-):
-    # type: (...) -> Dict[str, Any]
+    include_local_variables: bool = True,
+    include_source_context: bool = True,
+    max_value_length: Optional[int] = None,
+) -> Dict[str, Any]:
     __tracebackhide__ = True
     frames = []
 
-    f = sys._getframe()  # type: Optional[FrameType]
+    f: Optional[FrameType] = sys._getframe()
     while f is not None:
         if not should_hide_frame(f):
             frames.append(
@@ -632,13 +606,11 @@ def current_stacktrace(
     return {"frames": frames}
 
 
-def get_errno(exc_value):
-    # type: (BaseException) -> Optional[Any]
+def get_errno(exc_value: BaseException) -> Optional[Any]:
     return getattr(exc_value, "errno", None)
 
 
-def get_error_message(exc_value):
-    # type: (Optional[BaseException]) -> str
+def get_error_message(exc_value: Optional[BaseException]) -> str:
     return (
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
@@ -647,23 +619,22 @@ def get_error_message(exc_value):
 
 
 def single_exception_from_error_tuple(
-    exc_type,  # type: Optional[type]
-    exc_value,  # type: Optional[BaseException]
-    tb,  # type: Optional[TracebackType]
-    client_options=None,  # type: Optional[Dict[str, Any]]
-    mechanism=None,  # type: Optional[Dict[str, Any]]
-    exception_id=None,  # type: Optional[int]
-    parent_id=None,  # type: Optional[int]
-    source=None,  # type: Optional[str]
-):
-    # type: (...) -> Dict[str, Any]
+    exc_type: Optional[type],
+    exc_value: Optional[BaseException],
+    tb: Optional[TracebackType],
+    client_options: Optional[Dict[str, Any]] = None,
+    mechanism: Optional[Dict[str, Any]] = None,
+    exception_id: Optional[int] = None,
+    parent_id: Optional[int] = None,
+    source: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Creates a dict that goes into the events `exception.values` list and is ingestible by Sentry.
 
     See the Exception Interface documentation for more details:
     https://develop.sentry.dev/sdk/event-payloads/exception/
     """
-    exception_value = {}  # type: Dict[str, Any]
+    exception_value: Dict[str, Any] = {}
     exception_value["mechanism"] = (
         mechanism.copy() if mechanism else {"type": "generic", "handled": True}
     )
@@ -731,12 +702,11 @@ HAS_CHAINED_EXCEPTIONS = hasattr(Exception, "__suppress_context__")
 
 if HAS_CHAINED_EXCEPTIONS:
 
-    def walk_exception_chain(exc_info):
-        # type: (ExcInfo) -> Iterator[ExcInfo]
+    def walk_exception_chain(exc_info: ExcInfo) -> Iterator[ExcInfo]:
         exc_type, exc_value, tb = exc_info
 
         seen_exceptions = []
-        seen_exception_ids = set()  # type: Set[int]
+        seen_exception_ids: Set[int] = set()
 
         while (
             exc_type is not None
@@ -763,22 +733,20 @@ if HAS_CHAINED_EXCEPTIONS:
 
 else:
 
-    def walk_exception_chain(exc_info):
-        # type: (ExcInfo) -> Iterator[ExcInfo]
+    def walk_exception_chain(exc_info: ExcInfo) -> Iterator[ExcInfo]:
         yield exc_info
 
 
 def exceptions_from_error(
-    exc_type,  # type: Optional[type]
-    exc_value,  # type: Optional[BaseException]
-    tb,  # type: Optional[TracebackType]
-    client_options=None,  # type: Optional[Dict[str, Any]]
-    mechanism=None,  # type: Optional[Dict[str, Any]]
-    exception_id=0,  # type: int
-    parent_id=0,  # type: int
-    source=None,  # type: Optional[str]
-):
-    # type: (...) -> Tuple[int, List[Dict[str, Any]]]
+    exc_type: Optional[type],
+    exc_value: Optional[BaseException],
+    tb: Optional[TracebackType],
+    client_options: Optional[Dict[str, Any]] = None,
+    mechanism: Optional[Dict[str, Any]] = None,
+    exception_id: int = 0,
+    parent_id: int = 0,
+    source: Optional[str] = None,
+) -> Tuple[int, List[Dict[str, Any]]]:
     """
     Creates the list of exceptions.
     This can include chained exceptions and exceptions from an ExceptionGroup.
@@ -865,11 +833,10 @@ def exceptions_from_error(
 
 
 def exceptions_from_error_tuple(
-    exc_info,  # type: ExcInfo
-    client_options=None,  # type: Optional[Dict[str, Any]]
-    mechanism=None,  # type: Optional[Dict[str, Any]]
-):
-    # type: (...) -> List[Dict[str, Any]]
+    exc_info: ExcInfo,
+    client_options: Optional[Dict[str, Any]] = None,
+    mechanism: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     exc_type, exc_value, tb = exc_info
 
     is_exception_group = BaseExceptionGroup is not None and isinstance(
@@ -901,16 +868,14 @@ def exceptions_from_error_tuple(
     return exceptions
 
 
-def to_string(value):
-    # type: (str) -> str
+def to_string(value: str) -> str:
     try:
         return str(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
 
 
-def iter_event_stacktraces(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+def iter_event_stacktraces(event: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -923,15 +888,18 @@ def iter_event_stacktraces(event):
                 yield exception["stacktrace"]
 
 
-def iter_event_frames(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+def iter_event_frames(event: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
     for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
-def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
+def handle_in_app(
+    event: Dict[str, Any],
+    in_app_exclude: Optional[List[str]] = None,
+    in_app_include: Optional[List[str]] = None,
+    project_root: Optional[str] = None,
+) -> Dict[str, Any]:
     for stacktrace in iter_event_stacktraces(event):
         set_in_app_in_frames(
             stacktrace.get("frames"),
@@ -943,8 +911,12 @@ def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=
     return event
 
 
-def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=None):
-    # type: (Any, Optional[List[str]], Optional[List[str]], Optional[str]) -> Optional[Any]
+def set_in_app_in_frames(
+    frames: Any,
+    in_app_exclude: Optional[List[str]],
+    in_app_include: Optional[List[str]],
+    project_root: Optional[str] = None,
+) -> Optional[Any]:
     if not frames:
         return None
 
@@ -982,8 +954,7 @@ def set_in_app_in_frames(frames, in_app_exclude, in_app_include, project_root=No
     return frames
 
 
-def exc_info_from_error(error):
-    # type: (Union[BaseException, ExcInfo]) -> ExcInfo
+def exc_info_from_error(error: Union[BaseException, ExcInfo]) -> ExcInfo:
     if isinstance(error, tuple) and len(error) == 3:
         exc_type, exc_value, tb = error
     elif isinstance(error, BaseException):
@@ -1005,11 +976,10 @@ def exc_info_from_error(error):
 
 
 def event_from_exception(
-    exc_info,  # type: Union[BaseException, ExcInfo]
-    client_options=None,  # type: Optional[Dict[str, Any]]
-    mechanism=None,  # type: Optional[Dict[str, Any]]
-):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    exc_info: Union[BaseException, ExcInfo],
+    client_options: Optional[Dict[str, Any]] = None,
+    mechanism: Optional[Dict[str, Any]] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
@@ -1025,8 +995,7 @@ def event_from_exception(
     )
 
 
-def _module_in_list(name, items):
-    # type: (str, Optional[List[str]]) -> bool
+def _module_in_list(name: str, items: Optional[List[str]]) -> bool:
     if name is None:
         return False
 
@@ -1040,8 +1009,7 @@ def _module_in_list(name, items):
     return False
 
 
-def _is_external_source(abs_path):
-    # type: (str) -> bool
+def _is_external_source(abs_path: str) -> bool:
     # check if frame is in 'site-packages' or 'dist-packages'
     external_source = (
         re.search(r"[\\/](?:dist|site)-packages[\\/]", abs_path) is not None
@@ -1049,8 +1017,7 @@ def _is_external_source(abs_path):
     return external_source
 
 
-def _is_in_project_root(abs_path, project_root):
-    # type: (str, Optional[str]) -> bool
+def _is_in_project_root(abs_path: str, project_root: Optional[str]) -> bool:
     if project_root is None:
         return False
 
@@ -1061,8 +1028,9 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
-def strip_string(value, max_length=None):
-    # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
+def strip_string(
+    value: str, max_length: Optional[int] = None
+) -> Union[AnnotatedValue, str]:
     if not value:
         return value
 
@@ -1082,8 +1050,7 @@ def strip_string(value, max_length=None):
     return value
 
 
-def parse_version(version):
-    # type: (str) -> Optional[Tuple[int, ...]]
+def parse_version(version: str) -> Optional[Tuple[int, ...]]:
     """
     Parses a version string into a tuple of integers.
     This uses the parsing loging from PEP 440:
@@ -1127,15 +1094,14 @@ def parse_version(version):
 
     try:
         release = pattern.match(version).groupdict()["release"]  # type: ignore
-        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+        release_tuple: Tuple[int, ...] = tuple(map(int, release.split(".")[:3]))
     except (TypeError, ValueError, AttributeError):
         return None
 
     return release_tuple
 
 
-def _is_contextvars_broken():
-    # type: () -> bool
+def _is_contextvars_broken() -> bool:
     """
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
@@ -1186,54 +1152,45 @@ def _is_contextvars_broken():
     return False
 
 
-def _make_threadlocal_contextvars(local):
-    # type: (type) -> type
+def _make_threadlocal_contextvars(local: type) -> type:
     class ContextVar:
         # Super-limited impl of ContextVar
 
-        def __init__(self, name, default=None):
-            # type: (str, Any) -> None
+        def __init__(self, name: str, default: Any = None) -> None:
             self._name = name
             self._default = default
             self._local = local()
             self._original_local = local()
 
-        def get(self, default=None):
-            # type: (Any) -> Any
+        def get(self, default: Any = None) -> Any:
             return getattr(self._local, "value", default or self._default)
 
-        def set(self, value):
-            # type: (Any) -> Any
+        def set(self, value: Any) -> Any:
             token = str(random.getrandbits(64))
             original_value = self.get()
             setattr(self._original_local, token, original_value)
             self._local.value = value
             return token
 
-        def reset(self, token):
-            # type: (Any) -> None
+        def reset(self, token: Any) -> None:
             self._local.value = getattr(self._original_local, token)
             del self._original_local[token]
 
     return ContextVar
 
 
-def _make_noop_copy_context():
-    # type: () -> Callable[[], Any]
+def _make_noop_copy_context() -> Callable[[], Any]:
     class NoOpContext:
-        def run(self, func, *args, **kwargs):
-            # type: (Callable[..., Any], *Any, **Any) -> Any
+        def run(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
             return func(*args, **kwargs)
 
-    def copy_context():
-        # type: () -> NoOpContext
+    def copy_context() -> NoOpContext:
         return NoOpContext()
 
     return copy_context
 
 
-def _get_contextvars():
-    # type: () -> Tuple[bool, type, Callable[[], Any]]
+def _get_contextvars() -> Tuple[bool, type, Callable[[], Any]]:
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1282,10 +1239,9 @@ Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more in
 """
 
 
-def qualname_from_function(func):
-    # type: (Callable[..., Any]) -> Optional[str]
+def qualname_from_function(func: Callable[..., Any]) -> Optional[str]:
     """Return the qualified name of func. Works with regular function, lambda, partial and partialmethod."""
-    func_qualname = None  # type: Optional[str]
+    func_qualname: Optional[str] = None
 
     # Python 2
     try:
@@ -1322,8 +1278,7 @@ def qualname_from_function(func):
     return func_qualname
 
 
-def transaction_from_function(func):
-    # type: (Callable[..., Any]) -> Optional[str]
+def transaction_from_function(func: Callable[..., Any]) -> Optional[str]:
     return qualname_from_function(func)
 
 
@@ -1341,20 +1296,16 @@ class TimeoutThread(threading.Thread):
     waiting_time and raises a custom ServerlessTimeout exception.
     """
 
-    def __init__(self, waiting_time, configured_timeout):
-        # type: (float, int) -> None
+    def __init__(self, waiting_time: float, configured_timeout: int) -> None:
         threading.Thread.__init__(self)
         self.waiting_time = waiting_time
         self.configured_timeout = configured_timeout
         self._stop_event = threading.Event()
 
-    def stop(self):
-        # type: () -> None
+    def stop(self) -> None:
         self._stop_event.set()
 
-    def run(self):
-        # type: () -> None
-
+    def run(self) -> None:
         self._stop_event.wait(self.waiting_time)
 
         if self._stop_event.is_set():
@@ -1374,8 +1325,7 @@ class TimeoutThread(threading.Thread):
         )
 
 
-def to_base64(original):
-    # type: (str) -> Optional[str]
+def to_base64(original: str) -> Optional[str]:
     """
     Convert a string to base64, via UTF-8. Returns None on invalid input.
     """
@@ -1391,8 +1341,7 @@ def to_base64(original):
     return base64_string
 
 
-def from_base64(base64_string):
-    # type: (str) -> Optional[str]
+def from_base64(base64_string: str) -> Optional[str]:
     """
     Convert a string from base64, via UTF-8. Returns None on invalid input.
     """
@@ -1416,8 +1365,12 @@ def from_base64(base64_string):
 Components = namedtuple("Components", ["scheme", "netloc", "path", "query", "fragment"])
 
 
-def sanitize_url(url, remove_authority=True, remove_query_values=True, split=False):
-    # type: (str, bool, bool, bool) -> Union[str, Components]
+def sanitize_url(
+    url: str,
+    remove_authority: bool = True,
+    remove_query_values: bool = True,
+    split: bool = False,
+) -> Union[str, Components]:
     """
     Removes the authority and query parameter values from a given URL.
     """
@@ -1463,8 +1416,7 @@ def sanitize_url(url, remove_authority=True, remove_query_values=True, split=Fal
 ParsedUrl = namedtuple("ParsedUrl", ["url", "query", "fragment"])
 
 
-def parse_url(url, sanitize=True):
-    # type: (str, bool) -> ParsedUrl
+def parse_url(url: str, sanitize: bool = True) -> ParsedUrl:
     """
     Splits a URL into a url (including path), query and fragment. If sanitize is True, the query
     parameters will be sanitized to remove sensitive data. The autority (username and password)
@@ -1491,8 +1443,7 @@ def parse_url(url, sanitize=True):
     )
 
 
-def is_valid_sample_rate(rate, source):
-    # type: (Any, str) -> bool
+def is_valid_sample_rate(rate: Any, source: str) -> bool:
     """
     Checks the given sample rate to make sure it is valid type and value (a
     boolean or a number between 0 and 1, inclusive).
@@ -1522,8 +1473,9 @@ def is_valid_sample_rate(rate, source):
     return True
 
 
-def match_regex_list(item, regex_list=None, substring_matching=False):
-    # type: (str, Optional[List[str]], bool) -> bool
+def match_regex_list(
+    item: str, regex_list: Optional[List[str]] = None, substring_matching: bool = False
+) -> bool:
     if regex_list is None:
         return False
 
@@ -1538,8 +1490,7 @@ def match_regex_list(item, regex_list=None, substring_matching=False):
     return False
 
 
-def is_sentry_url(hub, url):
-    # type: (sentry_sdk.Hub, str) -> bool
+def is_sentry_url(hub: sentry_sdk.Hub, url: str) -> bool:
     """
     Determines whether the given URL matches the Sentry DSN.
     """
@@ -1551,8 +1502,7 @@ def is_sentry_url(hub, url):
     )
 
 
-def _generate_installed_modules():
-    # type: () -> Iterator[Tuple[str, str]]
+def _generate_installed_modules() -> Iterator[Tuple[str, str]]:
     try:
         from importlib import metadata
 
@@ -1578,21 +1528,18 @@ def _generate_installed_modules():
             yield _normalize_module_name(info.key), info.version
 
 
-def _normalize_module_name(name):
-    # type: (str) -> str
+def _normalize_module_name(name: str) -> str:
     return name.lower()
 
 
-def _get_installed_modules():
-    # type: () -> Dict[str, str]
+def _get_installed_modules() -> Dict[str, str]:
     global _installed_modules
     if _installed_modules is None:
         _installed_modules = dict(_generate_installed_modules())
     return _installed_modules
 
 
-def package_version(package):
-    # type: (str) -> Optional[Tuple[int, ...]]
+def package_version(package: str) -> Optional[Tuple[int, ...]]:
     installed_packages = _get_installed_modules()
     version = installed_packages.get(package)
     if version is None:
@@ -1601,8 +1548,11 @@ def package_version(package):
     return parse_version(version)
 
 
-def reraise(tp, value, tb=None):
-    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> NoReturn
+def reraise(
+    tp: Optional[Type[BaseException]],
+    value: Optional[BaseException],
+    tb: Optional[Any] = None,
+) -> NoReturn:
     assert value is not None
     if value.__traceback__ is not tb:
         raise value.with_traceback(tb)
@@ -1611,17 +1561,14 @@ def reraise(tp, value, tb=None):
 
 if PY37:
 
-    def nanosecond_time():
-        # type: () -> int
+    def nanosecond_time() -> int:
         return time.perf_counter_ns()
 
 else:
 
-    def nanosecond_time():
-        # type: () -> int
+    def nanosecond_time() -> int:
         return int(time.perf_counter() * 1e9)
 
 
-def now():
-    # type: () -> float
+def now() -> float:
     return time.perf_counter()

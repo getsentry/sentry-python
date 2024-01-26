@@ -17,14 +17,14 @@ if TYPE_CHECKING:
 class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
     identifier = "trytond_wsgi"
 
-    def __init__(self):  # type: () -> None
+    def __init__(self) -> None:
         pass
 
     @staticmethod
-    def setup_once():  # type: () -> None
+    def setup_once() -> None:
         app.wsgi_app = sentry_sdk.integrations.wsgi.SentryWsgiMiddleware(app.wsgi_app)
 
-        def error_handler(e):  # type: (Exception) -> None
+        def error_handler(e: Exception) -> None:
             hub = sentry_sdk.hub.Hub.current
 
             if hub.get_integration(TrytondWSGIIntegration) is None:
@@ -33,7 +33,7 @@ class TrytondWSGIIntegration(sentry_sdk.integrations.Integration):
                 return
             else:
                 # If an integration is there, a client has to be there.
-                client = hub.client  # type: Any
+                client: Any = hub.client
                 event, hint = sentry_sdk.utils.event_from_exception(
                     e,
                     client_options=client.options,

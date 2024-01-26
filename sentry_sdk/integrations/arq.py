@@ -40,9 +40,7 @@ class ArqIntegration(Integration):
     identifier = "arq"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         try:
             if isinstance(ARQ_VERSION, str):
                 version = parse_version(ARQ_VERSION)
@@ -65,12 +63,12 @@ class ArqIntegration(Integration):
         ignore_logger("arq.worker")
 
 
-def patch_enqueue_job():
-    # type: () -> None
+def patch_enqueue_job() -> None:
     old_enqueue_job = ArqRedis.enqueue_job
 
-    async def _sentry_enqueue_job(self, function, *args, **kwargs):
-        # type: (ArqRedis, str, *Any, **Any) -> Optional[Job]
+    async def _sentry_enqueue_job(
+        self: ArqRedis, function: str, *args: Any, **kwargs: Any
+    ) -> Optional[Job]:
         hub = Hub.current
 
         if hub.get_integration(ArqIntegration) is None:
@@ -82,12 +80,10 @@ def patch_enqueue_job():
     ArqRedis.enqueue_job = _sentry_enqueue_job
 
 
-def patch_run_job():
-    # type: () -> None
+def patch_run_job() -> None:
     old_run_job = Worker.run_job
 
-    async def _sentry_run_job(self, job_id, score):
-        # type: (Worker, str, int) -> None
+    async def _sentry_run_job(self: Worker, job_id: str, score: int) -> None:
         hub = Hub(Hub.current)
 
         if hub.get_integration(ArqIntegration) is None:
@@ -110,8 +106,7 @@ def patch_run_job():
     Worker.run_job = _sentry_run_job
 
 
-def _capture_exception(exc_info):
-    # type: (ExcInfo) -> None
+def _capture_exception(exc_info: ExcInfo) -> None:
     hub = Hub.current
 
     if hub.scope.transaction is not None:
@@ -129,11 +124,10 @@ def _capture_exception(exc_info):
     hub.capture_event(event, hint=hint)
 
 
-def _make_event_processor(ctx, *args, **kwargs):
-    # type: (Dict[Any, Any], *Any, **Any) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
-
+def _make_event_processor(
+    ctx: Dict[Any, Any], *args: Any, **kwargs: Any
+) -> EventProcessor:
+    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
         hub = Hub.current
 
         with capture_internal_exceptions():
@@ -161,10 +155,8 @@ def _make_event_processor(ctx, *args, **kwargs):
     return event_processor
 
 
-def _wrap_coroutine(name, coroutine):
-    # type: (str, WorkerCoroutine) -> WorkerCoroutine
-    async def _sentry_coroutine(ctx, *args, **kwargs):
-        # type: (Dict[Any, Any], *Any, **Any) -> Any
+def _wrap_coroutine(name: str, coroutine: WorkerCoroutine) -> WorkerCoroutine:
+    async def _sentry_coroutine(ctx: Dict[Any, Any], *args: Any, **kwargs: Any) -> Any:
         hub = Hub.current
         if hub.get_integration(ArqIntegration) is None:
             return await coroutine(ctx, *args, **kwargs)
@@ -185,12 +177,10 @@ def _wrap_coroutine(name, coroutine):
     return _sentry_coroutine
 
 
-def patch_create_worker():
-    # type: () -> None
+def patch_create_worker() -> None:
     old_create_worker = arq.worker.create_worker
 
-    def _sentry_create_worker(*args, **kwargs):
-        # type: (*Any, **Any) -> Worker
+    def _sentry_create_worker(*args: Any, **kwargs: Any) -> Worker:
         hub = Hub.current
 
         if hub.get_integration(ArqIntegration) is None:
@@ -221,16 +211,14 @@ def patch_create_worker():
     arq.worker.create_worker = _sentry_create_worker
 
 
-def _get_arq_function(func):
-    # type: (Union[str, Function, WorkerCoroutine]) -> Function
+def _get_arq_function(func: Union[str, Function, WorkerCoroutine]) -> Function:
     arq_func = arq.worker.func(func)
     arq_func.coroutine = _wrap_coroutine(arq_func.name, arq_func.coroutine)
 
     return arq_func
 
 
-def _get_arq_cron_job(cron_job):
-    # type: (CronJob) -> CronJob
+def _get_arq_cron_job(cron_job: CronJob) -> CronJob:
     cron_job.coroutine = _wrap_coroutine(cron_job.name, cron_job.coroutine)
 
     return cron_job

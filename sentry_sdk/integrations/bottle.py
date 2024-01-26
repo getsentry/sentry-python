@@ -42,9 +42,7 @@ class BottleIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="endpoint"):
-        # type: (str) -> None
-
+    def __init__(self, transaction_style: str = "endpoint") -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -53,9 +51,7 @@ class BottleIntegration(Integration):
         self.transaction_style = transaction_style
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(BOTTLE_VERSION)
 
         if version is None:
@@ -67,9 +63,9 @@ class BottleIntegration(Integration):
         # monkey patch method Bottle.__call__
         old_app = Bottle.__call__
 
-        def sentry_patched_wsgi_app(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-
+        def sentry_patched_wsgi_app(
+            self: Any, environ: Dict[str, str], start_response: Callable[..., Any]
+        ) -> _ScopedResponse:
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
             if integration is None:
@@ -84,8 +80,7 @@ class BottleIntegration(Integration):
         # monkey patch method Bottle._handle
         old_handle = Bottle._handle
 
-        def _patched_handle(self, environ):
-            # type: (Bottle, Dict[str, Any]) -> Any
+        def _patched_handle(self: Bottle, environ: Dict[str, Any]) -> Any:
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
             if integration is None:
@@ -111,8 +106,7 @@ class BottleIntegration(Integration):
         # monkey patch method Route._make_callback
         old_make_callback = Route._make_callback
 
-        def patched_make_callback(self, *args, **kwargs):
-            # type: (Route, *object, **object) -> Any
+        def patched_make_callback(self: Route, *args: object, **kwargs: object) -> Any:
             hub = Hub.current
             integration = hub.get_integration(BottleIntegration)
             prepared_callback = old_make_callback(self, *args, **kwargs)
@@ -120,11 +114,9 @@ class BottleIntegration(Integration):
                 return prepared_callback
 
             # If an integration is there, a client has to be there.
-            client = hub.client  # type: Any
+            client: Any = hub.client
 
-            def wrapped_callback(*args, **kwargs):
-                # type: (*object, **object) -> Any
-
+            def wrapped_callback(*args: object, **kwargs: object) -> Any:
                 try:
                     res = prepared_callback(*args, **kwargs)
                 except HTTPResponse:
@@ -146,38 +138,33 @@ class BottleIntegration(Integration):
 
 
 class BottleRequestExtractor(RequestExtractor):
-    def env(self):
-        # type: () -> Dict[str, str]
+    def env(self) -> Dict[str, str]:
         return self.request.environ
 
-    def cookies(self):
-        # type: () -> Dict[str, str]
+    def cookies(self) -> Dict[str, str]:
         return self.request.cookies
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.body.read()
 
-    def form(self):
-        # type: () -> FormsDict
+    def form(self) -> FormsDict:
         if self.is_json():
             return None
         return self.request.forms.decode()
 
-    def files(self):
-        # type: () -> Optional[Dict[str, str]]
+    def files(self) -> Optional[Dict[str, str]]:
         if self.is_json():
             return None
 
         return self.request.files
 
-    def size_of_file(self, file):
-        # type: (FileUpload) -> int
+    def size_of_file(self, file: FileUpload) -> int:
         return file.content_length
 
 
-def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Event, str, Any) -> None
+def _set_transaction_name_and_source(
+    event: Event, transaction_style: str, request: Any
+) -> None:
     name = ""
 
     if transaction_style == "url":
@@ -194,11 +181,10 @@ def _set_transaction_name_and_source(event, transaction_style, request):
     event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
 
 
-def _make_request_event_processor(app, request, integration):
-    # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
-
-    def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _make_request_event_processor(
+    app: Bottle, request: LocalRequest, integration: BottleIntegration
+) -> EventProcessor:
+    def event_processor(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         _set_transaction_name_and_source(event, integration.transaction_style, request)
 
         with capture_internal_exceptions():

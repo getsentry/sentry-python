@@ -37,9 +37,7 @@ class RqIntegration(Integration):
     identifier = "rq"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(RQ_VERSION)
 
         if version is None:
@@ -50,8 +48,9 @@ class RqIntegration(Integration):
 
         old_perform_job = Worker.perform_job
 
-        def sentry_patched_perform_job(self, job, *args, **kwargs):
-            # type: (Any, Job, *Queue, **Any) -> bool
+        def sentry_patched_perform_job(
+            self: Any, job: Job, *args: Queue, **kwargs: Any
+        ) -> bool:
             hub = Hub.current
             integration = hub.get_integration(RqIntegration)
 
@@ -92,8 +91,9 @@ class RqIntegration(Integration):
 
         old_handle_exception = Worker.handle_exception
 
-        def sentry_patched_handle_exception(self, job, *exc_info, **kwargs):
-            # type: (Worker, Any, *Any, **Any) -> Any
+        def sentry_patched_handle_exception(
+            self: Worker, job: Any, *exc_info: Any, **kwargs: Any
+        ) -> Any:
             # Note, the order of the `or` here is important,
             # because calling `job.is_failed` will change `_status`.
             if job._status == JobStatus.FAILED or job.is_failed:
@@ -105,8 +105,7 @@ class RqIntegration(Integration):
 
         old_enqueue_job = Queue.enqueue_job
 
-        def sentry_patched_enqueue_job(self, job, **kwargs):
-            # type: (Queue, Any, **Any) -> Any
+        def sentry_patched_enqueue_job(self: Queue, job: Any, **kwargs: Any) -> Any:
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
                 if hub.scope.span is not None:
@@ -121,10 +120,8 @@ class RqIntegration(Integration):
         ignore_logger("rq.worker")
 
 
-def _make_event_processor(weak_job):
-    # type: (Callable[[], Job]) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _make_event_processor(weak_job: Callable[[], Job]) -> EventProcessor:
+    def event_processor(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():
@@ -152,14 +149,13 @@ def _make_event_processor(weak_job):
     return event_processor
 
 
-def _capture_exception(exc_info, **kwargs):
-    # type: (ExcInfo, **Any) -> None
+def _capture_exception(exc_info: ExcInfo, **kwargs: Any) -> None:
     hub = Hub.current
     if hub.get_integration(RqIntegration) is None:
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
+    client: Any = hub.client
 
     event, hint = event_from_exception(
         exc_info,

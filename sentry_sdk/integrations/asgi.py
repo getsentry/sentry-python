@@ -4,6 +4,8 @@ An ASGI middleware.
 Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 """
 
+from __future__ import annotations
+
 import asyncio
 import inspect
 from copy import deepcopy
@@ -54,9 +56,7 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
-def _capture_exception(hub, exc, mechanism_type="asgi"):
-    # type: (Hub, Any, str) -> None
-
+def _capture_exception(hub: Hub, exc: Any, mechanism_type: str = "asgi") -> None:
     # Check client here as it might have been unset while streaming response
     if hub.client is not None:
         event, hint = event_from_exception(
@@ -67,8 +67,7 @@ def _capture_exception(hub, exc, mechanism_type="asgi"):
         hub.capture_event(event, hint=hint)
 
 
-def _looks_like_asgi3(app):
-    # type: (Any) -> bool
+def _looks_like_asgi3(app: Any) -> bool:
     """
     Try to figure out if an application object supports ASGI3.
 
@@ -88,12 +87,11 @@ class SentryAsgiMiddleware:
 
     def __init__(
         self,
-        app,
-        unsafe_context_data=False,
-        transaction_style="endpoint",
-        mechanism_type="asgi",
-    ):
-        # type: (Any, bool, str, str) -> None
+        app: Any,
+        unsafe_context_data: bool = False,
+        transaction_style: str = "endpoint",
+        mechanism_type: str = "asgi",
+    ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -129,24 +127,22 @@ class SentryAsgiMiddleware:
         self.app = app
 
         if _looks_like_asgi3(app):
-            self.__call__ = self._run_asgi3  # type: Callable[..., Any]
+            self.__call__: Callable[..., Any] = self._run_asgi3
         else:
             self.__call__ = self._run_asgi2
 
-    def _run_asgi2(self, scope):
-        # type: (Any) -> Any
-        async def inner(receive, send):
-            # type: (Any, Any) -> Any
+    def _run_asgi2(self, scope: Any) -> Any:
+        async def inner(receive: Any, send: Any) -> Any:
             return await self._run_app(scope, receive, send, asgi_version=2)
 
         return inner
 
-    async def _run_asgi3(self, scope, receive, send):
-        # type: (Any, Any, Any) -> Any
+    async def _run_asgi3(self, scope: Any, receive: Any, send: Any) -> Any:
         return await self._run_app(scope, receive, send, asgi_version=3)
 
-    async def _run_app(self, scope, receive, send, asgi_version):
-        # type: (Any, Any, Any, Any, int) -> Any
+    async def _run_app(
+        self: Any, scope: Any, receive: Any, send: Any, asgi_version: int
+    ) -> Any:
         is_recursive_asgi_middleware = _asgi_middleware_applied.get(False)
         is_lifespan = scope["type"] == "lifespan"
         if is_recursive_asgi_middleware or is_lifespan:
@@ -214,8 +210,9 @@ class SentryAsgiMiddleware:
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
 
-                            async def _sentry_wrapped_send(event):
-                                # type: (Dict[str, Any]) -> Any
+                            async def _sentry_wrapped_send(
+                                event: Dict[str, Any]
+                            ) -> Any:
                                 is_http_response = (
                                     event.get("type") == "http.response.start"
                                     and transaction is not None
@@ -242,8 +239,9 @@ class SentryAsgiMiddleware:
         finally:
             _asgi_middleware_applied.set(False)
 
-    def event_processor(self, event, hint, asgi_scope):
-        # type: (Event, Hint, Any) -> Optional[Event]
+    def event_processor(
+        self, event: Event, hint: Hint, asgi_scope: Any
+    ) -> Optional[Event]:
         request_data = event.get("request", {})
         request_data.update(_get_request_data(asgi_scope))
         event["request"] = deepcopy(request_data)
@@ -276,8 +274,9 @@ class SentryAsgiMiddleware:
     # data to your liking it's recommended to use the `before_send` callback
     # for that.
 
-    def _get_transaction_name_and_source(self, transaction_style, asgi_scope):
-        # type: (SentryAsgiMiddleware, str, Any) -> Tuple[str, str]
+    def _get_transaction_name_and_source(
+        self: SentryAsgiMiddleware, transaction_style: str, asgi_scope: Any
+    ) -> Tuple[str, str]:
         name = None
         source = SOURCE_FOR_STYLE[transaction_style]
         ty = asgi_scope.get("type")

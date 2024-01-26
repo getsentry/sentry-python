@@ -32,10 +32,9 @@ except ImportError:
 
 
 class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
-    def __call__(self, event, context):
-        # type: (Any, Any) -> Any
+    def __call__(self, event: Any, context: Any) -> Any:
         hub = Hub.current
-        client = hub.client  # type: Any
+        client: Any = hub.client
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -57,13 +56,11 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 reraise(*exc_info)
 
 
-def _get_view_function_response(app, view_function, function_args):
-    # type: (Any, F, Any) -> F
+def _get_view_function_response(app: Any, view_function: F, function_args: Any) -> F:
     @wraps(view_function)
-    def wrapped_view_function(**function_args):
-        # type: (**Any) -> Any
+    def wrapped_view_function(**function_args: Any) -> Any:
         hub = Hub.current
-        client = hub.client  # type: Any
+        client: Any = hub.client
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
@@ -101,9 +98,7 @@ class ChaliceIntegration(Integration):
     identifier = "chalice"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(CHALICE_VERSION)
 
         if version is None:
@@ -118,8 +113,9 @@ class ChaliceIntegration(Integration):
                 RestAPIEventHandler._get_view_function_response
             )
 
-        def sentry_event_response(app, view_function, function_args):
-            # type: (Any, F, Dict[str, Any]) -> Any
+        def sentry_event_response(
+            app: Any, view_function: F, function_args: Dict[str, Any]
+        ) -> Any:
             wrapped_view_function = _get_view_function_response(
                 app, view_function, function_args
             )

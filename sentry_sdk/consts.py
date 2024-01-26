@@ -241,65 +241,67 @@ class OP:
 class ClientConstructor:
     def __init__(
         self,
-        dsn=None,  # type: Optional[str]
-        max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
-        release=None,  # type: Optional[str]
-        environment=None,  # type: Optional[str]
-        server_name=None,  # type: Optional[str]
-        shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[Integration]  # noqa: B006
-        in_app_include=[],  # type: List[str]  # noqa: B006
-        in_app_exclude=[],  # type: List[str]  # noqa: B006
-        default_integrations=True,  # type: bool
-        dist=None,  # type: Optional[str]
-        transport=None,  # type: Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]
-        transport_queue_size=DEFAULT_QUEUE_SIZE,  # type: int
-        sample_rate=1.0,  # type: float
-        send_default_pii=False,  # type: bool
-        http_proxy=None,  # type: Optional[str]
-        https_proxy=None,  # type: Optional[str]
-        ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
-        max_request_body_size="medium",  # type: str
-        before_send=None,  # type: Optional[EventProcessor]
-        before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
-        debug=None,  # type: Optional[bool]
-        attach_stacktrace=False,  # type: bool
-        ca_certs=None,  # type: Optional[str]
-        propagate_traces=True,  # type: bool
-        traces_sample_rate=None,  # type: Optional[float]
-        traces_sampler=None,  # type: Optional[TracesSampler]
-        profiles_sample_rate=None,  # type: Optional[float]
-        profiles_sampler=None,  # type: Optional[TracesSampler]
-        profiler_mode=None,  # type: Optional[ProfilerMode]
-        auto_enabling_integrations=True,  # type: bool
-        auto_session_tracking=True,  # type: bool
-        send_client_reports=True,  # type: bool
-        _experiments={},  # type: Experiments  # noqa: B006
-        proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
-        before_send_transaction=None,  # type: Optional[TransactionProcessor]
-        project_root=None,  # type: Optional[str]
-        enable_tracing=None,  # type: Optional[bool]
-        include_local_variables=True,  # type: Optional[bool]
-        include_source_context=True,  # type: Optional[bool]
-        trace_propagation_targets=[  # noqa: B006
-            MATCH_ALL
-        ],  # type: Optional[Sequence[str]]
-        functions_to_trace=[],  # type: Sequence[Dict[str, str]]  # noqa: B006
-        event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
-        max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
-        enable_backpressure_handling=True,  # type: bool
-        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
-        enable_db_query_source=False,  # type: bool
-        db_query_source_threshold_ms=100,  # type: int
-        spotlight=None,  # type: Optional[Union[bool, str]]
-    ):
-        # type: (...) -> None
+        dsn: Optional[str] = None,
+        max_breadcrumbs: int = DEFAULT_MAX_BREADCRUMBS,
+        release: Optional[str] = None,
+        environment: Optional[str] = None,
+        server_name: Optional[str] = None,
+        shutdown_timeout: float = 2,
+        integrations: Sequence[Integration] = [],  # noqa: B006
+        in_app_include: List[str] = [],  # noqa: B006
+        in_app_exclude: List[str] = [],  # noqa: B006
+        default_integrations: bool = True,
+        dist: Optional[str] = None,
+        transport: Optional[
+            Union[
+                sentry_sdk.transport.Transport,
+                Type[sentry_sdk.transport.Transport],
+                Callable[[Event], None],
+            ]
+        ] = None,
+        transport_queue_size: int = DEFAULT_QUEUE_SIZE,
+        sample_rate: float = 1.0,
+        send_default_pii: bool = False,
+        http_proxy: Optional[str] = None,
+        https_proxy: Optional[str] = None,
+        ignore_errors: Sequence[Union[type, str]] = [],  # noqa: B006
+        max_request_body_size: str = "medium",
+        before_send: Optional[EventProcessor] = None,
+        before_breadcrumb: Optional[BreadcrumbProcessor] = None,
+        debug: Optional[bool] = None,
+        attach_stacktrace: bool = False,
+        ca_certs: Optional[str] = None,
+        propagate_traces: bool = True,
+        traces_sample_rate: Optional[float] = None,
+        traces_sampler: Optional[TracesSampler] = None,
+        profiles_sample_rate: Optional[float] = None,
+        profiles_sampler: Optional[TracesSampler] = None,
+        profiler_mode: Optional[ProfilerMode] = None,
+        auto_enabling_integrations: bool = True,
+        auto_session_tracking: bool = True,
+        send_client_reports: bool = True,
+        _experiments: Experiments = {},  # noqa: B006
+        proxy_headers: Optional[Dict[str, str]] = None,
+        instrumenter: Optional[str] = INSTRUMENTER.SENTRY,
+        before_send_transaction: Optional[TransactionProcessor] = None,
+        project_root: Optional[str] = None,
+        enable_tracing: Optional[bool] = None,
+        include_local_variables: Optional[bool] = True,
+        include_source_context: Optional[bool] = True,
+        trace_propagation_targets: Optional[Sequence[str]] = [MATCH_ALL],  # noqa: B006
+        functions_to_trace: Sequence[Dict[str, str]] = [],  # noqa: B006
+        event_scrubber: Optional[sentry_sdk.scrubber.EventScrubber] = None,
+        max_value_length: int = DEFAULT_MAX_VALUE_LENGTH,
+        enable_backpressure_handling: bool = True,
+        error_sampler: Optional[Callable[[Event, Hint], Union[float, bool]]] = None,
+        enable_db_query_source: bool = False,
+        db_query_source_threshold_ms: int = 100,
+        spotlight: Optional[Union[bool, str]] = None,
+    ) -> None:
         pass
 
 
-def _get_default_options():
-    # type: () -> Dict[str, Any]
+def _get_default_options() -> Dict[str, Any]:
     import inspect
 
     if hasattr(inspect, "getfullargspec"):

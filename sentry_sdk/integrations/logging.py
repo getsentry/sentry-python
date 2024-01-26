@@ -43,9 +43,8 @@ _IGNORED_LOGGERS = set(
 
 
 def ignore_logger(
-    name,  # type: str
-):
-    # type: (...) -> None
+    name: str,
+) -> None:
     """This disables recording (both in breadcrumbs and as events) calls to
     a logger of a specific name.  Among other uses, many of our integrations
     use this to prevent their actions being recorded as breadcrumbs. Exposed
@@ -59,8 +58,11 @@ def ignore_logger(
 class LoggingIntegration(Integration):
     identifier = "logging"
 
-    def __init__(self, level=DEFAULT_LEVEL, event_level=DEFAULT_EVENT_LEVEL):
-        # type: (Optional[int], Optional[int]) -> None
+    def __init__(
+        self,
+        level: Optional[int] = DEFAULT_LEVEL,
+        event_level: Optional[int] = DEFAULT_EVENT_LEVEL,
+    ) -> None:
         self._handler = None
         self._breadcrumb_handler = None
 
@@ -70,8 +72,7 @@ class LoggingIntegration(Integration):
         if event_level is not None:
             self._handler = EventHandler(level=event_level)
 
-    def _handle_record(self, record):
-        # type: (LogRecord) -> None
+    def _handle_record(self, record: LogRecord) -> None:
         if self._handler is not None and record.levelno >= self._handler.level:
             self._handler.handle(record)
 
@@ -82,12 +83,10 @@ class LoggingIntegration(Integration):
             self._breadcrumb_handler.handle(record)
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         old_callhandlers = logging.Logger.callHandlers
 
-        def sentry_patched_callhandlers(self, record):
-            # type: (Any, LogRecord) -> Any
+        def sentry_patched_callhandlers(self: Any, record: LogRecord) -> Any:
             # keeping a local reference because the
             # global might be discarded on shutdown
             ignored_loggers = _IGNORED_LOGGERS
@@ -138,22 +137,19 @@ class _BaseHandler(logging.Handler, object):
         )
     )
 
-    def _can_record(self, record):
-        # type: (LogRecord) -> bool
+    def _can_record(self, record: LogRecord) -> bool:
         """Prevents ignored loggers from recording"""
         for logger in _IGNORED_LOGGERS:
             if fnmatch(record.name, logger):
                 return False
         return True
 
-    def _logging_to_event_level(self, record):
-        # type: (LogRecord) -> str
+    def _logging_to_event_level(self, record: LogRecord) -> str:
         return LOGGING_TO_EVENT_LEVEL.get(
             record.levelno, record.levelname.lower() if record.levelname else ""
         )
 
-    def _extra_from_record(self, record):
-        # type: (LogRecord) -> Dict[str, None]
+    def _extra_from_record(self, record: LogRecord) -> Dict[str, None]:
         return {
             k: v
             for k, v in vars(record).items()
@@ -169,14 +165,12 @@ class EventHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
-    def emit(self, record):
-        # type: (LogRecord) -> Any
+    def emit(self, record: LogRecord) -> Any:
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
-    def _emit(self, record):
-        # type: (LogRecord) -> None
+    def _emit(self, record: LogRecord) -> None:
         if not self._can_record(record):
             return
 
@@ -261,14 +255,12 @@ class BreadcrumbHandler(_BaseHandler):
     Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
-    def emit(self, record):
-        # type: (LogRecord) -> Any
+    def emit(self, record: LogRecord) -> Any:
         with capture_internal_exceptions():
             self.format(record)
             return self._emit(record)
 
-    def _emit(self, record):
-        # type: (LogRecord) -> None
+    def _emit(self, record: LogRecord) -> None:
         if not self._can_record(record):
             return
 
@@ -276,8 +268,7 @@ class BreadcrumbHandler(_BaseHandler):
             self._breadcrumb_from_record(record), hint={"log_record": record}
         )
 
-    def _breadcrumb_from_record(self, record):
-        # type: (LogRecord) -> Dict[str, Any]
+    def _breadcrumb_from_record(self, record: LogRecord) -> Dict[str, Any]:
         return {
             "type": "log",
             "level": self._logging_to_event_level(record),

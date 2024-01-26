@@ -41,8 +41,7 @@ class OpenTelemetryIntegration(Integration):
     identifier = "opentelemetry"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         logger.warning(
             "[OTel] Initializing highly experimental OpenTelemetry support. "
             "Use at your own risk."
@@ -70,8 +69,7 @@ class OpenTelemetryIntegration(Integration):
         logger.debug("[OTel] Finished setting up OpenTelemetry integration")
 
 
-def _record_unpatched_classes():
-    # type: () -> Dict[str, type]
+def _record_unpatched_classes() -> Dict[str, type]:
     """
     Keep references to classes that are about to be instrumented.
 
@@ -95,8 +93,7 @@ def _record_unpatched_classes():
     return original_classes
 
 
-def _patch_remaining_classes(original_classes):
-    # type: (Dict[str, type]) -> None
+def _patch_remaining_classes(original_classes: Dict[str, type]) -> None:
     """
     Best-effort attempt to patch any uninstrumented classes in sys.modules.
 
@@ -157,14 +154,12 @@ def _patch_remaining_classes(original_classes):
                     setattr(module, var_name, instrumented_classes[package])
 
 
-def _import_by_path(path):
-    # type: (str) -> type
+def _import_by_path(path: str) -> type:
     parts = path.rsplit(".", maxsplit=1)
     return getattr(import_module(parts[0]), parts[-1])
 
 
-def _setup_sentry_tracing():
-    # type: () -> None
+def _setup_sentry_tracing() -> None:
     provider = TracerProvider()
 
     provider.add_span_processor(SentrySpanProcessor())

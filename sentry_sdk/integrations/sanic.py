@@ -59,8 +59,9 @@ class SanicIntegration(Integration):
     identifier = "sanic"
     version = None
 
-    def __init__(self, unsampled_statuses=frozenset({404})):
-        # type: (Optional[Container[int]]) -> None
+    def __init__(
+        self, unsampled_statuses: Optional[Container[int]] = frozenset({404})
+    ) -> None:
         """
         The unsampled_statuses parameter can be used to specify for which HTTP statuses the
         transactions should not be sent to Sentry. By default, transactions are sent for all
@@ -70,9 +71,7 @@ class SanicIntegration(Integration):
         self._unsampled_statuses = unsampled_statuses or set()
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         SanicIntegration.version = parse_version(SANIC_VERSION)
 
         if SanicIntegration.version is None:
@@ -109,56 +108,45 @@ class SanicIntegration(Integration):
 
 
 class SanicRequestExtractor(RequestExtractor):
-    def content_length(self):
-        # type: () -> int
+    def content_length(self) -> int:
         if self.request.body is None:
             return 0
         return len(self.request.body)
 
-    def cookies(self):
-        # type: () -> Dict[str, str]
+    def cookies(self) -> Dict[str, str]:
         return dict(self.request.cookies)
 
-    def raw_data(self):
-        # type: () -> bytes
+    def raw_data(self) -> bytes:
         return self.request.body
 
-    def form(self):
-        # type: () -> RequestParameters
+    def form(self) -> RequestParameters:
         return self.request.form
 
-    def is_json(self):
-        # type: () -> bool
+    def is_json(self) -> bool:
         raise NotImplementedError()
 
-    def json(self):
-        # type: () -> Optional[Any]
+    def json(self) -> Optional[Any]:
         return self.request.json
 
-    def files(self):
-        # type: () -> RequestParameters
+    def files(self) -> RequestParameters:
         return self.request.files
 
-    def size_of_file(self, file):
-        # type: (Any) -> int
+    def size_of_file(self, file: Any) -> int:
         return len(file.body or ())
 
 
-def _setup_sanic():
-    # type: () -> None
+def _setup_sanic() -> None:
     Sanic._startup = _startup
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
-def _setup_legacy_sanic():
-    # type: () -> None
+def _setup_legacy_sanic() -> None:
     Sanic.handle_request = _legacy_handle_request
     Router.get = _legacy_router_get
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
-async def _startup(self):
-    # type: (Sanic) -> None
+async def _startup(self: Sanic) -> None:
     # This happens about as early in the lifecycle as possible, just after the
     # Request object is created. The body has not yet been consumed.
     self.signal("http.lifecycle.request")(_hub_enter)
@@ -177,8 +165,7 @@ async def _startup(self):
     await old_startup(self)
 
 
-async def _hub_enter(request):
-    # type: (Request) -> None
+async def _hub_enter(request: Request) -> None:
     hub = Hub.current
     request.ctx._sentry_do_integration = (
         hub.get_integration(SanicIntegration) is not None
@@ -207,13 +194,14 @@ async def _hub_enter(request):
     ).__enter__()
 
 
-async def _hub_exit(request, response=None):
-    # type: (Request, Optional[BaseHTTPResponse]) -> None
+async def _hub_exit(
+    request: Request, response: Optional[BaseHTTPResponse] = None
+) -> None:
     with capture_internal_exceptions():
         if not request.ctx._sentry_do_integration:
             return
 
-        integration = Hub.current.get_integration(SanicIntegration)  # type: Integration
+        integration: Integration = Hub.current.get_integration(SanicIntegration)
 
         response_status = None if response is None else response.status
 
@@ -230,8 +218,7 @@ async def _hub_exit(request, response=None):
         request.ctx._sentry_hub.__exit__(None, None, None)
 
 
-async def _set_transaction(request, route, **_):
-    # type: (Request, Route, **Any) -> None
+async def _set_transaction(request: Request, route: Route, **_: Any) -> None:
     hub = Hub.current
     if request.ctx._sentry_do_integration:
         with capture_internal_exceptions():
@@ -242,8 +229,9 @@ async def _set_transaction(request, route, **_):
                 )
 
 
-def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
-    # type: (Any, Exception, *Any, **Any) -> Optional[object]
+def _sentry_error_handler_lookup(
+    self: Any, exception: Exception, *args: Any, **kwargs: Any
+) -> Optional[object]:
     _capture_exception(exception)
     old_error_handler = old_error_handler_lookup(self, exception, *args, **kwargs)
 
@@ -253,8 +241,9 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     if Hub.current.get_integration(SanicIntegration) is None:
         return old_error_handler
 
-    async def sentry_wrapped_error_handler(request, exception):
-        # type: (Request, Exception) -> Any
+    async def sentry_wrapped_error_handler(
+        request: Request, exception: Exception
+    ) -> Any:
         try:
             response = old_error_handler(request, exception)
             if isawaitable(response):
@@ -276,8 +265,9 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     return sentry_wrapped_error_handler
 
 
-async def _legacy_handle_request(self, request, *args, **kwargs):
-    # type: (Any, Request, *Any, **Any) -> Any
+async def _legacy_handle_request(
+    self: Any, request: Request, *args: Any, **kwargs: Any
+) -> Any:
     hub = Hub.current
     if hub.get_integration(SanicIntegration) is None:
         return old_handle_request(self, request, *args, **kwargs)
@@ -296,8 +286,7 @@ async def _legacy_handle_request(self, request, *args, **kwargs):
         return response
 
 
-def _legacy_router_get(self, *args):
-    # type: (Any, Union[Any, Request]) -> Any
+def _legacy_router_get(self: Any, *args: Union[Any, Request]) -> Any:
     rv = old_router_get(self, *args)
     hub = Hub.current
     if hub.get_integration(SanicIntegration) is not None:
@@ -327,15 +316,16 @@ def _legacy_router_get(self, *args):
     return rv
 
 
-def _capture_exception(exception):
-    # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
+def _capture_exception(
+    exception: Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]
+) -> None:
     hub = Hub.current
     integration = hub.get_integration(SanicIntegration)
     if integration is None:
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
+    client: Any = hub.client
 
     with capture_internal_exceptions():
         event, hint = event_from_exception(
@@ -346,11 +336,8 @@ def _capture_exception(exception):
         hub.capture_event(event, hint=hint)
 
 
-def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> EventProcessor
-    def sanic_processor(event, hint):
-        # type: (Event, Optional[Hint]) -> Optional[Event]
-
+def _make_request_processor(weak_request: Callable[[], Request]) -> EventProcessor:
+    def sanic_processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
         try:
             if hint and issubclass(hint["exc_info"][0], SanicException):
                 return None

@@ -42,8 +42,7 @@ ignore_logger("strawberry.execution")
 class StrawberryIntegration(Integration):
     identifier = "strawberry"
 
-    def __init__(self, async_execution=None):
-        # type: (Optional[bool]) -> None
+    def __init__(self, async_execution: Optional[bool] = None) -> None:
         if async_execution not in (None, False, True):
             raise ValueError(
                 'Invalid value for async_execution: "{}" (must be bool)'.format(
@@ -53,8 +52,7 @@ class StrawberryIntegration(Integration):
         self.async_execution = async_execution
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         version = package_version("strawberry-graphql")
 
         if version is None:
@@ -70,12 +68,10 @@ class StrawberryIntegration(Integration):
         _patch_views()
 
 
-def _patch_schema_init():
-    # type: () -> None
+def _patch_schema_init() -> None:
     old_schema_init = Schema.__init__
 
-    def _sentry_patched_schema_init(self, *args, **kwargs):
-        # type: (Schema, Any, Any) -> None
+    def _sentry_patched_schema_init(self: Schema, *args: Any, **kwargs: Any) -> None:
         integration = Hub.current.get_integration(StrawberryIntegration)
         if integration is None:
             return old_schema_init(self, *args, **kwargs)
@@ -116,17 +112,15 @@ def _patch_schema_init():
 
 class SentryAsyncExtension(SchemaExtension):  # type: ignore
     def __init__(
-        self,
+        self: Any,
         *,
-        execution_context=None,
-    ):
-        # type: (Any, Optional[ExecutionContext]) -> None
+        execution_context: Optional[ExecutionContext] = None,
+    ) -> None:
         if execution_context:
             self.execution_context = execution_context
 
     @cached_property
-    def _resource_name(self):
-        # type: () -> str
+    def _resource_name(self) -> str:
         query_hash = self.hash_query(self.execution_context.query)
 
         if self.execution_context.operation_name:
@@ -134,12 +128,10 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         return query_hash
 
-    def hash_query(self, query):
-        # type: (str) -> str
+    def hash_query(self, query: str) -> str:
         return hashlib.md5(query.encode("utf-8")).hexdigest()
 
-    def on_operation(self):
-        # type: () -> Generator[None, None, None]
+    def on_operation(self) -> Generator[None, None, None]:
         self._operation_name = self.execution_context.operation_name
 
         operation_type = "query"
@@ -181,8 +173,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         self.graphql_span.finish()
 
-    def on_validate(self):
-        # type: () -> Generator[None, None, None]
+    def on_validate(self) -> Generator[None, None, None]:
         self.validation_span = self.graphql_span.start_child(
             op=OP.GRAPHQL_VALIDATE, description="validation"
         )
@@ -191,8 +182,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         self.validation_span.finish()
 
-    def on_parse(self):
-        # type: () -> Generator[None, None, None]
+    def on_parse(self) -> Generator[None, None, None]:
         self.parsing_span = self.graphql_span.start_child(
             op=OP.GRAPHQL_PARSE, description="parsing"
         )
@@ -201,12 +191,21 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         self.parsing_span.finish()
 
-    def should_skip_tracing(self, _next, info):
-        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], GraphQLResolveInfo) -> bool
+    def should_skip_tracing(
+        self,
+        _next: Callable[[Any, GraphQLResolveInfo, Any, Any], Any],
+        info: GraphQLResolveInfo,
+    ) -> bool:
         return strawberry_should_skip_tracing(_next, info)
 
-    async def _resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
+    async def _resolve(
+        self,
+        _next: Callable[[Any, GraphQLResolveInfo, Any, Any], Any],
+        root: Any,
+        info: GraphQLResolveInfo,
+        *args: str,
+        **kwargs: Any,
+    ) -> Any:
         result = _next(root, info, *args, **kwargs)
 
         if isawaitable(result):
@@ -214,8 +213,14 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         return result
 
-    async def resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable[[Any, GraphQLResolveInfo, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
+    async def resolve(
+        self,
+        _next: Callable[[Any, GraphQLResolveInfo, Any, Any], Any],
+        root: Any,
+        info: GraphQLResolveInfo,
+        *args: str,
+        **kwargs: Any,
+    ) -> Any:
         if self.should_skip_tracing(_next, info):
             return await self._resolve(_next, root, info, *args, **kwargs)
 
@@ -233,8 +238,14 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
 
 class SentrySyncExtension(SentryAsyncExtension):
-    def resolve(self, _next, root, info, *args, **kwargs):
-        # type: (Callable[[Any, Any, Any, Any], Any], Any, GraphQLResolveInfo, str, Any) -> Any
+    def resolve(
+        self,
+        _next: Callable[[Any, Any, Any, Any], Any],
+        root: Any,
+        info: GraphQLResolveInfo,
+        *args: str,
+        **kwargs: Any,
+    ) -> Any:
         if self.should_skip_tracing(_next, info):
             return _next(root, info, *args, **kwargs)
 
@@ -251,13 +262,13 @@ class SentrySyncExtension(SentryAsyncExtension):
             return _next(root, info, *args, **kwargs)
 
 
-def _patch_execute():
-    # type: () -> None
+def _patch_execute() -> None:
     old_execute_async = strawberry_schema.execute
     old_execute_sync = strawberry_schema.execute_sync
 
-    async def _sentry_patched_execute_async(*args, **kwargs):
-        # type: (Any, Any) -> ExecutionResult
+    async def _sentry_patched_execute_async(
+        *args: Any, **kwargs: Any
+    ) -> ExecutionResult:
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
@@ -274,8 +285,7 @@ def _patch_execute():
 
         return result
 
-    def _sentry_patched_execute_sync(*args, **kwargs):
-        # type: (Any, Any) -> ExecutionResult
+    def _sentry_patched_execute_sync(*args: Any, **kwargs: Any) -> ExecutionResult:
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
@@ -296,23 +306,25 @@ def _patch_execute():
     strawberry_schema.execute_sync = _sentry_patched_execute_sync
 
 
-def _patch_views():
-    # type: () -> None
+def _patch_views() -> None:
     old_async_view_handle_errors = async_base_view.AsyncBaseHTTPView._handle_errors
     old_sync_view_handle_errors = sync_base_view.SyncBaseHTTPView._handle_errors
 
-    def _sentry_patched_async_view_handle_errors(self, errors, response_data):
-        # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
+    def _sentry_patched_async_view_handle_errors(
+        self: Any, errors: List[GraphQLError], response_data: GraphQLHTTPResponse
+    ) -> None:
         old_async_view_handle_errors(self, errors, response_data)
         _sentry_patched_handle_errors(self, errors, response_data)
 
-    def _sentry_patched_sync_view_handle_errors(self, errors, response_data):
-        # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
+    def _sentry_patched_sync_view_handle_errors(
+        self: Any, errors: List[GraphQLError], response_data: GraphQLHTTPResponse
+    ) -> None:
         old_sync_view_handle_errors(self, errors, response_data)
         _sentry_patched_handle_errors(self, errors, response_data)
 
-    def _sentry_patched_handle_errors(self, errors, response_data):
-        # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
+    def _sentry_patched_handle_errors(
+        self: Any, errors: List[GraphQLError], response_data: GraphQLHTTPResponse
+    ) -> None:
         hub = Hub.current
         integration = hub.get_integration(StrawberryIntegration)
         if integration is None:
@@ -345,11 +357,10 @@ def _patch_views():
     )
 
 
-def _make_request_event_processor(execution_context):
-    # type: (ExecutionContext) -> EventProcessor
-
-    def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _make_request_event_processor(
+    execution_context: ExecutionContext,
+) -> EventProcessor:
+    def inner(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_data = event.setdefault("request", {})
@@ -376,11 +387,10 @@ def _make_request_event_processor(execution_context):
     return inner
 
 
-def _make_response_event_processor(response_data):
-    # type: (GraphQLHTTPResponse) -> EventProcessor
-
-    def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _make_response_event_processor(
+    response_data: GraphQLHTTPResponse,
+) -> EventProcessor:
+    def inner(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 contexts = event.setdefault("contexts", {})
@@ -391,8 +401,7 @@ def _make_response_event_processor(response_data):
     return inner
 
 
-def _guess_if_using_async(extensions):
-    # type: (List[SchemaExtension]) -> bool
+def _guess_if_using_async(extensions: List[SchemaExtension]) -> bool:
     if StrawberrySentryAsyncExtension in extensions:
         return True
     elif StrawberrySentrySyncExtension in extensions:

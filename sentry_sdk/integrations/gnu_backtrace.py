@@ -38,17 +38,18 @@ class GnuBacktraceIntegration(Integration):
     identifier = "gnu_backtrace"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def process_gnu_backtrace(event, hint):
-            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        def process_gnu_backtrace(
+            event: Dict[str, Any], hint: Dict[str, Any]
+        ) -> Dict[str, Any]:
             with capture_internal_exceptions():
                 return _process_gnu_backtrace(event, hint)
 
 
-def _process_gnu_backtrace(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _process_gnu_backtrace(
+    event: Dict[str, Any], hint: Dict[str, Any]
+) -> Dict[str, Any]:
     if Hub.current.get_integration(GnuBacktraceIntegration) is None:
         return event
 

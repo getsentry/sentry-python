@@ -36,7 +36,7 @@ DEFAULT_EVENT_LEVEL = LoggingLevels.ERROR.value
 # in tests (they call `LoguruIntegration.__init__` multiple times,
 # and we can't use `setup_once` because it's called before
 # than we get configuration).
-_ADDED_HANDLERS = (None, None)  # type: Tuple[Optional[int], Optional[int]]
+_ADDED_HANDLERS: Tuple[Optional[int], Optional[int]] = (None, None)
 
 
 class LoguruIntegration(Integration):
@@ -44,12 +44,11 @@ class LoguruIntegration(Integration):
 
     def __init__(
         self,
-        level=DEFAULT_LEVEL,
-        event_level=DEFAULT_EVENT_LEVEL,
-        breadcrumb_format=DEFAULT_FORMAT,
-        event_format=DEFAULT_FORMAT,
-    ):
-        # type: (Optional[int], Optional[int], str | loguru.FormatFunction, str | loguru.FormatFunction) -> None
+        level: Optional[int] = DEFAULT_LEVEL,
+        event_level: Optional[int] = DEFAULT_EVENT_LEVEL,
+        breadcrumb_format: str | loguru.FormatFunction = DEFAULT_FORMAT,
+        event_format: str | loguru.FormatFunction = DEFAULT_FORMAT,
+    ) -> None:
         global _ADDED_HANDLERS
         breadcrumb_handler, event_handler = _ADDED_HANDLERS
 
@@ -77,14 +76,12 @@ class LoguruIntegration(Integration):
         _ADDED_HANDLERS = (breadcrumb_handler, event_handler)
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         pass  # we do everything in __init__
 
 
 class _LoguruBaseHandler(_BaseHandler):
-    def _logging_to_event_level(self, record):
-        # type: (LogRecord) -> str
+    def _logging_to_event_level(self, record: LogRecord) -> str:
         try:
             return LoggingLevels(record.levelno).name.lower()
         except ValueError:

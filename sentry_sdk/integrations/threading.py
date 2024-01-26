@@ -21,18 +21,15 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_hub=False):
-        # type: (bool) -> None
+    def __init__(self, propagate_hub: bool = False) -> None:
         self.propagate_hub = propagate_hub
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         old_start = Thread.start
 
         @wraps(old_start)
-        def sentry_start(self, *a, **kw):
-            # type: (Thread, *Any, **Any) -> Any
+        def sentry_start(self: Thread, *a: Any, **kw: Any) -> Any:
             hub = Hub.current
             integration = hub.get_integration(ThreadingIntegration)
             if integration is not None:
@@ -55,11 +52,9 @@ class ThreadingIntegration(Integration):
         Thread.start = sentry_start  # type: ignore
 
 
-def _wrap_run(parent_hub, old_run_func):
-    # type: (Optional[Hub], F) -> F
+def _wrap_run(parent_hub: Optional[Hub], old_run_func: F) -> F:
     @wraps(old_run_func)
-    def run(*a, **kw):
-        # type: (*Any, **Any) -> Any
+    def run(*a: Any, **kw: Any) -> Any:
         hub = parent_hub or Hub.current
         with hub:
             try:
@@ -71,14 +66,13 @@ def _wrap_run(parent_hub, old_run_func):
     return run  # type: ignore
 
 
-def _capture_exception():
-    # type: () -> ExcInfo
+def _capture_exception() -> ExcInfo:
     hub = Hub.current
     exc_info = sys.exc_info()
 
     if hub.get_integration(ThreadingIntegration) is not None:
         # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+        client: Any = hub.client
 
         event, hint = event_from_exception(
             exc_info,

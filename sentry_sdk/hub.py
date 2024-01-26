@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 from contextlib import contextmanager
 
@@ -46,16 +48,14 @@ if TYPE_CHECKING:
 
 else:
 
-    def overload(x):
-        # type: (T) -> T
+    def overload(x: T) -> T:
         return x
 
 
 _local = ContextVar("sentry_current_hub")
 
 
-def _should_send_default_pii():
-    # type: () -> bool
+def _should_send_default_pii() -> bool:
     client = Hub.current.client
     if not client:
         return False
@@ -63,31 +63,26 @@ def _should_send_default_pii():
 
 
 class _InitGuard:
-    def __init__(self, client):
-        # type: (Client) -> None
+    def __init__(self, client: Client) -> None:
         self._client = client
 
-    def __enter__(self):
-        # type: () -> _InitGuard
+    def __enter__(self) -> _InitGuard:
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: Any, exc_value: Any, tb: Any) -> None:
         c = self._client
         if c is not None:
             c.close()
 
 
-def _check_python_deprecations():
-    # type: () -> None
+def _check_python_deprecations() -> None:
     # Since we're likely to deprecate Python versions in the future, I'm keeping
     # this handy function around. Use this to detect the Python version used and
     # to output logger.warning()s if it's deprecated.
     pass
 
 
-def _init(*args, **kwargs):
-    # type: (*Optional[str], **Any) -> ContextManager[Any]
+def _init(*args: Optional[str], **kwargs: Any) -> ContextManager[Any]:
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.
@@ -121,8 +116,7 @@ else:
 
 class HubMeta(type):
     @property
-    def current(cls):
-        # type: () -> Hub
+    def current(cls) -> Hub:
         """Returns the current instance of the hub."""
         rv = _local.get(None)
         if rv is None:
@@ -131,27 +125,23 @@ class HubMeta(type):
         return rv
 
     @property
-    def main(cls):
-        # type: () -> Hub
+    def main(cls) -> Hub:
         """Returns the main instance of the hub."""
         return GLOBAL_HUB
 
 
 class _ScopeManager:
-    def __init__(self, hub):
-        # type: (Hub) -> None
+    def __init__(self, hub: Hub) -> None:
         self._hub = hub
         self._original_len = len(hub._stack)
         self._layer = hub._stack[-1]
 
-    def __enter__(self):
-        # type: () -> Scope
+    def __enter__(self) -> Scope:
         scope = self._layer[1]
         assert scope is not None
         return scope
 
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: Any, exc_value: Any, tb: Any) -> None:
         current_len = len(self._hub._stack)
         if current_len < self._original_len:
             logger.error(
@@ -193,20 +183,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     If the hub is used with a with statement it's temporarily activated.
     """
 
-    _stack = None  # type: List[Tuple[Optional[Client], Scope]]
+    _stack: List[Tuple[Optional[Client], Scope]] = None
 
     # Mypy doesn't pick up on the metaclass.
 
     if TYPE_CHECKING:
-        current = None  # type: Hub
-        main = None  # type: Hub
+        current: Hub = None
+        main: Hub = None
 
     def __init__(
         self,
-        client_or_hub=None,  # type: Optional[Union[Hub, Client]]
-        scope=None,  # type: Optional[Any]
-    ):
-        # type: (...) -> None
+        client_or_hub: Optional[Union[Hub, Client]] = None,
+        scope: Optional[Any] = None,
+    ) -> None:
         if isinstance(client_or_hub, Hub):
             hub = client_or_hub
             client, other_scope = hub._stack[-1]
@@ -218,39 +207,31 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             scope = Scope()
 
         self._stack = [(client, scope)]
-        self._last_event_id = None  # type: Optional[str]
-        self._old_hubs = []  # type: List[Hub]
+        self._last_event_id: Optional[str] = None
+        self._old_hubs: List[Hub] = []
 
-    def __enter__(self):
-        # type: () -> Hub
+    def __enter__(self) -> Hub:
         self._old_hubs.append(Hub.current)
         _local.set(self)
         return self
 
     def __exit__(
         self,
-        exc_type,  # type: Optional[type]
-        exc_value,  # type: Optional[BaseException]
-        tb,  # type: Optional[Any]
-    ):
-        # type: (...) -> None
+        exc_type: Optional[type],
+        exc_value: Optional[BaseException],
+        tb: Optional[Any],
+    ) -> None:
         old = self._old_hubs.pop()
         _local.set(old)
 
-    def run(
-        self, callback  # type: Callable[[], T]
-    ):
-        # type: (...) -> T
+    def run(self, callback: Callable[[], T]) -> T:
         """Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
         with self:
             return callback()
 
-    def get_integration(
-        self, name_or_class  # type: Union[str, Type[Integration]]
-    ):
-        # type: (...) -> Any
+    def get_integration(self, name_or_class: Union[str, Type[Integration]]) -> Any:
         """Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
@@ -263,32 +244,31 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return client.get_integration(name_or_class)
 
     @property
-    def client(self):
-        # type: () -> Optional[Client]
+    def client(self) -> Optional[Client]:
         """Returns the current client on the hub."""
         return self._stack[-1][0]
 
     @property
-    def scope(self):
-        # type: () -> Scope
+    def scope(self) -> Scope:
         """Returns the current scope on the hub."""
         return self._stack[-1][1]
 
-    def last_event_id(self):
-        # type: () -> Optional[str]
+    def last_event_id(self) -> Optional[str]:
         """Returns the last event ID."""
         return self._last_event_id
 
-    def bind_client(
-        self, new  # type: Optional[Client]
-    ):
-        # type: (...) -> None
+    def bind_client(self, new: Optional[Client]) -> None:
         """Binds a new client to the hub."""
         top = self._stack[-1]
         self._stack[-1] = (new, top[1])
 
-    def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
-        # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
+    def capture_event(
+        self,
+        event: Event,
+        hint: Optional[Hint] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """
         Captures an event.
 
@@ -319,8 +299,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
+    def capture_message(
+        self,
+        message: str,
+        level: Optional[str] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """
         Captures a message.
 
@@ -352,8 +337,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def capture_exception(self, error=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
+    def capture_exception(
+        self,
+        error: Optional[Union[BaseException, ExcInfo]] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """Captures an exception.
 
         Alias of :py:meth:`sentry_sdk.Scope.capture_exception`.
@@ -382,10 +371,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
+    def _capture_internal_exception(self, exc_info: Any) -> Any:
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.
@@ -396,8 +382,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
+    def add_breadcrumb(
+        self,
+        crumb: Optional[Breadcrumb] = None,
+        hint: Optional[BreadcrumbHint] = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Adds a breadcrumb.
 
@@ -415,8 +405,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         scope.add_breadcrumb(crumb, hint, **kwargs)
 
-    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (Optional[Span], str, Any) -> Span
+    def start_span(
+        self,
+        span: Optional[Span] = None,
+        instrumenter: str = INSTRUMENTER.SENTRY,
+        **kwargs: Any,
+    ) -> Span:
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -440,9 +434,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return scope.start_span(span=span, instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
-        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
-    ):
-        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
+        self,
+        transaction: Optional[Transaction] = None,
+        instrumenter: str = INSTRUMENTER.SENTRY,
+        **kwargs: Any,
+    ) -> Union[Transaction, NoOpSpan]:
         """
         Start and return a transaction.
 
@@ -476,8 +472,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             transaction=transaction, instrumenter=instrumenter, **kwargs
         )
 
-    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    def continue_trace(
+        self,
+        environ_or_headers: Dict[str, Any],
+        op: Optional[str] = None,
+        name: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> Transaction:
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
@@ -488,25 +489,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         )
 
     @overload
-    def push_scope(
-        self, callback=None  # type: Optional[None]
-    ):
-        # type: (...) -> ContextManager[Scope]
+    def push_scope(self, callback: Optional[None] = None) -> ContextManager[Scope]:
         pass
 
     @overload
-    def push_scope(  # noqa: F811
-        self, callback  # type: Callable[[Scope], None]
-    ):
-        # type: (...) -> None
+    def push_scope(self, callback: Callable[[Scope], None]) -> None:  # noqa: F811
         pass
 
     def push_scope(  # noqa
         self,
-        callback=None,  # type: Optional[Callable[[Scope], None]]
-        continue_trace=True,  # type: bool
-    ):
-        # type: (...) -> Optional[ContextManager[Scope]]
+        callback: Optional[Callable[[Scope], None]] = None,
+        continue_trace: bool = True,
+    ) -> Optional[ContextManager[Scope]]:
         """
         Pushes a new layer on the scope stack.
 
@@ -533,8 +527,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return _ScopeManager(self)
 
-    def pop_scope_unsafe(self):
-        # type: () -> Tuple[Optional[Client], Scope]
+    def pop_scope_unsafe(self) -> Tuple[Optional[Client], Scope]:
         """
         Pops a scope layer from the stack.
 
@@ -545,26 +538,18 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return rv
 
     @overload
-    def configure_scope(
-        self, callback=None  # type: Optional[None]
-    ):
-        # type: (...) -> ContextManager[Scope]
+    def configure_scope(self, callback: Optional[None] = None) -> ContextManager[Scope]:
         pass
 
     @overload
-    def configure_scope(  # noqa: F811
-        self, callback  # type: Callable[[Scope], None]
-    ):
-        # type: (...) -> None
+    def configure_scope(self, callback: Callable[[Scope], None]) -> None:  # noqa: F811
         pass
 
     def configure_scope(  # noqa
         self,
-        callback=None,  # type: Optional[Callable[[Scope], None]]
-        continue_trace=True,  # type: bool
-    ):
-        # type: (...) -> Optional[ContextManager[Scope]]
-
+        callback: Optional[Callable[[Scope], None]] = None,
+        continue_trace: bool = True,
+    ) -> Optional[ContextManager[Scope]]:
         """
         Reconfigures the scope.
 
@@ -585,8 +570,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             return None
 
         @contextmanager
-        def inner():
-            # type: () -> Generator[Scope, None, None]
+        def inner() -> Generator[Scope, None, None]:
             if client is not None:
                 yield scope
             else:
@@ -594,10 +578,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return inner()
 
-    def start_session(
-        self, session_mode="application"  # type: str
-    ):
-        # type: (...) -> None
+    def start_session(self, session_mode: str = "application") -> None:
         """Starts a new session."""
         client, scope = self._stack[-1]
         scope.start_session(
@@ -605,14 +586,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             session_mode=session_mode,
         )
 
-    def end_session(self):
-        # type: (...) -> None
+    def end_session(self) -> None:
         """Ends the current session if there is one."""
         client, scope = self._stack[-1]
         scope.end_session(client=client)
 
-    def stop_auto_session_tracking(self):
-        # type: (...) -> None
+    def stop_auto_session_tracking(self) -> None:
         """Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
@@ -621,8 +600,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client, scope = self._stack[-1]
         scope.stop_auto_session_tracking(client=client)
 
-    def resume_auto_session_tracking(self):
-        # type: (...) -> None
+    def resume_auto_session_tracking(self) -> None:
         """Resumes automatic session tracking for the current scope if
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
@@ -632,10 +610,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def flush(
         self,
-        timeout=None,  # type: Optional[float]
-        callback=None,  # type: Optional[Callable[[int, float], None]]
-    ):
-        # type: (...) -> None
+        timeout: Optional[float] = None,
+        callback: Optional[Callable[[int, float], None]] = None,
+    ) -> None:
         """
         Alias for :py:meth:`sentry_sdk.Client.flush`
         """
@@ -643,16 +620,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if client is not None:
             return client.flush(timeout=timeout, callback=callback)
 
-    def get_traceparent(self):
-        # type: () -> Optional[str]
+    def get_traceparent(self) -> Optional[str]:
         """
         Returns the traceparent either from the active span or from the scope.
         """
         client, scope = self._stack[-1]
         return scope.get_traceparent(client=client)
 
-    def get_baggage(self):
-        # type: () -> Optional[str]
+    def get_baggage(self) -> Optional[str]:
         """
         Returns Baggage either from the active span or from the scope.
         """
@@ -664,8 +639,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return None
 
-    def iter_trace_propagation_headers(self, span=None):
-        # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
+    def iter_trace_propagation_headers(
+        self, span: Optional[Span] = None
+    ) -> Generator[Tuple[str, str], None, None]:
         """
         Return HTTP headers which allow propagation of trace data. Data taken
         from the span representing the request, if available, or the current
@@ -675,8 +651,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return scope.iter_trace_propagation_headers(span=span, client=client)
 
-    def trace_propagation_meta(self, span=None):
-        # type: (Optional[Span]) -> str
+    def trace_propagation_meta(self, span: Optional[Span] = None) -> str:
         """
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.

@@ -10,11 +10,10 @@ from sentry_sdk.utils import parse_version
 from pytest_chalice.handlers import RequestHandler
 
 
-def _generate_lambda_context(self):
+def _generate_lambda_context(self) -> LambdaContext:
     # Monkeypatch of the function _generate_lambda_context
     # from the class LocalGateway
     # for mock the timeout
-    # type: () -> LambdaContext
     if self._config.lambda_timeout is None:
         timeout = 10 * 1000
     else:

@@ -58,13 +58,11 @@ DEFAULT_DENYLIST = [
 
 
 class EventScrubber:
-    def __init__(self, denylist=None):
-        # type: (Optional[List[str]]) -> None
+    def __init__(self, denylist: Optional[List[str]] = None) -> None:
         self.denylist = DEFAULT_DENYLIST if denylist is None else denylist
         self.denylist = [x.lower() for x in self.denylist]
 
-    def scrub_dict(self, d):
-        # type: (Dict[str, Any]) -> None
+    def scrub_dict(self, d: Dict[str, Any]) -> None:
         if not isinstance(d, dict):
             return
 
@@ -72,8 +70,7 @@ class EventScrubber:
             if isinstance(k, str) and k.lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
 
-    def scrub_request(self, event):
-        # type: (Event) -> None
+    def scrub_request(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "request" in event:
                 if "headers" in event["request"]:
@@ -83,20 +80,17 @@ class EventScrubber:
                 if "data" in event["request"]:
                     self.scrub_dict(event["request"]["data"])
 
-    def scrub_extra(self, event):
-        # type: (Event) -> None
+    def scrub_extra(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "extra" in event:
                 self.scrub_dict(event["extra"])
 
-    def scrub_user(self, event):
-        # type: (Event) -> None
+    def scrub_user(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "user" in event:
                 self.scrub_dict(event["user"])
 
-    def scrub_breadcrumbs(self, event):
-        # type: (Event) -> None
+    def scrub_breadcrumbs(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "breadcrumbs" in event:
                 if "values" in event["breadcrumbs"]:
@@ -104,23 +98,20 @@ class EventScrubber:
                         if "data" in value:
                             self.scrub_dict(value["data"])
 
-    def scrub_frames(self, event):
-        # type: (Event) -> None
+    def scrub_frames(self, event: Event) -> None:
         with capture_internal_exceptions():
             for frame in iter_event_frames(event):
                 if "vars" in frame:
                     self.scrub_dict(frame["vars"])
 
-    def scrub_spans(self, event):
-        # type: (Event) -> None
+    def scrub_spans(self, event: Event) -> None:
         with capture_internal_exceptions():
             if "spans" in event:
                 for span in event["spans"]:
                     if "data" in span:
                         self.scrub_dict(span["data"])
 
-    def scrub_event(self, event):
-        # type: (Event) -> None
+    def scrub_event(self, event: Event) -> None:
         self.scrub_request(event)
         self.scrub_extra(event)
         self.scrub_user(event)

@@ -13,8 +13,13 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-def attach_explain_plan_to_span(span, connection, statement, parameters, options):
-    # type: (Span, Any, str, Any, dict[str, Any]) -> None
+def attach_explain_plan_to_span(
+    span: Span,
+    connection: Any,
+    statement: str,
+    parameters: Any,
+    options: dict[str, Any],
+) -> None:
     """
     Run EXPLAIN or EXPLAIN ANALYZE on the given statement and attach the explain plan to the span data.
 

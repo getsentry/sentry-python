@@ -38,8 +38,7 @@ if TYPE_CHECKING:
 
 if getattr(Request, "authenticated_userid", None):
 
-    def authenticated_userid(request):
-        # type: (Request) -> Optional[Any]
+    def authenticated_userid(request: Request) -> Optional[Any]:
         return request.authenticated_userid
 
 else:
@@ -55,8 +54,7 @@ class PyramidIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="route_name"):
-        # type: (str) -> None
+    def __init__(self, transaction_style: str = "route_name") -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -65,14 +63,14 @@ class PyramidIntegration(Integration):
         self.transaction_style = transaction_style
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         from pyramid import router
 
         old_call_view = router._call_view
 
-        def sentry_patched_call_view(registry, request, *args, **kwargs):
-            # type: (Any, Request, *Any, **Any) -> Response
+        def sentry_patched_call_view(
+            registry: Any, request: Request, *args: Any, **kwargs: Any
+        ) -> Response:
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
 
@@ -92,8 +90,9 @@ class PyramidIntegration(Integration):
         if hasattr(Request, "invoke_exception_view"):
             old_invoke_exception_view = Request.invoke_exception_view
 
-            def sentry_patched_invoke_exception_view(self, *args, **kwargs):
-                # type: (Request, *Any, **Any) -> Any
+            def sentry_patched_invoke_exception_view(
+                self: Request, *args: Any, **kwargs: Any
+            ) -> Any:
                 rv = old_invoke_exception_view(self, *args, **kwargs)
 
                 if (
@@ -110,15 +109,17 @@ class PyramidIntegration(Integration):
 
         old_wsgi_call = router.Router.__call__
 
-        def sentry_patched_wsgi_call(self, environ, start_response):
-            # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
+        def sentry_patched_wsgi_call(
+            self: Any, environ: Dict[str, str], start_response: Callable[..., Any]
+        ) -> _ScopedResponse:
             hub = Hub.current
             integration = hub.get_integration(PyramidIntegration)
             if integration is None:
                 return old_wsgi_call(self, environ, start_response)
 
-            def sentry_patched_inner_wsgi_call(environ, start_response):
-                # type: (Dict[str, Any], Callable[..., Any]) -> Any
+            def sentry_patched_inner_wsgi_call(
+                environ: Dict[str, Any], start_response: Callable[..., Any]
+            ) -> Any:
                 try:
                     return old_wsgi_call(self, environ, start_response)
                 except Exception:
@@ -133,8 +134,7 @@ class PyramidIntegration(Integration):
         router.Router.__call__ = sentry_patched_wsgi_call
 
 
-def _capture_exception(exc_info):
-    # type: (ExcInfo) -> None
+def _capture_exception(exc_info: ExcInfo) -> None:
     if exc_info[0] is None or issubclass(exc_info[0], HTTPException):
         return
     hub = Hub.current
@@ -142,7 +142,7 @@ def _capture_exception(exc_info):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
+    client: Any = hub.client
 
     event, hint = event_from_exception(
         exc_info,
@@ -153,8 +153,9 @@ def _capture_exception(exc_info):
     hub.capture_event(event, hint=hint)
 
 
-def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> None
+def _set_transaction_name_and_source(
+    scope: Scope, transaction_style: str, request: Request
+) -> None:
     try:
         name_for_style = {
             "route_name": request.matched_route.name,
@@ -169,40 +170,33 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
 
 class PyramidRequestExtractor(RequestExtractor):
-    def url(self):
-        # type: () -> str
+    def url(self) -> str:
         return self.request.path_url
 
-    def env(self):
-        # type: () -> Dict[str, str]
+    def env(self) -> Dict[str, str]:
         return self.request.environ
 
-    def cookies(self):
-        # type: () -> RequestCookies
+    def cookies(self) -> RequestCookies:
         return self.request.cookies
 
-    def raw_data(self):
-        # type: () -> str
+    def raw_data(self) -> str:
         return self.request.text
 
-    def form(self):
-        # type: () -> Dict[str, str]
+    def form(self) -> Dict[str, str]:
         return {
             key: value
             for key, value in self.request.POST.items()
             if not getattr(value, "filename", None)
         }
 
-    def files(self):
-        # type: () -> Dict[str, cgi_FieldStorage]
+    def files(self) -> Dict[str, cgi_FieldStorage]:
         return {
             key: value
             for key, value in self.request.POST.items()
             if getattr(value, "filename", None)
         }
 
-    def size_of_file(self, postdata):
-        # type: (cgi_FieldStorage) -> int
+    def size_of_file(self, postdata: cgi_FieldStorage) -> int:
         file = postdata.file
         try:
             return os.fstat(file.fileno()).st_size
@@ -210,10 +204,10 @@ class PyramidRequestExtractor(RequestExtractor):
             return 0
 
 
-def _make_event_processor(weak_request, integration):
-    # type: (Callable[[], Request], PyramidIntegration) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _make_event_processor(
+    weak_request: Callable[[], Request], integration: PyramidIntegration
+) -> EventProcessor:
+    def event_processor(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         request = weak_request()
         if request is None:
             return event

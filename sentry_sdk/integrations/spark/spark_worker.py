@@ -24,15 +24,13 @@ class SparkWorkerIntegration(Integration):
     identifier = "spark_worker"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         import pyspark.daemon as original_daemon
 
         original_daemon.worker_main = _sentry_worker_main
 
 
-def _capture_exception(exc_info, hub):
-    # type: (ExcInfo, Hub) -> None
+def _capture_exception(exc_info: ExcInfo, hub: Hub) -> None:
     client = hub.client
 
     client_options = client.options  # type: ignore
@@ -63,15 +61,13 @@ def _capture_exception(exc_info, hub):
         hub.capture_event(event, hint=hint)
 
 
-def _tag_task_context():
-    # type: () -> None
+def _tag_task_context() -> None:
     from pyspark.taskcontext import TaskContext
 
     with configure_scope() as scope:
 
         @scope.add_event_processor
-        def process_event(event, hint):
-            # type: (Event, Hint) -> Optional[Event]
+        def process_event(event: Event, hint: Hint) -> Optional[Event]:
             with capture_internal_exceptions():
                 integration = Hub.current.get_integration(SparkWorkerIntegration)
                 task_context = TaskContext.get()
@@ -108,8 +104,7 @@ def _tag_task_context():
             return event
 
 
-def _sentry_worker_main(*args, **kwargs):
-    # type: (*Optional[Any], **Optional[Any]) -> None
+def _sentry_worker_main(*args: Optional[Any], **kwargs: Optional[Any]) -> None:
     import pyspark.worker as original_worker
 
     try:

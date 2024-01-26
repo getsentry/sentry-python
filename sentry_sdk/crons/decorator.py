@@ -11,8 +11,7 @@ if TYPE_CHECKING:
 
 
 @contextmanager
-def monitor(monitor_slug=None):
-    # type: (Optional[str]) -> Generator[None, None, None]
+def monitor(monitor_slug: Optional[str] = None) -> Generator[None, None, None]:
     """
     Decorator/context manager to capture checkin events for a monitor.
 

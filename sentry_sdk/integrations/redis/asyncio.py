@@ -18,13 +18,14 @@ if TYPE_CHECKING:
 
 
 def patch_redis_async_pipeline(
-    pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn
-):
-    # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Span, Any], None]) -> None
+    pipeline_cls: Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]],
+    is_cluster: bool,
+    get_command_args_fn: Any,
+    set_db_data_fn: Callable[[Span, Any], None],
+) -> None:
     old_execute = pipeline_cls.execute
 
-    async def _sentry_execute(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    async def _sentry_execute(self: Any, *args: Any, **kwargs: Any) -> Any:
         hub = Hub.current
 
         if hub.get_integration(RedisIntegration) is None:
@@ -48,12 +49,16 @@ def patch_redis_async_pipeline(
     pipeline_cls.execute = _sentry_execute  # type: ignore[method-assign]
 
 
-def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
-    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
+def patch_redis_async_client(
+    cls: Union[type[StrictRedis[Any]], type[RedisCluster[Any]]],
+    is_cluster: bool,
+    set_db_data_fn: Callable[[Span, Any], None],
+) -> None:
     old_execute_command = cls.execute_command
 
-    async def _sentry_execute_command(self, name, *args, **kwargs):
-        # type: (Any, str, *Any, **Any) -> Any
+    async def _sentry_execute_command(
+        self: Any, name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         hub = Hub.current
 
         if hub.get_integration(RedisIntegration) is None:

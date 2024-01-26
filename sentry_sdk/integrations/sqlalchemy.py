@@ -25,9 +25,7 @@ class SqlalchemyIntegration(Integration):
     identifier = "sqlalchemy"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(SQLALCHEMY_VERSION)
 
         if version is None:
@@ -44,9 +42,14 @@ class SqlalchemyIntegration(Integration):
 
 
 def _before_cursor_execute(
-    conn, cursor, statement, parameters, context, executemany, *args
-):
-    # type: (Any, Any, Any, Any, Any, bool, *Any) -> None
+    conn: Any,
+    cursor: Any,
+    statement: Any,
+    parameters: Any,
+    context: Any,
+    executemany: bool,
+    *args: Any
+) -> None:
     hub = Hub.current
     if hub.get_integration(SqlalchemyIntegration) is None:
         return
@@ -78,15 +81,16 @@ def _before_cursor_execute(
         context._sentry_sql_span = span
 
 
-def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
-    # type: (Any, Any, Any, Any, Any, *Any) -> None
+def _after_cursor_execute(
+    conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, *args: Any
+) -> None:
     hub = Hub.current
     if hub.get_integration(SqlalchemyIntegration) is None:
         return
 
-    ctx_mgr = getattr(
+    ctx_mgr: Optional[ContextManager[Any]] = getattr(
         context, "_sentry_sql_span_manager", None
-    )  # type: Optional[ContextManager[Any]]
+    )
 
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
@@ -98,13 +102,12 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
             add_query_source(hub, span)
 
 
-def _handle_error(context, *args):
-    # type: (Any, *Any) -> None
+def _handle_error(context: Any, *args: Any) -> None:
     execution_context = context.execution_context
     if execution_context is None:
         return
 
-    span = getattr(execution_context, "_sentry_sql_span", None)  # type: Optional[Span]
+    span: Optional[Span] = getattr(execution_context, "_sentry_sql_span", None)
 
     if span is not None:
         span.set_status("internal_error")
@@ -112,9 +115,9 @@ def _handle_error(context, *args):
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this
     # handler is going to be fatal.
-    ctx_mgr = getattr(
+    ctx_mgr: Optional[ContextManager[Any]] = getattr(
         execution_context, "_sentry_sql_span_manager", None
-    )  # type: Optional[ContextManager[Any]]
+    )
 
     if ctx_mgr is not None:
         execution_context._sentry_sql_span_manager = None
@@ -122,8 +125,7 @@ def _handle_error(context, *args):
 
 
 # See: https://docs.sqlalchemy.org/en/20/dialects/index.html
-def _get_db_system(name):
-    # type: (str) -> Optional[str]
+def _get_db_system(name: str) -> Optional[str]:
     name = str(name)
 
     if "sqlite" in name:
@@ -144,8 +146,7 @@ def _get_db_system(name):
     return None
 
 
-def _set_db_data(span, conn):
-    # type: (Span, Any) -> None
+def _set_db_data(span: Span, conn: Any) -> None:
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)

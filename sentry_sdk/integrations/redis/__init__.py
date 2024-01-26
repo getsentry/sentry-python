@@ -33,8 +33,7 @@ _MAX_NUM_COMMANDS = 10  # Trim command lists to this many values
 _DEFAULT_MAX_DATA_SIZE = 1024
 
 
-def _get_safe_command(name, args):
-    # type: (str, Sequence[Any]) -> str
+def _get_safe_command(name: str, args: Sequence[Any]) -> str:
     command_parts = [name]
 
     for i, arg in enumerate(args):
@@ -61,8 +60,7 @@ def _get_safe_command(name, args):
     return command
 
 
-def _get_span_description(name, *args):
-    # type: (str, *Any) -> str
+def _get_span_description(name: str, *args: Any) -> str:
     description = name
 
     with capture_internal_exceptions():
@@ -71,20 +69,21 @@ def _get_span_description(name, *args):
     return description
 
 
-def _get_redis_command_args(command):
-    # type: (Any) -> Sequence[Any]
+def _get_redis_command_args(command: Any) -> Sequence[Any]:
     return command[0]
 
 
-def _parse_rediscluster_command(command):
-    # type: (Any) -> Sequence[Any]
+def _parse_rediscluster_command(command: Any) -> Sequence[Any]:
     return command.args
 
 
 def _set_pipeline_data(
-    span, is_cluster, get_command_args_fn, is_transaction, command_stack
-):
-    # type: (Span, bool, Any, bool, Sequence[Any]) -> None
+    span: Span,
+    is_cluster: bool,
+    get_command_args_fn: Any,
+    is_transaction: bool,
+    command_stack: Sequence[Any],
+) -> None:
     span.set_tag("redis.is_cluster", is_cluster)
     span.set_tag("redis.transaction", is_transaction)
 
@@ -105,8 +104,7 @@ def _set_pipeline_data(
     )
 
 
-def _set_client_data(span, is_cluster, name, *args):
-    # type: (Span, bool, str, *Any) -> None
+def _set_client_data(span: Span, is_cluster: bool, name: str, *args: Any) -> None:
     span.set_tag("redis.is_cluster", is_cluster)
     if name:
         span.set_tag("redis.command", name)
@@ -120,8 +118,7 @@ def _set_client_data(span, is_cluster, name, *args):
             span.set_tag("redis.key", args[0])
 
 
-def _set_db_data_on_span(span, connection_params):
-    # type: (Span, Dict[str, Any]) -> None
+def _set_db_data_on_span(span: Span, connection_params: Dict[str, Any]) -> None:
     span.set_data(SPANDATA.DB_SYSTEM, "redis")
 
     db = connection_params.get("db")
@@ -137,16 +134,14 @@ def _set_db_data_on_span(span, connection_params):
         span.set_data(SPANDATA.SERVER_PORT, port)
 
 
-def _set_db_data(span, redis_instance):
-    # type: (Span, Redis[Any]) -> None
+def _set_db_data(span: Span, redis_instance: Redis[Any]) -> None:
     try:
         _set_db_data_on_span(span, redis_instance.connection_pool.connection_kwargs)
     except AttributeError:
         pass  # connections_kwargs may be missing in some cases
 
 
-def _set_cluster_db_data(span, redis_cluster_instance):
-    # type: (Span, RedisCluster[Any]) -> None
+def _set_cluster_db_data(span: Span, redis_cluster_instance: RedisCluster[Any]) -> None:
     default_node = redis_cluster_instance.get_default_node()
     if default_node is not None:
         _set_db_data_on_span(
@@ -154,15 +149,17 @@ def _set_cluster_db_data(span, redis_cluster_instance):
         )
 
 
-def _set_async_cluster_db_data(span, async_redis_cluster_instance):
-    # type: (Span, AsyncRedisCluster[Any]) -> None
+def _set_async_cluster_db_data(
+    span: Span, async_redis_cluster_instance: AsyncRedisCluster[Any]
+) -> None:
     default_node = async_redis_cluster_instance.get_default_node()
     if default_node is not None and default_node.connection_kwargs is not None:
         _set_db_data_on_span(span, default_node.connection_kwargs)
 
 
-def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_instance):
-    # type: (Span, AsyncClusterPipeline[Any]) -> None
+def _set_async_cluster_pipeline_db_data(
+    span: Span, async_redis_cluster_pipeline_instance: AsyncClusterPipeline[Any]
+) -> None:
     with capture_internal_exceptions():
         _set_async_cluster_db_data(
             span,
@@ -172,12 +169,15 @@ def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_insta
         )
 
 
-def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn):
-    # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
+def patch_redis_pipeline(
+    pipeline_cls: Any,
+    is_cluster: bool,
+    get_command_args_fn: Any,
+    set_db_data_fn: Callable[[Span, Any], None],
+) -> None:
     old_execute = pipeline_cls.execute
 
-    def sentry_patched_execute(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_patched_execute(self: Any, *args: Any, **kwargs: Any) -> Any:
         hub = Hub.current
 
         if hub.get_integration(RedisIntegration) is None:
@@ -201,16 +201,18 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_d
     pipeline_cls.execute = sentry_patched_execute
 
 
-def patch_redis_client(cls, is_cluster, set_db_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None]) -> None
+def patch_redis_client(
+    cls: Any, is_cluster: bool, set_db_data_fn: Callable[[Span, Any], None]
+) -> None:
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
     """
     old_execute_command = cls.execute_command
 
-    def sentry_patched_execute_command(self, name, *args, **kwargs):
-        # type: (Any, str, *Any, **Any) -> Any
+    def sentry_patched_execute_command(
+        self: Any, name: str, *args: Any, **kwargs: Any
+    ) -> Any:
         hub = Hub.current
         integration = hub.get_integration(RedisIntegration)
 
@@ -234,8 +236,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
     cls.execute_command = sentry_patched_execute_command
 
 
-def _patch_redis(StrictRedis, client):  # noqa: N803
-    # type: (Any, Any) -> None
+def _patch_redis(StrictRedis: Any, client: Any) -> None:  # noqa: N803
     patch_redis_client(StrictRedis, is_cluster=False, set_db_data_fn=_set_db_data)
     patch_redis_pipeline(client.Pipeline, False, _get_redis_command_args, _set_db_data)
     try:
@@ -270,8 +271,7 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
         )
 
 
-def _patch_redis_cluster():
-    # type: () -> None
+def _patch_redis_cluster() -> None:
     """Patches the cluster module on redis SDK (as opposed to rediscluster library)"""
     try:
         from redis import RedisCluster, cluster
@@ -309,8 +309,7 @@ def _patch_redis_cluster():
         )
 
 
-def _patch_rb():
-    # type: () -> None
+def _patch_rb() -> None:
     try:
         import rb.clients  # type: ignore
     except ImportError:
@@ -327,8 +326,7 @@ def _patch_rb():
         )
 
 
-def _patch_rediscluster():
-    # type: () -> None
+def _patch_rediscluster() -> None:
     try:
         import rediscluster  # type: ignore
     except ImportError:
@@ -362,13 +360,11 @@ def _patch_rediscluster():
 class RedisIntegration(Integration):
     identifier = "redis"
 
-    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE):
-        # type: (int) -> None
+    def __init__(self, max_data_size: int = _DEFAULT_MAX_DATA_SIZE) -> None:
         self.max_data_size = max_data_size
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         try:
             from redis import StrictRedis, client
         except ImportError:

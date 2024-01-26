@@ -20,9 +20,7 @@ except (ImportError, SyntaxError):
     wrap_async_view = None  # type: ignore
 
 
-def patch_views():
-    # type: () -> None
-
+def patch_views() -> None:
     from django.core.handlers.base import BaseHandler
     from django.template.response import SimpleTemplateResponse
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -30,8 +28,7 @@ def patch_views():
     old_make_view_atomic = BaseHandler.make_view_atomic
     old_render = SimpleTemplateResponse.render
 
-    def sentry_patched_render(self):
-        # type: (SimpleTemplateResponse) -> Any
+    def sentry_patched_render(self: SimpleTemplateResponse) -> Any:
         hub = Hub.current
         with hub.start_span(
             op=OP.VIEW_RESPONSE_RENDER, description="serialize response"
@@ -39,8 +36,7 @@ def patch_views():
             return old_render(self)
 
     @functools.wraps(old_make_view_atomic)
-    def sentry_patched_make_view_atomic(self, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_patched_make_view_atomic(self: Any, *args: Any, **kwargs: Any) -> Any:
         callback = old_make_view_atomic(self, *args, **kwargs)
 
         # XXX: The wrapper function is created for every request. Find more
@@ -68,11 +64,9 @@ def patch_views():
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
 
 
-def _wrap_sync_view(hub, callback):
-    # type: (Hub, Any) -> Any
+def _wrap_sync_view(hub: Hub, callback: Any) -> Any:
     @functools.wraps(callback)
-    def sentry_wrapped_callback(request, *args, **kwargs):
-        # type: (Any, *Any, **Any) -> Any
+    def sentry_wrapped_callback(request: Any, *args: Any, **kwargs: Any) -> Any:
         with hub.configure_scope() as sentry_scope:
             # set the active thread id to the handler thread for sync views
             # this isn't necessary for async views since that runs on main

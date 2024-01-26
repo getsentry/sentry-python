@@ -63,11 +63,10 @@ class CeleryIntegration(Integration):
 
     def __init__(
         self,
-        propagate_traces=True,
-        monitor_beat_tasks=False,
-        exclude_beat_tasks=None,
-    ):
-        # type: (bool, bool, Optional[List[str]]) -> None
+        propagate_traces: bool = True,
+        monitor_beat_tasks: bool = False,
+        exclude_beat_tasks: Optional[List[str]] = None,
+    ) -> None:
         self.propagate_traces = propagate_traces
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
@@ -77,8 +76,7 @@ class CeleryIntegration(Integration):
             _setup_celery_beat_signals()
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         if CELERY_VERSION < (3,):
             raise DidNotEnable("Celery 3 or newer required.")
 
@@ -86,8 +84,7 @@ class CeleryIntegration(Integration):
 
         old_build_tracer = trace.build_tracer
 
-        def sentry_build_tracer(name, task, *args, **kwargs):
-            # type: (Any, Any, *Any, **Any) -> Any
+        def sentry_build_tracer(name: Any, task: Any, *args: Any, **kwargs: Any) -> Any:
             if not getattr(task, "_sentry_is_patched", False):
                 # determine whether Celery will use __call__ or run and patch
                 # accordingly
@@ -122,8 +119,7 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
-def _now_seconds_since_epoch():
-    # type: () -> float
+def _now_seconds_since_epoch() -> float:
     # We cannot use `time.perf_counter()` when dealing with the duration
     # of a Celery task, because the start of a Celery task and
     # the end are recorded in different processes.
@@ -133,20 +129,16 @@ def _now_seconds_since_epoch():
 
 
 class NoOpMgr:
-    def __enter__(self):
-        # type: () -> None
+    def __enter__(self) -> None:
         return None
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        # type: (Any, Any, Any) -> None
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         return None
 
 
-def _wrap_apply_async(f):
-    # type: (F) -> F
+def _wrap_apply_async(f: F) -> F:
     @wraps(f)
-    def apply_async(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def apply_async(*args: Any, **kwargs: Any) -> Any:
         hub = Hub.current
         integration = hub.get_integration(CeleryIntegration)
 
@@ -170,11 +162,11 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        span_mgr = (
+        span_mgr: Union[Span, NoOpMgr] = (
             hub.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
             if not task_started_from_beat
             else NoOpMgr()
-        )  # type: Union[Span, NoOpMgr]
+        )
 
         with span_mgr as span:
             with capture_internal_exceptions():
@@ -228,9 +220,7 @@ def _wrap_apply_async(f):
     return apply_async  # type: ignore
 
 
-def _wrap_tracer(task, f):
-    # type: (Any, F) -> F
-
+def _wrap_tracer(task: Any, f: F) -> F:
     # Need to wrap tracer for pushing the scope before prerun is sent, and
     # popping it after postrun is sent.
     #
@@ -238,8 +228,7 @@ def _wrap_tracer(task, f):
     # Also because in Celery 3, signal dispatch returns early if one handler
     # crashes.
     @wraps(f)
-    def _inner(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _inner(*args: Any, **kwargs: Any) -> Any:
         hub = Hub.current
         if hub.get_integration(CeleryIntegration) is None:
             return f(*args, **kwargs)
@@ -283,9 +272,7 @@ def _wrap_tracer(task, f):
     return _inner  # type: ignore
 
 
-def _wrap_task_call(task, f):
-    # type: (Any, F) -> F
-
+def _wrap_task_call(task: Any, f: F) -> F:
     # Need to wrap task call because the exception is caught before we get to
     # see it. Also celery's reported stacktrace is untrustworthy.
 
@@ -293,8 +280,7 @@ def _wrap_task_call(task, f):
     # method's name.
     # https://github.com/getsentry/sentry-python/issues/421
     @wraps(f)
-    def _inner(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _inner(*args: Any, **kwargs: Any) -> Any:
         try:
             return f(*args, **kwargs)
         except Exception:
@@ -306,11 +292,10 @@ def _wrap_task_call(task, f):
     return _inner  # type: ignore
 
 
-def _make_event_processor(task, uuid, args, kwargs, request=None):
-    # type: (Any, Any, Any, Any, Optional[Any]) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
-
+def _make_event_processor(
+    task: Any, uuid: Any, args: Any, kwargs: Any, request: Optional[Any] = None
+) -> EventProcessor:
+    def event_processor(event: Event, hint: Hint) -> Optional[Event]:
         with capture_internal_exceptions():
             tags = event.setdefault("tags", {})
             tags["celery_task_id"] = uuid
@@ -335,8 +320,7 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
-def _capture_exception(task, exc_info):
-    # type: (Any, ExcInfo) -> None
+def _capture_exception(task: Any, exc_info: ExcInfo) -> None:
     hub = Hub.current
 
     if hub.get_integration(CeleryIntegration) is None:
@@ -352,7 +336,7 @@ def _capture_exception(task, exc_info):
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
+    client: Any = hub.client
 
     event, hint = event_from_exception(
         exc_info,
@@ -363,25 +347,21 @@ def _capture_exception(task, exc_info):
     hub.capture_event(event, hint=hint)
 
 
-def _set_status(hub, status):
-    # type: (Hub, str) -> None
+def _set_status(hub: Hub, status: str) -> None:
     with capture_internal_exceptions():
         with hub.configure_scope() as scope:
             if scope.span is not None:
                 scope.span.set_status(status)
 
 
-def _patch_worker_exit():
-    # type: () -> None
-
+def _patch_worker_exit() -> None:
     # Need to flush queue before worker shutdown because a crashing worker will
     # call os._exit
     from billiard.pool import Worker  # type: ignore
 
     old_workloop = Worker.workloop
 
-    def sentry_workloop(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_workloop(*args: Any, **kwargs: Any) -> Any:
         try:
             return old_workloop(*args, **kwargs)
         finally:
@@ -393,8 +373,7 @@ def _patch_worker_exit():
     Worker.workloop = sentry_workloop
 
 
-def _get_headers(task):
-    # type: (Task) -> Dict[str, Any]
+def _get_headers(task: Task) -> Dict[str, Any]:
     headers = task.request.get("headers") or {}
 
     # flatten nested headers
@@ -407,8 +386,7 @@ def _get_headers(task):
     return headers
 
 
-def _get_humanized_interval(seconds):
-    # type: (float) -> Tuple[int, str]
+def _get_humanized_interval(seconds: float) -> Tuple[int, str]:
     TIME_UNITS = (  # noqa: N806
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
@@ -424,12 +402,13 @@ def _get_humanized_interval(seconds):
     return (int(seconds), "second")
 
 
-def _get_monitor_config(celery_schedule, app, monitor_name):
-    # type: (Any, Celery, str) -> Dict[str, Any]
-    monitor_config = {}  # type: Dict[str, Any]
-    schedule_type = None  # type: Optional[str]
-    schedule_value = None  # type: Optional[Union[str, int]]
-    schedule_unit = None  # type: Optional[str]
+def _get_monitor_config(
+    celery_schedule: Any, app: Celery, monitor_name: str
+) -> Dict[str, Any]:
+    monitor_config: Dict[str, Any] = {}
+    schedule_type: Optional[str] = None
+    schedule_value: Optional[Union[str, int]] = None
+    schedule_unit: Optional[str] = None
 
     if isinstance(celery_schedule, crontab):
         schedule_type = "crontab"
@@ -481,12 +460,10 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
     return monitor_config
 
 
-def _patch_beat_apply_entry():
-    # type: () -> None
+def _patch_beat_apply_entry() -> None:
     original_apply_entry = Scheduler.apply_entry
 
-    def sentry_apply_entry(*args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def sentry_apply_entry(*args: Any, **kwargs: Any) -> None:
         scheduler, schedule_entry = args
         app = scheduler.app
 
@@ -533,15 +510,13 @@ def _patch_beat_apply_entry():
     Scheduler.apply_entry = sentry_apply_entry
 
 
-def _setup_celery_beat_signals():
-    # type: () -> None
+def _setup_celery_beat_signals() -> None:
     task_success.connect(crons_task_success)
     task_failure.connect(crons_task_failure)
     task_retry.connect(crons_task_retry)
 
 
-def crons_task_success(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
+def crons_task_success(sender: Task, **kwargs: Dict[Any, Any]) -> None:
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
 
@@ -561,8 +536,7 @@ def crons_task_success(sender, **kwargs):
     )
 
 
-def crons_task_failure(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
+def crons_task_failure(sender: Task, **kwargs: Dict[Any, Any]) -> None:
     logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
 
@@ -582,8 +556,7 @@ def crons_task_failure(sender, **kwargs):
     )
 
 
-def crons_task_retry(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
+def crons_task_retry(sender: Task, **kwargs: Dict[Any, Any]) -> None:
     logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
 

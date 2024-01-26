@@ -14,18 +14,15 @@ PY310 = sys.version_info[0] == 3 and sys.version_info[1] >= 10
 PY311 = sys.version_info[0] == 3 and sys.version_info[1] >= 11
 
 
-def with_metaclass(meta, *bases):
-    # type: (Any, *Any) -> Any
+def with_metaclass(meta: Any, *bases: Any) -> Any:
     class MetaClass(type):
-        def __new__(metacls, name, this_bases, d):
-            # type: (Any, Any, Any, Any) -> Any
+        def __new__(metacls: Any, name: Any, this_bases: Any, d: Any) -> Any:
             return meta(name, bases, d)
 
     return type.__new__(MetaClass, "temporary_class", (), {})
 
 
-def check_thread_support():
-    # type: () -> None
+def check_thread_support() -> None:
     try:
         from uwsgi import opt  # type: ignore
     except ImportError:

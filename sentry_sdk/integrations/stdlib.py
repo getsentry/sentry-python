@@ -40,14 +40,12 @@ class StdlibIntegration(Integration):
     identifier = "stdlib"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         _install_httplib()
         _install_subprocess()
 
         @add_global_event_processor
-        def add_python_runtime_context(event, hint):
-            # type: (Event, Hint) -> Optional[Event]
+        def add_python_runtime_context(event: Event, hint: Hint) -> Optional[Event]:
             if Hub.current.get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
@@ -56,13 +54,13 @@ class StdlibIntegration(Integration):
             return event
 
 
-def _install_httplib():
-    # type: () -> None
+def _install_httplib() -> None:
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
 
-    def putrequest(self, method, url, *args, **kwargs):
-        # type: (HTTPConnection, str, str, *Any, **Any) -> Any
+    def putrequest(
+        self: HTTPConnection, method: str, url: str, *args: Any, **kwargs: Any
+    ) -> Any:
         hub = Hub.current
 
         host = self.host
@@ -112,8 +110,7 @@ def _install_httplib():
 
         return rv
 
-    def getresponse(self, *args, **kwargs):
-        # type: (HTTPConnection, *Any, **Any) -> Any
+    def getresponse(self: HTTPConnection, *args: Any, **kwargs: Any) -> Any:
         span = getattr(self, "_sentrysdk_span", None)
 
         if span is None:
@@ -131,8 +128,13 @@ def _install_httplib():
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
 
 
-def _init_argument(args, kwargs, name, position, setdefault_callback=None):
-    # type: (List[Any], Dict[Any, Any], str, int, Optional[Callable[[Any], Any]]) -> Any
+def _init_argument(
+    args: List[Any],
+    kwargs: Dict[Any, Any],
+    name: str,
+    position: int,
+    setdefault_callback: Optional[Callable[[Any], Any]] = None,
+) -> Any:
     """
     given (*args, **kwargs) of a function call, retrieve (and optionally set a
     default for) an argument by either name or position.
@@ -162,13 +164,12 @@ def _init_argument(args, kwargs, name, position, setdefault_callback=None):
     return rv
 
 
-def _install_subprocess():
-    # type: () -> None
+def _install_subprocess() -> None:
     old_popen_init = subprocess.Popen.__init__
 
-    def sentry_patched_popen_init(self, *a, **kw):
-        # type: (subprocess.Popen[Any], *Any, **Any) -> None
-
+    def sentry_patched_popen_init(
+        self: subprocess.Popen[Any], *a: Any, **kw: Any
+    ) -> None:
         hub = Hub.current
         if hub.get_integration(StdlibIntegration) is None:
             return old_popen_init(self, *a, **kw)
@@ -217,8 +218,9 @@ def _install_subprocess():
 
     old_popen_wait = subprocess.Popen.wait
 
-    def sentry_patched_popen_wait(self, *a, **kw):
-        # type: (subprocess.Popen[Any], *Any, **Any) -> Any
+    def sentry_patched_popen_wait(
+        self: subprocess.Popen[Any], *a: Any, **kw: Any
+    ) -> Any:
         hub = Hub.current
 
         if hub.get_integration(StdlibIntegration) is None:
@@ -232,8 +234,9 @@ def _install_subprocess():
 
     old_popen_communicate = subprocess.Popen.communicate
 
-    def sentry_patched_popen_communicate(self, *a, **kw):
-        # type: (subprocess.Popen[Any], *Any, **Any) -> Any
+    def sentry_patched_popen_communicate(
+        self: subprocess.Popen[Any], *a: Any, **kw: Any
+    ) -> Any:
         hub = Hub.current
 
         if hub.get_integration(StdlibIntegration) is None:
@@ -246,6 +249,5 @@ def _install_subprocess():
     subprocess.Popen.communicate = sentry_patched_popen_communicate  # type: ignore
 
 
-def get_subprocess_traceparent_headers():
-    # type: () -> EnvironHeaders
+def get_subprocess_traceparent_headers() -> EnvironHeaders:
     return EnvironHeaders(os.environ, prefix="SUBPROCESS_")

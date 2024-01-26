@@ -27,9 +27,7 @@ class Boto3Integration(Integration):
     identifier = "boto3"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         version = parse_version(BOTOCORE_VERSION)
 
         if version is None:
@@ -42,8 +40,9 @@ class Boto3Integration(Integration):
 
         orig_init = BaseClient.__init__
 
-        def sentry_patched_init(self, *args, **kwargs):
-            # type: (Type[BaseClient], *Any, **Any) -> None
+        def sentry_patched_init(
+            self: Type[BaseClient], *args: Any, **kwargs: Any
+        ) -> None:
             orig_init(self, *args, **kwargs)
             meta = self.meta
             service_id = meta.service_model.service_id.hyphenize()
@@ -57,8 +56,9 @@ class Boto3Integration(Integration):
         BaseClient.__init__ = sentry_patched_init
 
 
-def _sentry_request_created(service_id, request, operation_name, **kwargs):
-    # type: (str, AWSRequest, str, **Any) -> None
+def _sentry_request_created(
+    service_id: str, request: AWSRequest, operation_name: str, **kwargs: Any
+) -> None:
     hub = Hub.current
     if hub.get_integration(Boto3Integration) is None:
         return
@@ -89,9 +89,10 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     request.context["_sentrysdk_span"] = span
 
 
-def _sentry_after_call(context, parsed, **kwargs):
-    # type: (Dict[str, Any], Dict[str, Any], **Any) -> None
-    span = context.pop("_sentrysdk_span", None)  # type: Optional[Span]
+def _sentry_after_call(
+    context: Dict[str, Any], parsed: Dict[str, Any], **kwargs: Any
+) -> None:
+    span: Optional[Span] = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
@@ -110,8 +111,7 @@ def _sentry_after_call(context, parsed, **kwargs):
     orig_read = body.read
     orig_close = body.close
 
-    def sentry_streaming_body_read(*args, **kwargs):
-        # type: (*Any, **Any) -> bytes
+    def sentry_streaming_body_read(*args: Any, **kwargs: Any) -> bytes:
         try:
             ret = orig_read(*args, **kwargs)
             if not ret:
@@ -123,17 +123,17 @@ def _sentry_after_call(context, parsed, **kwargs):
 
     body.read = sentry_streaming_body_read
 
-    def sentry_streaming_body_close(*args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def sentry_streaming_body_close(*args: Any, **kwargs: Any) -> None:
         streaming_span.finish()
         orig_close(*args, **kwargs)
 
     body.close = sentry_streaming_body_close
 
 
-def _sentry_after_call_error(context, exception, **kwargs):
-    # type: (Dict[str, Any], Type[BaseException], **Any) -> None
-    span = context.pop("_sentrysdk_span", None)  # type: Optional[Span]
+def _sentry_after_call_error(
+    context: Dict[str, Any], exception: Type[BaseException], **kwargs: Any
+) -> None:
+    span: Optional[Span] = context.pop("_sentrysdk_span", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:

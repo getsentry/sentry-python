@@ -15,8 +15,7 @@ class SocketIntegration(Integration):
     identifier = "socket"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         """
         patches two of the most used functions of socket: create_connection and getaddrinfo(dns resolver)
         """
@@ -24,9 +23,9 @@ class SocketIntegration(Integration):
         _patch_getaddrinfo()
 
 
-def _get_span_description(host, port):
-    # type: (Union[bytes, str, None], Union[str, int, None]) -> str
-
+def _get_span_description(
+    host: Union[bytes, str, None], port: Union[str, int, None]
+) -> str:
     try:
         host = host.decode()  # type: ignore
     except (UnicodeDecodeError, AttributeError):
@@ -37,16 +36,14 @@ def _get_span_description(host, port):
     return description
 
 
-def _patch_create_connection():
-    # type: () -> None
+def _patch_create_connection() -> None:
     real_create_connection = socket.create_connection
 
     def create_connection(
-        address,
-        timeout=socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore
-        source_address=None,
-    ):
-        # type: (Tuple[Optional[str], int], Optional[float], Optional[Tuple[Union[bytearray, bytes, str], int]])-> socket.socket
+        address: Tuple[Optional[str], int],
+        timeout: Optional[float] = socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore
+        source_address: Optional[Tuple[Union[bytearray, bytes, str], int]] = None,
+    ) -> socket.socket:
         hub = Hub.current
         if hub.get_integration(SocketIntegration) is None:
             return real_create_connection(
@@ -68,12 +65,25 @@ def _patch_create_connection():
     socket.create_connection = create_connection  # type: ignore
 
 
-def _patch_getaddrinfo():
-    # type: () -> None
+def _patch_getaddrinfo() -> None:
     real_getaddrinfo = socket.getaddrinfo
 
-    def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        # type: (Union[bytes, str, None], Union[str, int, None], int, int, int, int) -> List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int]]]]
+    def getaddrinfo(
+        host: Union[bytes, str, None],
+        port: Union[str, int, None],
+        family: int = 0,
+        type: int = 0,
+        proto: int = 0,
+        flags: int = 0,
+    ) -> List[
+        Tuple[
+            AddressFamily,
+            SocketKind,
+            int,
+            str,
+            Union[Tuple[str, int], Tuple[str, int, int, int]],
+        ]
+    ]:
         hub = Hub.current
         if hub.get_integration(SocketIntegration) is None:
             return real_getaddrinfo(host, port, family, type, proto, flags)

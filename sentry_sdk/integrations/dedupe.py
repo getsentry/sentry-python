@@ -14,16 +14,13 @@ if TYPE_CHECKING:
 class DedupeIntegration(Integration):
     identifier = "dedupe"
 
-    def __init__(self):
-        # type: () -> None
+    def __init__(self) -> None:
         self._last_seen = ContextVar("last-seen")
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def processor(event, hint):
-            # type: (Event, Optional[Hint]) -> Optional[Event]
+        def processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
             if hint is None:
                 return event
 

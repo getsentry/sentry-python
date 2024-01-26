@@ -273,7 +273,7 @@ class Queue:
 
     # Initialize the queue representation
     def _init(self, maxsize):
-        self.queue = deque()  # type: Any
+        self.queue: Any = deque()
 
     def _qsize(self):
         return len(self.queue)

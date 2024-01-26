@@ -9,8 +9,7 @@ from logging import LogRecord
 
 
 class _HubBasedClientFilter(logging.Filter):
-    def filter(self, record):
-        # type: (LogRecord) -> bool
+    def filter(self, record: LogRecord) -> bool:
         if _client_init_debug.get(False):
             return True
         hub = Hub.current
@@ -19,15 +18,13 @@ class _HubBasedClientFilter(logging.Filter):
         return False
 
 
-def init_debug_support():
-    # type: () -> None
+def init_debug_support() -> None:
     if not logger.handlers:
         configure_logger()
     configure_debug_hub()
 
 
-def configure_logger():
-    # type: () -> None
+def configure_logger() -> None:
     _handler = logging.StreamHandler(sys.stderr)
     _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
     logger.addHandler(_handler)
@@ -35,10 +32,8 @@ def configure_logger():
     logger.addFilter(_HubBasedClientFilter())
 
 
-def configure_debug_hub():
-    # type: () -> None
-    def _get_debug_hub():
-        # type: () -> Hub
+def configure_debug_hub() -> None:
+    def _get_debug_hub() -> Hub:
         return Hub.current
 
     utils._get_debug_hub = _get_debug_hub

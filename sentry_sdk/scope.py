@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 import uuid
@@ -62,24 +64,20 @@ if TYPE_CHECKING:
     T = TypeVar("T")
 
 
-global_event_processors = []  # type: List[EventProcessor]
+global_event_processors: List[EventProcessor] = []
 
 
-def add_global_event_processor(processor):
-    # type: (EventProcessor) -> None
+def add_global_event_processor(processor: EventProcessor) -> None:
     global_event_processors.append(processor)
 
 
-def _attr_setter(fn):
-    # type: (Any) -> Any
+def _attr_setter(fn: Any) -> Any:
     return property(fset=fn, doc=fn.__doc__)
 
 
-def _disable_capture(fn):
-    # type: (F) -> F
+def _disable_capture(fn: F) -> F:
     @wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        # type: (Any, *Dict[str, Any], **Any) -> Any
+    def wrapper(self: Any, *args: Dict[str, Any], **kwargs: Any) -> Any:
         if not self._should_capture:
             return
         try:
@@ -91,8 +89,9 @@ def _disable_capture(fn):
     return wrapper  # type: ignore
 
 
-def _merge_scopes(base, scope_change, scope_kwargs):
-    # type: (Scope, Optional[Any], Dict[str, Any]) -> Scope
+def _merge_scopes(
+    base: Scope, scope_change: Optional[Any], scope_kwargs: Dict[str, Any]
+) -> Scope:
     if scope_change and scope_kwargs:
         raise TypeError("cannot provide scope and kwargs")
 
@@ -148,21 +147,19 @@ class Scope(object):
         "_propagation_context",
     )
 
-    def __init__(self):
-        # type: () -> None
-        self._event_processors = []  # type: List[EventProcessor]
-        self._error_processors = []  # type: List[ErrorProcessor]
+    def __init__(self) -> None:
+        self._event_processors: List[EventProcessor] = []
+        self._error_processors: List[ErrorProcessor] = []
 
-        self._name = None  # type: Optional[str]
-        self._propagation_context = None  # type: Optional[Dict[str, Any]]
+        self._name: Optional[str] = None
+        self._propagation_context: Optional[Dict[str, Any]] = None
 
         self.clear()
 
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
-    def _load_trace_data_from_env(self):
-        # type: () -> Optional[Dict[str, str]]
+    def _load_trace_data_from_env(self) -> Optional[Dict[str, str]]:
         """
         Load Sentry trace id and baggage from environment variables.
         Can be disabled by setting SENTRY_USE_ENVIRONMENT to "false".
@@ -188,9 +185,10 @@ class Scope(object):
 
         return incoming_trace_information or None
 
-    def _extract_propagation_context(self, data):
-        # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
-        context = {}  # type: Dict[str, Any]
+    def _extract_propagation_context(
+        self, data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        context: Dict[str, Any] = {}
         normalized_data = normalize_incoming_data(data)
 
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
@@ -219,8 +217,7 @@ class Scope(object):
 
         return None
 
-    def _create_new_propagation_context(self):
-        # type: () -> Dict[str, Any]
+    def _create_new_propagation_context(self) -> Dict[str, Any]:
         return {
             "trace_id": uuid.uuid4().hex,
             "span_id": uuid.uuid4().hex[16:],
@@ -228,8 +225,7 @@ class Scope(object):
             "dynamic_sampling_context": None,
         }
 
-    def set_new_propagation_context(self):
-        # type: () -> None
+    def set_new_propagation_context(self) -> None:
         """
         Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
         """
@@ -239,8 +235,9 @@ class Scope(object):
             self._propagation_context,
         )
 
-    def generate_propagation_context(self, incoming_data=None):
-        # type: (Optional[Dict[str, str]]) -> None
+    def generate_propagation_context(
+        self, incoming_data: Optional[Dict[str, str]] = None
+    ) -> None:
         """
         Makes sure `_propagation_context` is set.
         If there is `incoming_data` overwrite existing `_propagation_context`.
@@ -259,8 +256,7 @@ class Scope(object):
         if self._propagation_context is None:
             self.set_new_propagation_context()
 
-    def get_dynamic_sampling_context(self):
-        # type: () -> Optional[Dict[str, str]]
+    def get_dynamic_sampling_context(self) -> Optional[Dict[str, str]]:
         """
         Returns the Dynamic Sampling Context from the Propagation Context.
         If not existing, creates a new one.
@@ -276,8 +272,7 @@ class Scope(object):
 
         return self._propagation_context["dynamic_sampling_context"]
 
-    def get_traceparent(self, *args, **kwargs):
-        # type: (Any, Any) -> Optional[str]
+    def get_traceparent(self, *args: Any, **kwargs: Any) -> Optional[str]:
         """
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the
         currently active span or the scopes Propagation Context.
@@ -301,8 +296,7 @@ class Scope(object):
         )
         return traceparent
 
-    def get_baggage(self, *args, **kwargs):
-        # type: (Any, Any) -> Optional[Baggage]
+    def get_baggage(self, *args: Any, **kwargs: Any) -> Optional[Baggage]:
         client = kwargs.pop("client", None)
 
         # If we have an active span, return baggage from there
@@ -324,25 +318,23 @@ class Scope(object):
         else:
             return Baggage(dynamic_sampling_context)
 
-    def get_trace_context(self):
-        # type: () -> Any
+    def get_trace_context(self) -> Any:
         """
         Returns the Sentry "trace" context from the Propagation Context.
         """
         if self._propagation_context is None:
             return None
 
-        trace_context = {
+        trace_context: Dict[str, Any] = {
             "trace_id": self._propagation_context["trace_id"],
             "span_id": self._propagation_context["span_id"],
             "parent_span_id": self._propagation_context["parent_span_id"],
             "dynamic_sampling_context": self.get_dynamic_sampling_context(),
-        }  # type: Dict[str, Any]
+        }
 
         return trace_context
 
-    def trace_propagation_meta(self, *args, **kwargs):
-        # type: (*Any, **Any) -> str
+    def trace_propagation_meta(self, *args: Any, **kwargs: Any) -> str:
         """
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
@@ -373,8 +365,7 @@ class Scope(object):
 
         return meta
 
-    def iter_headers(self):
-        # type: () -> Iterator[Tuple[str, str]]
+    def iter_headers(self) -> Iterator[Tuple[str, str]]:
         """
         Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
         """
@@ -388,8 +379,9 @@ class Scope(object):
                 baggage = Baggage(dsc).serialize()
                 yield BAGGAGE_HEADER_NAME, baggage
 
-    def iter_trace_propagation_headers(self, *args, **kwargs):
-        # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
+    def iter_trace_propagation_headers(
+        self, *args: Any, **kwargs: Any
+    ) -> Generator[Tuple[str, str], None, None]:
         """
         Return HTTP headers which allow propagation of trace data. Data taken
         from the span representing the request, if available, or the current
@@ -411,51 +403,46 @@ class Scope(object):
             for header in self.iter_headers():
                 yield header
 
-    def clear(self):
-        # type: () -> None
+    def clear(self) -> None:
         """Clears the entire scope."""
-        self._level = None  # type: Optional[str]
-        self._fingerprint = None  # type: Optional[List[str]]
-        self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: Dict[str, str]
-        self._user = None  # type: Optional[Dict[str, Any]]
+        self._level: Optional[str] = None
+        self._fingerprint: Optional[List[str]] = None
+        self._transaction: Optional[str] = None
+        self._transaction_info: Dict[str, str] = {}
+        self._user: Optional[Dict[str, Any]] = None
 
-        self._tags = {}  # type: Dict[str, Any]
-        self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: Dict[str, Any]
-        self._attachments = []  # type: List[Attachment]
+        self._tags: Dict[str, Any] = {}
+        self._contexts: Dict[str, Dict[str, Any]] = {}
+        self._extras: Dict[str, Any] = {}
+        self._attachments: List[Attachment] = []
 
         self.clear_breadcrumbs()
         self._should_capture = True
 
-        self._span = None  # type: Optional[Span]
-        self._session = None  # type: Optional[Session]
-        self._force_auto_session_tracking = None  # type: Optional[bool]
+        self._span: Optional[Span] = None
+        self._session: Optional[Session] = None
+        self._force_auto_session_tracking: Optional[bool] = None
 
-        self._profile = None  # type: Optional[Profile]
+        self._profile: Optional[Profile] = None
 
         self._propagation_context = None
 
     @_attr_setter
-    def level(self, value):
-        # type: (Optional[str]) -> None
+    def level(self, value: Optional[str]) -> None:
         """When set this overrides the level. Deprecated in favor of set_level."""
         self._level = value
 
-    def set_level(self, value):
-        # type: (Optional[str]) -> None
+    def set_level(self, value: Optional[str]) -> None:
         """Sets the level for the scope."""
         self._level = value
 
     @_attr_setter
-    def fingerprint(self, value):
-        # type: (Optional[List[str]]) -> None
+    def fingerprint(self, value: Optional[List[str]]) -> None:
         """When set this overrides the default fingerprint."""
         self._fingerprint = value
 
     @property
-    def transaction(self):
-        # type: () -> Any
+    def transaction(self) -> Any:
         # would be type: () -> Optional[Transaction], see https://github.com/python/mypy/issues/3004
         """Return the transaction (root span) in the scope, if any."""
 
@@ -472,8 +459,7 @@ class Scope(object):
         return self._span.containing_transaction
 
     @transaction.setter
-    def transaction(self, value):
-        # type: (Any) -> None
+    def transaction(self, value: Any) -> None:
         # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
         """When set this forces a specific transaction name to be set.
 
@@ -496,8 +482,7 @@ class Scope(object):
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
 
-    def set_transaction_name(self, name, source=None):
-        # type: (str, Optional[str]) -> None
+    def set_transaction_name(self, name: str, source: Optional[str] = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
 
@@ -510,27 +495,23 @@ class Scope(object):
             self._transaction_info["source"] = source
 
     @_attr_setter
-    def user(self, value):
-        # type: (Optional[Dict[str, Any]]) -> None
+    def user(self, value: Optional[Dict[str, Any]]) -> None:
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
         self.set_user(value)
 
-    def set_user(self, value):
-        # type: (Optional[Dict[str, Any]]) -> None
+    def set_user(self, value: Optional[Dict[str, Any]]) -> None:
         """Sets a user for the scope."""
         self._user = value
         if self._session is not None:
             self._session.update(user=value)
 
     @property
-    def span(self):
-        # type: () -> Optional[Span]
+    def span(self) -> Optional[Span]:
         """Get/set current tracing span or transaction."""
         return self._span
 
     @span.setter
-    def span(self, span):
-        # type: (Optional[Span]) -> None
+    def span(self, span: Optional[Span]) -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -542,78 +523,61 @@ class Scope(object):
                     self._transaction_info["source"] = transaction.source
 
     @property
-    def profile(self):
-        # type: () -> Optional[Profile]
+    def profile(self) -> Optional[Profile]:
         return self._profile
 
     @profile.setter
-    def profile(self, profile):
-        # type: (Optional[Profile]) -> None
-
+    def profile(self, profile: Optional[Profile]) -> None:
         self._profile = profile
 
     def set_tag(
         self,
-        key,  # type: str
-        value,  # type: Any
-    ):
-        # type: (...) -> None
+        key: str,
+        value: Any,
+    ) -> None:
         """Sets a tag for a key to a specific value."""
         self._tags[key] = value
 
-    def remove_tag(
-        self, key  # type: str
-    ):
-        # type: (...) -> None
+    def remove_tag(self, key: str) -> None:
         """Removes a specific tag."""
         self._tags.pop(key, None)
 
     def set_context(
         self,
-        key,  # type: str
-        value,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> None
+        key: str,
+        value: Dict[str, Any],
+    ) -> None:
         """Binds a context at a certain key to a specific value."""
         self._contexts[key] = value
 
-    def remove_context(
-        self, key  # type: str
-    ):
-        # type: (...) -> None
+    def remove_context(self, key: str) -> None:
         """Removes a context."""
         self._contexts.pop(key, None)
 
     def set_extra(
         self,
-        key,  # type: str
-        value,  # type: Any
-    ):
-        # type: (...) -> None
+        key: str,
+        value: Any,
+    ) -> None:
         """Sets an extra key to a specific value."""
         self._extras[key] = value
 
-    def remove_extra(
-        self, key  # type: str
-    ):
-        # type: (...) -> None
+    def remove_extra(self, key: str) -> None:
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
-    def clear_breadcrumbs(self):
-        # type: () -> None
+    def clear_breadcrumbs(self) -> None:
         """Clears breadcrumb buffer."""
-        self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
+        self._breadcrumbs: Deque[Breadcrumb] = deque()
 
     def add_attachment(
         self,
-        bytes=None,  # type: Optional[bytes]
-        filename=None,  # type: Optional[str]
-        path=None,  # type: Optional[str]
-        content_type=None,  # type: Optional[str]
-        add_to_transactions=False,  # type: bool
-    ):
-        # type: (...) -> None
+        bytes: Optional[bytes] = None,
+        filename: Optional[str] = None,
+        path: Optional[str] = None,
+        content_type: Optional[str] = None,
+        add_to_transactions: bool = False,
+    ) -> None:
         """Adds an attachment to future events sent."""
         self._attachments.append(
             Attachment(
@@ -625,8 +589,12 @@ class Scope(object):
             )
         )
 
-    def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
-        # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
+    def add_breadcrumb(
+        self,
+        crumb: Optional[Breadcrumb] = None,
+        hint: Optional[BreadcrumbHint] = None,
+        **kwargs: Any,
+    ) -> None:
         """
         Adds a breadcrumb.
 
@@ -642,12 +610,12 @@ class Scope(object):
         before_breadcrumb = client.options.get("before_breadcrumb")
         max_breadcrumbs = client.options.get("max_breadcrumbs")
 
-        crumb = dict(crumb or ())  # type: Breadcrumb
+        crumb: Breadcrumb = dict(crumb or ())
         crumb.update(kwargs)
         if not crumb:
             return
 
-        hint = dict(hint or ())  # type: Hint
+        hint: Hint = dict(hint or ())
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.now(timezone.utc)
@@ -668,9 +636,11 @@ class Scope(object):
             self._breadcrumbs.popleft()
 
     def start_transaction(
-        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
-    ):
-        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
+        self,
+        transaction: Optional[Transaction] = None,
+        instrumenter: str = INSTRUMENTER.SENTRY,
+        **kwargs: Any,
+    ) -> Union[Transaction, NoOpSpan]:
         """
         Start and return a transaction.
 
@@ -732,8 +702,12 @@ class Scope(object):
 
         return transaction
 
-    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (Optional[Span], str, Any) -> Span
+    def start_span(
+        self,
+        span: Optional[Span] = None,
+        instrumenter: str = INSTRUMENTER.SENTRY,
+        **kwargs: Any,
+    ) -> Span:
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -800,8 +774,13 @@ class Scope(object):
 
         return Span(**kwargs)
 
-    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    def continue_trace(
+        self,
+        environ_or_headers: Dict[str, Any],
+        op: Optional[str] = None,
+        name: Optional[str] = None,
+        source: Optional[str] = None,
+    ) -> Transaction:
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
@@ -816,8 +795,14 @@ class Scope(object):
 
         return transaction
 
-    def capture_event(self, event, hint=None, client=None, scope=None, **scope_kwargs):
-        # type: (Event, Optional[Hint], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+    def capture_event(
+        self,
+        event: Event,
+        hint: Optional[Hint] = None,
+        client: Optional[sentry_sdk.Client] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """
         Captures an event.
 
@@ -846,9 +831,13 @@ class Scope(object):
         return client.capture_event(event=event, hint=hint, scope=scope)
 
     def capture_message(
-        self, message, level=None, client=None, scope=None, **scope_kwargs
-    ):
-        # type: (str, Optional[str], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+        self,
+        message: str,
+        level: Optional[str] = None,
+        client: Optional[sentry_sdk.Client] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """
         Captures a message.
 
@@ -880,8 +869,13 @@ class Scope(object):
 
         return self.capture_event(event, client=client, scope=scope, **scope_kwargs)
 
-    def capture_exception(self, error=None, client=None, scope=None, **scope_kwargs):
-        # type: (Optional[Union[BaseException, ExcInfo]], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+    def capture_exception(
+        self,
+        error: Optional[Union[BaseException, ExcInfo]] = None,
+        client: Optional[sentry_sdk.Client] = None,
+        scope: Optional[Scope] = None,
+        **scope_kwargs: Any,
+    ) -> Optional[str]:
         """Captures an exception.
 
         :param error: An exception to capture. If `None`, `sys.exc_info()` will be used.
@@ -916,10 +910,7 @@ class Scope(object):
 
         return None
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
+    def _capture_internal_exception(self, exc_info: Any) -> Any:
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.
@@ -928,8 +919,7 @@ class Scope(object):
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
-    def start_session(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def start_session(self, *args: Any, **kwargs: Any) -> None:
         """Starts a new session."""
         client = kwargs.pop("client", None)
         session_mode = kwargs.pop("session_mode", "application")
@@ -943,8 +933,7 @@ class Scope(object):
             session_mode=session_mode,
         )
 
-    def end_session(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def end_session(self, *args: Any, **kwargs: Any) -> None:
         """Ends the current session if there is one."""
         client = kwargs.pop("client", None)
 
@@ -956,8 +945,7 @@ class Scope(object):
             if client is not None:
                 client.capture_session(session)
 
-    def stop_auto_session_tracking(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    def stop_auto_session_tracking(self, *args: Any, **kwargs: Any) -> None:
         """Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
@@ -969,18 +957,14 @@ class Scope(object):
 
         self._force_auto_session_tracking = False
 
-    def resume_auto_session_tracking(self):
-        # type: (...) -> None
+    def resume_auto_session_tracking(self) -> None:
         """Resumes automatic session tracking for the current scope if
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
         self._force_auto_session_tracking = None
 
-    def add_event_processor(
-        self, func  # type: EventProcessor
-    ):
-        # type: (...) -> None
+    def add_event_processor(self, func: EventProcessor) -> None:
         """Register a scope local event processor on the scope.
 
         :param func: This function behaves like `before_send.`
@@ -996,10 +980,9 @@ class Scope(object):
 
     def add_error_processor(
         self,
-        func,  # type: ErrorProcessor
-        cls=None,  # type: Optional[Type[BaseException]]
-    ):
-        # type: (...) -> None
+        func: ErrorProcessor,
+        cls: Optional[Type[BaseException]] = None,
+    ) -> None:
         """Register a scope local error processor on the scope.
 
         :param func: A callback that works similar to an event processor but is invoked with the original exception info triple as second argument.
@@ -1010,8 +993,7 @@ class Scope(object):
             cls_ = cls  # For mypy.
             real_func = func
 
-            def func(event, exc_info):
-                # type: (Event, ExcInfo) -> Optional[Event]
+            def func(event: Event, exc_info: ExcInfo) -> Optional[Event]:
                 try:
                     is_inst = isinstance(exc_info[1], cls_)
                 except Exception:
@@ -1022,49 +1004,58 @@ class Scope(object):
 
         self._error_processors.append(func)
 
-    def _apply_level_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_level_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._level is not None:
             event["level"] = self._level
 
-    def _apply_breadcrumbs_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_breadcrumbs_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
 
-    def _apply_user_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_user_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("user") is None and self._user is not None:
             event["user"] = self._user
 
-    def _apply_transaction_name_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_transaction_name_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("transaction") is None and self._transaction is not None:
             event["transaction"] = self._transaction
 
-    def _apply_transaction_info_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_transaction_info_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("transaction_info") is None and self._transaction_info is not None:
             event["transaction_info"] = self._transaction_info
 
-    def _apply_fingerprint_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_fingerprint_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if event.get("fingerprint") is None and self._fingerprint is not None:
             event["fingerprint"] = self._fingerprint
 
-    def _apply_extra_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_extra_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._extras:
             event.setdefault("extra", {}).update(self._extras)
 
-    def _apply_tags_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_tags_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._tags:
             event.setdefault("tags", {}).update(self._tags)
 
-    def _apply_contexts_to_event(self, event, hint, options):
-        # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
+    def _apply_contexts_to_event(
+        self, event: Event, hint: Hint, options: Optional[Dict[str, Any]]
+    ) -> None:
         if self._contexts:
             event.setdefault("contexts", {}).update(self._contexts)
 
@@ -1091,11 +1082,10 @@ class Scope(object):
     @_disable_capture
     def apply_to_event(
         self,
-        event,  # type: Event
-        hint,  # type: Hint
-        options=None,  # type: Optional[Dict[str, Any]]
-    ):
-        # type: (...) -> Optional[Event]
+        event: Event,
+        hint: Hint,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Event]:
         """Applies the information contained on the scope to the given event."""
         ty = event.get("type")
         is_transaction = ty == "transaction"
@@ -1130,8 +1120,7 @@ class Scope(object):
         if not is_transaction and not is_check_in:
             self._apply_breadcrumbs_to_event(event, hint, options)
 
-        def _drop(cause, ty):
-            # type: (Any, str) -> Optional[Any]
+        def _drop(cause: Any, ty: str) -> Optional[Any]:
             logger.info("%s (%s) dropped event", ty, cause)
             return None
 
@@ -1159,8 +1148,7 @@ class Scope(object):
 
         return event
 
-    def update_from_scope(self, scope):
-        # type: (Scope) -> None
+    def update_from_scope(self, scope: Scope) -> None:
         """Update the scope with another scope's data."""
         if scope._level is not None:
             self._level = scope._level
@@ -1191,14 +1179,13 @@ class Scope(object):
 
     def update_from_kwargs(
         self,
-        user=None,  # type: Optional[Any]
-        level=None,  # type: Optional[str]
-        extras=None,  # type: Optional[Dict[str, Any]]
-        contexts=None,  # type: Optional[Dict[str, Any]]
-        tags=None,  # type: Optional[Dict[str, str]]
-        fingerprint=None,  # type: Optional[List[str]]
-    ):
-        # type: (...) -> None
+        user: Optional[Any] = None,
+        level: Optional[str] = None,
+        extras: Optional[Dict[str, Any]] = None,
+        contexts: Optional[Dict[str, Any]] = None,
+        tags: Optional[Dict[str, str]] = None,
+        fingerprint: Optional[List[str]] = None,
+    ) -> None:
         """Update the scope's attributes."""
         if level is not None:
             self._level = level
@@ -1213,9 +1200,8 @@ class Scope(object):
         if fingerprint is not None:
             self._fingerprint = fingerprint
 
-    def __copy__(self):
-        # type: () -> Scope
-        rv = object.__new__(self.__class__)  # type: Scope
+    def __copy__(self) -> Scope:
+        rv: Scope = object.__new__(self.__class__)
 
         rv._level = self._level
         rv._name = self._name
@@ -1243,8 +1229,7 @@ class Scope(object):
 
         return rv
 
-    def __repr__(self):
-        # type: () -> str
+    def __repr__(self) -> str:
         return "<%s id=%s name=%s>" % (
             self.__class__.__name__,
             hex(id(self)),

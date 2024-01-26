@@ -19,8 +19,7 @@ METHODS_TO_INSTRUMENT = [
 ]
 
 
-def _get_span_description(method_name, args, kwargs):
-    # type: (str, Any, Any) -> str
+def _get_span_description(method_name: str, args: Any, kwargs: Any) -> str:
     description = "{} ".format(method_name)
 
     if args is not None and len(args) >= 1:
@@ -31,12 +30,16 @@ def _get_span_description(method_name, args, kwargs):
     return description
 
 
-def _patch_cache_method(cache, method_name):
-    # type: (CacheHandler, str) -> None
+def _patch_cache_method(cache: CacheHandler, method_name: str) -> None:
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    def _instrument_call(cache, method_name, original_method, args, kwargs):
-        # type: (CacheHandler, str, Callable[..., Any], Any, Any) -> Any
+    def _instrument_call(
+        cache: CacheHandler,
+        method_name: str,
+        original_method: Callable[..., Any],
+        args: Any,
+        kwargs: Any,
+    ) -> Any:
         hub = Hub.current
         integration = hub.get_integration(DjangoIntegration)
         if integration is None or not integration.cache_spans:
@@ -61,23 +64,20 @@ def _patch_cache_method(cache, method_name):
     original_method = getattr(cache, method_name)
 
     @functools.wraps(original_method)
-    def sentry_method(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def sentry_method(*args: Any, **kwargs: Any) -> Any:
         return _instrument_call(cache, method_name, original_method, args, kwargs)
 
     setattr(cache, method_name, sentry_method)
 
 
-def _patch_cache(cache):
-    # type: (CacheHandler) -> None
+def _patch_cache(cache: CacheHandler) -> None:
     if not hasattr(cache, "_sentry_patched"):
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name)
         cache._sentry_patched = True
 
 
-def patch_caching():
-    # type: () -> None
+def patch_caching() -> None:
     from sentry_sdk.integrations.django import DjangoIntegration
 
     if not hasattr(CacheHandler, "_sentry_patched"):
@@ -85,8 +85,7 @@ def patch_caching():
             original_get_item = CacheHandler.__getitem__
 
             @functools.wraps(original_get_item)
-            def sentry_get_item(self, alias):
-                # type: (CacheHandler, str) -> Any
+            def sentry_get_item(self: CacheHandler, alias: str) -> Any:
                 cache = original_get_item(self, alias)
 
                 integration = Hub.current.get_integration(DjangoIntegration)
@@ -102,8 +101,7 @@ def patch_caching():
             original_create_connection = CacheHandler.create_connection
 
             @functools.wraps(original_create_connection)
-            def sentry_create_connection(self, alias):
-                # type: (CacheHandler, str) -> Any
+            def sentry_create_connection(self: CacheHandler, alias: str) -> Any:
                 cache = original_create_connection(self, alias)
 
                 integration = Hub.current.get_integration(DjangoIntegration)

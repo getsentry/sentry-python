@@ -34,18 +34,15 @@ TIMEOUT_WARNING_BUFFER = 1500  # Buffer time required to send timeout warning to
 MILLIS_TO_SECONDS = 1000.0
 
 
-def _wrap_init_error(init_error):
-    # type: (F) -> F
-    def sentry_init_error(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-
+def _wrap_init_error(init_error: F) -> F:
+    def sentry_init_error(*args: Any, **kwargs: Any) -> Any:
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
         if integration is None:
             return init_error(*args, **kwargs)
 
         # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+        client: Any = hub.client
 
         with capture_internal_exceptions():
             with hub.configure_scope() as scope:
@@ -65,11 +62,10 @@ def _wrap_init_error(init_error):
     return sentry_init_error  # type: ignore
 
 
-def _wrap_handler(handler):
-    # type: (F) -> F
-    def sentry_handler(aws_event, aws_context, *args, **kwargs):
-        # type: (Any, Any, *Any, **Any) -> Any
-
+def _wrap_handler(handler: F) -> F:
+    def sentry_handler(
+        aws_event: Any, aws_context: Any, *args: Any, **kwargs: Any
+    ) -> Any:
         # Per https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html,
         # `event` here is *likely* a dictionary, but also might be a number of
         # other types (str, int, float, None).
@@ -99,7 +95,7 @@ def _wrap_handler(handler):
             return handler(aws_event, aws_context, *args, **kwargs)
 
         # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+        client: Any = hub.client
         configured_time = aws_context.get_remaining_time_in_millis()
 
         with hub.push_scope() as scope:
@@ -173,8 +169,7 @@ def _wrap_handler(handler):
     return sentry_handler  # type: ignore
 
 
-def _drain_queue():
-    # type: () -> None
+def _drain_queue() -> None:
     with capture_internal_exceptions():
         hub = Hub.current
         integration = hub.get_integration(AwsLambdaIntegration)
@@ -187,14 +182,11 @@ def _drain_queue():
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
 
-    def __init__(self, timeout_warning=False):
-        # type: (bool) -> None
+    def __init__(self, timeout_warning: bool = False) -> None:
         self.timeout_warning = timeout_warning
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         lambda_bootstrap = get_lambda_bootstrap()
         if not lambda_bootstrap:
             logger.warning(
@@ -215,8 +207,9 @@ class AwsLambdaIntegration(Integration):
         if pre_37:
             old_handle_event_request = lambda_bootstrap.handle_event_request
 
-            def sentry_handle_event_request(request_handler, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
+            def sentry_handle_event_request(
+                request_handler: Any, *args: Any, **kwargs: Any
+            ) -> Any:
                 request_handler = _wrap_handler(request_handler)
                 return old_handle_event_request(request_handler, *args, **kwargs)
 
@@ -224,8 +217,9 @@ class AwsLambdaIntegration(Integration):
 
             old_handle_http_request = lambda_bootstrap.handle_http_request
 
-            def sentry_handle_http_request(request_handler, *args, **kwargs):
-                # type: (Any, *Any, **Any) -> Any
+            def sentry_handle_http_request(
+                request_handler: Any, *args: Any, **kwargs: Any
+            ) -> Any:
                 request_handler = _wrap_handler(request_handler)
                 return old_handle_http_request(request_handler, *args, **kwargs)
 
@@ -236,8 +230,7 @@ class AwsLambdaIntegration(Integration):
 
             old_to_json = lambda_bootstrap.to_json
 
-            def sentry_to_json(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
+            def sentry_to_json(*args: Any, **kwargs: Any) -> Any:
                 _drain_queue()
                 return old_to_json(*args, **kwargs)
 
@@ -262,10 +255,8 @@ class AwsLambdaIntegration(Integration):
             # Patch the runtime client to drain the queue. This should work
             # even when the SDK is initialized inside of the handler
 
-            def _wrap_post_function(f):
-                # type: (F) -> F
-                def inner(*args, **kwargs):
-                    # type: (*Any, **Any) -> Any
+            def _wrap_post_function(f: F) -> F:
+                def inner(*args: Any, **kwargs: Any) -> Any:
                     _drain_queue()
                     return f(*args, **kwargs)
 
@@ -283,9 +274,7 @@ class AwsLambdaIntegration(Integration):
             )
 
 
-def get_lambda_bootstrap():
-    # type: () -> Optional[Any]
-
+def get_lambda_bootstrap() -> Optional[Any]:
     # Python 3.7: If the bootstrap module is *already imported*, it is the
     # one we actually want to use (no idea what's in __main__)
     #
@@ -320,12 +309,14 @@ def get_lambda_bootstrap():
         return None
 
 
-def _make_request_event_processor(aws_event, aws_context, configured_timeout):
-    # type: (Any, Any, Any) -> EventProcessor
+def _make_request_event_processor(
+    aws_event: Any, aws_context: Any, configured_timeout: Any
+) -> EventProcessor:
     start_time = datetime.now(timezone.utc)
 
-    def event_processor(sentry_event, hint, start_time=start_time):
-        # type: (Event, Hint, datetime) -> Optional[Event]
+    def event_processor(
+        sentry_event: Event, hint: Hint, start_time: datetime = start_time
+    ) -> Optional[Event]:
         remaining_time_in_milis = aws_context.get_remaining_time_in_millis()
         exec_duration = configured_timeout - remaining_time_in_milis
 
@@ -388,8 +379,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
     return event_processor
 
 
-def _get_url(aws_event, aws_context):
-    # type: (Any, Any) -> str
+def _get_url(aws_event: Any, aws_context: Any) -> str:
     path = aws_event.get("path", None)
 
     headers = aws_event.get("headers")
@@ -403,8 +393,7 @@ def _get_url(aws_event, aws_context):
     return "awslambda:///{}".format(aws_context.function_name)
 
 
-def _get_cloudwatch_logs_url(aws_context, start_time):
-    # type: (Any, datetime) -> str
+def _get_cloudwatch_logs_url(aws_context: Any, start_time: datetime) -> str:
     """
     Generates a CloudWatchLogs console URL based on the context object
 

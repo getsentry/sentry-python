@@ -16,11 +16,9 @@ class ArgvIntegration(Integration):
     identifier = "argv"
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
+    def setup_once() -> None:
         @add_global_event_processor
-        def processor(event, hint):
-            # type: (Event, Optional[Hint]) -> Optional[Event]
+        def processor(event: Event, hint: Optional[Hint]) -> Optional[Event]:
             if Hub.current.get_integration(ArgvIntegration) is not None:
                 extra = event.setdefault("extra", {})
                 # If some event processor decided to set extra to e.g. an

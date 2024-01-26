@@ -60,8 +60,7 @@ class QuartIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="endpoint"):
-        # type: (str) -> None
+    def __init__(self, transaction_style: str = "endpoint") -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -70,9 +69,7 @@ class QuartIntegration(Integration):
         self.transaction_style = transaction_style
 
     @staticmethod
-    def setup_once():
-        # type: () -> None
-
+    def setup_once() -> None:
         request_started.connect(_request_websocket_started)
         websocket_started.connect(_request_websocket_started)
         got_background_exception.connect(_capture_exception)
@@ -83,12 +80,12 @@ class QuartIntegration(Integration):
         patch_scaffold_route()
 
 
-def patch_asgi_app():
-    # type: () -> None
+def patch_asgi_app() -> None:
     old_app = Quart.__call__
 
-    async def sentry_patched_asgi_app(self, scope, receive, send):
-        # type: (Any, Any, Any, Any) -> Any
+    async def sentry_patched_asgi_app(
+        self: Any, scope: Any, receive: Any, send: Any
+    ) -> Any:
         if Hub.current.get_integration(QuartIntegration) is None:
             return await old_app(self, scope, receive, send)
 
@@ -99,24 +96,19 @@ def patch_asgi_app():
     Quart.__call__ = sentry_patched_asgi_app
 
 
-def patch_scaffold_route():
-    # type: () -> None
+def patch_scaffold_route() -> None:
     old_route = Scaffold.route
 
-    def _sentry_route(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
+    def _sentry_route(*args: Any, **kwargs: Any) -> Any:
         old_decorator = old_route(*args, **kwargs)
 
-        def decorator(old_func):
-            # type: (Any) -> Any
-
+        def decorator(old_func: Any) -> Any:
             if inspect.isfunction(old_func) and not asyncio.iscoroutinefunction(
                 old_func
             ):
 
                 @wraps(old_func)
-                def _sentry_func(*args, **kwargs):
-                    # type: (*Any, **Any) -> Any
+                def _sentry_func(*args: Any, **kwargs: Any) -> Any:
                     hub = Hub.current
                     integration = hub.get_integration(QuartIntegration)
                     if integration is None:
@@ -139,9 +131,9 @@ def patch_scaffold_route():
     Scaffold.route = _sentry_route
 
 
-def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> None
-
+def _set_transaction_name_and_source(
+    scope: Scope, transaction_style: str, request: Request
+) -> None:
     try:
         name_for_style = {
             "url": request.url_rule.rule,
@@ -155,8 +147,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-async def _request_websocket_started(app, **kwargs):
-    # type: (Quart, **Any) -> None
+async def _request_websocket_started(app: Quart, **kwargs: Any) -> None:
     hub = Hub.current
     integration = hub.get_integration(QuartIntegration)
     if integration is None:
@@ -180,10 +171,10 @@ async def _request_websocket_started(app, **kwargs):
         scope.add_event_processor(evt_processor)
 
 
-def _make_request_event_processor(app, request, integration):
-    # type: (Quart, Request, QuartIntegration) -> EventProcessor
-    def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+def _make_request_event_processor(
+    app: Quart, request: Request, integration: QuartIntegration
+) -> EventProcessor:
+    def inner(event: Dict[str, Any], hint: Dict[str, Any]) -> Dict[str, Any]:
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -209,14 +200,15 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
-async def _capture_exception(sender, exception, **kwargs):
-    # type: (Quart, Union[ValueError, BaseException], **Any) -> None
+async def _capture_exception(
+    sender: Quart, exception: Union[ValueError, BaseException], **kwargs: Any
+) -> None:
     hub = Hub.current
     if hub.get_integration(QuartIntegration) is None:
         return
 
     # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
+    client: Any = hub.client
 
     event, hint = event_from_exception(
         exception,
@@ -227,8 +219,7 @@ async def _capture_exception(sender, exception, **kwargs):
     hub.capture_event(event, hint=hint)
 
 
-def _add_user_to_event(event):
-    # type: (Dict[str, Any]) -> None
+def _add_user_to_event(event: Dict[str, Any]) -> None:
     if quart_auth is None:
         return
 
