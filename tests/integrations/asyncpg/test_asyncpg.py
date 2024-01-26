@@ -8,6 +8,7 @@ docker run --rm --name some-postgres -e POSTGRES_USER=foo -e POSTGRES_PASSWORD=b
 
 The tests use the following credentials to establish a database connection.
 """
+
 import os
 
 
