@@ -372,7 +372,7 @@ class Scope(object):
         if isolation_scope is not None and isolation_scope.client.is_active():
             return isolation_scope.client
 
-        if _global_scope is not None:
+        if _global_scope is not None and _global_scope.client.is_active():
             return _global_scope.client
 
         return NoopClient()

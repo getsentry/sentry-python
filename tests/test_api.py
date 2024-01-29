@@ -27,6 +27,7 @@ except ImportError:
     import mock  # python < 3.3
 
 
+@pytest.mark.forked
 def test_get_current_span():
     fake_hub = mock.MagicMock()
     fake_hub.scope = mock.MagicMock()
@@ -38,6 +39,7 @@ def test_get_current_span():
     assert get_current_span(fake_hub) is None
 
 
+@pytest.mark.forked
 def test_get_current_span_default_hub(sentry_init):
     sentry_init()
 
@@ -50,6 +52,7 @@ def test_get_current_span_default_hub(sentry_init):
         assert get_current_span() == fake_span
 
 
+@pytest.mark.forked
 def test_get_current_span_default_hub_with_transaction(sentry_init):
     sentry_init()
 
@@ -59,6 +62,7 @@ def test_get_current_span_default_hub_with_transaction(sentry_init):
         assert get_current_span() == new_transaction
 
 
+@pytest.mark.forked
 def test_traceparent_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
@@ -70,6 +74,7 @@ def test_traceparent_with_tracing_enabled(sentry_init):
         assert get_traceparent() == expected_traceparent
 
 
+@pytest.mark.forked
 def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
@@ -81,6 +86,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
     assert get_traceparent() == expected_traceparent
 
 
+@pytest.mark.forked
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
     propagation_context = Hub.current.scope._propagation_context
@@ -93,6 +99,7 @@ def test_baggage_with_tracing_disabled(sentry_init):
     assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
 
+@pytest.mark.forked
 def test_baggage_with_tracing_enabled(sentry_init):
     sentry_init(traces_sample_rate=1.0, release="1.0.0", environment="dev")
     with start_transaction() as transaction:
@@ -103,6 +110,7 @@ def test_baggage_with_tracing_enabled(sentry_init):
         assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
 
 
+@pytest.mark.forked
 def test_continue_trace(sentry_init):
     sentry_init()
 
