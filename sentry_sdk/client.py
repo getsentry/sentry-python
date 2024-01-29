@@ -80,26 +80,6 @@ def _get_options(*args, **kwargs):
 
     for key, value in options.items():
         if key not in rv:
-            # Option "with_locals" was renamed to "include_local_variables"
-            if key == "with_locals":
-                msg = (
-                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
-                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["include_local_variables"] = value
-                continue
-
-            # Option "request_bodies" was renamed to "max_request_body_size"
-            if key == "request_bodies":
-                msg = (
-                    "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. "
-                    "Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["max_request_body_size"] = value
-                continue
-
             raise TypeError("Unknown option %r" % (key,))
 
         rv[key] = value
