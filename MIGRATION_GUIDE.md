@@ -28,6 +28,9 @@
 - Removed support for the `install` method for custom integrations. Please use `setup_once` instead.
 - Removed `sentry_sdk.tracing.Span.new_span`. Use `sentry_sdk.tracing.Span.start_child` instead.
 - Removed `sentry_sdk.tracing.Transaction.new_span`. Use `sentry_sdk.tracing.Transaction.start_child` instead.
+- Removed support for the `install` method for custom integrations. Please use `setup_once` instead.
+- Removed `sentry_sdk.tracing.Span.new_span`. Use `sentry_sdk.tracing.Span.start_child` instead.
+- Removed `sentry_sdk.tracing.Transaction.new_span`. Use `sentry_sdk.tracing.Transaction.start_child` instead.
 
 ## Deprecated
 
