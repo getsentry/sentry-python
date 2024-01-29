@@ -180,7 +180,7 @@ def add_query_source(hub, span):
     if span.timestamp is None or span.start_timestamp is None:
         return
 
-    should_add_query_source = client.options.get("enable_db_query_source", False)
+    should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
