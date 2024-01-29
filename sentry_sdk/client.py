@@ -249,13 +249,13 @@ class _Client(object):
 
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics"):
+            if experiments.get("enable_metrics", True):
                 from sentry_sdk.metrics import MetricsAggregator
 
                 self.metrics_aggregator = MetricsAggregator(
                     capture_func=_capture_envelope,
                     enable_code_locations=bool(
-                        experiments.get("metric_code_locations")
+                        experiments.get("metric_code_locations", True)
                     ),
                 )
 

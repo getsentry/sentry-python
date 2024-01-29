@@ -418,7 +418,7 @@ def test_gauge(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -450,7 +450,7 @@ def test_multiple(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -503,7 +503,7 @@ def test_transaction_name(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -753,7 +753,7 @@ def test_tag_normalization(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -808,6 +808,7 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={
             "enable_metrics": True,
+            "metric_code_locations": False,
             "before_emit_metric": before_emit,
         },
     )
@@ -853,7 +854,7 @@ def test_tag_serialization(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     envelopes = capture_envelopes()
 
