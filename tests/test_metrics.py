@@ -644,7 +644,7 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 0.0},
     )
     ts = time.time()
     envelopes = capture_envelopes()
