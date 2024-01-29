@@ -427,3 +427,6 @@ def test_fork_copy_on_write_remove_tag():
     assert id(original_scope._tags) != id(forked_scope._tags)
     assert original_scope._tags == {"scope": 0}
     assert forked_scope._tags == {}
+
+
+# TODO: add tests for all properties of Scope that should have the copy-on-write feature

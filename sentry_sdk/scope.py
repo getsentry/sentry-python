@@ -375,6 +375,7 @@ class Scope(object):
 
         return NoopClient()
 
+    @_copy_on_write("client")
     def set_client(self, client=None):
         # type: (Optional[sentry_sdk.client.BaseClient]) -> None
         """
@@ -484,6 +485,7 @@ class Scope(object):
             "dynamic_sampling_context": None,
         }
 
+    @_copy_on_write("_propagation_context")
     def set_new_propagation_context(self):
         # type: () -> None
         """
@@ -495,6 +497,7 @@ class Scope(object):
             self._propagation_context,
         )
 
+    @_copy_on_write("_propagation_context")
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
@@ -515,6 +518,7 @@ class Scope(object):
         if self._propagation_context is None and self._type != ScopeType.CURRENT:
             self.set_new_propagation_context()
 
+    @_copy_on_write("_propagation_context")
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
         """
@@ -526,9 +530,9 @@ class Scope(object):
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context["dynamic_sampling_context"] = (
-                baggage.dynamic_sampling_context()
-            )
+            self._propagation_context[
+                "dynamic_sampling_context"
+            ] = baggage.dynamic_sampling_context()
 
         return self._propagation_context["dynamic_sampling_context"]
 
@@ -680,17 +684,20 @@ class Scope(object):
 
         self._propagation_context = None
 
+    @_copy_on_write("_level")
     @_attr_setter
     def level(self, value):
         # type: (Optional[str]) -> None
         """When set this overrides the level. Deprecated in favor of set_level."""
         self._level = value
 
+    @_copy_on_write("_level")
     def set_level(self, value):
         # type: (Optional[str]) -> None
         """Sets the level for the scope."""
         self._level = value
 
+    @_copy_on_write("_fingerprint")
     @_attr_setter
     def fingerprint(self, value):
         # type: (Optional[List[str]]) -> None
@@ -715,6 +722,7 @@ class Scope(object):
         # transaction) or a non-orphan span on the scope
         return self._span.containing_transaction
 
+    @_copy_on_write("_span")
     @transaction.setter
     def transaction(self, value):
         # type: (Any) -> None
@@ -740,6 +748,9 @@ class Scope(object):
         if self._span and self._span.containing_transaction:
             self._span.containing_transaction.name = value
 
+    @_copy_on_write("_transaction")
+    @_copy_on_write("_transaction_info")
+    @_copy_on_write("_span")
     def set_transaction_name(self, name, source=None):
         # type: (str, Optional[str]) -> None
         """Set the transaction name and optionally the transaction source."""
@@ -759,6 +770,7 @@ class Scope(object):
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
         self.set_user(value)
 
+    @_copy_on_write("_user")
     def set_user(self, value):
         # type: (Optional[Dict[str, Any]]) -> None
         """Sets a user for the scope."""
@@ -773,6 +785,7 @@ class Scope(object):
         """Get/set current tracing span or transaction."""
         return self._span
 
+    @_copy_on_write("_span")
     @span.setter
     def span(self, span):
         # type: (Optional[Span]) -> None
@@ -791,6 +804,7 @@ class Scope(object):
         # type: () -> Optional[Profile]
         return self._profile
 
+    @_copy_on_write("_profile")
     @profile.setter
     def profile(self, profile):
         # type: (Optional[Profile]) -> None
@@ -815,6 +829,7 @@ class Scope(object):
         """Removes a specific tag."""
         self._tags.pop(key, None)
 
+    @_copy_on_write("_contexts")
     def set_context(
         self,
         key,  # type: str
@@ -831,6 +846,7 @@ class Scope(object):
         """Removes a context."""
         self._contexts.pop(key, None)
 
+    @_copy_on_write("_extras")
     def set_extra(
         self,
         key,  # type: str
@@ -840,6 +856,7 @@ class Scope(object):
         """Sets an extra key to a specific value."""
         self._extras[key] = value
 
+    @_copy_on_write("_extras")
     def remove_extra(
         self, key  # type: str
     ):
@@ -847,11 +864,13 @@ class Scope(object):
         """Removes a specific extra key."""
         self._extras.pop(key, None)
 
+    @_copy_on_write("_breadcrumbs")
     def clear_breadcrumbs(self):
         # type: () -> None
         """Clears breadcrumb buffer."""
         self._breadcrumbs = deque()  # type: Deque[Breadcrumb]
 
+    @_copy_on_write("_attachments")
     def add_attachment(
         self,
         bytes=None,  # type: Optional[bytes]
@@ -872,6 +891,7 @@ class Scope(object):
             )
         )
 
+    @_copy_on_write("_breadcrumbs")
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """
@@ -1154,6 +1174,7 @@ class Scope(object):
         """
         logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
+    @_copy_on_write("_session")
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         """Starts a new session."""
@@ -1169,6 +1190,7 @@ class Scope(object):
             session_mode=session_mode,
         )
 
+    @_copy_on_write("_session")
     def end_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         """Ends the current session if there is one."""
@@ -1179,6 +1201,7 @@ class Scope(object):
             session.close()
             Scope.get_client().capture_session(session)
 
+    @_copy_on_write("_force_auto_session_tracking")
     def stop_auto_session_tracking(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         """Stops automatic session tracking.
@@ -1189,6 +1212,7 @@ class Scope(object):
         self.end_session()
         self._force_auto_session_tracking = False
 
+    @_copy_on_write("_force_auto_session_tracking")
     def resume_auto_session_tracking(self):
         # type: (...) -> None
         """Resumes automatic session tracking for the current scope if
@@ -1197,6 +1221,7 @@ class Scope(object):
         """
         self._force_auto_session_tracking = None
 
+    @_copy_on_write("_event_processors")
     def add_event_processor(
         self, func  # type: EventProcessor
     ):
@@ -1214,6 +1239,7 @@ class Scope(object):
 
         self._event_processors.append(func)
 
+    @_copy_on_write("_error_processors")
     def add_error_processor(
         self,
         func,  # type: ErrorProcessor
