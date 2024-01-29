@@ -535,6 +535,7 @@ def test_transaction_name(sentry_init, capture_envelopes):
         "environment": "not-fun-env",
     }
 
+
 @pytest.mark.parametrize(
     "sample_rate",
     [1.0, None]
