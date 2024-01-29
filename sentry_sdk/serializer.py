@@ -328,9 +328,9 @@ def serialize(event, **kwargs):
                     should_repr_strings=should_repr_strings,
                     is_databag=is_databag,
                     is_request_body=is_request_body,
-                    remaining_depth=remaining_depth - 1
-                    if remaining_depth is not None
-                    else None,
+                    remaining_depth=(
+                        remaining_depth - 1 if remaining_depth is not None else None
+                    ),
                     remaining_breadth=remaining_breadth,
                 )
                 rv_dict[str_k] = v
@@ -355,9 +355,9 @@ def serialize(event, **kwargs):
                         should_repr_strings=should_repr_strings,
                         is_databag=is_databag,
                         is_request_body=is_request_body,
-                        remaining_depth=remaining_depth - 1
-                        if remaining_depth is not None
-                        else None,
+                        remaining_depth=(
+                            remaining_depth - 1 if remaining_depth is not None else None
+                        ),
                         remaining_breadth=remaining_breadth,
                     )
                 )

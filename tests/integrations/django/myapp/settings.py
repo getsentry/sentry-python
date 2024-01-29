@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
-
 # We shouldn't access settings while setting up integrations. Initialize SDK
 # here to provoke any errors that might occur.
 import sentry_sdk

@@ -2,8 +2,6 @@ from __future__ import annotations
 import contextlib
 from typing import Any, TypeVar, Callable, Awaitable, Iterator
 
-from asyncpg.cursor import BaseCursor  # type: ignore
-
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -13,6 +11,7 @@ from sentry_sdk.utils import parse_version, capture_internal_exceptions
 
 try:
     import asyncpg  # type: ignore[import-not-found]
+    from asyncpg.cursor import BaseCursor  # type: ignore
 
 except ImportError:
     raise DidNotEnable("asyncpg not installed.")
