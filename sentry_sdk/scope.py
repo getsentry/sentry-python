@@ -1077,17 +1077,6 @@ class Scope(object):
             else:
                 contexts["trace"] = self.get_trace_context()
 
-        # Add "reply_id" context
-        try:
-            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
-        except (KeyError, TypeError):
-            replay_id = None
-
-        if replay_id is not None:
-            contexts["replay"] = {
-                "replay_id": replay_id,
-            }
-
     @_disable_capture
     def apply_to_event(
         self,

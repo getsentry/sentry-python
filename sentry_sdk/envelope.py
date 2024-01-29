@@ -26,6 +26,12 @@ def parse_json(data):
 
 
 class Envelope:
+    """
+    Represents a Sentry Envelope. The calling code is responsible for adhering to the constraints
+    documented in the Sentry docs: https://develop.sentry.dev/sdk/envelopes/#data-model. In particular,
+    each envelope may have at most one Item with type "event" or "transaction" (but not both).
+    """
+
     def __init__(
         self,
         headers=None,  # type: Optional[Dict[str, Any]]

@@ -1,7 +1,20 @@
+from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
+
+
+# Also needs to be at the top to prevent circular import
+class EndpointType(Enum):
+    """
+    The type of an endpoint. This is an enum, rather than a constant, for historical reasons
+    (the old /store endpoint). The enum also preserve future compatibility, in case we ever
+    have a new endpoint.
+    """
+
+    ENVELOPE = "envelope"
+
 
 if TYPE_CHECKING:
     import sentry_sdk

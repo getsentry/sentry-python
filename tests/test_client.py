@@ -17,7 +17,6 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
     capture_event,
-    start_transaction,
     set_tag,
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
@@ -32,13 +31,13 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
 
-class EventCapturedError(Exception):
+class EnvelopeCapturedError(Exception):
     pass
 
 
 class _TestTransport(Transport):
-    def capture_event(self, event):
-        raise EventCapturedError(event)
+    def capture_envelope(self, envelope):
+        raise EnvelopeCapturedError(envelope)
 
 
 def test_transport_option(monkeypatch):
@@ -51,7 +50,7 @@ def test_transport_option(monkeypatch):
     assert Client().dsn is None
 
     monkeypatch.setenv("SENTRY_DSN", dsn)
-    transport = Transport({"dsn": dsn2})
+    transport = _TestTransport({"dsn": dsn2})
     assert str(transport.parsed_dsn) == dsn2
     assert str(Client(transport=transport).dsn) == dsn
 
@@ -363,7 +362,9 @@ def test_ignore_errors(sentry_init, capture_events):
         e(ValueError())
 
         assert mock_capture_internal_exception.call_count == 1
-        assert mock_capture_internal_exception.call_args[0][0][0] == EventCapturedError
+        assert (
+            mock_capture_internal_exception.call_args[0][0][0] == EnvelopeCapturedError
+        )
 
 
 def test_include_local_variables_enabled(sentry_init, capture_events):
@@ -521,8 +522,8 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
 
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
-    pytest.raises(EventCapturedError, lambda: capture_event({}))
-    pytest.raises(EventCapturedError, lambda: capture_event({}))
+    pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
+    pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
@@ -534,11 +535,13 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     import time
     from sentry_sdk import init, transport, capture_message
 
-    def send_event(self, event):
+    def capture_envelope(self, envelope):
         time.sleep(0.1)
-        print(event["message"])
+        event = envelope.get_event() or dict()
+        message = event.get("message", "")
+        print(message)
 
-    transport.HttpTransport._send_event = send_event
+    transport.HttpTransport.capture_envelope = capture_envelope
     init("http://foobar@localhost/123", shutdown_timeout={num_messages})
 
     for _ in range({num_messages}):
@@ -946,91 +949,6 @@ def test_init_string_types(dsn, sentry_init):
         Hub.current.client.dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
     )
-
-
-def test_sending_events_with_tracing():
-    """
-    Tests for calling the right transport method (capture_event vs
-    capture_envelope) from the SDK client for different data types.
-    """
-
-    envelopes = []
-    events = []
-
-    class CustomTransport(Transport):
-        def capture_envelope(self, envelope):
-            envelopes.append(envelope)
-
-        def capture_event(self, event):
-            events.append(event)
-
-    with Hub(Client(enable_tracing=True, transport=CustomTransport())):
-        try:
-            1 / 0
-        except Exception:
-            event_id = capture_exception()
-
-        # Assert error events get passed in via capture_envelope
-        assert not events
-        envelope = envelopes.pop()
-        (item,) = envelope.items
-        assert item.data_category == "error"
-        assert item.headers.get("type") == "event"
-        assert item.get_event()["event_id"] == event_id
-
-        with start_transaction(name="foo"):
-            pass
-
-        # Assert transactions get passed in via capture_envelope
-        assert not events
-        envelope = envelopes.pop()
-
-        (item,) = envelope.items
-        assert item.data_category == "transaction"
-        assert item.headers.get("type") == "transaction"
-
-    assert not envelopes
-    assert not events
-
-
-def test_sending_events_with_no_tracing():
-    """
-    Tests for calling the right transport method (capture_event vs
-    capture_envelope) from the SDK client for different data types.
-    """
-
-    envelopes = []
-    events = []
-
-    class CustomTransport(Transport):
-        def capture_envelope(self, envelope):
-            envelopes.append(envelope)
-
-        def capture_event(self, event):
-            events.append(event)
-
-    with Hub(Client(enable_tracing=False, transport=CustomTransport())):
-        try:
-            1 / 0
-        except Exception:
-            event_id = capture_exception()
-
-        # Assert error events get passed in via capture_event
-        assert not envelopes
-        event = events.pop()
-
-        assert event["event_id"] == event_id
-        assert "type" not in event
-
-        with start_transaction(name="foo"):
-            pass
-
-        # Assert transactions get passed in via capture_envelope
-        assert not events
-        assert not envelopes
-
-    assert not envelopes
-    assert not events
 
 
 @pytest.mark.parametrize(
