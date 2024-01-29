@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
     _is_external_source,
     _module_in_list,
 )
-from sentry_sdk._compat import PY2, iteritems
+from sentry_sdk._compat import PY2, duration_in_milliseconds, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
 if PY2:
@@ -186,7 +186,7 @@ def add_query_source(hub, span):
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
-    slow_query = duration.microseconds > threshold * 1000
+    slow_query = duration_in_milliseconds(duration) > threshold
 
     if not slow_query:
         return
