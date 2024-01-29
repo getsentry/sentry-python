@@ -12,7 +12,7 @@ def test_leaks(maybe_monkeypatched_threading):
 
     from sentry_sdk import utils
 
-    _, ContextVar = utils._get_contextvars()  # noqa: N806
+    _, ContextVar, _ = utils._get_contextvars()  # noqa: N806
 
     ts = []
 
