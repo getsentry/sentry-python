@@ -231,6 +231,8 @@ class Scope(object):
 
         rv._profile = self._profile
 
+        rv.original_scope = self.original_scope
+
         return rv
 
     def _fork(self):
@@ -722,8 +724,9 @@ class Scope(object):
         # transaction) or a non-orphan span on the scope
         return self._span.containing_transaction
 
-    @_copy_on_write("_span")
     @transaction.setter
+    @_copy_on_write("_span")
+    @_copy_on_write("_transaction")
     def transaction(self, value):
         # type: (Any) -> None
         # would be type: (Optional[str]) -> None, see https://github.com/python/mypy/issues/3004
@@ -785,8 +788,8 @@ class Scope(object):
         """Get/set current tracing span or transaction."""
         return self._span
 
-    @_copy_on_write("_span")
     @span.setter
+    @_copy_on_write("_span")
     def span(self, span):
         # type: (Optional[Span]) -> None
         self._span = span
@@ -804,8 +807,8 @@ class Scope(object):
         # type: () -> Optional[Profile]
         return self._profile
 
-    @_copy_on_write("_profile")
     @profile.setter
+    @_copy_on_write("_profile")
     def profile(self, profile):
         # type: (Optional[Profile]) -> None
 
