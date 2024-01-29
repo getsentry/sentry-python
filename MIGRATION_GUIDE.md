@@ -10,7 +10,7 @@
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 - Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
-- Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, ClickHouse, GQL, Graphene, huey, Loguru, MongoDB, Quart, Starlite, Strawberry.
+- Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, pymongo, Quart, Starlite, Strawberry.
 
 ## Removed
 
