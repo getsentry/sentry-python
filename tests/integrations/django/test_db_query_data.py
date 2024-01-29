@@ -35,18 +35,14 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-@pytest.mark.parametrize("enable_db_query_source", [None, False])
-def test_query_source_disabled(
-    sentry_init, client, capture_events, enable_db_query_source
-):
+def test_query_source_disabled(sentry_init, client, capture_events):
     sentry_options = {
         "integrations": [DjangoIntegration()],
         "send_default_pii": True,
         "traces_sample_rate": 1.0,
+        "enable_db_query_source": False,
+        "db_query_source_threshold_ms": 0,
     }
-    if enable_db_query_source is not None:
-        sentry_options["enable_db_query_source"] = enable_db_query_source
-        sentry_options["db_query_source_threshold_ms"] = 0
 
     sentry_init(**sentry_options)
 
@@ -70,6 +66,50 @@ def test_query_source_disabled(
             assert SPANDATA.CODE_NAMESPACE not in data
             assert SPANDATA.CODE_FILEPATH not in data
             assert SPANDATA.CODE_FUNCTION not in data
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+@pytest.mark.parametrize("enable_db_query_source", [None, True])
+def test_query_source_enabled(
+    sentry_init, client, capture_events, enable_db_query_source
+):
+    sentry_options = {
+        "integrations": [DjangoIntegration()],
+        "send_default_pii": True,
+        "traces_sample_rate": 1.0,
+        "db_query_source_threshold_ms": 0,
+    }
+
+    if enable_db_query_source is not None:
+        sentry_options["enable_db_query_source"] = enable_db_query_source
+
+    sentry_init(**sentry_options)
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
+    assert status == "200 OK"
+
+    (event,) = events
+    for span in event["spans"]:
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
             break
     else:
         raise AssertionError("No db span found")
