@@ -536,16 +536,16 @@ def test_transaction_name(sentry_init, capture_envelopes):
     }
 
 
-@pytest.mark.parametrize(
-    "sample_rate",
-    [1.0, None]
-)
+@pytest.mark.parametrize("sample_rate", [1.0, None])
 def test_metric_summaries(sentry_init, capture_envelopes, sample_rate):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": sample_rate},
+        _experiments={
+            "enable_metrics": True,
+            "metrics_summary_sample_rate": sample_rate,
+        },
     )
     ts = time.time()
     envelopes = capture_envelopes()
