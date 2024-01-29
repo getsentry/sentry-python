@@ -1,6 +1,7 @@
 """
 Create spans from Django middleware invocations
 """
+
 from functools import wraps
 
 from django import VERSION as DJANGO_VERSION
