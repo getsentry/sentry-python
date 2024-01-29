@@ -192,7 +192,7 @@ class Scope(object):
         """
         Returns the current scope.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         current_scope = _current_scope.get()
         if current_scope is None:
@@ -207,7 +207,7 @@ class Scope(object):
         """
         Returns the isolation scope.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         isolation_scope = _isolation_scope.get()
         if isolation_scope is None:
@@ -222,7 +222,7 @@ class Scope(object):
         """
         Returns the global scope.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         global _global_scope
         if _global_scope is None:
@@ -237,7 +237,7 @@ class Scope(object):
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
@@ -272,7 +272,7 @@ class Scope(object):
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         current_scope = _current_scope.get()
         if current_scope is not None and current_scope.client.is_active():
@@ -294,7 +294,7 @@ class Scope(object):
         :param client: The client to use in this scope.
             If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NoopClient`.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         self.client = client or NoopClient()
 
@@ -304,7 +304,7 @@ class Scope(object):
         """
         Whether this scope is a fork of another scope.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         return self.original_scope is not None
 
@@ -313,7 +313,7 @@ class Scope(object):
         """
         Returns a fork of this scope.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         forked_scope = copy(self)
         forked_scope.original_scope = self
@@ -326,7 +326,7 @@ class Scope(object):
         Creates a new isolation scope for this scope.
         The new isolation scope will be a fork of the current isolation scope.
 
-        .. versionadded:: 1.XX.0
+        .. versionadded:: X.X.X
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
@@ -441,9 +441,9 @@ class Scope(object):
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context["dynamic_sampling_context"] = (
-                baggage.dynamic_sampling_context()
-            )
+            self._propagation_context[
+                "dynamic_sampling_context"
+            ] = baggage.dynamic_sampling_context()
 
         return self._propagation_context["dynamic_sampling_context"]
 
@@ -1429,7 +1429,7 @@ def new_scope():
     """
     Context manager that forks the current scope and runs the wrapped code in it.
 
-    .. versionadded:: 1.XX.0
+    .. versionadded:: X.X.X
     """
     current_scope = Scope.get_current_scope()
     forked_scope = current_scope.fork()
@@ -1450,7 +1450,7 @@ def isolated_scope():
     Context manager that forks the current isolation scope
     (and the related current scope) and runs the wrapped code in it.
 
-    .. versionadded:: 1.XX.0
+    .. versionadded:: X.X.X
     """
     # fork current scope
     current_scope = Scope.get_current_scope()
