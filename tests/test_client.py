@@ -21,7 +21,6 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk._types import TYPE_CHECKING
@@ -365,60 +364,6 @@ def test_ignore_errors(sentry_init, capture_events):
         assert mock_capture_internal_exception.call_count == 1
         assert (
             mock_capture_internal_exception.call_args[0][0][0] == EnvelopeCapturedError
-        )
-
-
-def test_with_locals_deprecation_enabled(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(with_locals=True)
-
-        client = Hub.current.client
-        assert "with_locals" not in client.options
-        assert "include_local_variables" in client.options
-        assert client.options["include_local_variables"]
-
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-        )
-
-
-def test_with_locals_deprecation_disabled(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(with_locals=False)
-
-        client = Hub.current.client
-        assert "with_locals" not in client.options
-        assert "include_local_variables" in client.options
-        assert not client.options["include_local_variables"]
-
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-        )
-
-
-def test_include_local_variables_deprecation(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(include_local_variables=False)
-
-        client = Hub.current.client
-        assert "with_locals" not in client.options
-        assert "include_local_variables" in client.options
-        assert not client.options["include_local_variables"]
-
-        fake_warning.assert_not_called()
-
-
-def test_request_bodies_deprecation(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(request_bodies="small")
-
-        client = Hub.current.client
-        assert "request_bodies" not in client.options
-        assert "max_request_body_size" in client.options
-        assert client.options["max_request_body_size"] == "small"
-
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
         )
 
 
