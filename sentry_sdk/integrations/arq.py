@@ -149,12 +149,12 @@ def _make_event_processor(ctx, *args, **kwargs):
             extra = event.setdefault("extra", {})
             extra["arq-job"] = {
                 "task": ctx["job_name"],
-                "args": args
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
-                "kwargs": kwargs
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
+                "args": (
+                    args if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
+                "kwargs": (
+                    kwargs if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
                 "retry": ctx["job_try"],
             }
 

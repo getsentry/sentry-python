@@ -20,7 +20,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk._compat import reraise, text_type, PY2
+from sentry_sdk._compat import text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -358,24 +358,27 @@ def test_simple_transport(sentry_init):
 
 
 def test_ignore_errors(sentry_init, capture_events):
-    class MyDivisionError(ZeroDivisionError):
-        pass
+    with mock.patch(
+        "sentry_sdk.scope.Scope._capture_internal_exception"
+    ) as mock_capture_internal_exception:
 
-    def raise_it(exc_info):
-        reraise(*exc_info)
+        class MyDivisionError(ZeroDivisionError):
+            pass
 
-    sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
-    Hub.current._capture_internal_exception = raise_it
+        sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
 
-    def e(exc):
-        try:
-            raise exc
-        except Exception:
-            capture_exception()
+        def e(exc):
+            try:
+                raise exc
+            except Exception:
+                capture_exception()
 
-    e(ZeroDivisionError())
-    e(MyDivisionError())
-    pytest.raises(EventCapturedError, lambda: e(ValueError()))
+        e(ZeroDivisionError())
+        e(MyDivisionError())
+        e(ValueError())
+
+        assert mock_capture_internal_exception.call_count == 1
+        assert mock_capture_internal_exception.call_args[0][0][0] == EventCapturedError
 
 
 def test_with_locals_deprecation_enabled(sentry_init):
