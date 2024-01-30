@@ -4,15 +4,15 @@
 
 ### Various fixes & improvements
 
-- feat(ddm): Enable metrics related settings by default (#2685) by @iambriccardo
-- fix(utils): Fix `UnicodeDecodeError` on Python 2 (#2657) by @sentrivana
+- Enable metrics related settings by default (#2685) by @iambriccardo
+- Fix `UnicodeDecodeError` on Python 2 (#2657) by @sentrivana
 - Enable DB query source by default (#2629) by @sentrivana
-- fix(query-source): Fix query source duration check (#2675) by @sentrivana
-- style: Reformat with black==24.1.0 (#2680) by @sentrivana
+- Fix query source duration check (#2675) by @sentrivana
+- Reformat with `black==24.1.0` (#2680) by @sentrivana
 - Cleaning up existing code to prepare for new Scopes API (#2611) by @antonpirker
 - Moved redis related tests to databases (#2674) by @antonpirker
-- ref(api): Improve `sentry_sdk.trace` type hints (#2633) by @szokeasaurusrex
-- build(deps): bump checkouts/data-schemas from `e9f7d58` to `aa7058c` (#2639) by @dependabot
+- Improve `sentry_sdk.trace` type hints (#2633) by @szokeasaurusrex
+- Bump `checkouts/data-schemas` from `e9f7d58` to `aa7058c` (#2639) by @dependabot
 
 ## 1.39.2
 
