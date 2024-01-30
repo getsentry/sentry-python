@@ -1,7 +1,7 @@
 pip  # always use newest pip
 pytest
 pytest-cov==2.8.1
-pytest-forked<=1.4.0
+pytest-forked
 pytest-localserver
 pytest-watch==4.2.0
 tox==3.7.0
