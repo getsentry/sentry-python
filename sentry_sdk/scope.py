@@ -365,15 +365,30 @@ class Scope(object):
         .. versionadded:: X.X.X
         """
         current_scope = _current_scope.get()
-        if current_scope is not None and current_scope.client.is_active():
-            return current_scope.client
+        try:
+            client = current_scope.client
+        except AttributeError:
+            client = None
+
+        if client is not None and client.is_active():
+            return client
 
         isolation_scope = _isolation_scope.get()
-        if isolation_scope is not None and isolation_scope.client.is_active():
-            return isolation_scope.client
+        try:
+            client = isolation_scope.client
+        except AttributeError:
+            client = None
 
-        if _global_scope is not None and _global_scope.client.is_active():
-            return _global_scope.client
+        if client is not None and client.is_active():
+            return client
+
+        try:
+            client = _global_scope.client
+        except AttributeError:
+            client = None
+
+        if client is not None and client.is_active():
+            return client
 
         return NoopClient()
 
@@ -686,8 +701,8 @@ class Scope(object):
 
         self._propagation_context = None
 
-    @_copy_on_write("_level")
     @_attr_setter
+    @_copy_on_write("_level")
     def level(self, value):
         # type: (Optional[str]) -> None
         """When set this overrides the level. Deprecated in favor of set_level."""
@@ -699,8 +714,8 @@ class Scope(object):
         """Sets the level for the scope."""
         self._level = value
 
-    @_copy_on_write("_fingerprint")
     @_attr_setter
+    @_copy_on_write("_fingerprint")
     def fingerprint(self, value):
         # type: (Optional[List[str]]) -> None
         """When set this overrides the default fingerprint."""
