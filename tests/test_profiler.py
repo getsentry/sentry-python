@@ -266,6 +266,7 @@ def test_minimum_unique_samples_required(
     assert reports == [("insufficient_data", "profile")]
 
 
+@pytest.mark.forked
 def test_profile_captured(
     sentry_init,
     capture_envelopes,
