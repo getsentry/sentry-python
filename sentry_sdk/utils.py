@@ -1747,10 +1747,6 @@ try:
     from gevent.monkey import is_module_patched
 except ImportError:
 
-    def get_gevent_hub():
-        # type: () -> Any
-        return None
-
     def is_module_patched(*args, **kwargs):
         # type: (*Any, **Any) -> bool
         # unable to import from gevent means no modules have been patched
