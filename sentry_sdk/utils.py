@@ -1741,3 +1741,22 @@ else:
     def now():
         # type: () -> float
         return time.perf_counter()
+
+
+try:
+    from gevent.monkey import is_module_patched  # type: ignore
+except ImportError:
+
+    def get_gevent_hub():
+        # type: () -> Any
+        return None
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
+
+
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")
