@@ -1744,7 +1744,7 @@ else:
 
 
 try:
-    from gevent.monkey import is_module_patched  # type: ignore
+    from gevent.monkey import is_module_patched
 except ImportError:
 
     def get_gevent_hub():

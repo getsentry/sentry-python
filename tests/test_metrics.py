@@ -13,6 +13,13 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+
 
 def parse_metrics(bytes):
     rv = []
@@ -43,6 +50,23 @@ def parse_metrics(bytes):
         rv.append((ts, name, ty, values, tags))
     rv.sort(key=lambda x: (x[0], x[1], tuple(sorted(tags.items()))))
     return rv
+
+
+@requires_gevent
+def test_metrics_disabled_with_gevent(sentry_init, capture_envelopes):
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    Hub.current.flush()
+
+    assert len(envelopes) == 0
 
 
 def test_incr(sentry_init, capture_envelopes):
