@@ -122,7 +122,7 @@ class BackgroundWorker(object):
         # type: (Callable[[], None]) -> bool
         self._ensure_thread()
         try:
-            self._queue.put_nowait(callback)
+            self._queue.put(callback)
             return True
         except FullError:
             return False
