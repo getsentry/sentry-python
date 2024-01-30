@@ -3,9 +3,9 @@ pytest
 pytest-cov
 pytest-forked
 pytest-localserver
-pytest-watch
+pytest-watch==4.2.0
 tox
-jsonschema
+jsonschema==3.2.0
 pyrsistent
 executing
 asttokens
