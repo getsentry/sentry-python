@@ -3,8 +3,8 @@ pytest
 pytest-cov==2.8.1
 pytest-forked
 pytest-localserver
-pytest-watch==4.2.0
-tox
+pytest-watch
+tox==3.7.0
 jsonschema==3.2.0
 pyrsistent
 executing
