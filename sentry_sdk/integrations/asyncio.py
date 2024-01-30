@@ -1,11 +1,13 @@
 from __future__ import absolute_import
 import sys
 
+from sentry_sdk import isolated_scope
 from sentry_sdk._compat import reraise
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import event_from_exception
 
 try:
@@ -43,15 +45,14 @@ def patch_asyncio():
 
             async def _coro_creating_hub_and_span():
                 # type: () -> Any
-                hub = Hub(Hub.current)
                 result = None
 
-                with hub:
-                    with hub.start_span(op=OP.FUNCTION, description=get_name(coro)):
+                with isolated_scope() as scope:
+                    with scope.start_span(op=OP.FUNCTION, description=get_name(coro)):
                         try:
                             result = await coro
                         except Exception:
-                            reraise(*_capture_exception(hub))
+                            reraise(*_capture_exception())
 
                 return result
 
@@ -78,21 +79,18 @@ def patch_asyncio():
         pass
 
 
-def _capture_exception(hub):
-    # type: (Hub) -> ExcInfo
+def _capture_exception():
+    # type: () -> ExcInfo
     exc_info = sys.exc_info()
 
-    integration = hub.get_integration(AsyncioIntegration)
-    if integration is not None:
-        # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+    client = Scope.get_client()
 
-        event, hint = event_from_exception(
-            exc_info,
-            client_options=client.options,
-            mechanism={"type": "asyncio", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=client.options,
+        mechanism={"type": "asyncio", "handled": False},
+    )
+    Scope.get_current_scope().capture_event(event, hint=hint)
 
     return exc_info
 
