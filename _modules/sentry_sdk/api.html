@@ -4,14 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.api - sentry-python 1.39.2 documentation</title>
+      <title>sentry_sdk.api - sentry-python 1.40.0 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
 
   <script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(sessionStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=aecf457f" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=5d7d6ab7" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=db2d6636" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -97,17 +97,28 @@
         <i class="i-icon menu"></i>
       </button>
     </div>
-    <ul class="flex-1">
+    <ol class="flex-1" itemscope itemtype="https://schema.org/BreadcrumbList">
       
       
-      <li><a href="../../index.html">sentry-python</a><span>/</span></li>
+      <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../../index.html"><span itemprop="name">sentry-python</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="1" />
+      </li>
       
-      <li><a href="../index.html">Module code</a><span>/</span></li>
+      <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <a itemprop="item" href="../index.html"><span itemprop="name">Module code</span></a>
+        <span>/</span>
+        <meta itemprop="position" content="2" />
+      </li>
       
-      <li><strong>sentry_sdk.api</strong></li>
+      <li itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+        <strong itemprop="name">sentry_sdk.api</strong>
+        <meta itemprop="position" content="3" />
+      </li>
       
       
-    </ul>
+    </ol>
     <div class="xl:hidden ml-1">
       <button class="js-menu" aria-label="Show table of contents" type="button" aria-controls="rside"
         aria-expanded="false">
@@ -206,10 +217,10 @@
 </span><span id="1-82">    <span class="n">event</span><span class="p">,</span>  <span class="c1"># type: Event</span>
 </span><span id="1-83">    <span class="n">hint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Hint]</span>
 </span><span id="1-84">    <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-85">    <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Any</span>
+</span><span id="1-85">    <span class="o">**</span><span class="n">scope_kwargs</span>  <span class="c1"># type: Any</span>
 </span><span id="1-86"><span class="p">):</span>
 </span><span id="1-87">    <span class="c1"># type: (...) -&gt; Optional[str]</span>
-</span><span id="1-88">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">)</span></div>
+</span><span id="1-88">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">)</span></div>
 
 </span><span id="1-89">
 </span><span id="1-90">
@@ -220,10 +231,10 @@
 </span><span id="1-93">    <span class="n">message</span><span class="p">,</span>  <span class="c1"># type: str</span>
 </span><span id="1-94">    <span class="n">level</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
 </span><span id="1-95">    <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-96">    <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Any</span>
+</span><span id="1-96">    <span class="o">**</span><span class="n">scope_kwargs</span>  <span class="c1"># type: Any</span>
 </span><span id="1-97"><span class="p">):</span>
 </span><span id="1-98">    <span class="c1"># type: (...) -&gt; Optional[str]</span>
-</span><span id="1-99">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">)</span></div>
+</span><span id="1-99">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">)</span></div>
 
 </span><span id="1-100">
 </span><span id="1-101">
@@ -233,10 +244,10 @@
 </span><span id="1-103"><span class="k">def</span> <span class="nf">capture_exception</span><span class="p">(</span>
 </span><span id="1-104">    <span class="n">error</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Union[BaseException, ExcInfo]]</span>
 </span><span id="1-105">    <span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-106">    <span class="o">**</span><span class="n">scope_args</span>  <span class="c1"># type: Any</span>
+</span><span id="1-106">    <span class="o">**</span><span class="n">scope_kwargs</span>  <span class="c1"># type: Any</span>
 </span><span id="1-107"><span class="p">):</span>
 </span><span id="1-108">    <span class="c1"># type: (...) -&gt; Optional[str]</span>
-</span><span id="1-109">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_args</span><span class="p">)</span></div>
+</span><span id="1-109">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">capture_exception</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="n">scope</span><span class="p">,</span> <span class="o">**</span><span class="n">scope_kwargs</span><span class="p">)</span></div>
 
 </span><span id="1-110">
 </span><span id="1-111">
@@ -472,7 +483,7 @@
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=e2b5d38d"></script>
+      <script src="../../_static/documentation_options.js?v=44fa7dab"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=ccb09f80"></script>
