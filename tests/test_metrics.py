@@ -52,23 +52,6 @@ def parse_metrics(bytes):
     return rv
 
 
-@requires_gevent
-def test_metrics_disabled_with_gevent(sentry_init, capture_envelopes):
-    sentry_init(
-        release="fun-release",
-        environment="not-fun-env",
-        _experiments={"enable_metrics": True, "metric_code_locations": True},
-    )
-    ts = time.time()
-    envelopes = capture_envelopes()
-
-    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
-    metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
-    Hub.current.flush()
-
-    assert len(envelopes) == 0
-
-
 def test_incr(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
@@ -971,3 +954,26 @@ def test_flush_recursion_protection_background_flush(
     m = parse_metrics(envelope.items[0].payload.get_bytes())
     assert len(m) == 1
     assert m[0][1] == "counter@none"
+
+
+@pytest.mark.forked
+@requires_gevent
+def test_no_metrics_with_gevent(sentry_init, capture_envelopes):
+    from gevent import monkey
+
+    monkey.patch_all()
+
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    Hub.current.flush()
+
+    assert Hub.current.client.metrics_aggregator is None
+    assert len(envelopes) == 0

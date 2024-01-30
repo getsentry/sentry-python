@@ -252,7 +252,7 @@ class _Client(object):
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
                 if is_gevent():
-                    logger.warning("Metrics are currently not supported with gevent.")
+                    logger.warning("Metrics currently not supported with gevent.")
 
                 else:
                     from sentry_sdk.metrics import MetricsAggregator
