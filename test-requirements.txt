@@ -1,11 +1,11 @@
-pip  # always use newest pip
+pip
 pytest
-pytest-cov==2.8.1
+pytest-cov
 pytest-forked
 pytest-localserver
-pytest-watch==4.2.0
-tox==3.7.0
-jsonschema==3.2.0
+pytest-watch
+tox
+jsonschema
 pyrsistent
 executing
 asttokens
