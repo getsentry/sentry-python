@@ -548,6 +548,10 @@ class HttpTransport(Transport):
         # type: (...) -> None
         logger.debug("Flushing HTTP transport")
 
+        while self._worker._queue.qsize() > 0:
+            logger.info("Waiting for worker to finish pending tasks.")
+            time.sleep(0.5)
+    
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
