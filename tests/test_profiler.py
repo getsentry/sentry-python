@@ -282,6 +282,7 @@ def test_minimum_unique_samples_required(
     assert reports == [("insufficient_data", "profile")]
 
 
+@pytest.mark.forked
 @requires_python_version(3, 3)
 def test_profile_captured(
     sentry_init,
