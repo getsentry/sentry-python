@@ -42,6 +42,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test gevent latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test loguru latest
         run: |
           set -x # print commands that are executed
@@ -73,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -90,6 +94,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test gevent pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test loguru pinned
         run: |
           set -x # print commands that are executed
@@ -114,14 +122,59 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+  test-miscellaneous-py27:
+    name: Miscellaneous (py27)
+    timeout-minutes: 30
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+      - name: Erase coverage
+        run: |
+          coverage erase
+      - name: Test gevent py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test loguru py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-loguru" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test opentelemetry py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-opentelemetry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test pure_eval py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-pure_eval" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test trytond py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-trytond" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
   check_required_tests:
     name: All Miscellaneous tests passed
-    needs: test-miscellaneous-pinned
+    needs: [test-miscellaneous-pinned, test-miscellaneous-py27]
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test-miscellaneous-pinned.result, 'failure') || contains(needs.test-miscellaneous-pinned.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+      - name: Check for 2.7 failures
+        if: contains(needs.test-miscellaneous-py27.result, 'failure') || contains(needs.test-miscellaneous-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

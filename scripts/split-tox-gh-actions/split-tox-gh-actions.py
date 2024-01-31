@@ -14,6 +14,7 @@ If the parameter `--fail-on-changes` is set, the script will raise a RuntimeErro
 files have been changed by the scripts execution. This is used in CI to check if the yaml files
 represent the current tox.ini file. (And if not the CI run fails.)
 """
+
 import configparser
 import hashlib
 import sys
@@ -86,7 +87,6 @@ GROUPS = {
         "strawberry",
     ],
     "Networking": [
-        "gevent",
         "grpc",
         "httpx",
         "requests",
@@ -109,6 +109,7 @@ GROUPS = {
         "tornado",
     ],
     "Miscellaneous": [
+        "gevent",
         "loguru",
         "opentelemetry",
         "pure_eval",
