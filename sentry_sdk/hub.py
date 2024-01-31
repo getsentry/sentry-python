@@ -239,9 +239,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @property
     def client(self):
-        # type: () -> Client
+        # type: () -> Optional[Client]
         """Returns the current client on the hub."""
-        return Scope.get_client()
+        client = Scope.get_client()
+
+        if client.is_active():
+            return None
+        
+        return client
 
     @property
     def scope(self):
