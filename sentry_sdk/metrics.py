@@ -2,14 +2,13 @@ import os
 import io
 import re
 import sys
-import threading
 import random
 import time
 import zlib
+from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps, partial
-from threading import Event, Lock, Thread
-from contextlib import contextmanager
+from threading import Thread
 
 import sentry_sdk
 from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
@@ -19,6 +18,7 @@ from sentry_sdk.utils import (
     to_timestamp,
     serialize_frame,
     json_dumps,
+    is_gevent,
 )
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
@@ -53,7 +53,16 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-_thread_local = threading.local()
+if is_gevent():
+    from gevent.local import local
+    from gevent.lock import BoundedSemaphore
+    from gevent.event import Event
+
+    Lock = lambda: BoundedSemaphore(1)
+else:
+    from threading import Event, Lock, local
+
+_thread_local = local()
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 _set = set  # set is shadowed below
