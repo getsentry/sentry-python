@@ -54,9 +54,9 @@ if TYPE_CHECKING:
 
 
 if is_gevent():
-    from gevent.local import local
-    from gevent.lock import BoundedSemaphore
-    from gevent.event import Event
+    from gevent.local import local  # type: ignore
+    from gevent.lock import BoundedSemaphore  # type: ignore
+    from gevent.event import Event  # type: ignore
 
     Lock = lambda: BoundedSemaphore(1)
 else:

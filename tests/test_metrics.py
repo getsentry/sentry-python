@@ -13,13 +13,6 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
-try:
-    import gevent
-except ImportError:
-    gevent = None
-
-requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
-
 
 def parse_metrics(bytes):
     rv = []
