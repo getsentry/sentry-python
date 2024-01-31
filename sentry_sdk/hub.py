@@ -5,7 +5,7 @@ from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, isolated_scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
     NoOpSpan,
@@ -152,7 +152,8 @@ class _ScopeManager(object):
 
     def __enter__(self):
         # type: () -> Scope
-        return Scope.get_isolation_scope()
+        with isolated_scope() as scope:
+            return scope
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
