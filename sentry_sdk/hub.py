@@ -243,7 +243,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """Returns the current client on the hub."""
         client = Scope.get_client()
 
-        if client.is_active():
+        if not client.is_active():
             return None
         
         return client
