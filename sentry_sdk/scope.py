@@ -207,6 +207,7 @@ class Scope(object):
         """
         rv = object.__new__(self.__class__)  # type: Scope
 
+        rv._type = self._type
         rv._level = self._level
         rv._name = self._name
         rv._fingerprint = self._fingerprint
@@ -248,6 +249,7 @@ class Scope(object):
         """
         forked_scope = object.__new__(self.__class__)  # type: Scope
 
+        forked_scope._type = self._type
         forked_scope._level = self._level
         forked_scope._name = self._name
         forked_scope._fingerprint = self._fingerprint
