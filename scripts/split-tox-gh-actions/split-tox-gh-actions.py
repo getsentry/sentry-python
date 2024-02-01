@@ -87,6 +87,7 @@ GROUPS = {
         "strawberry",
     ],
     "Networking": [
+        "gevent",
         "grpc",
         "httpx",
         "requests",
@@ -109,7 +110,6 @@ GROUPS = {
         "tornado",
     ],
     "Miscellaneous": [
-        "gevent",
         "loguru",
         "opentelemetry",
         "pure_eval",

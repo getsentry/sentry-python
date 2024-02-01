@@ -8,6 +8,7 @@ import zlib
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps, partial
+from threading import Event, Lock, Thread, local
 
 import sentry_sdk
 from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
@@ -52,15 +53,10 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-if is_gevent():
-    from gevent.local import local  # type: ignore
-    from gevent.lock import BoundedSemaphore  # type: ignore
-    from gevent.event import Event  # type: ignore
-    from gevent.threading import Thread  # type: ignore
+# if is_gevent():
+#    from gevent.local import local  # type: ignore
+# from gevent.event import Event  # type: ignore
 
-    Lock = lambda: BoundedSemaphore(1)
-else:
-    from threading import Event, Lock, Thread, local
 
 _thread_local = local()
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
@@ -444,15 +440,26 @@ class MetricsAggregator(object):
         """
         if not self._running:
             return False
+
         pid = os.getpid()
         if self._flusher_pid == pid:
             return True
+
         with self._lock:
             self._flusher_pid = pid
-            self._flusher = Thread(target=self._flush_loop)
-            self._flusher.daemon = True
+
+            if not is_gevent():
+                self._flusher = Thread(target=self._flush_loop)
+                self._flusher.daemon = True
+                start_flusher = self._flusher.start
+            else:
+                from gevent.threadpool import ThreadPool  # type: ignore
+
+                self._flusher = ThreadPool(1)
+                start_flusher = partial(self._flusher.spawn, self._flush_loop)
+
             try:
-                self._flusher.start()
+                start_flusher()
             except RuntimeError:
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.

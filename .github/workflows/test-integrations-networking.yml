@@ -42,6 +42,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test gevent latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test grpc latest
         run: |
           set -x # print commands that are executed
@@ -86,6 +90,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test gevent pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test grpc pinned
         run: |
           set -x # print commands that are executed
@@ -119,6 +127,10 @@ jobs:
       - name: Erase coverage
         run: |
           coverage erase
+      - name: Test gevent py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test grpc py27
         run: |
           set -x # print commands that are executed
