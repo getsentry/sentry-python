@@ -241,11 +241,22 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def client(self):
         # type: () -> Optional[Client]
         """Returns the current client on the hub."""
+        import logging
+        logging.warning("c1")
         client = Scope.get_client()
-
+        logging.warning("c2")
+        logging.warning(client)
+        logging.warning(client.is_active())
+        
         if not client.is_active():
+            logging.warning("c3")
+            logging.warning(client)
+            logging.warning(client.is_active())
             return None
         
+        logging.warning("c4")
+        logging.warning(client)
+        logging.warning(client.is_active())
         return client
 
     @property
