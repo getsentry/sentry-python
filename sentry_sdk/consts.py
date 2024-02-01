@@ -316,4 +316,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.0.0a0"
+VERSION = "1.39.2"
