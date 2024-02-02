@@ -430,13 +430,10 @@ class MetricsAggregator(object):
             # the gevent-patched class. Luckily, threading.Event is just an alias
             # for threading._Event in Python 2, and get_original on
             # threading._Event correctly gets us the stdlib original.
-            self._flush_event = get_original(
-                "threading", "_Event"
-            )()  # type: threading._Event
+            event_cls = get_original("threading", "_Event")
         else:
-            self._flush_event = get_original(
-                "threading", "Event"
-            )()  # type: threading.Event
+            event_cls = get_original("threading", "Event")
+        self._flush_event = event_cls()  # type: threading.Event
 
         self._force_flush = False
 
