@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import wraps, partial
 
 import sentry_sdk
-from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
+from sentry_sdk._compat import PY2, text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
     now,
     nanosecond_time,
@@ -54,8 +54,8 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent.monkey import get_original
-    from gevent.threadpool import ThreadPool
+    from gevent.monkey import get_original  # type: ignore
+    from gevent.threadpool import ThreadPool  # type: ignore
 except ImportError:
     import importlib
 
@@ -422,9 +422,17 @@ class MetricsAggregator(object):
         self._buckets_total_weight = 0
         self._capture_func = capture_func
         self._running = True
-        self._flush_event = get_original(
-            "threading", "Event"
-        )()  # type: threading.Event
+        if PY2:
+            # get_original on threading.Event in Python 2 incorrectly returns
+            # the gevent-patched class. Using threading._Event here instead which
+            # correctly gets us the stdlib original.
+            self._flush_event = get_original(
+                "threading", "_Event"
+            )()  # type: threading._Event
+        else:
+            self._flush_event = get_original(
+                "threading", "Event"
+            )()  # type: threading.Event
         self._lock = threading.Lock()
 
         self._force_flush = False
