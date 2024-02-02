@@ -60,6 +60,7 @@ except ImportError:
     import importlib
 
     def get_original(module, name):
+        # type: (str, str) -> Any
         return getattr(importlib.import_module(module), name)
 
 
