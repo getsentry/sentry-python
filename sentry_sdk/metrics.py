@@ -1,14 +1,14 @@
-import os
 import io
+import os
+import random
 import re
 import sys
-import random
+import threading
 import time
 import zlib
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps, partial
-from threading import Event, Lock, Thread, local
 
 import sentry_sdk
 from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
@@ -53,12 +53,17 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-# if is_gevent():
-#    from gevent.local import local  # type: ignore
-# from gevent.event import Event  # type: ignore
+try:
+    from gevent.monkey import get_original
+    from gevent.threadpool import ThreadPool
+except ImportError:
+    import importlib
+
+    def get_original(module, name):
+        return getattr(importlib.import_module(module), name)
 
 
-_thread_local = local()
+_thread_local = threading.local()
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 _set = set  # set is shadowed below
@@ -416,12 +421,15 @@ class MetricsAggregator(object):
         self._pending_locations = {}  # type: Dict[int, List[Tuple[MetricMetaKey, Any]]]
         self._buckets_total_weight = 0
         self._capture_func = capture_func
-        self._lock = Lock()
         self._running = True
-        self._flush_event = Event()
+        self._flush_event = get_original(
+            "threading", "Event"
+        )()  # type: threading.Event
+        self._lock = threading.Lock()
+
         self._force_flush = False
 
-        # The aggregator shifts it's flushing by up to an entire rollup window to
+        # The aggregator shifts its flushing by up to an entire rollup window to
         # avoid multiple clients trampling on end of a 10 second window as all the
         # buckets are anchored to multiples of ROLLUP seconds.  We randomize this
         # number once per aggregator boot to achieve some level of offsetting
@@ -429,7 +437,7 @@ class MetricsAggregator(object):
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Thread]
+        self._flusher = None  # type: Optional[Union[threading.Thread, ThreadPool]]
         self._flusher_pid = None  # type: Optional[int]
         self._ensure_thread()
 
@@ -449,14 +457,12 @@ class MetricsAggregator(object):
             self._flusher_pid = pid
 
             if not is_gevent():
-                self._flusher = Thread(target=self._flush_loop)
+                self._flusher = threading.Thread(target=self._flush_loop)
                 self._flusher.daemon = True
                 start_flusher = self._flusher.start
             else:
-                from gevent.threadpool import ThreadPool  # type: ignore
-
                 self._flusher = ThreadPool(1)
-                start_flusher = partial(self._flusher.spawn, self._flush_loop)
+                start_flusher = partial(self._flusher.spawn, func=self._flush_loop)
 
             try:
                 start_flusher()
@@ -465,6 +471,7 @@ class MetricsAggregator(object):
                 # longer allows us to spawn a thread and we have to bail.
                 self._running = False
                 return False
+
         return True
 
     def _flush_loop(self):
