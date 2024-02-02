@@ -423,10 +423,13 @@ class MetricsAggregator(object):
         self._buckets_total_weight = 0
         self._capture_func = capture_func
         self._running = True
-        if PY2:
+        self._lock = threading.Lock()
+
+        if is_gevent() and PY2:
             # get_original on threading.Event in Python 2 incorrectly returns
-            # the gevent-patched class. Using threading._Event here instead which
-            # correctly gets us the stdlib original.
+            # the gevent-patched class. Luckily, threading.Event is just an alias
+            # for threading._Event in Python 2, and get_original on
+            # threading._Event correctly gets us the stdlib original.
             self._flush_event = get_original(
                 "threading", "_Event"
             )()  # type: threading._Event
@@ -434,7 +437,6 @@ class MetricsAggregator(object):
             self._flush_event = get_original(
                 "threading", "Event"
             )()  # type: threading.Event
-        self._lock = threading.Lock()
 
         self._force_flush = False
 
