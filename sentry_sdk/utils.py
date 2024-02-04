@@ -1666,6 +1666,7 @@ def _generate_installed_modules():
     try:
         from importlib import metadata
 
+        yielded = set()
         for dist in metadata.distributions():
             name = dist.metadata["Name"]
             # `metadata` values may be `None`, see:
@@ -1673,9 +1674,10 @@ def _generate_installed_modules():
             # and
             # https://github.com/python/importlib_metadata/issues/371
             if name is not None:
-                version = metadata.version(name)
-                if version is not None:
-                    yield _normalize_module_name(name), version
+                normalized_name = _normalize_module_name(name)
+                if dist.version is not None and normalized_name not in yielded:
+                    yield normalized_name, dist.version
+                    yielded.add(normalized_name)
 
     except ImportError:
         # < py3.8
