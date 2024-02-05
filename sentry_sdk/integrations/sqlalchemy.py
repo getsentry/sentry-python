@@ -95,7 +95,7 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
         context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
 
-    span = context._sentry_sql_span
+    span = getattr(context, "_sentry_sql_span", None)  # type: Optional[Span]
     if span is not None:
         with capture_internal_exceptions():
             add_query_source(hub, span)
