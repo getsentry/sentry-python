@@ -13,6 +13,7 @@ from functools import wraps, partial
 import sentry_sdk
 from sentry_sdk._compat import PY2, text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
+    ContextVar,
     now,
     nanosecond_time,
     to_timestamp,
@@ -64,7 +65,7 @@ except ImportError:
         return getattr(importlib.import_module(module), name)
 
 
-_thread_local = threading.local()
+_in_metrics = ContextVar("in_metrics")
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 _set = set  # set is shadowed below
@@ -95,15 +96,12 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
-    try:
-        in_metrics = _thread_local.in_metrics
-    except AttributeError:
-        in_metrics = False
-    _thread_local.in_metrics = True
+    in_metrics = _in_metrics.get(False)
+    _in_metrics.set(True)
     try:
         yield in_metrics
     finally:
-        _thread_local.in_metrics = in_metrics
+        _in_metrics.set(in_metrics)
 
 
 def metrics_noop(func):
@@ -484,7 +482,7 @@ class MetricsAggregator(object):
 
     def _flush_loop(self):
         # type: (...) -> None
-        _thread_local.in_metrics = True
+        _in_metrics.set(True)
         while self._running or self._force_flush:
             self._flush()
             if self._running:
