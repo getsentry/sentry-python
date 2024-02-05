@@ -153,6 +153,9 @@ def _set_db_data(span, conn):
     if db_system is not None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)
 
+    if conn.engine.url is None:
+        return
+
     db_name = conn.engine.url.database
     if db_name is not None:
         span.set_data(SPANDATA.DB_NAME, db_name)
