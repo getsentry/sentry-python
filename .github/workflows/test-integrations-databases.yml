@@ -52,7 +52,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - uses: getsentry/action-clickhouse-in-ci@v1
@@ -130,7 +130,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - uses: getsentry/action-clickhouse-in-ci@v1
