@@ -242,10 +242,10 @@ def test_no_stackoverflows(celery):
 
         results.append(42)
 
-    for _ in range(1):
+    for _ in range(10000):
         dummy_task.delay()
 
-    assert results == [42] * 1
+    assert results == [42] * 10000
 
     with configure_scope() as scope:
         # Because celery is executed with "task_always_eager" the task is not sent to the
