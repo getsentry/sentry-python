@@ -608,7 +608,6 @@ class MetricsAggregator(object):
 
         self._running = False
         self._flush_event.set()
-        self._flusher.join()
         self._flusher = None
 
     @metrics_noop
