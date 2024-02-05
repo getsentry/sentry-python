@@ -165,10 +165,6 @@ class BaseClient:
     monitor = None  # type: Optional[Monitor]
     transport = None  # type: Optional[Transport]
 
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        return None
-
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
         return {"options": {}}
