@@ -76,6 +76,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test redis latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test rediscluster latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
@@ -146,6 +154,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test redis pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test rediscluster pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
@@ -205,6 +221,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py2.7-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test redis py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test rediscluster py27
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py2.7-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy py27
         run: |
           set -x # print commands that are executed

@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -381,6 +382,13 @@ class AnnotatedValue(object):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
 
     @classmethod
     def removed_because_raw_data(cls):
@@ -1118,6 +1126,39 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
+def _truncate_by_bytes(string, max_bytes):
+    # type: (str, int) -> str
+    """
+    Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
+    """
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if isinstance(string, bytes):
+        truncated = string[: max_bytes - 3]
+    else:
+        truncated = string.encode("utf-8")[: max_bytes - 3].decode(
+            "utf-8", errors="ignore"
+        )
+
+    return truncated + "..."
+
+
+def _get_size_in_bytes(value):
+    # type: (str) -> Optional[int]
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if not isinstance(value, (bytes, text_type)):
+        return None
+
+    if isinstance(value, bytes):
+        return len(value)
+
+    try:
+        return len(value.encode("utf-8"))
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     if not value:
@@ -1126,17 +1167,27 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value.encode("utf-8"))
+    byte_size = _get_size_in_bytes(value)
+    text_size = None
+    if isinstance(value, text_type):
+        text_size = len(value)
 
-    if length > max_length:
-        return AnnotatedValue(
-            value=value[: max_length - 3] + "...",
-            metadata={
-                "len": length,
-                "rem": [["!limit", "x", max_length - 3, max_length]],
-            },
-        )
-    return value
+    if byte_size is not None and byte_size > max_length:
+        # truncate to max_length bytes, preserving code points
+        truncated_value = _truncate_by_bytes(value, max_length)
+    elif text_size is not None and text_size > max_length:
+        # fallback to truncating by string length
+        truncated_value = value[: max_length - 3] + "..."
+    else:
+        return value
+
+    return AnnotatedValue(
+        value=truncated_value,
+        metadata={
+            "len": byte_size or text_size,
+            "rem": [["!limit", "x", max_length - 3, max_length]],
+        },
+    )
 
 
 def parse_version(version):
@@ -1248,24 +1299,49 @@ def _make_threadlocal_contextvars(local):
     class ContextVar(object):
         # Super-limited impl of ContextVar
 
-        def __init__(self, name):
-            # type: (str) -> None
+        def __init__(self, name, default=None):
+            # type: (str, Any) -> None
             self._name = name
+            self._default = default
             self._local = local()
+            self._original_local = local()
 
-        def get(self, default):
+        def get(self, default=None):
             # type: (Any) -> Any
-            return getattr(self._local, "value", default)
+            return getattr(self._local, "value", default or self._default)
 
         def set(self, value):
-            # type: (Any) -> None
+            # type: (Any) -> Any
+            token = str(random.getrandbits(64))
+            original_value = self.get()
+            setattr(self._original_local, token, original_value)
             self._local.value = value
+            return token
+
+        def reset(self, token):
+            # type: (Any) -> None
+            self._local.value = getattr(self._original_local, token)
+            del self._original_local[token]
 
     return ContextVar
 
 
+def _make_noop_copy_context():
+    # type: () -> Callable[[], Any]
+    class NoOpContext:
+        def run(self, func, *args, **kwargs):
+            # type: (Callable[..., Any], *Any, **Any) -> Any
+            return func(*args, **kwargs)
+
+    def copy_context():
+        # type: () -> NoOpContext
+        return NoOpContext()
+
+    return copy_context
+
+
 def _get_contextvars():
-    # type: () -> Tuple[bool, type]
+    # type: () -> Tuple[bool, type, Callable[[], Any]]
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1281,17 +1357,17 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
 
@@ -1299,10 +1375,10 @@ def _get_contextvars():
 
     from threading import local
 
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(local), _make_noop_copy_context()
 
 
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+HAS_REAL_CONTEXTVARS, ContextVar, copy_context = _get_contextvars()
 
 CONTEXTVARS_ERROR_MESSAGE = """
 
@@ -1665,3 +1741,18 @@ else:
     def now():
         # type: () -> float
         return time.perf_counter()
+
+
+try:
+    from gevent.monkey import is_module_patched
+except ImportError:
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
+
+
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")
