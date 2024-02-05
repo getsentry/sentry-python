@@ -246,7 +246,7 @@ def _wrap_tracer(task, f):
         if hub.get_integration(CeleryIntegration) is None:
             return f(*args, **kwargs)
 
-        with hub.push_scope() as scope:
+        with hub.configure_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
