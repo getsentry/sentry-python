@@ -1,5 +1,5 @@
 # coding: utf-8
-
+import pytest
 import sys
 import time
 import linecache
@@ -12,6 +12,13 @@ try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
+
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
 def parse_metrics(bytes):
@@ -418,7 +425,7 @@ def test_gauge(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -450,7 +457,7 @@ def test_multiple(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -503,7 +510,7 @@ def test_transaction_name(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -536,12 +543,16 @@ def test_transaction_name(sentry_init, capture_envelopes):
     }
 
 
-def test_metric_summaries(sentry_init, capture_envelopes):
+@pytest.mark.parametrize("sample_rate", [1.0, None])
+def test_metric_summaries(sentry_init, capture_envelopes, sample_rate):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 1.0},
+        _experiments={
+            "enable_metrics": True,
+            "metrics_summary_sample_rate": sample_rate,
+        },
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -644,7 +655,7 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 0.0},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -750,7 +761,7 @@ def test_tag_normalization(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -805,6 +816,7 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={
             "enable_metrics": True,
+            "metric_code_locations": False,
             "before_emit_metric": before_emit,
         },
     )
@@ -850,7 +862,7 @@ def test_tag_serialization(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     envelopes = capture_envelopes()
 
@@ -942,3 +954,26 @@ def test_flush_recursion_protection_background_flush(
     m = parse_metrics(envelope.items[0].payload.get_bytes())
     assert len(m) == 1
     assert m[0][1] == "counter@none"
+
+
+@pytest.mark.forked
+@requires_gevent
+def test_no_metrics_with_gevent(sentry_init, capture_envelopes):
+    from gevent import monkey
+
+    monkey.patch_all()
+
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True, "metric_code_locations": True},
+    )
+    ts = time.time()
+    envelopes = capture_envelopes()
+
+    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    Hub.current.flush()
+
+    assert Hub.current.client.metrics_aggregator is None
+    assert len(envelopes) == 0

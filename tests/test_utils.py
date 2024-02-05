@@ -1,7 +1,9 @@
 import pytest
 import re
 import sys
+from datetime import timedelta
 
+from sentry_sdk._compat import duration_in_milliseconds
 from sentry_sdk.utils import (
     Components,
     Dsn,
@@ -592,3 +594,16 @@ def test_default_release_empty_string():
         release = get_default_release()
 
     assert release is None
+
+
+@pytest.mark.parametrize(
+    "timedelta,expected_milliseconds",
+    [
+        [timedelta(milliseconds=132), 132.0],
+        [timedelta(hours=1, milliseconds=132), float(60 * 60 * 1000 + 132)],
+        [timedelta(days=10), float(10 * 24 * 60 * 60 * 1000)],
+        [timedelta(microseconds=100), 0.1],
+    ],
+)
+def test_duration_in_milliseconds(timedelta, expected_milliseconds):
+    assert duration_in_milliseconds(timedelta) == expected_milliseconds

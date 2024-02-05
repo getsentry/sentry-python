@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.40.0
+
+### Various fixes & improvements
+
+- Enable metrics related settings by default (#2685) by @iambriccardo
+- Fix `UnicodeDecodeError` on Python 2 (#2657) by @sentrivana
+- Enable DB query source by default (#2629) by @sentrivana
+- Fix query source duration check (#2675) by @sentrivana
+- Reformat with `black==24.1.0` (#2680) by @sentrivana
+- Cleaning up existing code to prepare for new Scopes API (#2611) by @antonpirker
+- Moved redis related tests to databases (#2674) by @antonpirker
+- Improve `sentry_sdk.trace` type hints (#2633) by @szokeasaurusrex
+- Bump `checkouts/data-schemas` from `e9f7d58` to `aa7058c` (#2639) by @dependabot
+
+## 1.39.2
+
+### Various fixes & improvements
+
+- Fix timestamp in transaction created by OTel (#2627) by @antonpirker
+- Fix relative path in DB query source  (#2624) by @antonpirker
+- Run more CI checks on 2.0 branch (#2625) by @sentrivana
+- Fix tracing `TypeError` for static and class methods (#2559) by @szokeasaurusrex
+- Fix missing `ctx` in Arq integration (#2600) by @ivanovart
+- Change `data_category` from `check_in` to `monitor` (#2598) by @sentrivana
+
 ## 1.39.1
 
 ### Various fixes & improvements
