@@ -59,7 +59,7 @@ jobs:
         with:
           python-version: 3.12
       - name: Setup build cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: build_cache
         with:
           path: ${{ env.CACHED_BUILD_PATHS }}
