@@ -719,7 +719,11 @@ def _get_aggregator_and_update_tags(key, tags):
         if transaction_name:
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
-            sample_rate = experiments.get("metrics_summary_sample_rate") or 0.0
+            sample_rate = experiments.get("metrics_summary_sample_rate")
+            # We default the sample rate of metrics summaries to 1.0 only when the sample rate is `None` since we
+            # want to honor the user's decision if they pass a valid float.
+            if sample_rate is None:
+                sample_rate = 1.0
             should_summarize_metric_callback = experiments.get(
                 "should_summarize_metric"
             )

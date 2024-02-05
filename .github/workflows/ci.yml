@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - release/**
+      - sentry-sdk-2.0
 
   pull_request:
 
