@@ -96,12 +96,12 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
-    in_metrics = _in_metrics.get(False)
+    old_in_metrics = _in_metrics.get(False)
     _in_metrics.set(True)
     try:
-        yield in_metrics
+        yield old_in_metrics
     finally:
-        _in_metrics.set(in_metrics)
+        _in_metrics.set(old_in_metrics)
 
 
 def metrics_noop(func):
