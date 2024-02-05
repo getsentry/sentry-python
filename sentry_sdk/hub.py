@@ -2,6 +2,7 @@ import copy
 import sys
 
 from contextlib import contextmanager
+from sentry_sdk import scope
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
@@ -169,6 +170,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     """
 
     _stack = None  # type: List[Tuple[Optional[Client], Scope]]
+    _scope = None  # type: Optional[Scope]
 
     # Mypy doesn't pick up on the metaclass.
 
@@ -198,10 +200,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._last_event_id = None  # type: Optional[str]
         self._old_hubs = []  # type: List[Hub]
 
+        # This forked isolation scope if the hub is used as a context manager
+        self._scope = Scope.get_isolation_scope().fork()
+        self._old_scopes = []  # type: List[Scope]
+
     def __enter__(self):
         # type: () -> Hub
         self._old_hubs.append(Hub.current)
         _local.set(self)
+
+        isolation_scope = Scope.get_isolation_scope()
+        self._old_scopes.append(isolation_scope)
+        scope._isolation_scope.set(self._scope)
+
         return self
 
     def __exit__(
@@ -213,6 +224,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (...) -> None
         old = self._old_hubs.pop()
         _local.set(old)
+
+        old_scope = self._old_scopes.pop()
+        scope._isolation_scope.set(old_scope)
 
     def run(
         self, callback  # type: Callable[[], T]
@@ -242,10 +256,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: () -> Optional[Client]
         """Returns the current client on the hub."""
         client = Scope.get_client()
-        
+
         if not client.is_active():
             return None
-        
+
         return client
 
     @property
