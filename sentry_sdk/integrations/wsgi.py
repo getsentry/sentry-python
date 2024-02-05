@@ -82,8 +82,8 @@ class SentryWsgiMiddleware(object):
         _wsgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with auto_session_tracking(hub, session_mode="request"):
-                with hub:
+            with hub:
+                with auto_session_tracking(hub, session_mode="request"):
                     with capture_internal_exceptions():
                         with hub.configure_scope() as scope:
                             scope.clear_breadcrumbs()
