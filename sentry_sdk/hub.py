@@ -153,8 +153,7 @@ class _ScopeManager(object):
 
     def __enter__(self):
         # type: () -> Scope
-        with isolated_scope() as scope:
-            return scope
+        return Scope.get_isolation_scope()
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None
