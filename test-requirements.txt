@@ -1,6 +1,6 @@
 pip
 pytest
-pytest-cov==2.8.1
+pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
