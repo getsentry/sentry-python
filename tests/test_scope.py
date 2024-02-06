@@ -2,7 +2,7 @@ import copy
 import os
 import pytest
 
-import sentry_sdk
+from sentry_sdk import scope
 from sentry_sdk import capture_exception, new_scope, isolated_scope
 from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.scope import Scope, ScopeType
@@ -15,9 +15,9 @@ except ImportError:
 
 @pytest.fixture
 def clean_scopes():
-    sentry_sdk.scope._global_scope = None
-    sentry_sdk.scope._isolation_scope.set(None)
-    sentry_sdk.scope._current_scope.set(None)
+    scope._global_scope = None
+    scope._isolation_scope.set(None)
+    scope._current_scope.set(None)
 
 
 def test_copying():
