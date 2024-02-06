@@ -14,6 +14,7 @@ If the parameter `--fail-on-changes` is set, the script will raise a RuntimeErro
 files have been changed by the scripts execution. This is used in CI to check if the yaml files
 represent the current tox.ini file. (And if not the CI run fails.)
 """
+
 import configparser
 import hashlib
 import sys
@@ -155,7 +156,8 @@ def main(fail_on_changes):
 
         if old_hash != new_hash:
             raise RuntimeError(
-                "The yaml configuration files have changed. This means that tox.ini has changed "
+                "The yaml configuration files have changed. This means that either `tox.ini` "
+                "or one of the constants in `split-tox-gh-actions.py` has changed "
                 "but the changes have not been propagated to the GitHub actions config files. "
                 "Please run `python scripts/split-tox-gh-actions/split-tox-gh-actions.py` "
                 "locally and commit the changes of the yaml configuration files to continue. "
@@ -235,7 +237,7 @@ def _normalize_py_versions(py_versions):
 def get_files_hash():
     """Calculate a hash of all the yaml configuration files"""
     hasher = hashlib.md5()
-    path_pattern = (OUT_DIR / "test-integration-*.yml").as_posix()
+    path_pattern = (OUT_DIR / "test-integrations-*.yml").as_posix()
     for file in glob(path_pattern):
         with open(file, "rb") as f:
             buf = f.read()

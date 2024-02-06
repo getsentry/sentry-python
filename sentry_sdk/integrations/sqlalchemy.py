@@ -95,7 +95,7 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
         context._sentry_sql_span_manager = None
         ctx_mgr.__exit__(None, None, None)
 
-    span = context._sentry_sql_span
+    span = getattr(context, "_sentry_sql_span", None)  # type: Optional[Span]
     if span is not None:
         with capture_internal_exceptions():
             add_query_source(hub, span)
@@ -152,6 +152,9 @@ def _set_db_data(span, conn):
     db_system = _get_db_system(conn.engine.name)
     if db_system is not None:
         span.set_data(SPANDATA.DB_SYSTEM, db_system)
+
+    if conn.engine.url is None:
+        return
 
     db_name = conn.engine.url.database
     if db_name is not None:

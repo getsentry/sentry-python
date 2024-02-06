@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.40.1
+
+### Various fixes & improvements
+
+- Fix uWSGI workers hanging (#2694) by @sentrivana
+- Make metrics work with `gevent` (#2694) by @sentrivana
+- Guard against `engine.url` being `None` (#2708) by @sentrivana
+- Fix performance regression in `sentry_sdk.utils._generate_installed_modules` (#2703) by @GlenWalker
+- Guard against Sentry initialization mid SQLAlchemy cursor (#2702) by @apmorton
+- Fix yaml generation script (#2695) by @sentrivana
+- Fix AWS Lambda workflow (#2710) by @sentrivana
+- Bump `codecov/codecov-action` from 3 to 4 (#2706) by @dependabot
+- Bump `actions/cache` from 3 to 4 (#2661) by @dependabot
+- Bump `actions/checkout` from 3.1.0 to 4.1.1 (#2561) by @dependabot
+- Bump `github/codeql-action` from 2 to 3 (#2603) by @dependabot
+- Bump `actions/setup-python` from 4 to 5 (#2577) by @dependabot
+
+## 1.40.0
+
+### Various fixes & improvements
+
+- Enable metrics related settings by default (#2685) by @iambriccardo
+- Fix `UnicodeDecodeError` on Python 2 (#2657) by @sentrivana
+- Enable DB query source by default (#2629) by @sentrivana
+- Fix query source duration check (#2675) by @sentrivana
+- Reformat with `black==24.1.0` (#2680) by @sentrivana
+- Cleaning up existing code to prepare for new Scopes API (#2611) by @antonpirker
+- Moved redis related tests to databases (#2674) by @antonpirker
+- Improve `sentry_sdk.trace` type hints (#2633) by @szokeasaurusrex
+- Bump `checkouts/data-schemas` from `e9f7d58` to `aa7058c` (#2639) by @dependabot
+
 ## 1.39.2
 
 ### Various fixes & improvements
