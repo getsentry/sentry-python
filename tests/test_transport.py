@@ -163,12 +163,12 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     )
 
     # I am not sure why, but "werkzeug" logger makes an INFO log on sending
-    # the message "hi" and does creates an infinite look. 
+    # the message "hi" and does creates an infinite look.
     # Ignoring this for breaking the infinite loop and still we can test
-    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading 
+    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
     # to an infinite loop
     ignore_logger("werkzeug")
-    
+
     with Hub(client):
         capture_message("hi")
         client.flush()

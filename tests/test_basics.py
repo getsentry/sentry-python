@@ -351,9 +351,9 @@ def test_push_scope_null_client(sentry_init, capture_events):
 def test_push_scope_callback(sentry_init, null_client, capture_events):
     assert True
 
-    # Deactivated this test, because with the new Scopes push_scope returns 
+    # Deactivated this test, because with the new Scopes push_scope returns
     # the isolation_scope and thus the outer and the inner scope are the same.
-    # This test should be removed completly once the Hub and related code is removed. 
+    # This test should be removed completly once the Hub and related code is removed.
 
     # sentry_init()
 
@@ -463,9 +463,9 @@ def test_integration_scoping(sentry_init, capture_events):
 def test_client_initialized_within_scope(sentry_init, caplog):
     assert True
 
-    # Deactivated this test, because with the new Scopes calling bind_client on the Hub 
+    # Deactivated this test, because with the new Scopes calling bind_client on the Hub
     # sets the client on the global scope.
-    # This test should be removed completly once the Hub and related code is removed. 
+    # This test should be removed completly once the Hub and related code is removed.
 
     # caplog.set_level(logging.WARNING)
 
@@ -483,8 +483,8 @@ def test_client_initialized_within_scope(sentry_init, caplog):
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
     assert True
 
-    # Deactivated this test, because with the new Scopes the push_scope just returns the isolation scope. 
-    # This test should be removed completly once the Hub and related code is removed. 
+    # Deactivated this test, because with the new Scopes the push_scope just returns the isolation scope.
+    # This test should be removed completly once the Hub and related code is removed.
 
     # caplog.set_level(logging.WARNING)
 
@@ -506,7 +506,7 @@ def test_scope_popped_too_soon(sentry_init, caplog):
     assert True
 
     # Deactivated this test, because with the new Scopes there is not pushing and popping of scopes.
-    # This test should be removed completly once the Hub and related code is removed. 
+    # This test should be removed completly once the Hub and related code is removed.
 
     # caplog.set_level(logging.ERROR)
 

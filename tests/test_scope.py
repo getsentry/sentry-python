@@ -197,7 +197,6 @@ def test_get_isolation_scope():
     assert scope._type == ScopeType.ISOLATION
 
 
-
 def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
@@ -270,7 +269,6 @@ def test_isolate():
     assert isolation_scope_after.is_forked
     assert isolation_scope_after.original_scope == isolation_scope_before
     assert not scope.is_forked
-
 
 
 def test_get_global_scope_tags(clean_scopes):
