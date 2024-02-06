@@ -1,6 +1,8 @@
 import copy
 import os
 import pytest
+
+import sentry_sdk
 from sentry_sdk import capture_exception, new_scope, isolated_scope
 from sentry_sdk.client import Client, NoopClient
 from sentry_sdk.scope import Scope, ScopeType
@@ -11,7 +13,13 @@ except ImportError:
     import mock  # python < 3.3
 
 
-@pytest.mark.forked
+@pytest.fixture
+def clean_scopes():
+    sentry_sdk.scope._global_scope = None
+    sentry_sdk.scope._isolation_scope.set(None)
+    sentry_sdk.scope._current_scope.set(None)
+
+
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -27,7 +35,6 @@ def test_copying():
     assert s1._fingerprint is s2._fingerprint
 
 
-@pytest.mark.forked
 def test_merging(sentry_init, capture_events):
     sentry_init()
 
@@ -42,7 +49,6 @@ def test_merging(sentry_init, capture_events):
     assert event["user"] == {"id": "42"}
 
 
-@pytest.mark.forked
 def test_common_args():
     s = Scope()
     s.update_from_kwargs(
@@ -84,7 +90,6 @@ BAGGAGE_VALUE = (
 SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize(
     "env,excepted_value",
     [
@@ -154,7 +159,6 @@ SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
         ),
     ],
 )
-@pytest.mark.forked
 def test_load_trace_data_from_env(env, excepted_value):
     new_env = os.environ.copy()
     new_env.update(env)
@@ -165,7 +169,6 @@ def test_load_trace_data_from_env(env, excepted_value):
         assert incoming_trace_data == excepted_value
 
 
-@pytest.mark.forked
 def test_scope_client():
     scope = Scope(ty="test_something")
     assert scope._type == "test_something"
@@ -180,7 +183,6 @@ def test_scope_client():
     assert scope.client == custom_client
 
 
-@pytest.mark.forked
 def test_get_current_scope():
     scope = Scope.get_current_scope()
     assert scope is not None
@@ -188,7 +190,6 @@ def test_get_current_scope():
     assert scope._type == ScopeType.CURRENT
 
 
-@pytest.mark.forked
 def test_get_isolation_scope():
     scope = Scope.get_isolation_scope()
     assert scope is not None
@@ -196,7 +197,7 @@ def test_get_isolation_scope():
     assert scope._type == ScopeType.ISOLATION
 
 
-@pytest.mark.forked
+
 def test_get_global_scope():
     scope = Scope.get_global_scope()
     assert scope is not None
@@ -204,15 +205,13 @@ def test_get_global_scope():
     assert scope._type == ScopeType.GLOBAL
 
 
-@pytest.mark.forked
-def test_get_client():
+def test_get_client(clean_scopes):
     client = Scope.get_client()
     assert client is not None
     assert client.__class__ == NoopClient
     assert not client.is_active()
 
 
-@pytest.mark.forked
 def test_set_client():
     client1 = Client()
     client2 = Client()
@@ -244,13 +243,11 @@ def test_set_client():
     assert client == client3
 
 
-@pytest.mark.forked
 def test_is_forked():
     scope = Scope()
     assert not scope.is_forked
 
 
-@pytest.mark.forked
 def test_fork():
     scope = Scope()
     forked_scope = scope.fork()
@@ -261,7 +258,6 @@ def test_fork():
     assert forked_scope.original_scope == scope
 
 
-@pytest.mark.forked
 def test_isolate():
     isolation_scope_before = Scope.get_isolation_scope()
 
@@ -276,8 +272,8 @@ def test_isolate():
     assert not scope.is_forked
 
 
-@pytest.mark.forked
-def test_get_global_scope_tags():
+
+def test_get_global_scope_tags(clean_scopes):
     global_scope1 = Scope.get_global_scope()
     global_scope2 = Scope.get_global_scope()
     assert global_scope1 == global_scope2
@@ -296,7 +292,6 @@ def test_get_global_scope_tags():
     assert not global_scope2.client.is_active()
 
 
-@pytest.mark.forked
 def test_get_global_with_new_scope():
     original_global_scope = Scope.get_global_scope()
 
@@ -310,7 +305,6 @@ def test_get_global_with_new_scope():
     assert after_with_global_scope is original_global_scope
 
 
-@pytest.mark.forked
 def test_get_global_with_isolated_scope():
     original_global_scope = Scope.get_global_scope()
 
@@ -324,8 +318,7 @@ def test_get_global_with_isolated_scope():
     assert after_with_global_scope is original_global_scope
 
 
-@pytest.mark.forked
-def test_get_isolation_scope_tags():
+def test_get_isolation_scope_tags(clean_scopes):
     isolation_scope1 = Scope.get_isolation_scope()
     isolation_scope2 = Scope.get_isolation_scope()
     assert isolation_scope1 == isolation_scope2
@@ -344,7 +337,6 @@ def test_get_isolation_scope_tags():
     assert not isolation_scope2.client.is_active()
 
 
-@pytest.mark.forked
 def test_with_isolated_scope():
     original_current_scope = Scope.get_current_scope()
     original_isolation_scope = Scope.get_isolation_scope()
@@ -363,7 +355,6 @@ def test_with_isolated_scope():
     assert after_with_isolation_scope is original_isolation_scope
 
 
-@pytest.mark.forked
 def test_get_current_scope_tags():
     scope1 = Scope.get_current_scope()
     scope2 = Scope.get_current_scope()
@@ -383,7 +374,6 @@ def test_get_current_scope_tags():
     assert not scope2.client.is_active()
 
 
-@pytest.mark.forked
 def test_with_new_scope():
     original_current_scope = Scope.get_current_scope()
     original_isolation_scope = Scope.get_isolation_scope()
@@ -402,7 +392,6 @@ def test_with_new_scope():
     assert after_with_isolation_scope is original_isolation_scope
 
 
-@pytest.mark.forked
 def test_fork_copy_on_write_set_tag():
     original_scope = Scope()
     original_scope.set_tag("scope", 0)
@@ -416,7 +405,6 @@ def test_fork_copy_on_write_set_tag():
     assert forked_scope._tags == {"scope": 1}
 
 
-@pytest.mark.forked
 def test_fork_copy_on_write_remove_tag():
     original_scope = Scope()
     original_scope.set_tag("scope", 0)
