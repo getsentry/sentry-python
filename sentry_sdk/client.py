@@ -15,7 +15,6 @@ from sentry_sdk.utils import (
     get_default_release,
     handle_in_app,
     logger,
-    is_gevent,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace, has_tracing_enabled
@@ -251,18 +250,14 @@ class _Client(object):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                if is_gevent():
-                    logger.warning("Metrics currently not supported with gevent.")
+                from sentry_sdk.metrics import MetricsAggregator
 
-                else:
-                    from sentry_sdk.metrics import MetricsAggregator
-
-                    self.metrics_aggregator = MetricsAggregator(
-                        capture_func=_capture_envelope,
-                        enable_code_locations=bool(
-                            experiments.get("metric_code_locations", True)
-                        ),
-                    )
+                self.metrics_aggregator = MetricsAggregator(
+                    capture_func=_capture_envelope,
+                    enable_code_locations=bool(
+                        experiments.get("metric_code_locations", True)
+                    ),
+                )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
