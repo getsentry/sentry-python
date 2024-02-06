@@ -157,7 +157,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
         final_time = datetime.now(timezone.utc)
         time_diff = final_time - initial_time
 
-        execution_duration_in_millis = time_diff.microseconds / MILLIS_TO_SECONDS
+        execution_duration_in_millis = time_diff / timedelta(milliseconds=1)
 
         extra = event.setdefault("extra", {})
         extra["google cloud functions"] = {

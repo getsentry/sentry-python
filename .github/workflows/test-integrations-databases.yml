@@ -51,8 +51,8 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4.1.1
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - uses: getsentry/action-clickhouse-in-ci@v1
@@ -76,6 +76,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test redis latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test rediscluster latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
@@ -84,7 +92,7 @@ jobs:
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -121,8 +129,8 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4.1.1
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - uses: getsentry/action-clickhouse-in-ci@v1
@@ -146,6 +154,14 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test redis pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test rediscluster pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
@@ -154,7 +170,7 @@ jobs:
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

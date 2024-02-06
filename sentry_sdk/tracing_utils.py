@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from collections.abc import Mapping
+from datetime import timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
 
@@ -176,13 +177,13 @@ def add_query_source(hub, span):
     if span.timestamp is None or span.start_timestamp is None:
         return
 
-    should_add_query_source = client.options.get("enable_db_query_source", False)
+    should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
-    slow_query = duration.microseconds > threshold * 1000
+    slow_query = duration / timedelta(milliseconds=1) > threshold
 
     if not slow_query:
         return

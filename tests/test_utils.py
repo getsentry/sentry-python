@@ -1,7 +1,8 @@
-import pytest
 import re
 import sys
 from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk.utils import (
