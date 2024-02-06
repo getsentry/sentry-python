@@ -2,7 +2,6 @@ import copy
 import sys
 
 from contextlib import contextmanager
-from sentry_sdk import scope
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
@@ -644,3 +643,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
+
+
+# Circular imports
+from sentry_sdk import scope
