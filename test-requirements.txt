@@ -5,7 +5,7 @@ pytest-forked
 pytest-localserver
 pytest-watch
 tox==3.7.0
-jsonschema==3.2.0
+jsonschema
 pyrsistent
 executing
 asttokens
