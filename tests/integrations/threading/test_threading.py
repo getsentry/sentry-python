@@ -16,6 +16,10 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 original_start = Thread.start
 original_run = Thread.run
 
+minimum_python_37 = pytest.mark.skipif(
+    sys.version_info < (3, 7), reason="Test needs Python >= 3.7"
+)
+
 
 @pytest.mark.parametrize("integrations", [[ThreadingIntegration()], []])
 def test_handles_exceptions(sentry_init, capture_events, integrations):
@@ -40,6 +44,7 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
+@minimum_python_37
 @pytest.mark.parametrize("propagate_hub", (True, False))
 def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     sentry_init(
@@ -77,10 +82,7 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
         assert "stage1" not in event.get("tags", {})
 
 
-@pytest.mark.skipif(
-    futures is None,
-    reason="ThreadPool was added in 3.2",
-)
+@minimum_python_37
 @pytest.mark.parametrize("propagate_hub", (True, False))
 def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
     sentry_init(
