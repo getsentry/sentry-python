@@ -385,7 +385,7 @@ class Scope(object):
             return client
 
         try:
-            client = _global_scope.client
+            client = _global_scope.client  # type: ignore
         except AttributeError:
             client = None
 
@@ -693,7 +693,7 @@ class Scope(object):
         self._attachments = []  # type: List[Attachment]
 
         self.clear_breadcrumbs()
-        self._should_capture = True
+        self._should_capture = True  # type: bool
 
         self._span = None  # type: Optional[Span]
         self._session = None  # type: Optional[Session]

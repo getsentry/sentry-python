@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
 
+    from sentry_sdk.client import BaseClient
     from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
         Event,
@@ -252,7 +253,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     @property
     def client(self):
-        # type: () -> Optional[Client]
+        # type: () -> Optional[BaseClient]
         """Returns the current client on the hub."""
         client = Scope.get_client()
 
@@ -273,7 +274,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return self._last_event_id
 
     def bind_client(
-        self, new  # type: Optional[Client]
+        self, new  # type: Optional[BaseClient]
     ):
         # type: (...) -> None
         """Binds a new client to the hub."""
