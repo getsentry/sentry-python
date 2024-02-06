@@ -481,6 +481,7 @@ def test_on_end_sentry_span():
     fake_sentry_span.finish.assert_called_once()
 
 
+@pytest.mark.forked
 def test_link_trace_context_to_error_event():
     """
     Test that the trace context is added to the error event.
