@@ -154,6 +154,7 @@ SENTRY_TRACE_VALUE = "771a43a4192642f0b136d5159a501700-1234567890abcdef-1"
         ),
     ],
 )
+@pytest.mark.forked
 def test_load_trace_data_from_env(env, excepted_value):
     new_env = os.environ.copy()
     new_env.update(env)
