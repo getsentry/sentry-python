@@ -154,6 +154,62 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
+)
+def test_transactions_no_engine_url(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        _experiments={"record_sql_params": True},
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    Base = declarative_base()  # noqa: N806
+
+    class Person(Base):
+        __tablename__ = "person"
+        id = Column(Integer, primary_key=True)
+        name = Column(String(250), nullable=False)
+
+    class Address(Base):
+        __tablename__ = "address"
+        id = Column(Integer, primary_key=True)
+        street_name = Column(String(250))
+        street_number = Column(String(250))
+        post_code = Column(String(250), nullable=False)
+        person_id = Column(Integer, ForeignKey("person.id"))
+        person = relationship(Person)
+
+    engine = create_engine("sqlite:///:memory:")
+    engine.url = None
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)  # noqa: N806
+    session = Session()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        with session.begin_nested():
+            session.query(Person).first()
+
+        for _ in range(2):
+            with pytest.raises(IntegrityError):
+                with session.begin_nested():
+                    session.add(Person(id=1, name="bob"))
+                    session.add(Person(id=1, name="bob"))
+
+        with session.begin_nested():
+            session.query(Person).first()
+
+    (event,) = events
+
+    for span in event["spans"]:
+        assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+        assert SPANDATA.DB_NAME not in span["data"]
+        assert SPANDATA.SERVER_ADDRESS not in span["data"]
+        assert SPANDATA.SERVER_PORT not in span["data"]
+
+
 def test_long_sql_query_preserved(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1,
