@@ -12,3 +12,4 @@ asttokens
 responses
 pysocks
 ipdb
+setuptools
