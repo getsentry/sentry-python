@@ -316,6 +316,7 @@ def run_lambda_function(
 
                 waiter = client.get_waiter("function_active_v2")
                 waiter.wait(FunctionName=full_fn_name)
+                print("Created Lambda function in AWS: ", full_fn_name)
         except client.exceptions.ResourceConflictException:
             print(
                 "Lambda function already exists, this is fine, we will just invoke it."

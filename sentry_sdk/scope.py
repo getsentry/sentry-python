@@ -1390,7 +1390,6 @@ class Scope(object):
         is_check_in = ty == "check_in"
 
         if not is_check_in:
-            global _global_scope
             isolation_scope = _isolation_scope.get()
             current_scope = _current_scope.get()
             event_processors = chain(

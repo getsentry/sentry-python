@@ -39,6 +39,7 @@ import pytest
 
 LAMBDA_PRELUDE = """
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration, get_lambda_bootstrap
+from sentry_sdk.integrations.threading import ThreadingIntegration
 import sentry_sdk
 import json
 import time
@@ -127,7 +128,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
         transport=TestTransport,
-        integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning)],
+        integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning), ThreadingIntegration(propagate_context=True)],
         shutdown_timeout=10,
         **extra_init_args
     )
