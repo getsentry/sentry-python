@@ -6,7 +6,7 @@ from sentry_sdk import scope
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope, isolated_scope
+from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
     NoOpSpan,

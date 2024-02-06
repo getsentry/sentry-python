@@ -8,7 +8,6 @@ import pytest
 from tests.conftest import patch_start_tracing_child
 
 from sentry_sdk import (
-    Client,
     push_scope,
     configure_scope,
     capture_event,
