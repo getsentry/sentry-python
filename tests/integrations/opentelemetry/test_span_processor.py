@@ -20,6 +20,7 @@ from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
 
+@pytest.mark.forked
 def test_is_sentry_span():
     otel_span = MagicMock()
 
@@ -47,6 +48,7 @@ def test_is_sentry_span():
     assert span_processor._is_sentry_span(hub, otel_span)
 
 
+@pytest.mark.forked
 def test_get_otel_context():
     otel_span = MagicMock()
     otel_span.attributes = {"foo": "bar"}
@@ -62,6 +64,7 @@ def test_get_otel_context():
     }
 
 
+@pytest.mark.forked
 def test_get_trace_data_with_span_and_trace():
     otel_span = MagicMock()
     span_context = SpanContext(
@@ -83,6 +86,7 @@ def test_get_trace_data_with_span_and_trace():
     assert sentry_trace_data["baggage"] is None
 
 
+@pytest.mark.forked
 def test_get_trace_data_with_span_and_trace_and_parent():
     otel_span = MagicMock()
     span_context = SpanContext(
@@ -105,6 +109,7 @@ def test_get_trace_data_with_span_and_trace_and_parent():
     assert sentry_trace_data["baggage"] is None
 
 
+@pytest.mark.forked
 def test_get_trace_data_with_sentry_trace():
     otel_span = MagicMock()
     span_context = SpanContext(
@@ -153,6 +158,7 @@ def test_get_trace_data_with_sentry_trace():
         assert sentry_trace_data["baggage"] is None
 
 
+@pytest.mark.forked
 def test_get_trace_data_with_sentry_trace_and_baggage():
     otel_span = MagicMock()
     span_context = SpanContext(
@@ -190,6 +196,7 @@ def test_get_trace_data_with_sentry_trace_and_baggage():
         assert sentry_trace_data["baggage"] == baggage
 
 
+@pytest.mark.forked
 def test_update_span_with_otel_data_http_method():
     sentry_span = Span()
 
@@ -228,6 +235,7 @@ def test_update_span_with_otel_data_http_method():
         pytest.param(Status(StatusCode.ERROR), "internal_error", id="error"),
     ],
 )
+@pytest.mark.forked
 def test_update_span_with_otel_status(otel_status, expected_status):
     sentry_span = Span()
 
@@ -242,6 +250,7 @@ def test_update_span_with_otel_status(otel_status, expected_status):
     assert sentry_span.get_trace_context().get("status") == expected_status
 
 
+@pytest.mark.forked
 def test_update_span_with_otel_data_http_method2():
     sentry_span = Span()
 
@@ -273,6 +282,7 @@ def test_update_span_with_otel_data_http_method2():
     )
 
 
+@pytest.mark.forked
 def test_update_span_with_otel_data_db_query():
     sentry_span = Span()
 
@@ -295,6 +305,7 @@ def test_update_span_with_otel_data_db_query():
     )
 
 
+@pytest.mark.forked
 def test_on_start_transaction():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
@@ -342,6 +353,7 @@ def test_on_start_transaction():
         assert list(span_processor.otel_span_map.keys())[0] == "1234567890abcdef"
 
 
+@pytest.mark.forked
 def test_on_start_child():
     otel_span = MagicMock()
     otel_span.name = "Sample OTel Span"
@@ -390,6 +402,7 @@ def test_on_start_child():
         assert "1234567890abcdef" in span_processor.otel_span_map.keys()
 
 
+@pytest.mark.forked
 def test_on_end_no_sentry_span():
     """
     If on_end is called on a span that is not in the otel_span_map, it should be a no-op.
@@ -415,6 +428,7 @@ def test_on_end_no_sentry_span():
     span_processor._update_span_with_otel_data.assert_not_called()
 
 
+@pytest.mark.forked
 def test_on_end_sentry_transaction():
     """
     Test on_end for a sentry Transaction.
@@ -447,6 +461,7 @@ def test_on_end_sentry_transaction():
     fake_sentry_span.finish.assert_called_once()
 
 
+@pytest.mark.forked
 def test_on_end_sentry_span():
     """
     Test on_end for a sentry Span.
