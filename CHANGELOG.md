@@ -4,17 +4,18 @@
 
 ### Various fixes & improvements
 
-- fix(ci): Fix AWS Lambda workflow (#2710) by @sentrivana
-- feat(metrics): Make metrics work with `gevent` (#2694) by @sentrivana
-- fix(sqlalchemy): Guard against `engine.url` being `None` (#2708) by @sentrivana
-- build(deps): bump codecov/codecov-action from 3 to 4 (#2706) by @dependabot
-- build(deps): bump actions/cache from 3 to 4 (#2661) by @dependabot
-- build(deps): bump actions/checkout from 3.1.0 to 4.1.1 (#2561) by @dependabot
-- build(deps): bump github/codeql-action from 2 to 3 (#2603) by @dependabot
-- build(deps): bump actions/setup-python from 4 to 5 (#2577) by @dependabot
-- Fix performance regression in sentry_sdk.utils._generate_installed_modules (#2703) by @GlenWalker
-- Guard against sentry initialization mid sqlalchemy cursor (#2702) by @apmorton
-- fix(ci): Fix yaml generation script (#2695) by @sentrivana
+- Fix uWSGI workers hanging (#2694) by @sentrivana
+- Make metrics work with `gevent` (#2694) by @sentrivana
+- Guard against `engine.url` being `None` (#2708) by @sentrivana
+- Fix performance regression in `sentry_sdk.utils._generate_installed_modules` (#2703) by @GlenWalker
+- Guard against Sentry initialization mid SQLAlchemy cursor (#2702) by @apmorton
+- Fix yaml generation script (#2695) by @sentrivana
+- Fix AWS Lambda workflow (#2710) by @sentrivana
+- Bump `codecov/codecov-action` from 3 to 4 (#2706) by @dependabot
+- Bump `actions/cache` from 3 to 4 (#2661) by @dependabot
+- Bump `actions/checkout` from 3.1.0 to 4.1.1 (#2561) by @dependabot
+- Bump `github/codeql-action` from 2 to 3 (#2603) by @dependabot
+- Bump `actions/setup-python` from 4 to 5 (#2577) by @dependabot
 
 ## 1.40.0
 
