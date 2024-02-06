@@ -182,7 +182,11 @@ def init_beam(sentry_init):
         signature = pardo._signature
         output_processor = _OutputHandler()
         return DoFnInvoker.create_invoker(
-            signature, output_processor, DoFnContext("test")
+            signature,
+            output_processor,
+            DoFnContext("test"),
+            input_args=[],
+            input_kwargs={},
         )
 
     return inner
