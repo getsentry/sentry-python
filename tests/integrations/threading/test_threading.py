@@ -131,7 +131,8 @@ def test_circular_references(sentry_init, request):
     t.join()
     del t
 
-    assert not gc.collect()
+    unreachable_objects = gc.collect()
+    assert unreachable_objects == 0
 
 
 @pytest.mark.forked

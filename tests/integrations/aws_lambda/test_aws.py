@@ -462,23 +462,23 @@ def test_performance_error(run_lambda_function):
             [
                 {
                     "headers": {
-                        "Host": "x.io",
-                        "X-Forwarded-Proto": "http"
+                        "Host": "x1.io",
+                        "X-Forwarded-Proto": "https"
                     },
                     "httpMethod": "GET",
-                    "path": "/somepath",
+                    "path": "/path1",
                     "queryStringParameters": {
-                        "done": "true"
+                        "done": "false"
                     },
                     "dog": "Maisey"
                 },
                 {
                     "headers": {
-                        "Host": "x.io",
+                        "Host": "x2.io",
                         "X-Forwarded-Proto": "http"
                     },
-                    "httpMethod": "GET",
-                    "path": "/somepath",
+                    "httpMethod": "POST",
+                    "path": "/path2",
                     "queryStringParameters": {
                         "done": "true"
                     },
@@ -539,11 +539,11 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
-            "url": "http://x.io/somepath",
+            "url": "https://x1.io/path1",
             "query_string": {
-                "done": "true",
+                "done": "false",
             },
         }
     else:
