@@ -463,11 +463,11 @@ def test_performance_error(run_lambda_function):
             [
                 {
                     "headers": {
-                        "Host": "x.io",
+                        "Host": "x1.io",
                         "X-Forwarded-Proto": "http"
                     },
                     "httpMethod": "GET",
-                    "path": "/somepath",
+                    "path": "/path1",
                     "queryStringParameters": {
                         "done": "true"
                     },
@@ -475,13 +475,13 @@ def test_performance_error(run_lambda_function):
                 },
                 {
                     "headers": {
-                        "Host": "x.io",
+                        "Host": "x2.io",
                         "X-Forwarded-Proto": "http"
                     },
-                    "httpMethod": "GET",
-                    "path": "/somepath",
+                    "httpMethod": "POST",
+                    "path": "/path2",
                     "queryStringParameters": {
-                        "done": "true"
+                        "done": "false"
                     },
                     "dog": "Charlie"
                 }
