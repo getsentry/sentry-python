@@ -212,7 +212,7 @@ class PyramidRequestExtractor(RequestExtractor):
 
 def _make_event_processor(weak_request, integration):
     # type: (Callable[[], Request], PyramidIntegration) -> EventProcessor
-    def event_processor(event, hint):
+    def pyramid_event_processor(event, hint):
         # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
         request = weak_request()
         if request is None:
@@ -228,4 +228,4 @@ def _make_event_processor(weak_request, integration):
 
         return event
 
-    return event_processor
+    return pyramid_event_processor
