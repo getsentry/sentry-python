@@ -135,7 +135,6 @@ def test_circular_references(sentry_init, request):
     assert unreachable_objects == 0
 
 
-
 @pytest.mark.forked
 def test_double_patching(sentry_init, capture_events):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
