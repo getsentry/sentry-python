@@ -460,7 +460,7 @@ def test_performance_error(run_lambda_function):
         (
             b"""
             [
-              {
+                {
                     "headers": {
                         "Host": "x1.io",
                         "X-Forwarded-Proto": "https"
