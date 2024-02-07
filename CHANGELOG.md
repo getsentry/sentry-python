@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.2
+
+### Various fixes & improvements
+
+- test: Fix `pytest` error (#2712) by @szokeasaurusrex
+- build(deps): bump types-protobuf from 4.24.0.4 to 4.24.0.20240129 (#2691) by @dependabot
+
 ## 1.40.1
 
 ### Various fixes & improvements
