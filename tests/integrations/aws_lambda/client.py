@@ -251,10 +251,14 @@ def run_lambda_function(
         dir_already_existing = os.path.isdir(base_dir)
 
         if dir_already_existing:
-            print(f"Local Lambda function directory ({base_dir}) already exists, skipping creation")
+            print(
+                f"Local Lambda function directory ({base_dir}) already exists, skipping creation"
+            )
 
         if not dir_already_existing:
-            print(f"Creating Lambda function package ({full_fn_name}) locally in directory {base_dir}")
+            print(
+                f"Creating Lambda function package ({full_fn_name}) locally in directory {base_dir}"
+            )
             os.mkdir(base_dir)
             _create_lambda_package(
                 base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
