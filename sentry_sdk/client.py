@@ -251,7 +251,7 @@ class _Client(object):
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
                 try:
-                    import uwsgi
+                    import uwsgi  # type: ignore
                 except ImportError:
                     uwsgi = None
 
