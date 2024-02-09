@@ -250,14 +250,23 @@ class _Client(object):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
+                try:
+                    import uwsgi
+                except ImportError:
+                    uwsgi = None
 
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
+                if uwsgi is not None:
+                    logger.warning("Metrics currently not supported with uWSGI.")
+
+                else:
+                    from sentry_sdk.metrics import MetricsAggregator
+
+                    self.metrics_aggregator = MetricsAggregator(
+                        capture_func=_capture_envelope,
+                        enable_code_locations=bool(
+                            experiments.get("metric_code_locations", True)
+                        ),
+                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
