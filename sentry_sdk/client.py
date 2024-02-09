@@ -249,13 +249,17 @@ class _Client(object):
 
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics", True):
+            if experiments.get("enable_metrics", True) or experiments.get(
+                "force_enable_metrics", False
+            ):
                 try:
                     import uwsgi  # type: ignore
                 except ImportError:
                     uwsgi = None
 
-                if uwsgi is not None:
+                if uwsgi is not None and not experiments.get(
+                    "force_enable_metrics", False
+                ):
                     logger.warning("Metrics currently not supported with uWSGI.")
 
                 else:
