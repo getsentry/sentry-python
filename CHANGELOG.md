@@ -4,7 +4,7 @@
 
 ### Various fixes & improvements
 
-- fix(metrics): Turn off metrics for uWSGI (#2720) by @sentrivana
+- Turn off metrics for uWSGI (#2720) by @sentrivana
 - Minor improvements (#2714) by @antonpirker
 
 ## 1.40.2
