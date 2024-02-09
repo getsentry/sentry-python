@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.3
+
+### Various fixes & improvements
+
+- Turn off metrics for uWSGI (#2720) by @sentrivana
+- Minor improvements (#2714) by @antonpirker
+
 ## 1.40.2
 
 ### Various fixes & improvements
