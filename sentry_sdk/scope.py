@@ -218,6 +218,17 @@ class Scope(object):
         return current_scope
 
     @classmethod
+    def set_current_scope(cls, new_current_scope):
+        # type: (Scope) -> None
+        """
+        Sets the given scope as the new current scope overwriting the existing current scope.
+        :param new_current_scope: The scope to set as the new current scope.
+
+        .. versionadded:: 2.0.0
+        """
+        _current_scope.set(new_current_scope)
+
+    @classmethod
     def get_isolation_scope(cls):
         # type: () -> Scope
         """
@@ -231,6 +242,17 @@ class Scope(object):
             _isolation_scope.set(isolation_scope)
 
         return isolation_scope
+
+    @classmethod
+    def set_isolation_scope(cls, new_isolation_scope):
+        # type: (Scope) -> None
+        """
+        Sets the given scope as the new isolation scope overwriting the existing isolation scope.
+        :param new_isolation_scope: The scope to set as the new isolation scope.
+
+        .. versionadded:: 2.0.0
+        """
+        _isolation_scope.set(new_isolation_scope)
 
     @classmethod
     def get_global_scope(cls):
