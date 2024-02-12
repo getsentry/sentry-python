@@ -159,11 +159,12 @@ class BaseClient:
 
     .. versionadded:: 2.0.0
     """
+    def __init__(self, options=_get_options()):
+        self.options = options  # type: Dict[str, Any]
 
-    options = _get_options()  # type: Dict[str, Any]
-    metrics_aggregator = None  # type: Optional[MetricsAggregator]
-    monitor = None  # type: Optional[Monitor]
-    transport = None  # type: Optional[Transport]
+        self.transport = None  # type: Optional[Transport]
+        self.monitor = None  # type: Optional[Monitor]
+        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -242,8 +243,7 @@ class _Client(BaseClient):
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
-
+        super().__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self):
