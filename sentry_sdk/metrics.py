@@ -445,7 +445,6 @@ class MetricsAggregator(object):
 
         self._flusher = None  # type: Optional[Union[threading.Thread, ThreadPool]]
         self._flusher_pid = None  # type: Optional[int]
-        self._ensure_thread()
 
     def _ensure_thread(self):
         # type: (...) -> bool
