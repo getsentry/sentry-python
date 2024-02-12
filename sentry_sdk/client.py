@@ -157,7 +157,7 @@ class BaseClient:
     """
     The basic definition of a client that is used for sending data to Sentry.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
 
     options = _get_options()  # type: Dict[str, Any]
@@ -187,7 +187,7 @@ class BaseClient:
         """
         Returns weither the client is active (able to send data to Sentry)
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         return False
 
@@ -224,7 +224,7 @@ class NonRecordingClient(BaseClient):
     """
     A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
 
     pass
@@ -388,7 +388,7 @@ class _Client(BaseClient):
         """
         Returns weither the client is active (able to send data to Sentry)
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         return True
 

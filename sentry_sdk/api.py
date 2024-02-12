@@ -94,7 +94,7 @@ def is_initialized():
     Returns whether Sentry has been initialized or not.
     If a client is available Sentry is initialized.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
     return Scope.get_client().is_active()
 
@@ -129,7 +129,7 @@ def set_current_scope(new_current_scope):
     Sets the given scope as the new current scope overwriting the existing current scope.
     :param new_current_scope: The scope to set as the new current scope.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
     scope._current_scope.set(new_current_scope)
 
@@ -140,7 +140,7 @@ def set_isolation_scope(new_isolation_scope):
     Sets the given scope as the new isolation scope overwriting the existing isolation scope.
     :param new_isolation_scope: The scope to set as the new isolation scope.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
     scope._isolation_scope.set(new_isolation_scope)
 
