@@ -296,7 +296,7 @@ class Scope(object):
 
         .. versionadded:: X.X.X
         """
-        self.client = client or NoopClient()
+        self.client = client if client is not None else NoopClient()
 
     @property
     def is_forked(self):
