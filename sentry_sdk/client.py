@@ -153,7 +153,7 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class BaseClient:
+class BaseClient(object):
     """
     The basic definition of a client that is used for sending data to Sentry.
 
