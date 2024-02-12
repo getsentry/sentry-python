@@ -65,8 +65,20 @@ if TYPE_CHECKING:
     T = TypeVar("T")
 
 
+# Holds data that will be added to **all** events sent by this process.
+# In case this is a http server (think web framework) with multiple users
+# the data will be added to events of all users.
+# Typically this is used for process wide data such as the release.
 _global_scope = None  # type: Optional[Scope]
+
+# Holds data for the active request.
+# This is used to isolate data for different requests or users.
+# The isolation scope is created by integrations and there should not
+# be created manually
 _isolation_scope = ContextVar("isolation_scope", default=None)
+
+# Holds data for the active span.
+# This can be used to manually add additional data to a span.
 _current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
