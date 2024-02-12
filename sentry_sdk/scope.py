@@ -176,7 +176,7 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
-        self.client = NoopClient()  # type: sentry_sdk.client.BaseClient
+        self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
         if client is not None:
             self.set_client(client)
@@ -270,7 +270,7 @@ class Scope(object):
         """
         Returns the currently used :py:class:`sentry_sdk.Client`.
         This checks the current scope, the isolation scope and the global scope for a client.
-        If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+        If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
 
         .. versionadded:: X.X.X
         """
@@ -285,18 +285,18 @@ class Scope(object):
         if _global_scope is not None:
             return _global_scope.client
 
-        return NoopClient()
+        return NonRecordingClient()
 
     def set_client(self, client=None):
         # type: (Optional[sentry_sdk.client.BaseClient]) -> None
         """
         Sets the client for this scope.
         :param client: The client to use in this scope.
-            If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NoopClient`.
+            If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NonRecordingClient`.
 
         .. versionadded:: X.X.X
         """
-        self.client = client if client is not None else NoopClient()
+        self.client = client if client is not None else NonRecordingClient()
 
     @property
     def is_forked(self):
@@ -1472,4 +1472,4 @@ def isolated_scope():
 
 
 # Circular imports
-from sentry_sdk.client import NoopClient
+from sentry_sdk.client import NonRecordingClient

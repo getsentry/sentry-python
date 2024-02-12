@@ -16,7 +16,7 @@ from sentry_sdk import (
     start_transaction,
 )
 
-from sentry_sdk.client import Client, NoopClient
+from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope, ScopeType
 
@@ -141,7 +141,7 @@ def test_is_initialized():
 def test_get_client():
     client = get_client()
     assert client is not None
-    assert client.__class__ == NoopClient
+    assert client.__class__ == NonRecordingClient
     assert not client.is_active()
 
 

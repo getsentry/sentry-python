@@ -220,7 +220,7 @@ class BaseClient:
         return None
 
 
-class NoopClient(BaseClient):
+class NonRecordingClient(BaseClient):
     """
     A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
 
