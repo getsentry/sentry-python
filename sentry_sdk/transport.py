@@ -6,6 +6,7 @@ import gzip
 import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from urllib.request import getproxies
 
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
@@ -30,11 +31,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
     DataCategory = Optional[str]
-
-try:
-    from urllib.request import getproxies
-except ImportError:
-    from urllib import getproxies  # type: ignore
 
 
 class Transport:
