@@ -159,8 +159,11 @@ class BaseClient:
 
     .. versionadded:: 2.0.0
     """
-    def __init__(self, options=_get_options()):
-        self.options = options  # type: Dict[str, Any]
+
+    def __init__(self, options=None):
+        self.options = (
+            options if options is not None else _get_options()
+        )  # type: Dict[str, Any]
 
         self.transport = None  # type: Optional[Transport]
         self.monitor = None  # type: Optional[Monitor]
