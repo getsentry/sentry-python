@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
 
-    from sentry_sdk._types import SessionStatus
+    from sentry_sdk._types import Event, SessionStatus
 
 
 def _minute_trunc(ts):
@@ -155,7 +155,7 @@ class Session(object):
         return attrs
 
     def to_json(self):
-        # type: (...) -> Any
+        # type: (...) -> Event
         rv = {
             "sid": str(self.sid),
             "init": True,

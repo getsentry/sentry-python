@@ -18,6 +18,8 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Union
 
+    from sentry_sdk._types import Event
+
 
 def is_auto_session_tracking_enabled(hub=None):
     # type: (Optional[sentry_sdk.Hub]) -> Union[Any, bool, None]
@@ -55,7 +57,7 @@ MAX_ENVELOPE_ITEMS = 100
 
 
 def make_aggregate_envelope(aggregate_states, attrs):
-    # type: (Any, Any) -> Any
+    # type: (Any, Any) -> Event
     return {"attrs": dict(attrs), "aggregates": list(aggregate_states.values())}
 
 

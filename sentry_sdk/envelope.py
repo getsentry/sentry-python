@@ -79,11 +79,13 @@ class Envelope(object):
     ):
         # type: (...) -> None
         if isinstance(session, Session):
-            session = session.to_json()
-        self.add_item(Item(payload=PayloadRef(json=session), type="session"))
+            json = session.to_json()
+        else:
+            json = session
+        self.add_item(Item(payload=PayloadRef(json=json), type="session"))
 
     def add_sessions(
-        self, sessions  # type: Any
+        self, sessions  # type: Event
     ):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=sessions), type="sessions"))
@@ -160,7 +162,7 @@ class PayloadRef(object):
         self,
         bytes=None,  # type: Optional[bytes]
         path=None,  # type: Optional[Union[bytes, text_type]]
-        json=None,  # type: Optional[Any]
+        json=None,  # type: Optional[Event]
     ):
         # type: (...) -> None
         self.json = json
