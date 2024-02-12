@@ -73,7 +73,7 @@ _global_scope = None  # type: Optional[Scope]
 
 # Holds data for the active request.
 # This is used to isolate data for different requests or users.
-# The isolation scope is created by integrations and there should not
+# The isolation scope is usually created by integrations, but may also
 # be created manually
 _isolation_scope = ContextVar("isolation_scope", default=None)
 
