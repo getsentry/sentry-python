@@ -161,6 +161,7 @@ class BaseClient:
     """
 
     def __init__(self, options=None):
+        # type: (Optional[Dict[str, Any]]) -> None
         self.options = (
             options if options is not None else _get_options()
         )  # type: Dict[str, Any]
@@ -246,7 +247,7 @@ class _Client(BaseClient):
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        super().__init__(options=get_options(*args, **kwargs))
+        super(_Client, self).__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self):
