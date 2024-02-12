@@ -161,7 +161,7 @@ def maybe_create_breadcrumbs_from_span(hub, span):
         # In the SDKs codebase a Hub that is not Hub.current is never passed in here, but it is probably
         # done by users.
         logger.warning(
-            "Deprecated: The Hub will be replaces by the Scope. Please use the Scope instead of the Hub."
+            "Deprecated: The Hub will be replaced by the Scope. Please use the Scope instead of the Hub."
         )
         hub = sentry_sdk.Scope.get_isolation_scope()
 
