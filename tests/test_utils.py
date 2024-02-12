@@ -1,13 +1,11 @@
 import pytest
 import re
 import sys
-import threading
 from datetime import timedelta
 
 from sentry_sdk._compat import duration_in_milliseconds
 from sentry_sdk.utils import (
     Components,
-    create_universal_lock,
     Dsn,
     get_default_release,
     get_error_message,
@@ -22,7 +20,6 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
-    UniversalLock,
 )
 
 import sentry_sdk
@@ -618,45 +615,3 @@ def test_default_release_empty_string():
 )
 def test_duration_in_milliseconds(timedelta, expected_milliseconds):
     assert duration_in_milliseconds(timedelta) == expected_milliseconds
-
-
-global_test_var = {
-    "val": 0,
-}
-
-lock = create_universal_lock()
-
-
-def _modify_global():
-    global global_test_var
-    for _ in range(100000):
-        with UniversalLock(lock):
-            old_val = global_test_var["val"]
-            global_test_var["val"] = old_val + 1
-
-
-@pytest.mark.forked
-def test_universal_lock_threading():
-    threads = []
-    for _ in range(10):
-        t = threading.Thread(target=_modify_global)
-        threads.append(t)
-        t.start()
-
-    for t in threads:
-        t.join()
-
-    assert global_test_var["val"] == 100000 * 10
-
-
-# TODO: this test does not fail without the lock.
-@pytest.mark.forked
-@requires_gevent
-def test_universal_lock_gevent():
-    greenlets = []
-    for _ in range(10):
-        greenlets.append(gevent.spawn(_modify_global))
-
-    gevent.joinall(greenlets)
-
-    assert global_test_var["val"] == 100000 * 10
