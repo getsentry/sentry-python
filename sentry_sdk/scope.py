@@ -30,9 +30,11 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ContextVar,
+    create_universal_lock,
     event_from_exception,
     exc_info_from_error,
     logger,
+    UniversalLock,
 )
 
 if TYPE_CHECKING:
@@ -82,6 +84,8 @@ _isolation_scope = ContextVar("isolation_scope", default=None)
 _current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
+
+_lock = create_universal_lock()
 
 
 class ScopeType(Enum):
@@ -238,7 +242,8 @@ class Scope(object):
         """
         global _global_scope
         if _global_scope is None:
-            _global_scope = Scope(ty=ScopeType.GLOBAL)
+            with UniversalLock(_lock):
+                _global_scope = Scope(ty=ScopeType.GLOBAL)
 
         return _global_scope
 

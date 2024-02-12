@@ -16,6 +16,16 @@ from decimal import Decimal
 from numbers import Real
 
 try:
+    from gevent.lock import Semaphore as GeventSemaphore  # type: ignore
+except ImportError:
+    GeventSemaphore = None
+
+try:
+    import asyncio
+except ImportError:
+    asyncio = None  # type: ignore
+
+try:
     # Python 3
     from urllib.parse import parse_qs
     from urllib.parse import unquote
@@ -1759,3 +1769,47 @@ except ImportError:
 def is_gevent():
     # type: () -> bool
     return is_module_patched("threading") or is_module_patched("_thread")
+
+
+class UniversalLock:
+    """
+    A universal lock that works when used in threading, gevent or asyncio concurrency model.
+    """
+
+    def __init__(self, lock):
+        # type: (Union[threading.Lock, GeventSemaphore, asyncio.Lock]) -> None
+        self._lock = lock
+
+    def acquire(self):
+        # type: () -> None
+        self._lock.acquire()
+
+    def release(self):
+        # type: () -> None
+        self._lock.release()
+
+    def __enter__(self):
+        # type: () -> None
+        self.acquire()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
+        self.release()
+
+
+def create_universal_lock():
+    # type: () -> Union[threading.Lock, GeventSemaphore, asyncio.Lock]
+    """
+    Create a lock that works in threading, gevent and asyncio
+    """
+    if GeventSemaphore is not None and is_gevent():
+        lock = GeventSemaphore()
+        return lock
+    elif threading is not None:
+        lock = threading.Lock()
+        return lock
+    elif asyncio is not None:
+        lock = asyncio.Lock()
+        return lock
+    else:
+        raise RuntimeError("No supported concurrency library found.")
