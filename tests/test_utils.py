@@ -44,14 +44,8 @@ try:
 except ImportError:
     gevent = None
 
-try:
-    import asyncio
-except ImportError:
-    asyncio = None
-
 
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
-requires_asyncio = pytest.mark.skipif(asyncio is None, reason="asyncio not enabled")
 
 
 def _normalize_distribution_name(name):
@@ -664,24 +658,5 @@ def test_universal_lock_gevent():
         greenlets.append(gevent.spawn(_modify_global))
 
     gevent.joinall(greenlets)
-
-    assert global_test_var["val"] == 100000 * 10
-
-
-async def _modify_global_async():
-    global global_test_var
-    for _ in range(100000):
-        with UniversalLock(lock):
-            old_val = global_test_var["val"]
-            global_test_var["val"] = old_val + 1
-
-
-# TODO: this test does not fail without the lock.
-@pytest.mark.forked
-@pytest.mark.asyncio
-@requires_asyncio
-async def test_universal_lock_asyncio():
-    tasks = [_modify_global_async() for _ in range(10)]
-    await asyncio.gather(*tasks)
 
     assert global_test_var["val"] == 100000 * 10
