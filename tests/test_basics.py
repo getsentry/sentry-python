@@ -468,9 +468,6 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     with push_scope():
         Hub.current.bind_client(Client())
 
-    import ipdb
-
-    ipdb.set_trace()
     (record,) = (x for x in caplog.records if x.levelname == "WARNING")
 
     assert record.msg.startswith("init() called inside of pushed scope.")

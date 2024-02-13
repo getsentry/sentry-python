@@ -369,7 +369,8 @@ class Scope(object):
 
         .. versionadded:: 2.0.0
         """
-        return copy(self)
+        forked_scope = copy(self)
+        return forked_scope
 
     def isolate(self):
         # type: () -> None
