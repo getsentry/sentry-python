@@ -24,7 +24,6 @@ def generate_transaction_item():
                     "environment": "dogpark",
                     "release": "off.leash.park",
                     "public_key": "dogsarebadatkeepingsecrets",
-                    "user_segment": "bigs",
                     "transaction": "/interactions/other-dogs/new-dog",
                 },
             }
@@ -105,7 +104,6 @@ def test_envelope_headers(sentry_init, capture_envelopes, monkeypatch):
             "environment": "dogpark",
             "release": "off.leash.park",
             "public_key": "dogsarebadatkeepingsecrets",
-            "user_segment": "bigs",
             "transaction": "/interactions/other-dogs/new-dog",
         },
     }
