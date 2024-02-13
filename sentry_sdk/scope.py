@@ -1448,8 +1448,8 @@ class Scope(object):
 
 
 @contextmanager
-def scope(scope=None):
-    # type: (Optional[scope]) -> Generator[Scope, None, None]
+def new_scope(scope=None):
+    # type: (Optional[Scope]) -> Generator[Scope, None, None]
     """
     Context manager that forks the current scope and runs the wrapped code in it.
 
