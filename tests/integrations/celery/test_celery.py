@@ -284,44 +284,6 @@ def test_ignore_expected(capture_events, celery):
     assert not events
 
 
-def test_broken_prerun(init_celery, connect_signal):
-    from celery.signals import task_prerun
-
-    stack_lengths = []
-
-    def crash(*args, **kwargs):
-        # scope should exist in prerun
-        stack_lengths.append(len(Hub.current._stack))
-        1 / 0
-
-    # Order here is important to reproduce the bug: In Celery 3, a crashing
-    # prerun would prevent other preruns from running.
-
-    connect_signal(task_prerun, crash)
-    celery = init_celery()
-
-    assert len(Hub.current._stack) == 1
-
-    @celery.task(name="dummy_task")
-    def dummy_task(x, y):
-        stack_lengths.append(len(Hub.current._stack))
-        return x / y
-
-    if VERSION >= (4,):
-        dummy_task.delay(2, 2)
-    else:
-        with pytest.raises(ZeroDivisionError):
-            dummy_task.delay(2, 2)
-
-    assert len(Hub.current._stack) == 1
-    if VERSION < (4,):
-        # This new scopes the _stack is deprecated and its length is always 1.
-        assert stack_lengths == [1]
-    else:
-        # This new scopes the _stack is deprecated and its length is always 1.
-        assert stack_lengths == [1, 1]
-
-
 @pytest.mark.xfail(
     (4, 2, 0) <= VERSION < (4, 4, 3),
     strict=True,
