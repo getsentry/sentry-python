@@ -163,7 +163,7 @@ class BaseClient(object):
     def __init__(self, options=None):
         # type: (Optional[Dict[str, Any]]) -> None
         self.options = (
-            options if options is not None else _get_options()
+            options if options is not None else DEFAULT_OPTIONS
         )  # type: Dict[str, Any]
 
         self.transport = None  # type: Optional[Transport]
