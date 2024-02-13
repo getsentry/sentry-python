@@ -269,7 +269,6 @@ def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     Hub.current.flush()
 
     (envelope,) = envelopes
-    (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
 
     assert statsd_item.headers["type"] == "statsd"

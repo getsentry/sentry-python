@@ -488,9 +488,9 @@ class MetricsAggregator(object):
         # type: (...) -> None
         _in_metrics.set(True)
         while self._running or self._force_flush:
-            self._flush()
             if self._running:
                 self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
+            self._flush()
 
     def _flush(self):
         # type: (...) -> None
