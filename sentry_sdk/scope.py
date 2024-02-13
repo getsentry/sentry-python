@@ -372,18 +372,6 @@ class Scope(object):
         forked_scope = copy(self)
         return forked_scope
 
-    def isolate(self):
-        # type: () -> None
-        """
-        Creates a new isolation scope for this scope.
-        The new isolation scope will be a fork of the current isolation scope.
-
-        .. versionadded:: 2.0.0
-        """
-        isolation_scope = Scope.get_isolation_scope()
-        forked_isolation_scope = isolation_scope.fork()
-        _isolation_scope.set(forked_isolation_scope)
-
     def _load_trace_data_from_env(self):
         # type: () -> Optional[Dict[str, str]]
         """
