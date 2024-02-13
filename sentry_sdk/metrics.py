@@ -445,7 +445,6 @@ class MetricsAggregator(object):
 
         self._flusher = None  # type: Optional[Union[threading.Thread, ThreadPool]]
         self._flusher_pid = None  # type: Optional[int]
-        self._ensure_thread()
 
     def _ensure_thread(self):
         # type: (...) -> bool
@@ -460,6 +459,11 @@ class MetricsAggregator(object):
             return True
 
         with self._lock:
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
+            if self._flusher_pid == pid:
+                return True
+
             self._flusher_pid = pid
 
             if not is_gevent():
@@ -484,9 +488,9 @@ class MetricsAggregator(object):
         # type: (...) -> None
         _in_metrics.set(True)
         while self._running or self._force_flush:
-            self._flush()
             if self._running:
                 self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
+            self._flush()
 
     def _flush(self):
         # type: (...) -> None
