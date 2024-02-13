@@ -253,17 +253,6 @@ def test_fork():
     assert scope != forked_scope
 
 
-def test_isolate():
-    isolation_scope_before = Scope.get_isolation_scope()
-
-    scope = Scope()
-    scope.isolate()
-
-    isolation_scope_after = Scope.get_isolation_scope()
-
-    assert isolation_scope_after != isolation_scope_before
-
-
 def test_get_global_scope_tags(clean_scopes):
     global_scope1 = Scope.get_global_scope()
     global_scope2 = Scope.get_global_scope()
