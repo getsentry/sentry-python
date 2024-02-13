@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.40.4
+
+### Various fixes & improvements
+
+- Only start metrics flusher thread on demand (#2727) by @sentrivana
+- Bump checkouts/data-schemas from `aa7058c` to `6121fd3` (#2724) by @dependabot
+
+## 1.40.3
+
+### Various fixes & improvements
+
+- Turn off metrics for uWSGI (#2720) by @sentrivana
+- Minor improvements (#2714) by @antonpirker
+
 ## 1.40.2
 
 ### Various fixes & improvements
