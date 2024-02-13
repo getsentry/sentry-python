@@ -1,7 +1,11 @@
 import copy
 import sys
-
 from contextlib import contextmanager
+
+try:
+    from os import register_at_fork
+except ImportError:
+    register_at_fork = None
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
@@ -700,3 +704,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
 GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
+
+
+if register_at_fork is not None:
+
+    def detect_parent_with_live_threads():
+        import threading
+
+        print("ACTIVE THREADS IN PARENT:", threading.active_count())
+
+    register_at_fork(before=detect_parent_with_live_threads)
