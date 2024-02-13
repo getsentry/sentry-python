@@ -346,7 +346,10 @@ def test_push_scope_null_client(sentry_init, capture_events):
 
     assert len(events) == 0
 
-@pytest.mark.skip(reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed")
+
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
+)
 @pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
     sentry_init()
@@ -454,7 +457,9 @@ def test_integration_scoping(sentry_init, capture_events):
     assert not events
 
 
-@pytest.mark.skip(reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed")
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
+)
 def test_client_initialized_within_scope(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
@@ -463,13 +468,17 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     with push_scope():
         Hub.current.bind_client(Client())
 
-    import ipdb; ipdb.set_trace()
+    import ipdb
+
+    ipdb.set_trace()
     (record,) = (x for x in caplog.records if x.levelname == "WARNING")
 
     assert record.msg.startswith("init() called inside of pushed scope.")
 
 
-@pytest.mark.skip(reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed")
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
+)
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
@@ -487,7 +496,9 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
     assert record.message.startswith("Leaked 1 scopes:")
 
 
-@pytest.mark.skip(reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed")
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
+)
 def test_scope_popped_too_soon(sentry_init, caplog):
     caplog.set_level(logging.ERROR)
 

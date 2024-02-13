@@ -242,19 +242,11 @@ def test_set_client():
     assert client == client3
 
 
-def test_is_forked():
-    scope = Scope()
-    assert not scope.is_forked
-
-
 def test_fork():
     scope = Scope()
     forked_scope = scope.fork()
 
-    assert forked_scope.is_forked
-    assert not scope.is_forked
     assert scope != forked_scope
-    assert forked_scope.original_scope == scope
 
 
 def test_isolate():
@@ -266,9 +258,6 @@ def test_isolate():
     isolation_scope_after = Scope.get_isolation_scope()
 
     assert isolation_scope_after != isolation_scope_before
-    assert isolation_scope_after.is_forked
-    assert isolation_scope_after.original_scope == isolation_scope_before
-    assert not scope.is_forked
 
 
 def test_get_global_scope_tags(clean_scopes):
@@ -388,32 +377,3 @@ def test_with_new_scope():
     after_with_isolation_scope = Scope.get_isolation_scope()
     assert after_with_current_scope is original_current_scope
     assert after_with_isolation_scope is original_isolation_scope
-
-
-def test_fork_copy_on_write_set_tag():
-    original_scope = Scope()
-    original_scope.set_tag("scope", 0)
-
-    forked_scope = original_scope.fork()
-    assert id(original_scope._tags) == id(forked_scope._tags)
-
-    forked_scope.set_tag("scope", 1)
-    assert id(original_scope._tags) != id(forked_scope._tags)
-    assert original_scope._tags == {"scope": 0}
-    assert forked_scope._tags == {"scope": 1}
-
-
-def test_fork_copy_on_write_remove_tag():
-    original_scope = Scope()
-    original_scope.set_tag("scope", 0)
-
-    forked_scope = original_scope.fork()
-    assert id(original_scope._tags) == id(forked_scope._tags)
-
-    forked_scope.remove_tag("scope")
-    assert id(original_scope._tags) != id(forked_scope._tags)
-    assert original_scope._tags == {"scope": 0}
-    assert forked_scope._tags == {}
-
-
-# TODO: add tests for all properties of Scope that should have the copy-on-write feature
