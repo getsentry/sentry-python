@@ -1,119 +1,10 @@
-;</span><span class="p">)</span>
-</span><span id="1-75">
-</span><span id="1-76">    <span class="n">rv</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">DEFAULT_OPTIONS</span><span class="p">)</span>
-</span><span id="1-77">    <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-</span><span id="1-78">    <span class="k">if</span> <span class="n">dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dsn&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-79">        <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dsn</span>
-</span><span id="1-80">
-</span><span id="1-81">    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
-</span><span id="1-82">        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rv</span><span class="p">:</span>
-</span><span id="1-83">            <span class="c1"># Option &quot;with_locals&quot; was renamed to &quot;include_local_variables&quot;</span>
-</span><span id="1-84">            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;with_locals&quot;</span><span class="p">:</span>
-</span><span id="1-85">                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-86">                    <span class="s2">&quot;Deprecated: The option &#39;with_locals&#39; was renamed to &#39;include_local_variables&#39;. &quot;</span>
-</span><span id="1-87">                    <span class="s2">&quot;Please use &#39;include_local_variables&#39;. The option &#39;with_locals&#39; will be removed in the future.&quot;</span>
-</span><span id="1-88">                <span class="p">)</span>
-</span><span id="1-89">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-</span><span id="1-90">                <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;include_local_variables&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
-</span><span id="1-91">                <span class="k">continue</span>
-</span><span id="1-92">
-</span><span id="1-93">            <span class="c1"># Option &quot;request_bodies&quot; was renamed to &quot;max_request_body_size&quot;</span>
-</span><span id="1-94">            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;request_bodies&quot;</span><span class="p">:</span>
-</span><span id="1-95">                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="1-96">                    <span class="s2">&quot;Deprecated: The option &#39;request_bodies&#39; was renamed to &#39;max_request_body_size&#39;. &quot;</span>
-</span><span id="1-97">                    <span class="s2">&quot;Please use &#39;max_request_body_size&#39;. The option &#39;request_bodies&#39; will be removed in the future.&quot;</span>
-</span><span id="1-98">                <span class="p">)</span>
-</span><span id="1-99">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-</span><span id="1-100">                <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;max_request_body_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
-</span><span id="1-101">                <span class="k">continue</span>
-</span><span id="1-102">
-</span><span id="1-103">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unknown option </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,))</span>
-</span><span id="1-104">
-</span><span id="1-105">        <span class="n">rv</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
-</span><span id="1-106">
-</span><span id="1-107">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-108">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SENTRY_DSN&quot;</span><span class="p">)</span>
-</span><span id="1-109">
-</span><span id="1-110">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-111">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_default_release</span><span class="p">()</span>
-</span><span id="1-112">
-</span><span id="1-113">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-114">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SENTRY_ENVIRONMENT&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;production&quot;</span>
-</span><span id="1-115">
-</span><span id="1-116">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-117">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SENTRY_DEBUG&quot;</span><span class="p">,</span> <span class="s2">&quot;False&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span>
-</span><span id="1-118">            <span class="s2">&quot;true&quot;</span><span class="p">,</span>
-</span><span id="1-119">            <span class="s2">&quot;1&quot;</span><span class="p">,</span>
-</span><span id="1-120">            <span class="s2">&quot;t&quot;</span><span class="p">,</span>
-</span><span id="1-121">        <span class="p">)</span>
-</span><span id="1-122">
-</span><span id="1-123">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;server_name&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;gethostname&quot;</span><span class="p">):</span>
-</span><span id="1-124">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;server_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">gethostname</span><span class="p">()</span>
-</span><span id="1-125">
-</span><span id="1-126">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-127">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span>
-</span><span id="1-128">
-</span><span id="1-129">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;project_root&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-130">        <span class="k">try</span><span class="p">:</span>
-</span><span id="1-131">            <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
-</span><span id="1-132">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-</span><span id="1-133">            <span class="n">project_root</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="1-134">
-</span><span id="1-135">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;project_root&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">project_root</span>
-</span><span id="1-136">
-</span><span id="1-137">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;enable_tracing&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-138">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
-</span><span id="1-139">
-</span><span id="1-140">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;event_scrubber&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-141">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;event_scrubber&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">EventScrubber</span><span class="p">()</span>
-</span><span id="1-142">
-</span><span id="1-143">    <span class="k">return</span> <span class="n">rv</span>
-</span><span id="1-144">
-</span><span id="1-145">
-</span><span id="1-146"><span class="k">try</span><span class="p">:</span>
-</span><span id="1-147">    <span class="c1"># Python 3.6+</span>
-</span><span id="1-148">    <span class="n">module_not_found_error</span> <span class="o">=</span> <span class="ne">ModuleNotFoundError</span>
-</span><span id="1-149"><span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-</span><span id="1-150">    <span class="c1"># Older Python versions</span>
-</span><span id="1-151">    <span class="n">module_not_found_error</span> <span class="o">=</span> <span class="ne">ImportError</span>  <span class="c1"># type: ignore</span>
-</span><span id="1-152">
-</span><span id="1-153">
-<div class="viewcode-block" id="_Client">
-<a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client">[docs]</a>
-</span><span id="1-154"><span class="k">class</span> <span class="nc">_Client</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-</span><span id="1-155"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The client is internally responsible for capturing the events and</span>
-</span><span id="1-156"><span class="sd">    forwarding them to sentry through the configured transport.  It takes</span>
-</span><span id="1-157"><span class="sd">    the client options as keyword arguments and optionally the DSN as first</span>
-</span><span id="1-158"><span class="sd">    argument.</span>
-</span><span id="1-159">
-</span><span id="1-160"><span class="sd">    Alias of :py:class:`Client`. (Was created for better intelisense support)</span>
-</span><span id="1-161"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-162">
-</span><span id="1-163">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-</span><span id="1-164">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
-</span><span id="1-165">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: Dict[str, Any]</span>
-</span><span id="1-166">
-</span><span id="1-167">        <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
-</span><span id="1-168">
-</span><span id="1-169">    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-170">        <span class="c1"># type: () -&gt; Any</span>
-</span><span id="1-171">        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;options&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">}</span>
-</span><span id="1-172">
-</span><span id="1-173">    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
-</span><span id="1-174">        <span class="c1"># type: (Any) -&gt; None</span>
-</span><span id="1-175">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">&quot;options&quot;</span><span class="p">]</span>
-</span><span id="1-176">        <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
-</span><span id="1-177">
-</span><span id="1-178">    <span class="k">def</span> <span class="nf">_setup_instrumentation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">functions_to_trace</span><span class="p">):</span>
-</span><span id="1-179">        <span class="c1"># type: (Sequence[Dict[str, str]]) -&gt; None</span>
-</span><span id="1-180"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-181"><span class="sd">        Instruments th
+
   <!DOCTYPE html>
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.client - sentry-python 1.40.3 documentation</title>
+      <title>sentry_sdk.client - sentry-python 1.40.4 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
 
   <script>
@@ -313,7 +204,116 @@
 </span><span id="1-71">        <span class="n">dsn</span> <span class="o">=</span> <span class="kc">None</span>
 </span><span id="1-72">
 </span><span id="1-73">    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-</span><span id="1-74">        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Only single positional argument is expected&quote functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.</span>
+</span><span id="1-74">        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Only single positional argument is expected&quot;</span><span class="p">)</span>
+</span><span id="1-75">
+</span><span id="1-76">    <span class="n">rv</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">DEFAULT_OPTIONS</span><span class="p">)</span>
+</span><span id="1-77">    <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="1-78">    <span class="k">if</span> <span class="n">dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dsn&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-79">        <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dsn</span>
+</span><span id="1-80">
+</span><span id="1-81">    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">iteritems</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
+</span><span id="1-82">        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rv</span><span class="p">:</span>
+</span><span id="1-83">            <span class="c1"># Option &quot;with_locals&quot; was renamed to &quot;include_local_variables&quot;</span>
+</span><span id="1-84">            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;with_locals&quot;</span><span class="p">:</span>
+</span><span id="1-85">                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-86">                    <span class="s2">&quot;Deprecated: The option &#39;with_locals&#39; was renamed to &#39;include_local_variables&#39;. &quot;</span>
+</span><span id="1-87">                    <span class="s2">&quot;Please use &#39;include_local_variables&#39;. The option &#39;with_locals&#39; will be removed in the future.&quot;</span>
+</span><span id="1-88">                <span class="p">)</span>
+</span><span id="1-89">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span id="1-90">                <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;include_local_variables&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+</span><span id="1-91">                <span class="k">continue</span>
+</span><span id="1-92">
+</span><span id="1-93">            <span class="c1"># Option &quot;request_bodies&quot; was renamed to &quot;max_request_body_size&quot;</span>
+</span><span id="1-94">            <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;request_bodies&quot;</span><span class="p">:</span>
+</span><span id="1-95">                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="1-96">                    <span class="s2">&quot;Deprecated: The option &#39;request_bodies&#39; was renamed to &#39;max_request_body_size&#39;. &quot;</span>
+</span><span id="1-97">                    <span class="s2">&quot;Please use &#39;max_request_body_size&#39;. The option &#39;request_bodies&#39; will be removed in the future.&quot;</span>
+</span><span id="1-98">                <span class="p">)</span>
+</span><span id="1-99">                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+</span><span id="1-100">                <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;max_request_body_size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+</span><span id="1-101">                <span class="k">continue</span>
+</span><span id="1-102">
+</span><span id="1-103">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unknown option </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">key</span><span class="p">,))</span>
+</span><span id="1-104">
+</span><span id="1-105">        <span class="n">rv</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+</span><span id="1-106">
+</span><span id="1-107">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-108">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SENTRY_DSN&quot;</span><span class="p">)</span>
+</span><span id="1-109">
+</span><span id="1-110">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-111">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;release&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_default_release</span><span class="p">()</span>
+</span><span id="1-112">
+</span><span id="1-113">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-114">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;environment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SENTRY_ENVIRONMENT&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;production&quot;</span>
+</span><span id="1-115">
+</span><span id="1-116">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-117">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;debug&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SENTRY_DEBUG&quot;</span><span class="p">,</span> <span class="s2">&quot;False&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span>
+</span><span id="1-118">            <span class="s2">&quot;true&quot;</span><span class="p">,</span>
+</span><span id="1-119">            <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+</span><span id="1-120">            <span class="s2">&quot;t&quot;</span><span class="p">,</span>
+</span><span id="1-121">        <span class="p">)</span>
+</span><span id="1-122">
+</span><span id="1-123">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;server_name&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;gethostname&quot;</span><span class="p">):</span>
+</span><span id="1-124">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;server_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">socket</span><span class="o">.</span><span class="n">gethostname</span><span class="p">()</span>
+</span><span id="1-125">
+</span><span id="1-126">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-127">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;instrumenter&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">INSTRUMENTER</span><span class="o">.</span><span class="n">SENTRY</span>
+</span><span id="1-128">
+</span><span id="1-129">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;project_root&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-130">        <span class="k">try</span><span class="p">:</span>
+</span><span id="1-131">            <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+</span><span id="1-132">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span id="1-133">            <span class="n">project_root</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-134">
+</span><span id="1-135">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;project_root&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">project_root</span>
+</span><span id="1-136">
+</span><span id="1-137">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;enable_tracing&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-138">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+</span><span id="1-139">
+</span><span id="1-140">    <span class="k">if</span> <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;event_scrubber&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-141">        <span class="n">rv</span><span class="p">[</span><span class="s2">&quot;event_scrubber&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">EventScrubber</span><span class="p">()</span>
+</span><span id="1-142">
+</span><span id="1-143">    <span class="k">return</span> <span class="n">rv</span>
+</span><span id="1-144">
+</span><span id="1-145">
+</span><span id="1-146"><span class="k">try</span><span class="p">:</span>
+</span><span id="1-147">    <span class="c1"># Python 3.6+</span>
+</span><span id="1-148">    <span class="n">module_not_found_error</span> <span class="o">=</span> <span class="ne">ModuleNotFoundError</span>
+</span><span id="1-149"><span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span id="1-150">    <span class="c1"># Older Python versions</span>
+</span><span id="1-151">    <span class="n">module_not_found_error</span> <span class="o">=</span> <span class="ne">ImportError</span>  <span class="c1"># type: ignore</span>
+</span><span id="1-152">
+</span><span id="1-153">
+<div class="viewcode-block" id="_Client">
+<a class="viewcode-back" href="../../apidocs.html#sentry_sdk._Client">[docs]</a>
+</span><span id="1-154"><span class="k">class</span> <span class="nc">_Client</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+</span><span id="1-155"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The client is internally responsible for capturing the events and</span>
+</span><span id="1-156"><span class="sd">    forwarding them to sentry through the configured transport.  It takes</span>
+</span><span id="1-157"><span class="sd">    the client options as keyword arguments and optionally the DSN as first</span>
+</span><span id="1-158"><span class="sd">    argument.</span>
+</span><span id="1-159">
+</span><span id="1-160"><span class="sd">    Alias of :py:class:`Client`. (Was created for better intelisense support)</span>
+</span><span id="1-161"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-162">
+</span><span id="1-163">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+</span><span id="1-164">        <span class="c1"># type: (*Any, **Any) -&gt; None</span>
+</span><span id="1-165">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">get_options</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>  <span class="c1"># type: Dict[str, Any]</span>
+</span><span id="1-166">
+</span><span id="1-167">        <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
+</span><span id="1-168">
+</span><span id="1-169">    <span class="k">def</span> <span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-170">        <span class="c1"># type: () -&gt; Any</span>
+</span><span id="1-171">        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;options&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">}</span>
+</span><span id="1-172">
+</span><span id="1-173">    <span class="k">def</span> <span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+</span><span id="1-174">        <span class="c1"># type: (Any) -&gt; None</span>
+</span><span id="1-175">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">&quot;options&quot;</span><span class="p">]</span>
+</span><span id="1-176">        <span class="bp">self</span><span class="o">.</span><span class="n">_init_impl</span><span class="p">()</span>
+</span><span id="1-177">
+</span><span id="1-178">    <span class="k">def</span> <span class="nf">_setup_instrumentation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">functions_to_trace</span><span class="p">):</span>
+</span><span id="1-179">        <span class="c1"># type: (Sequence[Dict[str, str]]) -&gt; None</span>
+</span><span id="1-180"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-181"><span class="sd">        Instruments the functions given in the list `functions_to_trace` with the `@sentry_sdk.tracing.trace` decorator.</span>
 </span><span id="1-182"><span class="sd">        &quot;&quot;&quot;</span>
 </span><span id="1-183">        <span class="k">for</span> <span class="n">function</span> <span class="ow">in</span> <span class="n">functions_to_trace</span><span class="p">:</span>
 </span><span id="1-184">            <span class="n">class_name</span> <span class="o">=</span> <span class="kc">None</span>
@@ -957,7 +957,7 @@
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=7302f7c1"></script>
+      <script src="../../_static/documentation_options.js?v=b88b670c"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=ccb09f80"></script>
