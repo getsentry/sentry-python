@@ -1390,8 +1390,10 @@ class Scope(object):
         is_check_in = ty == "check_in"
 
         if not is_check_in:
+            # Get scopes without creating them to prevent infinite recursion
             isolation_scope = _isolation_scope.get()
             current_scope = _current_scope.get()
+            
             event_processors = chain(
                 global_event_processors,
                 _global_scope and _global_scope._event_processors or [],
