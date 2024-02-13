@@ -459,6 +459,11 @@ class MetricsAggregator(object):
             return True
 
         with self._lock:
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
+            if self._flusher_pid == pid:
+                return True
+
             self._flusher_pid = pid
 
             if not is_gevent():
