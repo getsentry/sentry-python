@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.4
+
+### Various fixes & improvements
+
+- fix(metrics): Only start thread on demand (#2727) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `aa7058c` to `6121fd3` (#2724) by @dependabot
+
 ## 1.40.3
 
 ### Various fixes & improvements
