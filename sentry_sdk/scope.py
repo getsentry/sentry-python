@@ -69,8 +69,20 @@ if TYPE_CHECKING:
     T = TypeVar("T")
 
 
+# Holds data that will be added to **all** events sent by this process.
+# In case this is a http server (think web framework) with multiple users
+# the data will be added to events of all users.
+# Typically this is used for process wide data such as the release.
 _global_scope = None  # type: Optional[Scope]
+
+# Holds data for the active request.
+# This is used to isolate data for different requests or users.
+# The isolation scope is usually created by integrations, but may also
+# be created manually
 _isolation_scope = ContextVar("isolation_scope", default=None)
+
+# Holds data for the active span.
+# This can be used to manually add additional data to a span.
 _current_scope = ContextVar("current_scope", default=None)
 
 global_event_processors = []  # type: List[EventProcessor]
@@ -189,7 +201,7 @@ class Scope(object):
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
 
-        self.client = NoopClient()  # type: sentry_sdk.client.BaseClient
+        self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
         if client is not None:
             self.set_client(client)
@@ -284,7 +296,7 @@ class Scope(object):
         """
         Returns the current scope.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         current_scope = _current_scope.get()
         if current_scope is None:
@@ -294,12 +306,23 @@ class Scope(object):
         return current_scope
 
     @classmethod
+    def set_current_scope(cls, new_current_scope):
+        # type: (Scope) -> None
+        """
+        Sets the given scope as the new current scope overwriting the existing current scope.
+        :param new_current_scope: The scope to set as the new current scope.
+
+        .. versionadded:: 2.0.0
+        """
+        _current_scope.set(new_current_scope)
+
+    @classmethod
     def get_isolation_scope(cls):
         # type: () -> Scope
         """
         Returns the isolation scope.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         isolation_scope = _isolation_scope.get()
         if isolation_scope is None:
@@ -309,12 +332,23 @@ class Scope(object):
         return isolation_scope
 
     @classmethod
+    def set_isolation_scope(cls, new_isolation_scope):
+        # type: (Scope) -> None
+        """
+        Sets the given scope as the new isolation scope overwriting the existing isolation scope.
+        :param new_isolation_scope: The scope to set as the new isolation scope.
+
+        .. versionadded:: 2.0.0
+        """
+        _isolation_scope.set(new_isolation_scope)
+
+    @classmethod
     def get_global_scope(cls):
         # type: () -> Scope
         """
         Returns the global scope.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         global _global_scope
         if _global_scope is None:
@@ -329,7 +363,7 @@ class Scope(object):
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
@@ -362,9 +396,9 @@ class Scope(object):
         """
         Returns the currently used :py:class:`sentry_sdk.Client`.
         This checks the current scope, the isolation scope and the global scope for a client.
-        If no client is available a :py:class:`sentry_sdk.client.NoopClient` is returned.
+        If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         current_scope = _current_scope.get()
         try:
@@ -392,7 +426,7 @@ class Scope(object):
         if client is not None and client.is_active():
             return client
 
-        return NoopClient()
+        return NonRecordingClient()
 
     @_copy_on_write("client")
     def set_client(self, client=None):
@@ -400,11 +434,11 @@ class Scope(object):
         """
         Sets the client for this scope.
         :param client: The client to use in this scope.
-            If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NoopClient`.
+            If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NonRecordingClient`.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
-        self.client = client or NoopClient()
+        self.client = client if client is not None else NonRecordingClient()
 
     @property
     def is_forked(self):
@@ -412,7 +446,7 @@ class Scope(object):
         """
         Whether this scope is a fork of another scope.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         return self.original_scope is not None
 
@@ -421,7 +455,7 @@ class Scope(object):
         """
         Returns a fork of this scope.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         return self._fork()
 
@@ -431,7 +465,7 @@ class Scope(object):
         Creates a new isolation scope for this scope.
         The new isolation scope will be a fork of the current isolation scope.
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         isolation_scope = Scope.get_isolation_scope()
         forked_isolation_scope = isolation_scope.fork()
@@ -1534,7 +1568,7 @@ def new_scope():
     """
     Context manager that forks the current scope and runs the wrapped code in it.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
     current_scope = Scope.get_current_scope()
     forked_scope = current_scope.fork()
@@ -1555,7 +1589,7 @@ def isolated_scope():
     Context manager that forks the current isolation scope
     (and the related current scope) and runs the wrapped code in it.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
     # fork current scope
     current_scope = Scope.get_current_scope()
@@ -1577,4 +1611,4 @@ def isolated_scope():
 
 
 # Circular imports
-from sentry_sdk.client import NoopClient
+from sentry_sdk.client import NonRecordingClient

@@ -36,6 +36,14 @@ except NameError:
     # Python 2
     FileNotFoundError = IOError
 
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+
+requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+
 
 def _normalize_distribution_name(name):
     # type: (str) -> str

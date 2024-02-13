@@ -4,7 +4,7 @@ import pytest
 
 from sentry_sdk import scope
 from sentry_sdk import capture_exception, new_scope, isolated_scope
-from sentry_sdk.client import Client, NoopClient
+from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import Scope, ScopeType
 
 try:
@@ -173,7 +173,7 @@ def test_scope_client():
     scope = Scope(ty="test_something")
     assert scope._type == "test_something"
     assert scope.client is not None
-    assert scope.client.__class__ == NoopClient
+    assert scope.client.__class__ == NonRecordingClient
 
     custom_client = Client()
     scope = Scope(ty="test_more", client=custom_client)
@@ -207,7 +207,7 @@ def test_get_global_scope():
 def test_get_client(clean_scopes):
     client = Scope.get_client()
     assert client is not None
-    assert client.__class__ == NoopClient
+    assert client.__class__ == NonRecordingClient
     assert not client.is_active()
 
 
@@ -275,18 +275,18 @@ def test_get_global_scope_tags(clean_scopes):
     global_scope1 = Scope.get_global_scope()
     global_scope2 = Scope.get_global_scope()
     assert global_scope1 == global_scope2
-    assert global_scope1.client.__class__ == NoopClient
+    assert global_scope1.client.__class__ == NonRecordingClient
     assert not global_scope1.client.is_active()
-    assert global_scope2.client.__class__ == NoopClient
+    assert global_scope2.client.__class__ == NonRecordingClient
     assert not global_scope2.client.is_active()
 
     global_scope1.set_tag("tag1", "value")
     tags_scope1 = global_scope1._tags
     tags_scope2 = global_scope2._tags
     assert tags_scope1 == tags_scope2 == {"tag1": "value"}
-    assert global_scope1.client.__class__ == NoopClient
+    assert global_scope1.client.__class__ == NonRecordingClient
     assert not global_scope1.client.is_active()
-    assert global_scope2.client.__class__ == NoopClient
+    assert global_scope2.client.__class__ == NonRecordingClient
     assert not global_scope2.client.is_active()
 
 
@@ -320,18 +320,18 @@ def test_get_isolation_scope_tags(clean_scopes):
     isolation_scope1 = Scope.get_isolation_scope()
     isolation_scope2 = Scope.get_isolation_scope()
     assert isolation_scope1 == isolation_scope2
-    assert isolation_scope1.client.__class__ == NoopClient
+    assert isolation_scope1.client.__class__ == NonRecordingClient
     assert not isolation_scope1.client.is_active()
-    assert isolation_scope2.client.__class__ == NoopClient
+    assert isolation_scope2.client.__class__ == NonRecordingClient
     assert not isolation_scope2.client.is_active()
 
     isolation_scope1.set_tag("tag1", "value")
     tags_scope1 = isolation_scope1._tags
     tags_scope2 = isolation_scope2._tags
     assert tags_scope1 == tags_scope2 == {"tag1": "value"}
-    assert isolation_scope1.client.__class__ == NoopClient
+    assert isolation_scope1.client.__class__ == NonRecordingClient
     assert not isolation_scope1.client.is_active()
-    assert isolation_scope2.client.__class__ == NoopClient
+    assert isolation_scope2.client.__class__ == NonRecordingClient
     assert not isolation_scope2.client.is_active()
 
 
@@ -357,18 +357,18 @@ def test_get_current_scope_tags():
     scope1 = Scope.get_current_scope()
     scope2 = Scope.get_current_scope()
     assert id(scope1) == id(scope2)
-    assert scope1.client.__class__ == NoopClient
+    assert scope1.client.__class__ == NonRecordingClient
     assert not scope1.client.is_active()
-    assert scope2.client.__class__ == NoopClient
+    assert scope2.client.__class__ == NonRecordingClient
     assert not scope2.client.is_active()
 
     scope1.set_tag("tag1", "value")
     tags_scope1 = scope1._tags
     tags_scope2 = scope2._tags
     assert tags_scope1 == tags_scope2 == {"tag1": "value"}
-    assert scope1.client.__class__ == NoopClient
+    assert scope1.client.__class__ == NonRecordingClient
     assert not scope1.client.is_active()
-    assert scope2.client.__class__ == NoopClient
+    assert scope2.client.__class__ == NonRecordingClient
     assert not scope2.client.is_active()
 
 

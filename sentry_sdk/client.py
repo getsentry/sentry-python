@@ -153,17 +153,22 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class BaseClient:
+class BaseClient(object):
     """
     The basic definition of a client that is used for sending data to Sentry.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
 
-    options = _get_options()  # type: Dict[str, Any]
-    metrics_aggregator = None  # type: Optional[MetricsAggregator]
-    monitor = None  # type: Optional[Monitor]
-    transport = None  # type: Optional[Transport]
+    def __init__(self, options=None):
+        # type: (Optional[Dict[str, Any]]) -> None
+        self.options = (
+            options if options is not None else DEFAULT_OPTIONS
+        )  # type: Dict[str, Any]
+
+        self.transport = None  # type: Optional[Transport]
+        self.monitor = None  # type: Optional[Monitor]
+        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
 
     def __getstate__(self, *args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -185,9 +190,9 @@ class BaseClient:
     def is_active(self):
         # type: () -> bool
         """
-        Returns weither the client is active (able to send data to Sentry)
+        Returns whether the client is active (able to send data to Sentry)
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         return False
 
@@ -220,11 +225,11 @@ class BaseClient:
         return None
 
 
-class NoopClient(BaseClient):
+class NonRecordingClient(BaseClient):
     """
     A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
 
-    .. versionadded:: X.X.X
+    .. versionadded:: 2.0.0
     """
 
     pass
@@ -242,8 +247,7 @@ class _Client(BaseClient):
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
-
+        super(_Client, self).__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self):
@@ -386,9 +390,9 @@ class _Client(BaseClient):
     def is_active(self):
         # type: () -> bool
         """
-        Returns weither the client is active (able to send data to Sentry)
+        Returns whether the client is active (able to send data to Sentry)
 
-        .. versionadded:: X.X.X
+        .. versionadded:: 2.0.0
         """
         return True
 

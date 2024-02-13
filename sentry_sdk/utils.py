@@ -16,6 +16,16 @@ from decimal import Decimal
 from numbers import Real
 
 try:
+    from gevent.lock import Semaphore as GeventSemaphore  # type: ignore
+except ImportError:
+    GeventSemaphore = None
+
+try:
+    import asyncio
+except ImportError:
+    asyncio = None  # type: ignore
+
+try:
     # Python 3
     from urllib.parse import parse_qs
     from urllib.parse import unquote
