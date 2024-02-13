@@ -28,6 +28,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.event import Event
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
@@ -1007,20 +1008,15 @@ def event_from_exception(
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
-    return (
-        {
-            "level": "error",
-            "exception": {
-                "values": exceptions_from_error_tuple(
-                    exc_info, client_options, mechanism
-                )
-            },
-        },
-        hint,
+    event = Event(
+        level=Event.Level.ERROR,
+        exceptions=exceptions_from_error_tuple(exc_info, client_options, mechanism),
     )
+
+    return event, hint
 
 
 def _module_in_list(name, items):

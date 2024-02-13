@@ -21,11 +21,13 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal
 
+    from sentry_sdk.event import Event
+
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
     ]
 
-    Event = Dict[str, Any]
+    # Event = Dict[str, Any]
     Hint = Dict[str, Any]
 
     Breadcrumb = Dict[str, Any]
