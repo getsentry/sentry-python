@@ -1448,19 +1448,25 @@ class Scope(object):
 
 
 @contextmanager
-def new_scope():
-    # type: () -> Generator[Scope, None, None]
+def scope(scope=None):
+    # type: (Optional[scope]) -> Generator[Scope, None, None]
     """
     Context manager that forks the current scope and runs the wrapped code in it.
 
     .. versionadded:: 2.0.0
     """
-    current_scope = Scope.get_current_scope()
-    forked_scope = current_scope.fork()
-    token = _current_scope.set(forked_scope)
+    if scope is not None:
+        # use given scope
+        new_scope = scope
+    else:
+        # fork current scope
+        current_scope = Scope.get_current_scope()
+        new_scope = current_scope.fork()
+
+    token = _current_scope.set(new_scope)
 
     try:
-        yield forked_scope
+        yield new_scope
 
     finally:
         # restore original scope
