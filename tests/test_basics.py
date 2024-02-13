@@ -4,6 +4,7 @@ import sys
 import time
 
 import pytest
+from sentry_sdk.client import Client
 
 from tests.conftest import patch_start_tracing_child
 
@@ -345,37 +346,31 @@ def test_push_scope_null_client(sentry_init, capture_events):
 
     assert len(events) == 0
 
-
+@pytest.mark.skip(reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed")
 @pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
-    assert True
+    sentry_init()
 
-    # Deactivated this test, because with the new Scopes push_scope returns
-    # the isolation_scope and thus the outer and the inner scope are the same.
-    # This test should be removed completly once the Hub and related code is removed.
+    if null_client:
+        Hub.current.bind_client(None)
 
-    # sentry_init()
+    outer_scope = Hub.current.scope
 
-    # if null_client:
-    #     Hub.current.bind_client(None)
+    calls = []
 
-    # outer_scope = Hub.current.scope
+    @push_scope
+    def _(scope):
+        assert scope is Hub.current.scope
+        assert scope is not outer_scope
+        calls.append(1)
 
-    # calls = []
+    # push_scope always needs to execute the callback regardless of
+    # client state, because that actually runs usercode in it, not
+    # just scope config code
+    assert calls == [1]
 
-    # @push_scope
-    # def _(scope):
-    #     assert scope is Hub.current.scope
-    #     assert scope is not outer_scope
-    #     calls.append(1)
-
-    # # push_scope always needs to execute the callback regardless of
-    # # client state, because that actually runs usercode in it, not
-    # # just scope config code
-    # assert calls == [1]
-
-    # # Assert scope gets popped correctly
-    # assert Hub.current.scope is outer_scope
+    # Assert scope gets popped correctly
+    assert Hub.current.scope is outer_scope
 
 
 def test_breadcrumbs(sentry_init, capture_events):
@@ -459,68 +454,55 @@ def test_integration_scoping(sentry_init, capture_events):
     assert not events
 
 
+@pytest.mark.skip(reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed")
 def test_client_initialized_within_scope(sentry_init, caplog):
-    assert True
+    caplog.set_level(logging.WARNING)
 
-    # Deactivated this test, because with the new Scopes calling bind_client on the Hub
-    # sets the client on the global scope.
-    # This test should be removed completly once the Hub and related code is removed.
+    sentry_init(debug=True)
 
-    # caplog.set_level(logging.WARNING)
+    with push_scope():
+        Hub.current.bind_client(Client())
 
-    # sentry_init(debug=True)
+    import ipdb; ipdb.set_trace()
+    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
 
-    # with push_scope():  # TODO: push scope and bind_client
-    #     Hub.current.bind_client(Client())
-
-    # import ipdb; ipdb.set_trace()
-    # (record,) = (x for x in caplog.records if x.levelname == "WARNING")
-
-    # assert record.msg.startswith("init() called inside of pushed scope.")
+    assert record.msg.startswith("init() called inside of pushed scope.")
 
 
+@pytest.mark.skip(reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed")
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
-    assert True
+    caplog.set_level(logging.WARNING)
 
-    # Deactivated this test, because with the new Scopes the push_scope just returns the isolation scope.
-    # This test should be removed completly once the Hub and related code is removed.
+    sentry_init(debug=True)
 
-    # caplog.set_level(logging.WARNING)
+    old_stack = list(Hub.current._stack)
 
-    # sentry_init(debug=True)
+    with push_scope():
+        push_scope()
 
-    # old_stack = list(Hub.current._stack)
+    assert Hub.current._stack == old_stack
 
-    # with push_scope():
-    #     push_scope()
+    (record,) = (x for x in caplog.records if x.levelname == "WARNING")
 
-    # assert Hub.current._stack == old_stack
-
-    # (record,) = (x for x in caplog.records if x.levelname == "WARNING")
-
-    # assert record.message.startswith("Leaked 1 scopes:")
+    assert record.message.startswith("Leaked 1 scopes:")
 
 
+@pytest.mark.skip(reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed")
 def test_scope_popped_too_soon(sentry_init, caplog):
-    assert True
+    caplog.set_level(logging.ERROR)
 
-    # Deactivated this test, because with the new Scopes there is not pushing and popping of scopes.
-    # This test should be removed completly once the Hub and related code is removed.
+    sentry_init(debug=True)
 
-    # caplog.set_level(logging.ERROR)
+    old_stack = list(Hub.current._stack)
 
-    # sentry_init(debug=True)
+    with push_scope():
+        Hub.current.pop_scope_unsafe()
 
-    # old_stack = list(Hub.current._stack)
+    assert Hub.current._stack == old_stack
 
-    # with push_scope():
-    #     Hub.current.pop_scope_unsafe()
+    (record,) = (x for x in caplog.records if x.levelname == "ERROR")
 
-    # assert Hub.current._stack == old_stack
-
-    # (record,) = (x for x in caplog.records if x.levelname == "ERROR")
-
-    # assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
+    assert record.message == ("Scope popped too soon. Popped 1 scopes too many.")
 
 
 def test_scope_event_processor_order(sentry_init, capture_events):
