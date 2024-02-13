@@ -84,7 +84,7 @@ class SentryWsgiMiddleware(object):
 
         _wsgi_middleware_applied.set(True)
         try:
-            with sentry_sdk.isolated_scope() as scope:
+            with sentry_sdk.isolation_scope() as scope:
                 with auto_session_tracking(scope, session_mode="request"):
                     with capture_internal_exceptions():
                         scope.clear_breadcrumbs()
@@ -221,10 +221,9 @@ class _ScopedResponse(object):
     def __iter__(self):
         # type: () -> Iterator[bytes]
         iterator = iter(self._response)
-        sentry_sdk.set_isolation_scope(self._scope)
 
         while True:
-            with sentry_sdk.isolated_scope():
+            with sentry_sdk.isolation_scope(self._scope):
                 try:
                     chunk = next(iterator)
                 except StopIteration:
@@ -236,8 +235,7 @@ class _ScopedResponse(object):
 
     def close(self):
         # type: () -> None
-        sentry_sdk.set_isolation_scope(self._scope)
-        with sentry_sdk.isolated_scope():
+        with sentry_sdk.isolation_scope(self._scope):
             try:
                 self._response.close()  # type: ignore
             except AttributeError:

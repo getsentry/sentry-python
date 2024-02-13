@@ -3,7 +3,7 @@ import os
 import pytest
 
 from sentry_sdk import scope
-from sentry_sdk import capture_exception, new_scope, isolated_scope
+from sentry_sdk import capture_exception, new_scope, isolation_scope
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import Scope, ScopeType
 
@@ -292,10 +292,10 @@ def test_get_global_with_new_scope():
     assert after_with_global_scope is original_global_scope
 
 
-def test_get_global_with_isolated_scope():
+def test_get_global_with_isolation_scope():
     original_global_scope = Scope.get_global_scope()
 
-    with isolated_scope() as scope:
+    with isolation_scope() as scope:
         in_with_global_scope = Scope.get_global_scope()
 
         assert scope is not in_with_global_scope
@@ -324,11 +324,11 @@ def test_get_isolation_scope_tags(clean_scopes):
     assert not isolation_scope2.client.is_active()
 
 
-def test_with_isolated_scope():
+def test_with_isolation_scope():
     original_current_scope = Scope.get_current_scope()
     original_isolation_scope = Scope.get_isolation_scope()
 
-    with isolated_scope() as scope:
+    with isolation_scope() as scope:
         in_with_current_scope = Scope.get_current_scope()
         in_with_isolation_scope = Scope.get_isolation_scope()
 

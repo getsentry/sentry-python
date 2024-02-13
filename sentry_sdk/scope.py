@@ -1468,11 +1468,13 @@ def new_scope():
 
 
 @contextmanager
-def isolated_scope():
-    # type: () -> Generator[Scope, None, None]
+def isolation_scope(isolation_scope=None):
+    # type: (Optional[Scope]) -> Generator[Scope, None, None]
     """
-    Context manager that forks the current isolation scope
-    (and the related current scope) and runs the wrapped code in it.
+    Context manager that either uses the given `isolation_scope` or
+    forks the current isolation scope and runs the wrapped code in it.
+    The current scope is also forked.
+    After the wrapped code is executed, the original scopes are restored.
 
     .. versionadded:: 2.0.0
     """
@@ -1481,13 +1483,18 @@ def isolated_scope():
     forked_current_scope = current_scope.fork()
     current_token = _current_scope.set(forked_current_scope)
 
-    # fork isolation scope
-    isolation_scope = Scope.get_isolation_scope()
-    forked_isolation_scope = isolation_scope.fork()
-    isolation_token = _isolation_scope.set(forked_isolation_scope)
+    if isolation_scope is not None:
+        # use given scope
+        new_isolation_scope = isolation_scope
+    else:
+        # fork isolation scope
+        isolation_scope = Scope.get_isolation_scope()
+        new_isolation_scope = isolation_scope.fork()
+
+    isolation_token = _isolation_scope.set(new_isolation_scope)
 
     try:
-        yield forked_isolation_scope
+        yield new_isolation_scope
 
     finally:
         # restore original scopes
