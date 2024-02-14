@@ -164,7 +164,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     """
     .. deprecated:: 2.0.0
         The Hub is deprecated. Its functionality will be merged into :py:class:`sentry_sdk.scope.Scope`.
-    
+
     The hub wraps the concurrency management of the SDK.  Each thread has
     its own hub but the hub might transfer with the flow of execution if
     context vars are available.
@@ -238,10 +238,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
-        
+
         Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.run()",
+        )
+
         with self:
             return callback()
 
@@ -261,6 +266,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         If the return value is not `None` the hub is guaranteed to have a
         client attached.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.get_integation()",
+        )
+
         return Scope.get_client().get_integration(name_or_class)
 
     @property
@@ -270,9 +280,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         .. deprecated:: 2.0.0
             This property is deprecated and will be removed in a future release.
             Please use :py:func:`sentry_sdk.api.get_client` instead.
-        
+
         Returns the current client on the hub.
         """
+        logger.warning(
+            'The propety "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.client",
+        )
+
         client = Scope.get_client()
 
         if not client.is_active():
@@ -285,9 +300,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: () -> Scope
         """
         .. deprecated:: 2.0.0
-            This function is deprecated and will be removed in a future release.
+            This property is deprecated and will be removed in a future release.
             Returns the current scope on the hub.
         """
+        logger.warning(
+            'The property "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.scope",
+        )
+
         return Scope.get_isolation_scope()
 
     def last_event_id(self):
@@ -298,6 +318,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns the last event ID.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.last_event_id()",
+        )
         return self._last_event_id
 
     def bind_client(
@@ -311,6 +335,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Binds a new client to the hub.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.bind_client()",
+        )
+
         Scope.get_global_scope().set_client(new)
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
@@ -335,6 +364,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.capture_event()",
+        )
+
         last_event_id = Scope.get_current_scope().capture_event(
             event, hint, scope=scope, **scope_kwargs
         )
@@ -369,6 +403,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.capture_message()",
+        )
+
         last_event_id = Scope.get_current_scope().capture_message(
             message, level=level, scope=scope, **scope_kwargs
         )
@@ -400,6 +439,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.capture_exception()",
+        )
+
         last_event_id = Scope.get_current_scope().capture_exception(
             error, scope=scope, **scope_kwargs
         )
@@ -441,6 +485,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.add_breadcrumb()",
+        )
         Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
@@ -464,6 +512,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.start_span()",
+        )
         scope = Scope.get_isolation_scope()
 
         # For backwards compatibility, we allow passing the scope as the hub.
@@ -504,6 +556,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.start_transaction()",
+        )
         scope = Scope.get_isolation_scope()
 
         # For backwards compatibility, we allow passing the scope as the hub.
@@ -523,6 +579,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Sets the propagation context from environment or headers and returns a transaction.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.continue_trace()",
+        )
         return Scope.get_isolation_scope().continue_trace(
             environ_or_headers=environ_or_headers, op=op, name=name, source=source
         )
@@ -559,6 +619,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         :returns: If no `callback` is provided, a context manager that should
             be used to pop the scope again.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.push_scope()",
+        )
         if callback is not None:
             with self.push_scope() as scope:
                 callback(scope)
@@ -576,6 +640,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Try to use the context manager :py:meth:`push_scope` instead.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.pop_scope_unsafe()",
+        )
         rv = self._stack.pop()
         assert self._stack, "stack must have at least one layer"
         return rv
@@ -610,6 +678,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: If no callback is provided, returns a context manager that returns the scope.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.configure_scope()",
+        )
         scope = Scope.get_isolation_scope()
 
         if continue_trace:
@@ -639,6 +711,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Starts a new session.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.start_session()",
+        )
         Scope.get_isolation_scope().start_session(
             session_mode=session_mode,
         )
@@ -652,6 +728,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Ends the current session if there is one.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.end_session()",
+        )
         Scope.get_isolation_scope().end_session()
 
     def stop_auto_session_tracking(self):
@@ -660,12 +740,16 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
             Please use :py:meth:`sentry_sdk.Scope.stop_auto_session_tracking` instead.
-        
+
         Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.stop_auto_session_tracking()",
+        )
         Scope.get_isolation_scope().stop_auto_session_tracking()
 
     def resume_auto_session_tracking(self):
@@ -679,6 +763,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.resume_auto_session_tracking()",
+        )
         Scope.get_isolation_scope().resume_auto_session_tracking()
 
     def flush(
@@ -694,6 +782,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Alias for :py:meth:`sentry_sdk.client._Client.flush`
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.flush()",
+        )
         return Scope.get_client().flush(timeout=timeout, callback=callback)
 
     def get_traceparent(self):
@@ -705,6 +797,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns the traceparent either from the active span or from the scope.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.get_traceparent()",
+        )
         return Scope.get_isolation_scope().get_traceparent()
 
     def get_baggage(self):
@@ -716,6 +812,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns Baggage either from the active span or from the scope.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.get_baggage()",
+        )
         baggage = Scope.get_isolation_scope().get_baggage()
 
         if baggage is not None:
@@ -734,6 +834,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.iter_trace_propagation_headers()",
+        )
         return Scope.get_isolation_scope().iter_trace_propagation_headers(
             span=span,
         )
@@ -748,6 +852,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
+        logger.warning(
+            'The function "%s" is deprecated and will be removed in the future. (See https://develop.sentry.dev/sdk/hub_and_scope_refactoring/)',
+            "Hub.trace_propagation_meta()",
+        )
+
         if span is not None:
             logger.warning(
                 "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
