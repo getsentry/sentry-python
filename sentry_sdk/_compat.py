@@ -140,6 +140,15 @@ def with_metaclass(meta, *bases):
     return type.__new__(MetaClass, "temporary_class", (), {})
 
 
+def check_profiler_support():
+    try:
+        from uwsgi import opt
+    except ImportError:
+        return
+
+    print(opt)
+
+
 def check_thread_support():
     # type: () -> None
     try:
