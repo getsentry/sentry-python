@@ -2,7 +2,7 @@ import copy
 import sys
 from contextlib import contextmanager
 
-from sentry_sdk._compat import check_uwsgi_support, with_metaclass
+from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope
 from sentry_sdk.client import Client
@@ -102,7 +102,6 @@ def _init(*args, **kwargs):
     client = Client(*args, **kwargs)  # type: ignore
     Hub.current.bind_client(client)
     _check_python_deprecations()
-    check_uwsgi_support()
     rv = _InitGuard(client)
     return rv
 

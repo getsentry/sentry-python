@@ -140,77 +140,54 @@ def with_metaclass(meta, *bases):
     return type.__new__(MetaClass, "temporary_class", (), {})
 
 
-def check_thread_support():
-    # type: () -> None
+def check_uwsgi_thread_support():
+    # type: () -> bool
+    # We check two things here:
+    #
+    # 1. uWSGI doesn't run in threaded mode by default -- issue a warning if
+    #    that's the case.
+    #
+    # 2. Additionally, if uWSGI is running in preforking mode (default), it needs
+    #    the --py-call-uwsgi-fork-hooks option for the SDK to work properly. This
+    #    is because any background threads spawned before the main process is
+    #    forked are NOT CLEANED UP IN THE CHILDREN BY DEFAULT even if
+    #    --enable-threads is on. One has to also explicitly provide
+    #    --py-call-uwsgi-fork-hooks to force uWSGI to run regular cpython
+    #    after-fork hooks that take care of cleaning up stale thread data.
     try:
         from uwsgi import opt  # type: ignore
     except ImportError:
-        return
+        return True
 
     # When `threads` is passed in as a uwsgi option,
     # `enable-threads` is implied on.
-    if "threads" in opt:
-        return
+    threads_enabled = bool("threads" in opt or opt.get("enable-threads"))
+    fork_hooks_on = bool(opt.get("py-call-uwsgi-fork-hooks"))
+    lazy_mode = bool(opt.get("lazy-apps") or opt.get("lazy"))
 
-    # put here because of circular import
-    from sentry_sdk.consts import FALSE_VALUES
-
-    if str(opt.get("enable-threads", "0")).lower() in FALSE_VALUES:
+    if lazy_mode and not threads_enabled:
         from warnings import warn
 
         warn(
             Warning(
-                "We detected the use of uwsgi with disabled threads.  "
-                "This will cause issues with the transport you are "
-                "trying to use.  Please enable threading for uwsgi.  "
-                '(Add the "enable-threads" flag).'
+                "We detected the use of uWSGI without thread support. "
+                "This might lead to unexpected issues with the Sentry SDK. "
+                'Please run uWSGI with the "--enable-threads" flag for full support.'
             )
         )
 
+        return False
 
-def check_uwsgi_support():
-    # type: () -> None
-    # If uWSGI is running in preforking mode (default) and the SDK spawns a
-    # background thread on startup, i.e., before the process is forked, this
-    # can lead to segfaults in the forked workers:
-    # https://github.com/getsentry/sentry-python/issues/2699
-    # We usually don't spawn threads right away but rather on demand, but
-    # if someone e.g. emits some metrics at startup manually, we will create a
-    # thread before the process is forked.
-    #
-    # We've tracked the segfaults down to the use of `sys._current_frames()` in
-    # the profiler when called from a child, though there might be more causes
-    # (gc hitting the same bad references?).
-    #
-    # It seems like after the fork, something related to the originally active
-    # threads doesn't get cleaned up properly in the child processes and this can
-    # make them segfault.
-    #
-    # In Python 3.12, forking a process with live threads even issues
-    # a `DeprecationWarning`, so this is something that is generally discouraged.
-    #
-    # Here we check whether uWSGI is running in preforking mode and if so, we
-    # issue a warning to switch to loading the app in each worker separately
-    # (with `--lazy-apps` or `--lazy`).
-    # https://uwsgi-docs.readthedocs.io/en/latest/articles/TheArtOfGracefulReloading.html#preforking-vs-lazy-apps-vs-lazy
-    try:
-        from uwsgi import opt
-    except ImportError:
-        return True
+    elif not lazy_mode and not (threads_enabled and fork_hooks_on):
+        from warnings import warn
 
-    if opt.get("--lazy-apps") or opt.get("--lazy"):
-        # We're not running in preforking mode, nothing to do.
-        return True
-
-    from warnings import warn
-
-    warn(
-        Warning(
-            "We detected the use of uWSGI in preforking mode. "
-            "This might lead to issues with workers when a background thread "
-            "(e.g. profiler) is active before the process is forked. "
-            'Please run uWSGI with the "--lazy-apps" flag for full support.'
+        warn(
+            Warning(
+                "We detected the use of uWSGI in preforking mode without "
+                "thread support. This might lead to crashing workers. "
+                'Please run uWSGI with the both the "--enable-threads" and '
+                '"--py-call-uwsgi-fork-hooks" flags for full support.'
+            )
         )
-    )
 
-    return False
+        return False
