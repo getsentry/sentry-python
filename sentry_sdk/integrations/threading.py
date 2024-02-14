@@ -53,7 +53,7 @@ class ThreadingIntegration(Integration):
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration is not None:
                 if integration.propagate_scope:
-                    scope = sentry_sdk.get_isolation_scope()
+                    scope = sentry_sdk.Scope.get_isolation_scope()
                 else:
                     scope = None
 

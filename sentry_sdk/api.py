@@ -88,9 +88,9 @@ def is_initialized():
     .. versionadded:: 2.0.0
 
     Returns whether Sentry has been initialized or not.
-    
+
     If a client is available and the client is active
-    (meaning it is configured to send data) then 
+    (meaning it is configured to send data) then
     Sentry is initialized.
     """
     return Scope.get_client().is_active()
@@ -100,36 +100,6 @@ def is_initialized():
 def get_client():
     # type: () -> BaseClient
     return Scope.get_client()
-
-
-@scopemethod
-def get_current_scope():
-    # type: () -> Scope
-    return Scope.get_current_scope()
-
-
-@scopemethod
-def get_isolation_scope():
-    # type: () -> Scope
-    return Scope.get_isolation_scope()
-
-
-@scopemethod
-def get_global_scope():
-    # type: () -> Scope
-    return Scope.get_global_scope()
-
-
-@scopemethod
-def set_current_scope(new_current_scope):
-    # type: (Scope) -> None
-    return Scope.set_current_scope(new_current_scope)
-
-
-@scopemethod
-def set_isolation_scope(new_isolation_scope):
-    # type: (Scope) -> None
-    return Scope.set_isolation_scope(new_isolation_scope)
 
 
 @hubmethod
