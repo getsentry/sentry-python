@@ -609,7 +609,7 @@ class MetricsAggregator:
                 )
 
     @metrics_noop
-    def need_code_loation(
+    def need_code_location(
         self,
         ty,  # type: MetricType
         key,  # type: str
