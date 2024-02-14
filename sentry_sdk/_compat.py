@@ -172,7 +172,7 @@ def check_uwsgi_thread_support():
             Warning(
                 "We detected the use of uWSGI without thread support. "
                 "This might lead to unexpected issues with the Sentry SDK. "
-                'Please run uWSGI with the "--enable-threads" flag for full support.'
+                'Please run uWSGI with "--enable-threads" for full support.'
             )
         )
 
@@ -185,9 +185,11 @@ def check_uwsgi_thread_support():
             Warning(
                 "We detected the use of uWSGI in preforking mode without "
                 "thread support. This might lead to crashing workers. "
-                'Please run uWSGI with the both the "--enable-threads" and '
-                '"--py-call-uwsgi-fork-hooks" flags for full support.'
+                'Please run uWSGI with the both "--enable-threads" and '
+                '"--py-call-uwsgi-fork-hooks" for full support.'
             )
         )
 
         return False
+
+    return True
