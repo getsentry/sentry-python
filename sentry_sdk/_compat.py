@@ -148,6 +148,16 @@ def check_profiler_support():
 
     print(opt)
 
+    from warnings import warn
+
+    warn(
+        Warning(
+            "We detected the use of uWSGI in preforking mode. "
+            "This might lead to issues with the profiler. "
+            'Please run uWSGI with the "--lazy-apps" flag.'
+        )
+    )
+
 
 def check_thread_support():
     # type: () -> None
