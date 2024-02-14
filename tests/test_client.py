@@ -1316,3 +1316,25 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
 
         # Ensure two arguments (the event and hint) were passed to the sampler function
         assert len(test_config.sampler_function_mock.call_args[0]) == 2
+
+
+@pytest.mark.parametrize(
+    "opt,warning",
+    [
+        [{"enable-threads": True, "lazy-apps": True}, None],
+        [{"enable-threads": True, "py-call-uwsgi-fork-hooks": True}, None],
+        [{}, True],
+        [{"enable-threads": True}, True],
+        [{"py-call-uwsgi-fork-hooks": True}, True],
+        [{"lazy-apps": True}, True],
+    ],
+)
+def test_uwsgi_warnings(sentry_init, recwarn, opt, warning):
+    uwsgi = mock.MagicMock()
+    uwsgi.opt = opt
+    with mock.patch.dict("sys.modules", uwsgi=uwsgi):
+        sentry_init(profiles_sample_rate=1.0)
+        if warning:
+            assert recwarn
+        else:
+            assert not recwarn
