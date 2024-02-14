@@ -209,12 +209,8 @@ def test_query_source_with_edited_sys_path(sentry_init, client, capture_events):
             assert data.get(SPANDATA.CODE_LINENO) > 0
 
             if not PY2:
-                assert (
-                    data.get(SPANDATA.CODE_NAMESPACE) == "supplementary_modules.views"
-                )
-                assert (
-                    data.get(SPANDATA.CODE_FILEPATH) == "supplementary_modules/views.py"
-                )
+                assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+                assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
