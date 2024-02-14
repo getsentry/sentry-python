@@ -52,10 +52,10 @@ class ThreadingIntegration(Integration):
             # type: (Thread, *Any, **Any) -> Any
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration is not None:
-                if not integration.propagate_scope:
-                    scope = None
-                else:
+                if integration.propagate_scope:
                     scope = sentry_sdk.get_isolation_scope()
+                else:
+                    scope = None
 
                 # Patching instance methods in `start()` creates a reference cycle if
                 # done in a naive way. See
