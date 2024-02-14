@@ -90,10 +90,10 @@ def scopemethod(f):
 def is_initialized():
     # type: () -> bool
     """
+    .. versionadded:: 2.0.0
+
     Returns whether Sentry has been initialized or not.
     If a client is available Sentry is initialized.
-
-    .. versionadded:: 2.0.0
     """
     return Scope.get_client().is_active()
 

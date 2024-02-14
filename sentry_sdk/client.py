@@ -155,9 +155,9 @@ except Exception:
 
 class BaseClient(object):
     """
-    The basic definition of a client that is used for sending data to Sentry.
-
     .. versionadded:: 2.0.0
+
+    The basic definition of a client that is used for sending data to Sentry.
     """
 
     def __init__(self, options=None):
@@ -190,9 +190,9 @@ class BaseClient(object):
     def is_active(self):
         # type: () -> bool
         """
-        Returns whether the client is active (able to send data to Sentry)
-
         .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
         """
         return False
 
@@ -227,9 +227,9 @@ class BaseClient(object):
 
 class NonRecordingClient(BaseClient):
     """
-    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
-
     .. versionadded:: 2.0.0
+
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
     """
 
     pass
@@ -403,9 +403,9 @@ class _Client(BaseClient):
     def is_active(self):
         # type: () -> bool
         """
-        Returns whether the client is active (able to send data to Sentry)
-
         .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
         """
         return True
 

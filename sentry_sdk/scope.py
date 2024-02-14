@@ -217,9 +217,9 @@ class Scope(object):
     def get_current_scope(cls):
         # type: () -> Scope
         """
-        Returns the current scope.
-
         .. versionadded:: 2.0.0
+
+        Returns the current scope.
         """
         current_scope = _current_scope.get()
         if current_scope is None:
@@ -232,10 +232,10 @@ class Scope(object):
     def set_current_scope(cls, new_current_scope):
         # type: (Scope) -> None
         """
+        .. versionadded:: 2.0.0
+
         Sets the given scope as the new current scope overwriting the existing current scope.
         :param new_current_scope: The scope to set as the new current scope.
-
-        .. versionadded:: 2.0.0
         """
         _current_scope.set(new_current_scope)
 
@@ -243,9 +243,9 @@ class Scope(object):
     def get_isolation_scope(cls):
         # type: () -> Scope
         """
-        Returns the isolation scope.
-
         .. versionadded:: 2.0.0
+
+        Returns the isolation scope.
         """
         isolation_scope = _isolation_scope.get()
         if isolation_scope is None:
@@ -258,10 +258,10 @@ class Scope(object):
     def set_isolation_scope(cls, new_isolation_scope):
         # type: (Scope) -> None
         """
+        .. versionadded:: 2.0.0
+
         Sets the given scope as the new isolation scope overwriting the existing isolation scope.
         :param new_isolation_scope: The scope to set as the new isolation scope.
-
-        .. versionadded:: 2.0.0
         """
         _isolation_scope.set(new_isolation_scope)
 
@@ -269,9 +269,9 @@ class Scope(object):
     def get_global_scope(cls):
         # type: () -> Scope
         """
-        Returns the global scope.
-
         .. versionadded:: 2.0.0
+
+        Returns the global scope.
         """
         global _global_scope
         if _global_scope is None:
@@ -283,10 +283,10 @@ class Scope(object):
     def _merge_scopes(cls, additional_scope=None, additional_scope_kwargs=None):
         # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
         """
+        .. versionadded:: 2.0.0
+
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
-
-        .. versionadded:: 2.0.0
         """
         if additional_scope and additional_scope_kwargs:
             raise TypeError("cannot provide scope and kwargs")
@@ -317,11 +317,11 @@ class Scope(object):
     def get_client(cls):
         # type: () -> sentry_sdk.client.BaseClient
         """
+        .. versionadded:: 2.0.0
+
         Returns the currently used :py:class:`sentry_sdk.Client`.
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
-
-        .. versionadded:: 2.0.0
         """
         current_scope = _current_scope.get()
         try:
@@ -354,20 +354,22 @@ class Scope(object):
     def set_client(self, client=None):
         # type: (Optional[sentry_sdk.client.BaseClient]) -> None
         """
+        .. versionadded:: 2.0.0
+
         Sets the client for this scope.
+
         :param client: The client to use in this scope.
             If `None` the client of the scope will be replaced by a :py:class:`sentry_sdk.NonRecordingClient`.
 
-        .. versionadded:: 2.0.0
         """
         self.client = client if client is not None else NonRecordingClient()
 
     def fork(self):
         # type: () -> Scope
         """
-        Returns a fork of this scope.
-
         .. versionadded:: 2.0.0
+
+        Returns a fork of this scope.
         """
         forked_scope = copy(self)
         return forked_scope
@@ -510,6 +512,10 @@ class Scope(object):
 
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
+        """
+        Returns the Sentry "baggage" header containing trace information from the
+        currently active span or the scopes Propagation Context.
+        """
         client = Scope.get_client()
 
         # If we have an active span, return baggage from there
@@ -1439,9 +1445,24 @@ class Scope(object):
 def new_scope(scope=None):
     # type: (Optional[Scope]) -> Generator[Scope, None, None]
     """
-    Context manager that forks the current scope and runs the wrapped code in it.
-
     .. versionadded:: 2.0.0
+
+    Context manager that either uses the given `scope` or
+    forks the current scope and runs the wrapped code in it.
+    After the wrapped code is executed, the original scope is restored.
+
+    Example Usage:
+
+    .. code-block:: python
+
+        import sentry_sdk
+
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag("color", "green")
+            sentry_sdk.capture_message("hello") # will include `color` tag.
+
+        sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
+
     """
     if scope is not None:
         # use given scope
@@ -1465,12 +1486,25 @@ def new_scope(scope=None):
 def isolation_scope(isolation_scope=None):
     # type: (Optional[Scope]) -> Generator[Scope, None, None]
     """
+    .. versionadded:: 2.0.0
+
     Context manager that either uses the given `isolation_scope` or
     forks the current isolation scope and runs the wrapped code in it.
     The current scope is also forked.
     After the wrapped code is executed, the original scopes are restored.
 
-    .. versionadded:: 2.0.0
+    Example Usage:
+
+    .. code-block:: python
+
+        import sentry_sdk
+
+        with sentry_sdk.isolation_scope() as scope:
+            scope.set_tag("color", "green")
+            sentry_sdk.capture_message("hello") # will include `color` tag.
+
+        sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
+
     """
     # fork current scope
     current_scope = Scope.get_current_scope()

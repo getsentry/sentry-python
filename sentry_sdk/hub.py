@@ -161,7 +161,11 @@ class _ScopeManager(object):
 
 
 class Hub(with_metaclass(HubMeta)):  # type: ignore
-    """The hub wraps the concurrency management of the SDK.  Each thread has
+    """
+    .. deprecated:: 2.0.0
+        The Hub is deprecated. Its functionality will be merged into :py:class:`sentry_sdk.scope.Scope`.
+
+    The hub wraps the concurrency management of the SDK.  Each thread has
     its own hub but the hub might transfer with the flow of execution if
     context vars are available.
 
@@ -231,7 +235,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self, callback  # type: Callable[[], T]
     ):
         # type: (...) -> T
-        """Runs a callback in the context of the hub.  Alternatively the
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
+        Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
         with self:
@@ -241,7 +249,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self, name_or_class  # type: Union[str, Type[Integration]]
     ):
         # type: (...) -> Any
-        """Returns the integration for this hub by name or class.  If there
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.client._Client.get_integration` instead.
+
+        Returns the integration for this hub by name or class.  If there
         is no client bound or the client does not have that integration
         then `None` is returned.
 
@@ -253,7 +266,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     @property
     def client(self):
         # type: () -> Optional[BaseClient]
-        """Returns the current client on the hub."""
+        """
+        .. deprecated:: 2.0.0
+            This property is deprecated and will be removed in a future release.
+            Please use the top level api
+            Please use :py:func:`sentry_sdk.api.get_client` instead.
+
+        Returns the current client on the hub.
+        """
         client = Scope.get_client()
 
         if not client.is_active():
@@ -264,24 +284,44 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     @property
     def scope(self):
         # type: () -> Scope
-        """Returns the current scope on the hub."""
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
+        Returns the current scope on the hub.
+        """
         return Scope.get_isolation_scope()
 
     def last_event_id(self):
         # type: () -> Optional[str]
-        """Returns the last event ID."""
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
+        Returns the last event ID.
+        """
         return self._last_event_id
 
     def bind_client(
         self, new  # type: Optional[BaseClient]
     ):
         # type: (...) -> None
-        """Binds a new client to the hub."""
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.set_client` instead.
+
+        Binds a new client to the hub.
+        """
         Scope.get_global_scope().set_client(new)
 
     def capture_event(self, event, hint=None, scope=None, **scope_kwargs):
         # type: (Event, Optional[Hint], Optional[Scope], Any) -> Optional[str]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.capture_event` instead.
+
         Captures an event.
 
         Alias of :py:meth:`sentry_sdk.Scope.capture_event`.
@@ -310,6 +350,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.capture_message` instead.
+
         Captures a message.
 
         Alias of :py:meth:`sentry_sdk.Scope.capture_message`.
@@ -340,6 +384,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
         """Captures an exception.
 
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.capture_exception` instead.
+
         Alias of :py:meth:`sentry_sdk.Scope.capture_exception`.
 
         :param error: An exception to capture. If `None`, `sys.exc_info()` will be used.
@@ -367,6 +415,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> Any
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.client._Client._capture_internal_exception` instead.
+
         Capture an exception that is likely caused by a bug in the SDK
         itself.
 
@@ -379,6 +431,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.add_breadcrumb` instead.
+
         Adds a breadcrumb.
 
         :param crumb: Dictionary with the data as the sentry v7/v8 protocol expects.
@@ -391,6 +447,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
         # type: (Optional[Span], str, Any) -> Span
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.start_span` instead.
+
         Start a span whose parent is the currently active span or transaction, if any.
 
         The return value is a :py:class:`sentry_sdk.tracing.Span` instance,
@@ -418,6 +478,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.start_transaction` instead.
+
         Start and return a transaction.
 
         Start an existing transaction if given, otherwise create and start a new
@@ -454,6 +518,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
         # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.continue_trace` instead.
+
         Sets the propagation context from environment or headers and returns a transaction.
         """
         return Scope.get_isolation_scope().continue_trace(
@@ -481,6 +549,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
         Pushes a new layer on the scope stack.
 
         :param callback: If provided, this method pushes a scope, calls
@@ -499,6 +570,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def pop_scope_unsafe(self):
         # type: () -> Tuple[Optional[Client], Scope]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
         Pops a scope layer from the stack.
 
         Try to use the context manager :py:meth:`push_scope` instead.
@@ -527,8 +601,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         continue_trace=True,  # type: bool
     ):
         # type: (...) -> Optional[ContextManager[Scope]]
-
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
         Reconfigures the scope.
 
         :param callback: If provided, call the callback with the current scope.
@@ -557,19 +633,36 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self, session_mode="application"  # type: str
     ):
         # type: (...) -> None
-        """Starts a new session."""
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.start_session` instead.
+
+        Starts a new session.
+        """
         Scope.get_isolation_scope().start_session(
             session_mode=session_mode,
         )
 
     def end_session(self):
         # type: (...) -> None
-        """Ends the current session if there is one."""
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.end_session` instead.
+
+        Ends the current session if there is one.
+        """
         Scope.get_isolation_scope().end_session()
 
     def stop_auto_session_tracking(self):
         # type: (...) -> None
-        """Stops automatic session tracking.
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.stop_auto_session_tracking` instead.
+
+        Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
         To resume session tracking call `resume_auto_session_tracking`.
@@ -578,7 +671,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def resume_auto_session_tracking(self):
         # type: (...) -> None
-        """Resumes automatic session tracking for the current scope if
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.resume_auto_session_tracking` instead.
+
+        Resumes automatic session tracking for the current scope if
         disabled earlier.  This requires that generally automatic session
         tracking is enabled.
         """
@@ -591,6 +689,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> None
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.client._Client.flush` instead.
+
         Alias for :py:meth:`sentry_sdk.Client.flush`
         """
         return Scope.get_client().flush(timeout=timeout, callback=callback)
@@ -598,6 +700,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def get_traceparent(self):
         # type: () -> Optional[str]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.get_traceparent` instead.
+
         Returns the traceparent either from the active span or from the scope.
         """
         return Scope.get_isolation_scope().get_traceparent()
@@ -605,6 +711,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def get_baggage(self):
         # type: () -> Optional[str]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.get_baggage` instead.
+
         Returns Baggage either from the active span or from the scope.
         """
         baggage = Scope.get_isolation_scope().get_baggage()
@@ -617,6 +727,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def iter_trace_propagation_headers(self, span=None):
         # type: (Optional[Span]) -> Generator[Tuple[str, str], None, None]
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.iter_trace_propagation_headers` instead.
+
         Return HTTP headers which allow propagation of trace data. Data taken
         from the span representing the request, if available, or the current
         span on the scope if not.
@@ -628,6 +742,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def trace_propagation_meta(self, span=None):
         # type: (Optional[Span]) -> str
         """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+            Please use :py:meth:`sentry_sdk.Scope.trace_propagation_meta` instead.
+
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """

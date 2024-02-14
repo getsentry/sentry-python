@@ -54,6 +54,9 @@ New Scopes/Client APIs
 .. autofunction:: sentry_sdk.api.set_isolation_scope
 
 
+.. autofunction:: sentry_sdk.api.new_scope
+.. autofunction:: sentry_sdk.api.isolation_scope
+
 Managing Scope (advanced)
 =========================
 
