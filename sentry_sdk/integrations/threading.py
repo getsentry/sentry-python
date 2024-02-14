@@ -4,15 +4,15 @@ import sys
 from functools import wraps
 from threading import Thread, current_thread
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
     logger,
-    copy_context,
 )
 
 if TYPE_CHECKING:
@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Callable
     from typing import Optional
-    from contextvars import Context
 
     from sentry_sdk._types import ExcInfo
 
@@ -30,18 +29,18 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_hub=False, propagate_context=False):
-        # type: (bool, bool) -> None
-        if propagate_hub:
+    def __init__(self, propagate_hub=None, propagate_scope=False):
+        # type: (Optional[bool], bool) -> None
+        if propagate_hub is not None:
             logger.warning(
-                "Deprecated: propagate_hub is deprecated. Use propagate_context instead. This will be removed in the future."
+                "Deprecated: propagate_hub is deprecated. Use propagate_scope instead. This will be removed in the future."
             )
-        self.propagate_context = propagate_context
+        self.propagate_scope = propagate_scope
 
-        # Make propagate_hub an alias for propagate_context.
+        # For backwards compatiblity when users set propagate_hub use this as propagate_scope.
         # Remove this when propagate_hub is removed.
-        if propagate_hub:
-            self.propagate_context = propagate_hub
+        if propagate_hub is not None:
+            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once():
@@ -51,13 +50,12 @@ class ThreadingIntegration(Integration):
         @wraps(old_start)
         def sentry_start(self, *a, **kw):
             # type: (Thread, *Any, **Any) -> Any
-            hub = Hub.current
-            integration = hub.get_integration(ThreadingIntegration)
+            integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration is not None:
-                if not integration.propagate_context:
-                    ctx = None
+                if not integration.propagate_scope:
+                    scope = None
                 else:
-                    ctx = copy_context()
+                    scope = sentry_sdk.get_isolation_scope()
 
                 # Patching instance methods in `start()` creates a reference cycle if
                 # done in a naive way. See
@@ -66,7 +64,7 @@ class ThreadingIntegration(Integration):
                 # In threading module, using current_thread API will access current thread instance
                 # without holding it to avoid a reference cycle in an easier way.
                 with capture_internal_exceptions():
-                    new_run = _wrap_run(ctx, getattr(self.run, "__func__", self.run))
+                    new_run = _wrap_run(scope, getattr(self.run, "__func__", self.run))
                     self.run = new_run  # type: ignore
 
             return old_start(self, *a, **kw)
@@ -74,8 +72,8 @@ class ThreadingIntegration(Integration):
         Thread.start = sentry_start  # type: ignore
 
 
-def _wrap_run(parent_context, old_run_func):
-    # type: (Optional[Context], F) -> F
+def _wrap_run(scope, old_run_func):
+    # type: (Optional[Scope], F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any
@@ -87,8 +85,9 @@ def _wrap_run(parent_context, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-        if parent_context is not None:
-            return parent_context.run(_run_old_run_func)
+        if scope is not None:
+            with sentry_sdk.isolation_scope(scope):
+                return _run_old_run_func()
         else:
             return _run_old_run_func()
 
@@ -97,18 +96,15 @@ def _wrap_run(parent_context, old_run_func):
 
 def _capture_exception():
     # type: () -> ExcInfo
-    hub = Hub.current
     exc_info = sys.exc_info()
 
-    if hub.get_integration(ThreadingIntegration) is not None:
-        # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
-
+    client = sentry_sdk.get_client()
+    if client.get_integration(ThreadingIntegration) is not None:
         event, hint = event_from_exception(
             exc_info,
             client_options=client.options,
             mechanism={"type": "threading", "handled": False},
         )
-        hub.capture_event(event, hint=hint)
+        sentry_sdk.capture_event(event, hint=hint)
 
     return exc_info

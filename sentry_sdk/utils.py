@@ -1337,22 +1337,8 @@ def _make_threadlocal_contextvars(local):
     return ContextVar
 
 
-def _make_noop_copy_context():
-    # type: () -> Callable[[], Any]
-    class NoOpContext:
-        def run(self, func, *args, **kwargs):
-            # type: (Callable[..., Any], *Any, **Any) -> Any
-            return func(*args, **kwargs)
-
-    def copy_context():
-        # type: () -> NoOpContext
-        return NoOpContext()
-
-    return copy_context
-
-
 def _get_contextvars():
-    # type: () -> Tuple[bool, type, Callable[[], Any]]
+    # type: () -> Tuple[bool, type]
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1368,17 +1354,17 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar, copy_context
+                from aiocontextvars import ContextVar
 
-                return True, ContextVar, copy_context
+                return True, ContextVar
             except ImportError:
                 pass
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar, copy_context
+                from contextvars import ContextVar
 
-                return True, ContextVar, copy_context
+                return True, ContextVar
             except ImportError:
                 pass
 
@@ -1386,10 +1372,10 @@ def _get_contextvars():
 
     from threading import local
 
-    return False, _make_threadlocal_contextvars(local), _make_noop_copy_context()
+    return False, _make_threadlocal_contextvars(local)
 
 
-HAS_REAL_CONTEXTVARS, ContextVar, copy_context = _get_contextvars()
+HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
 
 CONTEXTVARS_ERROR_MESSAGE = """
 

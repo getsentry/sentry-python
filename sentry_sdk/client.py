@@ -205,7 +205,7 @@ class BaseClient(object):
         return None
 
     def get_integration(self, *args, **kwargs):
-        # type: (*Any, **Any) -> Optional[Integration]
+        # type: (*Any, **Any) -> Any
         return None
 
     def close(self, *args, **kwargs):
