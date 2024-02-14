@@ -18,7 +18,7 @@ __all__ = [  # noqa
     "HttpTransport",
     "init",
     "integrations",
-    "trace",    
+    "trace",
     # From sentry_sdk.api
     "add_breadcrumb",
     "capture_event",

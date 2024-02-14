@@ -5,20 +5,15 @@ from sentry_sdk import (
     continue_trace,
     get_baggage,
     get_client,
-    get_current_scope,
     get_current_span,
-    get_global_scope,
-    get_isolation_scope,
     get_traceparent,
     is_initialized,
-    set_current_scope,
-    set_isolation_scope,
     start_transaction,
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.hub import Hub
-from sentry_sdk.scope import Scope, ScopeType
+from sentry_sdk.scope import Scope
 
 
 try:
@@ -153,55 +148,3 @@ def test_get_client():
     assert client is not None
     assert client.__class__ == NonRecordingClient
     assert not client.is_active()
-
-
-@pytest.mark.forked
-def test_get_current_scope():
-    scope = get_current_scope()
-    assert scope is not None
-    assert scope.__class__ == Scope
-    assert scope._type == ScopeType.CURRENT
-
-
-@pytest.mark.forked
-def test_get_isolation_scope():
-    scope = get_isolation_scope()
-    assert scope is not None
-    assert scope.__class__ == Scope
-    assert scope._type == ScopeType.ISOLATION
-
-
-@pytest.mark.forked
-def test_get_global_scope():
-    scope = get_global_scope()
-    assert scope is not None
-    assert scope.__class__ == Scope
-    assert scope._type == ScopeType.GLOBAL
-
-
-@pytest.mark.forked
-def test_set_current_scope():
-    scope = Scope(ty=ScopeType.ISOLATION)
-    set_current_scope(scope)
-
-    current_scope = Scope.get_current_scope()
-    assert current_scope == scope
-    assert current_scope._type == ScopeType.ISOLATION
-
-    isolation_scope = Scope.get_isolation_scope()
-    assert isolation_scope != scope
-    assert isolation_scope._type == ScopeType.ISOLATION
-
-
-@pytest.mark.forked
-def test_set_isolation_scope():
-    scope = Scope(ty=ScopeType.GLOBAL)
-    set_isolation_scope(scope)
-
-    current_scope = Scope.get_current_scope()
-    assert current_scope != scope
-    assert current_scope._type == ScopeType.CURRENT
-
-    isolation_scope = Scope.get_isolation_scope()
-    assert isolation_scope == scope
-    assert isolation_scope._type == ScopeType.GLOBAL
