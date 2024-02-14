@@ -1,17 +1,13 @@
 import asyncio
 import inspect
 import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
-
-try:
-    from unittest.mock import MagicMock, patch
-except ImportError:
-    from mock import MagicMock, patch
 
 try:
     from contextvars import Context, ContextVar

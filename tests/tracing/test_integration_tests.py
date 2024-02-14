@@ -1,4 +1,3 @@
-# coding: utf-8
 import weakref
 import gc
 import re
@@ -178,10 +177,15 @@ def test_dynamic_sampling_head_sdk_creates_dsc(
     }
 
     expected_baggage = (
-        "sentry-environment=production,sentry-release=foo,sentry-sample_rate=%s,sentry-transaction=Head%%20SDK%%20tx,sentry-trace_id=%s,sentry-sampled=%s"
-        % (sample_rate, trace_id, "true" if transaction.sampled else "false")
+        "sentry-trace_id=%s,"
+        "sentry-environment=production,"
+        "sentry-release=foo,"
+        "sentry-transaction=Head%%20SDK%%20tx,"
+        "sentry-sample_rate=%s,"
+        "sentry-sampled=%s"
+        % (trace_id, sample_rate, "true" if transaction.sampled else "false")
     )
-    assert sorted(baggage.serialize().split(",")) == sorted(expected_baggage.split(","))
+    assert baggage.serialize() == expected_baggage
 
     (envelope,) = envelopes
     assert envelope.headers["trace"] == baggage.dynamic_sampling_context()

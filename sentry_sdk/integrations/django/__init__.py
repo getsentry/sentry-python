@@ -1,13 +1,9 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 import inspect
 import sys
 import threading
 import weakref
 from importlib import import_module
 
-from sentry_sdk._compat import string_types, text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
@@ -393,7 +389,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         # So we don't check here what style is configured
         if hasattr(urlconf, "handler404"):
             handler = urlconf.handler404
-            if isinstance(handler, string_types):
+            if isinstance(handler, str):
                 scope.transaction = handler
             else:
                 scope.transaction = transaction_from_function(
@@ -723,7 +719,7 @@ def _set_db_data(span, cursor_or_db):
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, text_type(server_port))
+        span.set_data(SPANDATA.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:

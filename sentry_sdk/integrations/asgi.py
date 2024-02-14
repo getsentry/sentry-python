@@ -7,8 +7,8 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 import asyncio
 import inspect
 from copy import deepcopy
+from functools import partial
 
-from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP

@@ -1,10 +1,10 @@
-from importlib import import_module
 import os
 import uuid
 import random
 import socket
+from datetime import datetime, timezone
+from importlib import import_module
 
-from sentry_sdk._compat import datetime_utcnow, string_types, text_type, iteritems
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -17,7 +17,7 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace, has_tracing_enabled
+from sentry_sdk.tracing import trace
 from sentry_sdk.transport import make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
@@ -66,7 +66,7 @@ SDK_INFO = {
 
 def _get_options(*args, **kwargs):
     # type: (*Optional[str], **Any) -> Dict[str, Any]
-    if args and (isinstance(args[0], (text_type, bytes, str)) or args[0] is None):
+    if args and (isinstance(args[0], (bytes, str)) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:
@@ -80,28 +80,8 @@ def _get_options(*args, **kwargs):
     if dsn is not None and options.get("dsn") is None:
         options["dsn"] = dsn
 
-    for key, value in iteritems(options):
+    for key, value in options.items():
         if key not in rv:
-            # Option "with_locals" was renamed to "include_local_variables"
-            if key == "with_locals":
-                msg = (
-                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
-                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["include_local_variables"] = value
-                continue
-
-            # Option "request_bodies" was renamed to "max_request_body_size"
-            if key == "request_bodies":
-                msg = (
-                    "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. "
-                    "Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["max_request_body_size"] = value
-                continue
-
             raise TypeError("Unknown option %r" % (key,))
 
         rv[key] = value
@@ -153,7 +133,7 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class BaseClient(object):
+class BaseClient:
     """
     .. versionadded:: 2.0.0
 
@@ -424,7 +404,7 @@ class _Client(BaseClient):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime_utcnow()
+            event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
@@ -467,7 +447,7 @@ class _Client(BaseClient):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = text_type(self.options[key]).strip()
+                event[key] = str(self.options[key]).strip()
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -546,7 +526,7 @@ class _Client(BaseClient):
         for ignored_error in self.options["ignore_errors"]:
             # String types are matched against the type name in the
             # exception only
-            if isinstance(ignored_error, string_types):
+            if isinstance(ignored_error, str):
                 if ignored_error == error_full_name or ignored_error == error_type_name:
                     return True
             else:
@@ -649,7 +629,7 @@ class _Client(BaseClient):
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for k, v in iteritems(headers or {}):
+            for k, v in (headers or {}).items():
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
@@ -713,58 +693,40 @@ class _Client(BaseClient):
         ):
             return None
 
-        tracing_enabled = has_tracing_enabled(self.options)
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
         dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
-        # If tracing is enabled all events should go to /envelope endpoint.
-        # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
-        should_use_envelope_endpoint = (
-            tracing_enabled
-            or is_transaction
-            or is_checkin
-            or bool(attachments)
-            or bool(self.spotlight)
-        )
-        if should_use_envelope_endpoint:
-            headers = {
-                "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime_utcnow()),
-            }
+        headers = {
+            "event_id": event_opt["event_id"],
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }
 
-            if dynamic_sampling_context:
-                headers["trace"] = dynamic_sampling_context
+        if dynamic_sampling_context:
+            headers["trace"] = dynamic_sampling_context
 
-            envelope = Envelope(headers=headers)
+        envelope = Envelope(headers=headers)
 
-            if is_transaction:
-                if profile is not None:
-                    envelope.add_profile(profile.to_json(event_opt, self.options))
-                envelope.add_transaction(event_opt)
-            elif is_checkin:
-                envelope.add_checkin(event_opt)
-            else:
-                envelope.add_event(event_opt)
-
-            for attachment in attachments or ():
-                envelope.add_item(attachment.to_envelope_item())
-
-            if self.spotlight:
-                self.spotlight.capture_envelope(envelope)
-
-            if self.transport is None:
-                return None
-
-            self.transport.capture_envelope(envelope)
-
+        if is_transaction:
+            if profile is not None:
+                envelope.add_profile(profile.to_json(event_opt, self.options))
+            envelope.add_transaction(event_opt)
+        elif is_checkin:
+            envelope.add_checkin(event_opt)
         else:
-            if self.transport is None:
-                return None
+            envelope.add_event(event_opt)
 
-            # All other events go to the legacy /store/ endpoint (will be removed in the future).
-            self.transport.capture_event(event_opt)
+        for attachment in attachments or ():
+            envelope.add_item(attachment.to_envelope_item())
+
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is None:
+            return None
+
+        self.transport.capture_envelope(envelope)
 
         return event_id
 

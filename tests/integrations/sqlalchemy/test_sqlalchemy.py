@@ -1,8 +1,8 @@
 import os
-import pytest
-import sys
 from datetime import datetime
+from unittest import mock
 
+import pytest
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
@@ -15,11 +15,6 @@ from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -80,9 +75,6 @@ def test_orm_queries(sentry_init, capture_events):
     ]
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
-)
 def test_transactions(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
@@ -154,9 +146,6 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
-)
 def test_transactions_no_engine_url(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],

@@ -2,7 +2,6 @@ import sys
 import weakref
 
 from sentry_sdk.api import continue_trace
-from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
@@ -24,6 +23,7 @@ from sentry_sdk.utils import (
     logger,
     parse_url,
     parse_version,
+    reraise,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -213,9 +213,10 @@ def create_trace_config():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
         )
         span.set_data(SPANDATA.HTTP_METHOD, method)
-        span.set_data("url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if parsed_url is not None:
+            span.set_data("url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         if should_propagate_trace(hub, str(params.url)):
             for key, value in hub.iter_trace_propagation_headers(span):

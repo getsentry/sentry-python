@@ -1,6 +1,9 @@
 import threading
+from unittest import mock
 
 import pytest
+from celery import Celery, VERSION
+from celery.bin import worker
 
 from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
@@ -8,16 +11,6 @@ from sentry_sdk.integrations.celery import (
     _get_headers,
     _wrap_apply_async,
 )
-
-from sentry_sdk._compat import text_type
-
-from celery import Celery, VERSION
-from celery.bin import worker
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.fixture
@@ -221,7 +214,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "span_id": submission_event["spans"][0]["span_id"],
             "start_timestamp": submission_event["spans"][0]["start_timestamp"],
             "timestamp": submission_event["spans"][0]["timestamp"],
-            "trace_id": text_type(transaction.trace_id),
+            "trace_id": str(transaction.trace_id),
         }
     ]
 

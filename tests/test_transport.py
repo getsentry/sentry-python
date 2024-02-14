@@ -1,27 +1,20 @@
-# coding: utf-8
 import logging
 import pickle
 import gzip
 import io
-
-from datetime import datetime, timedelta
+from collections import namedtuple
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 import pytest
-from collections import namedtuple
+from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
-from pytest_localserver.http import WSGIServer
-
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
-from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
@@ -123,7 +116,9 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
     capture_message("löl")
 
     getattr(client, client_flush_method)()
@@ -133,7 +128,7 @@ def test_transport_works(
     assert capturing_server.captured
     assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
-    assert any("Sending event" in record.msg for record in caplog.records) == debug
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.parametrize(
@@ -285,7 +280,7 @@ def test_data_category_limits(
     client.flush()
 
     assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/store/"
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
@@ -364,7 +359,8 @@ def test_data_category_limits_reporting(
 
     assert len(capturing_server.captured) == 2
 
-    event = capturing_server.captured[0].event
+    assert len(capturing_server.captured[0].envelope.items) == 1
+    event = capturing_server.captured[0].envelope.items[0].get_event()
     assert event["type"] == "error"
     assert event["release"] == "foo"
 

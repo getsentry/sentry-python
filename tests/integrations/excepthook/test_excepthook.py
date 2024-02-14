@@ -12,11 +12,13 @@ def test_excepthook(tmpdir):
             """
     from sentry_sdk import init, transport
 
-    def send_event(self, event):
-        print("capture event was called")
-        print(event)
+    def capture_envelope(self, envelope):
+        print("capture_envelope was called")
+        event = envelope.get_event()
+        if event is not None:
+            print(event)
 
-    transport.HttpTransport._send_event = send_event
+    transport.HttpTransport.capture_envelope = capture_envelope
 
     init("http://foobar@localhost/123")
 
@@ -35,7 +37,7 @@ def test_excepthook(tmpdir):
 
     assert b"ZeroDivisionError" in output
     assert b"LOL" in output
-    assert b"capture event was called" in output
+    assert b"capture_envelope was called" in output
 
 
 def test_always_value_excepthook(tmpdir):
@@ -47,11 +49,13 @@ def test_always_value_excepthook(tmpdir):
     from sentry_sdk import init, transport
     from sentry_sdk.integrations.excepthook import ExcepthookIntegration
 
-    def send_event(self, event):
-        print("capture event was called")
-        print(event)
+    def capture_envelope(self, envelope):
+        print("capture_envelope was called")
+        event = envelope.get_event()
+        if event is not None:
+            print(event)
 
-    transport.HttpTransport._send_event = send_event
+    transport.HttpTransport.capture_envelope = capture_envelope
 
     sys.ps1 = "always_value_test"
     init("http://foobar@localhost/123",
@@ -73,4 +77,4 @@ def test_always_value_excepthook(tmpdir):
 
     assert b"ZeroDivisionError" in output
     assert b"LOL" in output
-    assert b"capture event was called" in output
+    assert b"capture_envelope was called" in output

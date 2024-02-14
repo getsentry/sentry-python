@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-
-from sentry_sdk._compat import text_type
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
@@ -127,7 +124,7 @@ def _handle_error(context, *args):
 # See: https://docs.sqlalchemy.org/en/20/dialects/index.html
 def _get_db_system(name):
     # type: (str) -> Optional[str]
-    name = text_type(name)
+    name = str(name)
 
     if "sqlite" in name:
         return "sqlite"

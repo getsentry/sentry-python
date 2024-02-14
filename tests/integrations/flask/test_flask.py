@@ -212,7 +212,7 @@ def test_flask_login_configured(
 ):
     sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
 
-    class User(object):
+    class User:
         is_authenticated = is_active = True
         is_anonymous = user_id is not None
 
@@ -862,9 +862,8 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
     assert match is not None
     assert match.group(1) == traceparent
 
-    # Python 2 does not preserve sort order
     rendered_baggage = match.group(2)
-    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
+    assert rendered_baggage == baggage
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
@@ -901,37 +900,6 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
 
     assert event["request"]["data"]["password"] == "[Filtered]"
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
-
-
-@pytest.mark.parametrize("traces_sample_rate", [None, 1.0])
-def test_replay_event_context(sentry_init, capture_events, app, traces_sample_rate):
-    """
-    Tests that the replay context is added to the event context.
-    This is not strictly a Flask integration test, but it's the easiest way to test this.
-    """
-    sentry_init(traces_sample_rate=traces_sample_rate)
-
-    @app.route("/error")
-    def error():
-        return 1 / 0
-
-    events = capture_events()
-
-    client = app.test_client()
-    headers = {
-        "baggage": "other-vendor-value-1=foo;bar;baz,sentry-trace_id=771a43a4192642f0b136d5159a501700,sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,other-vendor-value-2=foo;bar,sentry-replay_id=12312012123120121231201212312012",
-        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
-    }
-    with pytest.raises(ZeroDivisionError):
-        client.get("/error", headers=headers)
-
-    event = events[0]
-
-    assert event["contexts"]
-    assert event["contexts"]["replay"]
-    assert (
-        event["contexts"]["replay"]["replay_id"] == "12312012123120121231201212312012"
-    )
 
 
 def test_response_status_code_ok_in_transaction_context(

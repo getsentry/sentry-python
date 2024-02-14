@@ -1,11 +1,8 @@
-from __future__ import absolute_import
-
 import sys
 from functools import wraps
 from threading import Thread, current_thread
 
 import sentry_sdk
-from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import Scope
@@ -13,6 +10,7 @@ from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
     logger,
+    reraise,
 )
 
 if TYPE_CHECKING:

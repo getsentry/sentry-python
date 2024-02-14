@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from typing import Optional, Union, Callable
 
 
-class Attachment(object):
+class Attachment:
     def __init__(
         self,
         bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]

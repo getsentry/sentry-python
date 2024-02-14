@@ -1,5 +1,5 @@
 import re
-import sys
+
 import pytest
 
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
@@ -61,12 +61,9 @@ def body_normalizer(validate_event_schema):
 def test_bytes_serialization_decode(message_normalizer):
     binary = b"abc123\x80\xf0\x9f\x8d\x95"
     result = message_normalizer(binary, should_repr_strings=False)
-    # fmt: off
-    assert result == u"abc123\ufffd\U0001f355"
-    # fmt: on
+    assert result == "abc123\ufffd\U0001f355"
 
 
-@pytest.mark.xfail(sys.version_info < (3,), reason="Known safe_repr bugs in Py2.7")
 def test_bytes_serialization_repr(message_normalizer):
     binary = b"abc123\x80\xf0\x9f\x8d\x95"
     result = message_normalizer(binary, should_repr_strings=True)
@@ -76,12 +73,9 @@ def test_bytes_serialization_repr(message_normalizer):
 def test_bytearray_serialization_decode(message_normalizer):
     binary = bytearray(b"abc123\x80\xf0\x9f\x8d\x95")
     result = message_normalizer(binary, should_repr_strings=False)
-    # fmt: off
-    assert result == u"abc123\ufffd\U0001f355"
-    # fmt: on
+    assert result == "abc123\ufffd\U0001f355"
 
 
-@pytest.mark.xfail(sys.version_info < (3,), reason="Known safe_repr bugs in Py2.7")
 def test_bytearray_serialization_repr(message_normalizer):
     binary = bytearray(b"abc123\x80\xf0\x9f\x8d\x95")
     result = message_normalizer(binary, should_repr_strings=True)

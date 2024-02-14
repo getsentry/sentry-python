@@ -1,8 +1,8 @@
-from __future__ import absolute_import
-
 import os
+
 import pytest
 from datetime import datetime
+from unittest import mock
 
 from django import VERSION as DJANGO_VERSION
 from django.db import connections
@@ -21,11 +21,6 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 @pytest.fixture

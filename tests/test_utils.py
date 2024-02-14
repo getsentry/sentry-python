@@ -1,9 +1,10 @@
-import pytest
 import re
 import sys
-from datetime import timedelta
+from unittest import mock
 
-from sentry_sdk._compat import duration_in_milliseconds
+import pytest
+
+import sentry_sdk
 from sentry_sdk.utils import (
     Components,
     Dsn,
@@ -21,28 +22,6 @@ from sentry_sdk.utils import (
     is_sentry_url,
     _get_installed_modules,
 )
-
-import sentry_sdk
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
-try:
-    # Python 3
-    FileNotFoundError
-except NameError:
-    # Python 2
-    FileNotFoundError = IOError
-
-try:
-    import gevent
-except ImportError:
-    gevent = None
-
-
-requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
 def _normalize_distribution_name(name):
@@ -99,12 +78,7 @@ def _normalize_distribution_name(name):
     ],
 )
 def test_sanitize_url(url, expected_result):
-    # sort parts because old Python versions (<3.6) don't preserve order
-    sanitized_url = sanitize_url(url)
-    parts = sorted(re.split(r"\&|\?|\#", sanitized_url))
-    expected_parts = sorted(re.split(r"\&|\?|\#", expected_result))
-
-    assert parts == expected_parts
+    assert sanitize_url(url) == expected_result
 
 
 @pytest.mark.parametrize(
@@ -218,13 +192,10 @@ def test_sanitize_url(url, expected_result):
 )
 def test_sanitize_url_and_split(url, expected_result):
     sanitized_url = sanitize_url(url, split=True)
-    # sort query because old Python versions (<3.6) don't preserve order
-    query = sorted(sanitized_url.query.split("&"))
-    expected_query = sorted(expected_result.query.split("&"))
 
     assert sanitized_url.scheme == expected_result.scheme
     assert sanitized_url.netloc == expected_result.netloc
-    assert query == expected_query
+    assert sanitized_url.query == expected_result.query
     assert sanitized_url.path == expected_result.path
     assert sanitized_url.fragment == expected_result.fragment
 
@@ -351,13 +322,7 @@ def test_sanitize_url_and_split(url, expected_result):
 def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragment):
     assert parse_url(url, sanitize=sanitize).url == expected_url
     assert parse_url(url, sanitize=sanitize).fragment == expected_fragment
-
-    # sort parts because old Python versions (<3.6) don't preserve order
-    sanitized_query = parse_url(url, sanitize=sanitize).query
-    query_parts = sorted(re.split(r"\&|\?|\#", sanitized_query))
-    expected_query_parts = sorted(re.split(r"\&|\?|\#", expected_query))
-
-    assert query_parts == expected_query_parts
+    assert parse_url(url, sanitize=sanitize).query == expected_query
 
 
 @pytest.mark.parametrize(
@@ -602,16 +567,3 @@ def test_default_release_empty_string():
         release = get_default_release()
 
     assert release is None
-
-
-@pytest.mark.parametrize(
-    "timedelta,expected_milliseconds",
-    [
-        [timedelta(milliseconds=132), 132.0],
-        [timedelta(hours=1, milliseconds=132), float(60 * 60 * 1000 + 132)],
-        [timedelta(days=10), float(10 * 24 * 60 * 60 * 1000)],
-        [timedelta(microseconds=100), 0.1],
-    ],
-)
-def test_duration_in_milliseconds(timedelta, expected_milliseconds):
-    assert duration_in_milliseconds(timedelta) == expected_milliseconds

@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import json
 import os
 import random
@@ -19,7 +17,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk._compat import PY2, PY310
+from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception, configure_scope
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
@@ -669,7 +667,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
 
 
 def test_set_db_data_custom_backend():
-    class DummyBackend(object):
+    class DummyBackend:
         # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
         def __getattr__(self, attr):
             return self
@@ -795,9 +793,8 @@ def test_template_tracing_meta(sentry_init, client, capture_events):
     assert match is not None
     assert match.group(1) == traceparent
 
-    # Python 2 does not preserve sort order
     rendered_baggage = match.group(2)
-    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
+    assert rendered_baggage == baggage
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
@@ -1114,13 +1111,10 @@ def test_get_receiver_name():
 
     name = _get_receiver_name(dummy)
 
-    if PY2:
-        assert name == "tests.integrations.django.test_basic.dummy"
-    else:
-        assert (
-            name
-            == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
-        )
+    assert (
+        name
+        == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
+    )
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)

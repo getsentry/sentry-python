@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
+from functools import wraps
 
 from django.dispatch import Signal
 
 from sentry_sdk import Hub
-from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DJANGO_VERSION

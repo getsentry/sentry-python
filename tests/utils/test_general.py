@@ -1,4 +1,3 @@
-# coding: utf-8
 import sys
 import os
 
@@ -18,7 +17,7 @@ from sentry_sdk.utils import (
     strip_string,
     AnnotatedValue,
 )
-from sentry_sdk._compat import text_type, string_types
+from sentry_sdk.consts import EndpointType
 
 
 try:
@@ -32,24 +31,16 @@ else:
     @given(x=any_string)
     def test_safe_repr_never_broken_for_strings(x):
         r = safe_repr(x)
-        assert isinstance(r, text_type)
+        assert isinstance(r, str)
         assert "broken repr" not in r
 
 
 def test_safe_repr_regressions():
-    # fmt: off
-    assert u"лошадь" in safe_repr(u"лошадь")
-    # fmt: on
+    assert "лошадь" in safe_repr("лошадь")
 
 
-@pytest.mark.xfail(
-    sys.version_info < (3,),
-    reason="Fixing this in Python 2 would break other behaviors",
-)
-# fmt: off
-@pytest.mark.parametrize("prefix", ("", "abcd", u"лошадь"))
-@pytest.mark.parametrize("character", u"\x00\x07\x1b\n")
-# fmt: on
+@pytest.mark.parametrize("prefix", ("", "abcd", "лошадь"))
+@pytest.mark.parametrize("character", "\x00\x07\x1b\n")
 def test_safe_repr_non_printable(prefix, character):
     """Check that non-printable characters are escaped"""
     string = prefix + character
@@ -91,31 +82,27 @@ def test_filename():
 
 
 @pytest.mark.parametrize(
-    "given,expected_store,expected_envelope",
+    "given,expected_envelope",
     [
         (
             "https://foobar@sentry.io/123",
-            "https://sentry.io/api/123/store/",
             "https://sentry.io/api/123/envelope/",
         ),
         (
             "https://foobar@sentry.io/bam/123",
-            "https://sentry.io/bam/api/123/store/",
             "https://sentry.io/bam/api/123/envelope/",
         ),
         (
             "https://foobar@sentry.io/bam/baz/123",
-            "https://sentry.io/bam/baz/api/123/store/",
             "https://sentry.io/bam/baz/api/123/envelope/",
         ),
     ],
 )
-def test_parse_dsn_paths(given, expected_store, expected_envelope):
+def test_parse_dsn_paths(given, expected_envelope):
     dsn = Dsn(given)
     auth = dsn.to_auth()
-    assert auth.store_api_url == expected_store
-    assert auth.get_api_url("store") == expected_store
-    assert auth.get_api_url("envelope") == expected_envelope
+    assert auth.get_api_url() == expected_envelope
+    assert auth.get_api_url(EndpointType.ENVELOPE) == expected_envelope
 
 
 @pytest.mark.parametrize(
@@ -517,27 +504,25 @@ def test_iter_stacktraces():
     ) == {1, 2, 3}
 
 
-# fmt: off
 @pytest.mark.parametrize(
     ("original", "base64_encoded"),
     [
         # ascii only
         ("Dogs are great!", "RG9ncyBhcmUgZ3JlYXQh"),
         # emoji
-        (u"🐶", "8J+Qtg=="),
+        ("🐶", "8J+Qtg=="),
         # non-ascii
         (
-            u"Καλό κορίτσι, Μάιζεϊ!",
+            "Καλό κορίτσι, Μάιζεϊ!",
             "zprOsc67z4wgzrrOv8+Bzq/PhM+DzrksIM6czqzOuc62zrXPiiE=",
         ),
         # mix of ascii and non-ascii
         (
-            u"Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
+            "Of margir hundar! Ég geri ráð fyrir að ég þurfi stærra rúm.",
             "T2YgbWFyZ2lyIGh1bmRhciEgw4lnIGdlcmkgcsOhw7AgZnlyaXIgYcOwIMOpZyDDvnVyZmkgc3TDpnJyYSByw7ptLg==",
         ),
     ],
 )
-# fmt: on
 def test_successful_base64_conversion(original, base64_encoded):
     # all unicode characters should be handled correctly
     assert to_base64(original) == base64_encoded
@@ -568,7 +553,7 @@ def test_failed_base64_conversion(input):
 
     # any string can be converted to base64, so only type errors will cause
     # failures
-    if type(input) not in string_types:
+    if not isinstance(input, str):
         assert to_base64(input) is None
 
 
@@ -585,10 +570,6 @@ def test_failed_base64_conversion(input):
                 metadata={"len": 257, "rem": [["!limit", "x", 253, 256]]},
             ),
         ],
-        # fmt: off
-        [u"éééé", None, u"éééé"],
-        [u"éééé", 5, AnnotatedValue(value=u"é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]})],
-        # fmt: on
         ["éééé", None, "éééé"],
         [
             "éééé",

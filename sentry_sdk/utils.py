@@ -12,30 +12,11 @@ import threading
 import time
 from collections import namedtuple
 from copy import copy
+from datetime import datetime
 from decimal import Decimal
+from functools import partial, partialmethod
 from numbers import Real
-
-try:
-    # Python 3
-    from urllib.parse import parse_qs
-    from urllib.parse import unquote
-    from urllib.parse import urlencode
-    from urllib.parse import urlsplit
-    from urllib.parse import urlunsplit
-except ImportError:
-    # Python 2
-    from cgi import parse_qs  # type: ignore
-    from urllib import unquote  # type: ignore
-    from urllib import urlencode  # type: ignore
-    from urlparse import urlsplit  # type: ignore
-    from urlparse import urlunsplit  # type: ignore
-
-try:
-    # Python 3
-    FileNotFoundError
-except NameError:
-    # Python 2
-    FileNotFoundError = IOError
+from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 try:
     # Python 3.11
@@ -44,20 +25,10 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
-from datetime import datetime
-from functools import partial
-
-try:
-    from functools import partialmethod
-
-    _PARTIALMETHOD_AVAILABLE = True
-except ImportError:
-    _PARTIALMETHOD_AVAILABLE = False
-
 import sentry_sdk
-from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
+from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -68,6 +39,7 @@ if TYPE_CHECKING:
         Dict,
         Iterator,
         List,
+        NoReturn,
         Optional,
         Set,
         Tuple,
@@ -75,7 +47,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -181,7 +153,7 @@ def get_sdk_name(installed_integrations):
     return "sentry.python"
 
 
-class CaptureInternalException(object):
+class CaptureInternalException:
     __slots__ = ()
 
     def __enter__(self):
@@ -237,8 +209,7 @@ class BadDsn(ValueError):
     """Raised on invalid DSNs."""
 
 
-@implements_str
-class Dsn(object):
+class Dsn:
     """Represents a DSN."""
 
     def __init__(self, value):
@@ -246,7 +217,7 @@ class Dsn(object):
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
-        parts = urlparse.urlsplit(text_type(value))
+        parts = urlsplit(str(value))
 
         if parts.scheme not in ("http", "https"):
             raise BadDsn("Unsupported scheme %r" % parts.scheme)
@@ -271,7 +242,7 @@ class Dsn(object):
         path = parts.path.rsplit("/", 1)
 
         try:
-            self.project_id = text_type(int(path.pop()))
+            self.project_id = str(int(path.pop()))
         except (ValueError, TypeError):
             raise BadDsn("Invalid project in DSN (%r)" % (parts.path or "")[1:])
 
@@ -311,7 +282,7 @@ class Dsn(object):
         )
 
 
-class Auth(object):
+class Auth:
     """Helper object that represents the auth info."""
 
     def __init__(
@@ -335,17 +306,8 @@ class Auth(object):
         self.version = version
         self.client = client
 
-    @property
-    def store_api_url(self):
-        # type: () -> str
-        """Returns the API url for storing events.
-
-        Deprecated: use get_api_url instead.
-        """
-        return self.get_api_url(type="store")
-
     def get_api_url(
-        self, type="store"  # type: EndpointType
+        self, type=EndpointType.ENVELOPE  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""
@@ -354,7 +316,7 @@ class Auth(object):
             self.host,
             self.path,
             self.project_id,
-            type,
+            type.value,
         )
 
     def to_header(self):
@@ -368,7 +330,7 @@ class Auth(object):
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
-class AnnotatedValue(object):
+class AnnotatedValue:
     """
     Meta information for a data field in the event payload.
     This is to tell Relay that we have tampered with the fields value.
@@ -562,46 +524,17 @@ def get_source_context(
 def safe_str(value):
     # type: (Any) -> str
     try:
-        return text_type(value)
+        return str(value)
     except Exception:
         return safe_repr(value)
 
 
-if PY2:
-
-    def safe_repr(value):
-        # type: (Any) -> str
-        try:
-            rv = repr(value).decode("utf-8", "replace")
-
-            # At this point `rv` contains a bunch of literal escape codes, like
-            # this (exaggerated example):
-            #
-            # u"\\x2f"
-            #
-            # But we want to show this string as:
-            #
-            # u"/"
-            try:
-                # unicode-escape does this job, but can only decode latin1. So we
-                # attempt to encode in latin1.
-                return rv.encode("latin1").decode("unicode-escape")
-            except Exception:
-                # Since usually strings aren't latin1 this can break. In those
-                # cases we just give up.
-                return rv
-        except Exception:
-            # If e.g. the call to `repr` already fails
-            return "<broken repr>"
-
-else:
-
-    def safe_repr(value):
-        # type: (Any) -> str
-        try:
-            return repr(value)
-        except Exception:
-            return "<broken repr>"
+def safe_repr(value):
+    # type: (Any) -> str
+    try:
+        return repr(value)
+    except Exception:
+        return "<broken repr>"
 
 
 def filename_for_module(module, abs_path):
@@ -969,7 +902,7 @@ def exceptions_from_error_tuple(
 def to_string(value):
     # type: (str) -> str
     try:
-        return text_type(value)
+        return str(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
 
@@ -1131,28 +1064,13 @@ def _truncate_by_bytes(string, max_bytes):
     """
     Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
     """
-    # This function technically supports bytes, but only for Python 2 compat.
-    # XXX remove support for bytes when we drop Python 2
-    if isinstance(string, bytes):
-        truncated = string[: max_bytes - 3]
-    else:
-        truncated = string.encode("utf-8")[: max_bytes - 3].decode(
-            "utf-8", errors="ignore"
-        )
+    truncated = string.encode("utf-8")[: max_bytes - 3].decode("utf-8", errors="ignore")
 
     return truncated + "..."
 
 
 def _get_size_in_bytes(value):
     # type: (str) -> Optional[int]
-    # This function technically supports bytes, but only for Python 2 compat.
-    # XXX remove support for bytes when we drop Python 2
-    if not isinstance(value, (bytes, text_type)):
-        return None
-
-    if isinstance(value, bytes):
-        return len(value)
-
     try:
         return len(value.encode("utf-8"))
     except (UnicodeEncodeError, UnicodeDecodeError):
@@ -1168,9 +1086,7 @@ def strip_string(value, max_length=None):
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
     byte_size = _get_size_in_bytes(value)
-    text_size = None
-    if isinstance(value, text_type):
-        text_size = len(value)
+    text_size = len(value)
 
     if byte_size is not None and byte_size > max_length:
         # truncate to max_length bytes, preserving code points
@@ -1296,7 +1212,7 @@ def _is_contextvars_broken():
 
 def _make_threadlocal_contextvars(local):
     # type: (type) -> type
-    class ContextVar(object):
+    class ContextVar:
         # Super-limited impl of ContextVar
 
         def __init__(self, name, default=None):
@@ -1394,10 +1310,8 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if (
-        _PARTIALMETHOD_AVAILABLE
-        and hasattr(func, "_partialmethod")
-        and isinstance(func._partialmethod, partialmethod)
+    if hasattr(func, "_partialmethod") and isinstance(
+        func._partialmethod, partialmethod
     ):
         prefix, suffix = "partialmethod(<function ", ">)"
         func = func._partialmethod.func
@@ -1700,36 +1614,30 @@ def package_version(package):
     return parse_version(version)
 
 
+def reraise(tp, value, tb=None):
+    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> NoReturn
+    assert value is not None
+    if value.__traceback__ is not tb:
+        raise value.with_traceback(tb)
+    raise value
+
+
 if PY37:
 
     def nanosecond_time():
         # type: () -> int
         return time.perf_counter_ns()
 
-elif PY33:
+else:
 
     def nanosecond_time():
         # type: () -> int
         return int(time.perf_counter() * 1e9)
 
-else:
 
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.time() * 1e9)
-
-
-if PY2:
-
-    def now():
-        # type: () -> float
-        return time.time()
-
-else:
-
-    def now():
-        # type: () -> float
-        return time.perf_counter()
+def now():
+    # type: () -> float
+    return time.perf_counter()
 
 
 try:

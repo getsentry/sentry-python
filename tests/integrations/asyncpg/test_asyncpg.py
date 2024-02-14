@@ -20,24 +20,18 @@ PG_PORT = 5432
 
 
 import datetime
+from contextlib import contextmanager
+from unittest import mock
 
 import asyncpg
 import pytest
-
 import pytest_asyncio
-
 from asyncpg import connect, Connection
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk._compat import contextmanager
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(

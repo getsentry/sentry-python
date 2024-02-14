@@ -1,20 +1,16 @@
 import uuid
 import random
-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk._compat import datetime_utcnow, utc_from_timestamp, PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    import typing
-
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
     from typing import Any
     from typing import Dict
     from typing import Iterator
@@ -64,7 +60,7 @@ SOURCE_FOR_STYLE = {
 }
 
 
-class _SpanRecorder(object):
+class _SpanRecorder:
     """Limits the number of spans recorded in a transaction."""
 
     __slots__ = ("maxlen", "spans")
@@ -87,7 +83,7 @@ class _SpanRecorder(object):
             self.spans.append(span)
 
 
-class Span(object):
+class Span:
     """A span holds timing information of a block of code.
     Spans can have multiple child spans thus forming a span tree."""
 
@@ -155,9 +151,9 @@ class Span(object):
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         if start_timestamp is None:
-            start_timestamp = datetime_utcnow()
+            start_timestamp = datetime.now(timezone.utc)
         elif isinstance(start_timestamp, float):
-            start_timestamp = utc_from_timestamp(start_timestamp)
+            start_timestamp = datetime.fromtimestamp(start_timestamp, timezone.utc)
         self.start_timestamp = start_timestamp
         try:
             # profiling depends on this value and requires that
@@ -268,18 +264,10 @@ class Span(object):
 
         return child
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> Span
-        """DEPRECATED: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead."""
-        logger.warning(
-            "Deprecated: use Span.start_child instead of Span.new_span. This will be removed in the future."
-        )
-        return self.start_child(**kwargs)
-
     @classmethod
     def continue_from_environ(
         cls,
-        environ,  # type: typing.Mapping[str, str]
+        environ,  # type: Mapping[str, str]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
@@ -305,7 +293,7 @@ class Span(object):
     @classmethod
     def continue_from_headers(
         cls,
-        headers,  # type: typing.Mapping[str, str]
+        headers,  # type: Mapping[str, str]
         **kwargs  # type: Any
     ):
         # type: (...) -> Transaction
@@ -487,7 +475,7 @@ class Span(object):
         try:
             if end_timestamp:
                 if isinstance(end_timestamp, float):
-                    end_timestamp = utc_from_timestamp(end_timestamp)
+                    end_timestamp = datetime.fromtimestamp(end_timestamp, timezone.utc)
                 self.timestamp = end_timestamp
             else:
                 elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
@@ -495,7 +483,7 @@ class Span(object):
                     microseconds=elapsed / 1000
                 )
         except AttributeError:
-            self.timestamp = datetime_utcnow()
+            self.timestamp = datetime.now(timezone.utc)
 
         maybe_create_breadcrumbs_from_span(hub, self)
 
@@ -922,10 +910,6 @@ class NoOpSpan(Span):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> NoOpSpan
-        return self.start_child(**kwargs)
-
     def to_traceparent(self):
         # type: () -> str
         return ""
@@ -1023,10 +1007,7 @@ def trace(func=None):
         async def my_async_function():
             ...
     """
-    if PY2:
-        from sentry_sdk.tracing_utils_py2 import start_child_span_decorator
-    else:
-        from sentry_sdk.tracing_utils_py3 import start_child_span_decorator
+    from sentry_sdk.tracing_utils import start_child_span_decorator
 
     # This patterns allows usage of both @sentry_traced and @sentry_traced(...)
     # See https://stackoverflow.com/questions/52126071/decorator-with-arguments-avoid-parenthesis-when-no-arguments/52126278

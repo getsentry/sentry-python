@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 _TERMINATOR = object()
 
 
-class BackgroundWorker(object):
+class BackgroundWorker:
     def __init__(self, queue_size=DEFAULT_QUEUE_SIZE):
         # type: (int) -> None
         check_thread_support()
@@ -64,7 +64,7 @@ class BackgroundWorker(object):
         with self._lock:
             if not self.is_alive:
                 self._thread = threading.Thread(
-                    target=self._target, name="raven-sentry.BackgroundWorker"
+                    target=self._target, name="sentry-sdk.BackgroundWorker"
                 )
                 self._thread.daemon = True
                 try:

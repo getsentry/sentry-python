@@ -10,7 +10,7 @@ class Body(BytesIO):
             contents = self.read()
 
 
-class MockResponse(object):
+class MockResponse:
     def __init__(self, client, status_code, headers, body):
         self._client = client
         self._status_code = status_code

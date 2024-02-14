@@ -1,7 +1,12 @@
 import contextlib
+import inspect
 import os
 import re
 import sys
+from collections.abc import Mapping
+from datetime import timedelta
+from functools import wraps
+from urllib.parse import quote, unquote
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -10,24 +15,15 @@ from sentry_sdk.utils import (
     Dsn,
     logger,
     match_regex_list,
+    qualname_from_function,
     to_string,
     is_sentry_url,
     _is_external_source,
     _module_in_list,
 )
-from sentry_sdk._compat import PY2, duration_in_milliseconds, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
-if PY2:
-    from collections import Mapping
-    from urllib import quote, unquote
-else:
-    from collections.abc import Mapping
-    from urllib.parse import quote, unquote
-
 if TYPE_CHECKING:
-    import typing
-
     from typing import Any
     from typing import Dict
     from typing import Generator
@@ -60,7 +56,7 @@ base64_stripped = (
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: typing.Mapping[str, str]
+        environ,  # type: Mapping[str, str]
         prefix="HTTP_",  # type: str
     ):
         # type: (...) -> None
@@ -198,7 +194,7 @@ def add_query_source(hub, span):
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
-    slow_query = duration_in_milliseconds(duration) > threshold
+    slow_query = duration / timedelta(milliseconds=1) > threshold
 
     if not slow_query:
         return
@@ -212,8 +208,6 @@ def add_query_source(hub, span):
     while frame is not None:
         try:
             abs_path = frame.f_code.co_filename
-            if abs_path and PY2:
-                abs_path = os.path.abspath(abs_path)
         except Exception:
             abs_path = ""
 
@@ -334,7 +328,7 @@ def _format_sql(cursor, sql):
     return real_sql or to_string(sql)
 
 
-class Baggage(object):
+class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
     """
@@ -412,10 +406,6 @@ class Baggage(object):
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = options["traces_sample_rate"]
 
-        user = (scope and scope._user) or {}
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
-
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
@@ -432,15 +422,6 @@ class Baggage(object):
             return Baggage(sentry_items)
 
         options = client.options or {}
-        # For backwards compatibility, we allow passing the scope as the hub.
-        # So hub here can be an instance of Scope.
-        # We need a major release to make this nice. (if someone searches the code: deprecated)
-        hub = transaction.hub or sentry_sdk.Hub.current
-        user = (
-            (hasattr(hub, "_user") and hub._user)
-            or (hasattr(hub, "scope") and hub.scope and hub.scope._user)
-            or {}
-        )
 
         sentry_items["trace_id"] = transaction.trace_id
 
@@ -458,9 +439,6 @@ class Baggage(object):
             and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
         ):
             sentry_items["transaction"] = transaction.name
-
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
 
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
@@ -484,7 +462,7 @@ class Baggage(object):
         # type: () -> Dict[str, str]
         header = {}
 
-        for key, item in iteritems(self.sentry_items):
+        for key, item in self.sentry_items.items():
             header[key] = item
 
         return header
@@ -493,7 +471,7 @@ class Baggage(object):
         # type: (bool) -> str
         items = []
 
-        for key, val in iteritems(self.sentry_items):
+        for key, val in self.sentry_items.items():
             with capture_internal_exceptions():
                 item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
                 items.append(item)
@@ -534,5 +512,76 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
+def start_child_span_decorator(func):
+    # type: (Any) -> Any
+    """
+    Decorator to add child spans for functions.
+
+    See also ``sentry_sdk.tracing.trace()``.
+    """
+    # Asynchronous case
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span(sentry_sdk.Hub.current)
+
+            if span is None:
+                logger.warning(
+                    "Can not create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return await func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return await func(*args, **kwargs)
+
+    # Synchronous case
+    else:
+
+        @wraps(func)
+        def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span(sentry_sdk.Hub.current)
+
+            if span is None:
+                logger.warning(
+                    "Can not create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return func(*args, **kwargs)
+
+    return func_with_tracing
+
+
+def get_current_span(hub=None):
+    # type: (Optional[sentry_sdk.Hub]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    if hub is None:
+        hub = sentry_sdk.Hub.current
+
+    current_span = hub.scope.span
+    return current_span
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span

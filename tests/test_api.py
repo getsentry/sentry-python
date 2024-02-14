@@ -1,4 +1,5 @@
 import pytest
+from unittest import mock
 
 from sentry_sdk import (
     configure_scope,
@@ -14,12 +15,6 @@ from sentry_sdk import (
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
-
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.mark.forked
@@ -90,8 +85,7 @@ def test_baggage_with_tracing_disabled(sentry_init):
             propagation_context["trace_id"]
         )
     )
-    # order not guaranteed in older python versions
-    assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
+    assert get_baggage() == expected_baggage
 
 
 @pytest.mark.forked
@@ -101,8 +95,7 @@ def test_baggage_with_tracing_enabled(sentry_init):
         expected_baggage = "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0,sentry-sample_rate=1.0,sentry-sampled={}".format(
             transaction.trace_id, "true" if transaction.sampled else "false"
         )
-        # order not guaranteed in older python versions
-        assert sorted(get_baggage().split(",")) == sorted(expected_baggage.split(","))
+        assert get_baggage() == expected_baggage
 
 
 @pytest.mark.forked

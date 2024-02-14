@@ -1,16 +1,16 @@
+import os
+import sys
+import uuid
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
 from enum import Enum
+from datetime import datetime, timezone
+from functools import wraps
 from itertools import chain
-import os
-import sys
-import uuid
 
 from sentry_sdk.attachments import Attachment
-from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
-from sentry_sdk._functools import wraps
 from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -858,7 +858,7 @@ class Scope(object):
         hint = dict(hint or ())  # type: Hint
 
         if crumb.get("timestamp") is None:
-            crumb["timestamp"] = datetime_utcnow()
+            crumb["timestamp"] = datetime.now(timezone.utc)
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
@@ -1255,17 +1255,6 @@ class Scope(object):
                 contexts["trace"] = self._span.get_trace_context()
             else:
                 contexts["trace"] = self.get_trace_context()
-
-        # Add "reply_id" context
-        try:
-            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
-        except (KeyError, TypeError):
-            replay_id = None
-
-        if replay_id is not None:
-            contexts["replay"] = {
-                "replay_id": replay_id,
-            }
 
     def _drop(self, cause, ty):
         # type: (Any, str) -> Optional[Any]

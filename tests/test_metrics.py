@@ -1,17 +1,13 @@
-# coding: utf-8
-import pytest
 import sys
 import time
 import linecache
+from unittest import mock
+
+import pytest
 
 from sentry_sdk import Hub, metrics, push_scope, start_transaction
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def parse_metrics(bytes):
@@ -783,11 +779,9 @@ def test_tag_normalization(
     ts = time.time()
     envelopes = capture_envelopes()
 
-    # fmt: off
     metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
     metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
-    metrics.distribution("c", 1.0, tags={u"foö-bar": u"snöwmän"}, timestamp=ts)
-    # fmt: on
+    metrics.distribution("c", 1.0, tags={"foö-bar": "snöwmän"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -809,13 +803,11 @@ def test_tag_normalization(
         "environment": "not-fun-env",
     }
 
-    # fmt: off
     assert m[2][4] == {
-        "fo_-bar": u"snöwmän",
+        "fo_-bar": "snöwmän",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
-    # fmt: on
 
 
 @pytest.mark.forked

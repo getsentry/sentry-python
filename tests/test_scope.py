@@ -1,6 +1,7 @@
 import copy
 import os
 import pytest
+from unittest import mock
 
 from sentry_sdk import scope
 from sentry_sdk import (
@@ -10,11 +11,6 @@ from sentry_sdk import (
 )
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import Scope, ScopeType
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.fixture

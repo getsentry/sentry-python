@@ -36,7 +36,7 @@ import uuid
 from collections import deque
 
 import sentry_sdk
-from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._compat import PY311
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -175,8 +175,14 @@ def has_profiling_enabled(options):
         return True
 
     profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None and profiles_sample_rate > 0:
-        return True
+    if profiles_sample_rate is not None:
+        logger.warning(
+            "_experiments['profiles_sample_rate'] is deprecated. "
+            "Please use the non-experimental profiles_sample_rate option "
+            "directly."
+        )
+        if profiles_sample_rate > 0:
+            return True
 
     return False
 
@@ -187,10 +193,6 @@ def setup_profiler(options):
 
     if _scheduler is not None:
         logger.debug("[Profiling] Profiler is already setup")
-        return False
-
-    if not PY33:
-        logger.warn("[Profiling] Profiler requires Python >= 3.3")
         return False
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
@@ -207,10 +209,13 @@ def setup_profiler(options):
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
     else:
-        profiler_mode = (
-            options.get("_experiments", {}).get("profiler_mode")
-            or default_profiler_mode
-        )
+        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
+        if profiler_mode is not None:
+            logger.warning(
+                "_experiments['profiler_mode'] is deprecated. Please use the "
+                "non-experimental profiler_mode option directly."
+            )
+        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -435,7 +440,7 @@ def get_current_thread_id(thread=None):
     return None
 
 
-class Profile(object):
+class Profile:
     def __init__(
         self,
         transaction,  # type: sentry_sdk.tracing.Transaction
@@ -745,7 +750,7 @@ class Profile(object):
         return True
 
 
-class Scheduler(object):
+class Scheduler:
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
