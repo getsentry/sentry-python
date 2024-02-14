@@ -193,7 +193,9 @@ def setup_profiler(options):
         logger.warn("[Profiling] Profiler requires Python >= 3.3")
         return False
 
-    check_profiler_support()
+    supported = check_profiler_support()
+    if not supported:
+        raise RuntimeError("Incompatible uWSGI mode.")
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
