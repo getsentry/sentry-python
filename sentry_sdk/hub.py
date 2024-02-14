@@ -380,11 +380,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def capture_exception(self, error=None, scope=None, **scope_kwargs):
         # type: (Optional[Union[BaseException, ExcInfo]], Optional[Scope], Any) -> Optional[str]
-        """Captures an exception.
-
+        """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
             Please use :py:meth:`sentry_sdk.Scope.capture_exception` instead.
+
+        Captures an exception.
 
         Alias of :py:meth:`sentry_sdk.Scope.capture_exception`.
 

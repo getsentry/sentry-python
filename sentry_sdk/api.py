@@ -102,7 +102,7 @@ def get_client():
     return Scope.get_client()
 
 
-@hubmethod
+@scopemethod
 def capture_event(
     event,  # type: Event
     hint=None,  # type: Optional[Hint]
@@ -113,7 +113,7 @@ def capture_event(
     return Hub.current.capture_event(event, hint, scope=scope, **scope_kwargs)
 
 
-@hubmethod
+@scopemethod
 def capture_message(
     message,  # type: str
     level=None,  # type: Optional[str]
@@ -124,7 +124,7 @@ def capture_message(
     return Hub.current.capture_message(message, level, scope=scope, **scope_kwargs)
 
 
-@hubmethod
+@scopemethod
 def capture_exception(
     error=None,  # type: Optional[Union[BaseException, ExcInfo]]
     scope=None,  # type: Optional[Any]
@@ -134,7 +134,7 @@ def capture_exception(
     return Hub.current.capture_exception(error, scope=scope, **scope_kwargs)
 
 
-@hubmethod
+@scopemethod
 def add_breadcrumb(
     crumb=None,  # type: Optional[Breadcrumb]
     hint=None,  # type: Optional[BreadcrumbHint]
@@ -233,7 +233,7 @@ def last_event_id():
     return Hub.current.last_event_id()
 
 
-@hubmethod
+@scopemethod
 def start_span(
     span=None,  # type: Optional[Span]
     **kwargs  # type: Any
@@ -242,7 +242,7 @@ def start_span(
     return Hub.current.start_span(span=span, **kwargs)
 
 
-@hubmethod
+@scopemethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
     **kwargs  # type: Any
