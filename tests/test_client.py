@@ -390,8 +390,11 @@ def test_with_locals_deprecation_enabled(sentry_init):
         assert "include_local_variables" in client.options
         assert client.options["include_local_variables"]
 
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        assert (
+            mock.call(
+                "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+            )
+            in fake_warning.mock_calls
         )
 
 
@@ -404,8 +407,11 @@ def test_with_locals_deprecation_disabled(sentry_init):
         assert "include_local_variables" in client.options
         assert not client.options["include_local_variables"]
 
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+        assert (
+            mock.call(
+                "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+            )
+            in fake_warning.mock_calls
         )
 
 
@@ -418,7 +424,12 @@ def test_include_local_variables_deprecation(sentry_init):
         assert "include_local_variables" in client.options
         assert not client.options["include_local_variables"]
 
-        fake_warning.assert_not_called()
+        assert (
+            mock.call(
+                "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
+            )
+            not in fake_warning.mock_calls
+        )
 
 
 def test_request_bodies_deprecation(sentry_init):
@@ -430,8 +441,11 @@ def test_request_bodies_deprecation(sentry_init):
         assert "max_request_body_size" in client.options
         assert client.options["max_request_body_size"] == "small"
 
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+        assert (
+            mock.call(
+                "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+            )
+            in fake_warning.mock_calls
         )
 
 
