@@ -13,6 +13,7 @@
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - Setting the parameter `propagate_hub` to `True` in `ThreadingIntegration(propagate_hub=True)` does only work on Python 3.7+.
+- The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
 
 ## Removed
 
