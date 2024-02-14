@@ -41,21 +41,12 @@ Distributed Tracing
 .. autofunction:: sentry_sdk.api.get_traceparent
 
 
-New Scopes/Client APIs
-======================
+Client Management
+=================
 
-.. autofunction:: sentry_sdk.api.get_client
 .. autofunction:: sentry_sdk.api.is_initialized
-.. autofunction:: sentry_sdk.api.get_current_scope
-.. autofunction:: sentry_sdk.api.get_isolation_scope
-.. autofunction:: sentry_sdk.api.get_global_scope    
+.. autofunction:: sentry_sdk.api.get_client
 
-.. autofunction:: sentry_sdk.api.set_current_scope
-.. autofunction:: sentry_sdk.api.set_isolation_scope
-
-
-.. autofunction:: sentry_sdk.api.new_scope
-.. autofunction:: sentry_sdk.api.isolation_scope
 
 Managing Scope (advanced)
 =========================
@@ -63,7 +54,5 @@ Managing Scope (advanced)
 .. autofunction:: sentry_sdk.api.configure_scope
 .. autofunction:: sentry_sdk.api.push_scope
 
+.. autofunction:: sentry_sdk.api.new_scope
 
-.. Not documented (On purpose. Not sure if anyone should use those)
-.. last_event_id()
-.. flush()

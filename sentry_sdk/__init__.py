@@ -18,6 +18,7 @@ __all__ = [  # noqa
     "HttpTransport",
     "init",
     "integrations",
+    "trace",    
     # From sentry_sdk.api
     "add_breadcrumb",
     "capture_event",
@@ -28,10 +29,7 @@ __all__ = [  # noqa
     "flush",
     "get_baggage",
     "get_client",
-    "get_current_scope",
     "get_current_span",
-    "get_global_scope",
-    "get_isolation_scope",
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
@@ -39,16 +37,13 @@ __all__ = [  # noqa
     "new_scope",
     "push_scope",
     "set_context",
-    "set_current_scope",
     "set_extra",
-    "set_isolation_scope",
     "set_level",
     "set_measurement",
     "set_tag",
     "set_user",
     "start_span",
     "start_transaction",
-    "trace",
 ]
 
 # Initialize the debug support after everything is loaded

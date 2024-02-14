@@ -46,10 +46,7 @@ __all__ = [
     "flush",
     "get_baggage",
     "get_client",
-    "get_current_scope",
     "get_current_span",
-    "get_global_scope",
-    "get_isolation_scope",
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
@@ -57,9 +54,7 @@ __all__ = [
     "new_scope",
     "push_scope",
     "set_context",
-    "set_current_scope",
     "set_extra",
-    "set_isolation_scope",
     "set_level",
     "set_measurement",
     "set_tag",
@@ -93,7 +88,10 @@ def is_initialized():
     .. versionadded:: 2.0.0
 
     Returns whether Sentry has been initialized or not.
-    If a client is available Sentry is initialized.
+    
+    If a client is available and the client is active
+    (meaning it is configured to send data) then 
+    Sentry is initialized.
     """
     return Scope.get_client().is_active()
 
