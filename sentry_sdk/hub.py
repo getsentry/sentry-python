@@ -164,7 +164,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     """
     .. deprecated:: 2.0.0
         The Hub is deprecated. Its functionality will be merged into :py:class:`sentry_sdk.scope.Scope`.
-
+    
     The hub wraps the concurrency management of the SDK.  Each thread has
     its own hub but the hub might transfer with the flow of execution if
     context vars are available.
@@ -238,7 +238,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
-
+        
         Runs a callback in the context of the hub.  Alternatively the
         with statement can be used on the hub directly.
         """
@@ -269,9 +269,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         .. deprecated:: 2.0.0
             This property is deprecated and will be removed in a future release.
-            Please use the top level api
             Please use :py:func:`sentry_sdk.api.get_client` instead.
-
+        
         Returns the current client on the hub.
         """
         client = Scope.get_client()
@@ -287,8 +286,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
-
-        Returns the current scope on the hub.
+            Returns the current scope on the hub.
         """
         return Scope.get_isolation_scope()
 
@@ -369,7 +367,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
         last_event_id = Scope.get_current_scope().capture_message(
             message, level=level, scope=scope, **scope_kwargs
@@ -399,7 +397,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
         last_event_id = Scope.get_current_scope().capture_exception(
             error, scope=scope, **scope_kwargs
@@ -422,7 +420,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         Capture an exception that is likely caused by a bug in the SDK
         itself.
 
-        Duplicated in :py:meth:`sentry_sdk.Client._capture_internal_exception`.
+        Duplicated in :py:meth:`sentry_sdk.client._Client._capture_internal_exception`.
 
         These exceptions do not end up in Sentry and are just logged instead.
         """
@@ -661,7 +659,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
             Please use :py:meth:`sentry_sdk.Scope.stop_auto_session_tracking` instead.
-
+        
         Stops automatic session tracking.
 
         This temporarily session tracking for the current scope when called.
@@ -693,7 +691,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             This function is deprecated and will be removed in a future release.
             Please use :py:meth:`sentry_sdk.client._Client.flush` instead.
 
-        Alias for :py:meth:`sentry_sdk.Client.flush`
+        Alias for :py:meth:`sentry_sdk.client._Client.flush`
         """
         return Scope.get_client().flush(timeout=timeout, callback=callback)
 

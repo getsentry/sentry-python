@@ -1023,7 +1023,7 @@ class Scope(object):
         """
         Captures an event.
 
-        Merges given scope data and calls :py:meth:`sentry_sdk.Client.capture_event`.
+        Merges given scope data and calls :py:meth:`sentry_sdk.client._Client.capture_event`.
 
         :param event: A ready-made event that can be directly sent to Sentry.
 
@@ -1036,7 +1036,7 @@ class Scope(object):
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
         scope = Scope._merge_scopes(scope, scope_kwargs)
 
@@ -1058,7 +1058,7 @@ class Scope(object):
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
         if level is None:
             level = "info"
@@ -1083,7 +1083,7 @@ class Scope(object):
             For supported `**scope_kwargs` see :py:meth:`sentry_sdk.Scope.update_from_kwargs`.
             The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
-        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.Client.capture_event`).
+        :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
         if error is not None:
             exc_info = exc_info_from_error(error)
