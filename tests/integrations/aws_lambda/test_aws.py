@@ -128,7 +128,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
         dsn="https://123abc@example.com/123",
         transport=TestTransport,
-        integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning), ThreadingIntegration(propagate_context=True)],
+        integrations=[AwsLambdaIntegration(timeout_warning=timeout_warning), ThreadingIntegration(propagate_scope=True)],
         shutdown_timeout=10,
         **extra_init_args
     )
