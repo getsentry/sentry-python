@@ -175,8 +175,14 @@ def has_profiling_enabled(options):
         return True
 
     profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None and profiles_sample_rate > 0:
-        return True
+    if profiles_sample_rate is not None:
+        logger.warning(
+            "_experiments['profiles_sample_rate'] is deprecated. "
+            "Please use the non-experimental profiles_sample_rate option "
+            "directly."
+        )
+        if profiles_sample_rate > 0:
+            return True
 
     return False
 
@@ -206,6 +212,10 @@ def setup_profiler(options):
         profiler_mode = (
             options.get("_experiments", {}).get("profiler_mode")
             or default_profiler_mode
+        )
+        logger.warning(
+            "_experiments['profiler_mode'] is deprecated. Please use the "
+            "non-experimental profiler_mode option directly."
         )
 
     if (
