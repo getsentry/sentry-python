@@ -52,9 +52,6 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            # TODO: Remove these 2 profiling related experiments
-            "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],

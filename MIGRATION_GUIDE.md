@@ -39,3 +39,11 @@
 
 - Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
+- `profiler_mode` and `profiles_sample_rate` have been deprecated as `_experiments` options. Use them as top level options instead:
+    ```python
+        sentry_sdk.init(
+            ...,
+            profiler_mode="thread",
+            profiles_sample_rate=1.0,
+        )
+    ```
