@@ -1,6 +1,6 @@
 import inspect
 
-from sentry_sdk import tracing_utils
+from sentry_sdk import tracing_utils, Client
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope, new_scope, isolation_scope
@@ -83,6 +83,15 @@ def scopemethod(f):
     return f
 
 
+def clientmethod(f):
+    # type: (F) -> F
+    f.__doc__ = "%s\n\n%s" % (
+        "Alias for :py:meth:`sentry_sdk.Client.%s`" % f.__name__,
+        inspect.getdoc(getattr(Client, f.__name__)),
+    )
+    return f
+
+
 def is_initialized():
     # type: () -> bool
     """
@@ -111,7 +120,9 @@ def capture_event(
     **scope_kwargs  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Hub.current.capture_event(event, hint, scope=scope, **scope_kwargs)
+    return Scope.get_current_scope().capture_event(
+        event, hint, scope=scope, **scope_kwargs
+    )
 
 
 @scopemethod
@@ -122,7 +133,9 @@ def capture_message(
     **scope_kwargs  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Hub.current.capture_message(message, level, scope=scope, **scope_kwargs)
+    return Scope.get_current_scope().capture_message(
+        message, level, scope=scope, **scope_kwargs
+    )
 
 
 @scopemethod
@@ -132,7 +145,9 @@ def capture_exception(
     **scope_kwargs  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Hub.current.capture_exception(error, scope=scope, **scope_kwargs)
+    return Scope.get_current_scope().capture_exception(
+        error, scope=scope, **scope_kwargs
+    )
 
 
 @scopemethod
@@ -142,7 +157,7 @@ def add_breadcrumb(
     **kwargs  # type: Any
 ):
     # type: (...) -> None
-    return Hub.current.add_breadcrumb(crumb, hint, **kwargs)
+    return Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
 
 @overload
@@ -192,40 +207,40 @@ def push_scope(  # noqa: F811
 @scopemethod
 def set_tag(key, value):
     # type: (str, Any) -> None
-    return Hub.current.scope.set_tag(key, value)
+    return Scope.get_isolation_scope().set_tag(key, value)
 
 
 @scopemethod
 def set_context(key, value):
     # type: (str, Dict[str, Any]) -> None
-    return Hub.current.scope.set_context(key, value)
+    return Scope.get_isolation_scope().set_context(key, value)
 
 
 @scopemethod
 def set_extra(key, value):
     # type: (str, Any) -> None
-    return Hub.current.scope.set_extra(key, value)
+    return Scope.get_isolation_scope().set_extra(key, value)
 
 
 @scopemethod
 def set_user(value):
     # type: (Optional[Dict[str, Any]]) -> None
-    return Hub.current.scope.set_user(value)
+    return Scope.get_isolation_scope().set_user(value)
 
 
 @scopemethod
 def set_level(value):
     # type: (str) -> None
-    return Hub.current.scope.set_level(value)
+    return Scope.get_isolation_scope().set_level(value)
 
 
-@hubmethod
+@clientmethod
 def flush(
     timeout=None,  # type: Optional[float]
     callback=None,  # type: Optional[Callable[[int, float], None]]
 ):
     # type: (...) -> None
-    return Hub.current.flush(timeout=timeout, callback=callback)
+    return Scope.get_client().flush(timeout=timeout, callback=callback)
 
 
 @hubmethod
@@ -254,7 +269,7 @@ def start_transaction(
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
-    transaction = Hub.current.scope.transaction
+    transaction = Scope.get_isolation_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
 
@@ -272,7 +287,7 @@ def get_traceparent():
     """
     Returns the traceparent either from the active span or from the scope.
     """
-    return Hub.current.get_traceparent()
+    return Scope.get_isolation_scope().get_traceparent()
 
 
 def get_baggage():
@@ -280,7 +295,12 @@ def get_baggage():
     """
     Returns Baggage either from the active span or from the scope.
     """
-    return Hub.current.get_baggage()
+    baggage = Scope.get_isolation_scope().get_baggage()
+
+    if baggage is not None:
+        return baggage.serialize()
+
+    return None
 
 
 def continue_trace(environ_or_headers, op=None, name=None, source=None):
@@ -288,4 +308,6 @@ def continue_trace(environ_or_headers, op=None, name=None, source=None):
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
-    return Hub.current.continue_trace(environ_or_headers, op, name, source)
+    return Scope.get_isolation_scope().continue_trace(
+        environ_or_headers, op, name, source
+    )
