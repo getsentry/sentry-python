@@ -170,6 +170,7 @@ def check_uwsgi_thread_support():
 
         warn(
             Warning(
+                "IMPORTANT: "
                 "We detected the use of uWSGI without thread support. "
                 "This might lead to unexpected issues. "
                 'Please run uWSGI with "--enable-threads" for full support.'
@@ -183,6 +184,7 @@ def check_uwsgi_thread_support():
 
         warn(
             Warning(
+                "IMPORTANT: "
                 "We detected the use of uWSGI in preforking mode without "
                 "thread support. This might lead to crashing workers. "
                 'Please run uWSGI with both "--enable-threads" and '
