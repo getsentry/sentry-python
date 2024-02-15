@@ -1,14 +1,15 @@
 import inspect
+from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
+    from typing import Generator
     from typing import Optional
     from typing import overload
     from typing import Callable
@@ -63,15 +64,6 @@ __all__ = [
     "start_span",
     "start_transaction",
 ]
-
-
-def hubmethod(f):
-    # type: (F) -> F
-    f.__doc__ = "%s\n\n%s" % (
-        "Alias for :py:meth:`sentry_sdk.Hub.%s`" % f.__name__,
-        inspect.getdoc(getattr(Hub, f.__name__)),
-    )
-    return f
 
 
 def scopemethod(f):
@@ -174,12 +166,35 @@ def configure_scope(  # noqa: F811
     pass
 
 
-@hubmethod
 def configure_scope(  # noqa: F811
     callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
-    return Hub.current.configure_scope(callback)
+    """
+    .. deprecated:: 2.0.0
+        This function is deprecated and will be removed in a future release.
+
+    Reconfigures the scope.
+
+    :param callback: If provided, call the callback with the current scope.
+
+    :returns: If no callback is provided, returns a context manager that returns the scope.
+    """
+    scope = Scope.get_isolation_scope()
+    scope.generate_propagation_context()
+
+    if callback is not None:
+        # TODO: used to return None when client is None. Check if this changes behavior.
+        callback(scope)
+
+        return None
+
+    @contextmanager
+    def inner():
+        # type: () -> Generator[Scope, None, None]
+        yield scope
+
+    return inner()
 
 
 @overload
@@ -196,12 +211,42 @@ def push_scope(  # noqa: F811
     pass
 
 
-@hubmethod
 def push_scope(  # noqa: F811
     callback=None,  # type: Optional[Callable[[Scope], None]]
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
-    return Hub.current.push_scope(callback)
+    """
+    .. deprecated:: 2.0.0
+        This function is deprecated and will be removed in a future release.
+
+    Pushes a new layer on the scope stack.
+
+    :param callback: If provided, this method pushes a scope, calls
+        `callback`, and pops the scope again.
+
+    :returns: If no `callback` is provided, a context manager that should
+        be used to pop the scope again.
+    """
+
+    class _ScopeManager:
+        def __init__(self):
+            # type: () -> None
+            pass
+
+        def __enter__(self):
+            # type: () -> Scope
+            return Scope.get_isolation_scope()
+
+        def __exit__(self, exc_type, exc_value, tb):
+            # type: (Any, Any, Any) -> None
+            pass
+
+    if callback is not None:
+        with push_scope() as scope:
+            callback(scope)
+        return None
+
+    return _ScopeManager()
 
 
 @scopemethod
