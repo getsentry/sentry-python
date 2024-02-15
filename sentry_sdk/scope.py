@@ -1545,6 +1545,5 @@ def use_isolation_scope(isolation_scope):
         # restore original scope
         _isolation_scope.reset(isolation_token)
 
-
 # Circular imports
 from sentry_sdk.client import NonRecordingClient

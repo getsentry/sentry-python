@@ -720,20 +720,6 @@ class _Client(BaseClient):
         for attachment in attachments or ():
             envelope.add_item(attachment.to_envelope_item())
 
-        print("~~~ envelope ~~~")
-        import json
-
-        print('{"envelope": [')
-        print(json.dumps(envelope.headers))
-        print(",")
-        for item in envelope.items:
-            print(json.dumps(item.headers))
-            print(",")
-            print(json.dumps(item.payload.json))
-            print(",")
-        print("]}")
-        print("~~~ end ~~~")
-
         if self.spotlight:
             self.spotlight.capture_envelope(envelope)
 
