@@ -33,10 +33,10 @@ class ThreadingIntegration(Integration):
             logger.warning(
                 "Deprecated: propagate_hub is deprecated. This will be removed in the future."
             )
-        
+
         # Note: propagate_hub did not have any effect on propagation of scope data
         # scope data was always propagated no matter what the value of propagate_hub was
-            
+
         self.propagate_scope = propagate_scope
 
     @staticmethod
@@ -70,7 +70,7 @@ class ThreadingIntegration(Integration):
 
 
 def _wrap_run(scope_to_use, old_run_func):
-    # type: (Scope, F) -> F
+    # type: (Optional[Scope], F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any
