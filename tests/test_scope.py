@@ -182,8 +182,8 @@ def test_user_reset(sentry_init, capture_events):
     scope = Scope()
     assert scope._user is None
 
-    scope.set_user({"email": "lucy@dogs.com"})
-    assert scope._user == {"id": 23, "email": "lucy@dogs.com"}
+    scope.set_user({"id": 23, "email": "dottie@dogs.com"})
+    assert scope._user == {"id": 23, "email": "dottie@dogs.com"}
 
     scope.set_user({})
     assert scope._user is None
