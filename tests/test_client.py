@@ -5,8 +5,8 @@ import pytest
 import subprocess
 import sys
 import time
-
 from textwrap import dedent
+
 from sentry_sdk import (
     Hub,
     Client,
@@ -1320,22 +1320,37 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
 
 @pytest.mark.forked
 @pytest.mark.parametrize(
-    "opt,warning",
+    "opt,missing_flags",
     [
-        [{"enable-threads": True, "lazy-apps": True}, None],
-        [{"enable-threads": True, "py-call-uwsgi-fork-hooks": True}, None],
-        [{}, True],
-        [{"enable-threads": True}, True],
-        [{"py-call-uwsgi-fork-hooks": True}, True],
-        [{"lazy-apps": True}, True],
+        # lazy mode with enable-threads, no warning
+        [{"enable-threads": True, "lazy-apps": True}, []],
+        [{"enable-threads": "true", "lazy-apps": b"1"}, []],
+        # preforking mode with enable-threads and py-call-uwsgi-fork-hooks, no warning
+        [{"enable-threads": True, "py-call-uwsgi-fork-hooks": True}, []],
+        [{"enable-threads": b"true", "py-call-uwsgi-fork-hooks": b"on"}, []],
+        # lazy mode, no enable-threads, warning
+        [{"lazy-apps": True}, ["--enable-threads"]],
+        [{"enable-threads": b"false", "lazy-apps": True}, ["--enable-threads"]],
+        # preforking mode, no enable-threads or py-call-uwsgi-fork-hooks, warning
+        [{}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
+        [{"processes": b"2"}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
+        [{"enable-threads": True}, ["--py-call-uwsgi-fork-hooks"]],
+        [
+            {"enable-threads": b"false"},
+            ["--enable-threads", "--py-call-uwsgi-fork-hooks"],
+        ],
+        [{"py-call-uwsgi-fork-hooks": True}, ["--enable-threads"]],
     ],
 )
-def test_uwsgi_warnings(sentry_init, recwarn, opt, warning):
+def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
     with mock.patch.dict("sys.modules", uwsgi=uwsgi):
         sentry_init(profiles_sample_rate=1.0)
-        if warning:
-            assert recwarn
+        if missing_flags:
+            assert len(recwarn) == 1
+            record = recwarn.pop()
+            for flag in missing_flags:
+                assert flag in str(record.message)
         else:
             assert not recwarn

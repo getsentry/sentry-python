@@ -3,6 +3,7 @@ import contextlib
 from datetime import datetime, timedelta
 from functools import wraps
 
+from sentry_sdk.consts import FALSE_VALUES
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -151,7 +152,7 @@ def check_uwsgi_thread_support():
     #    the --py-call-uwsgi-fork-hooks option for the SDK to work properly. This
     #    is because any background threads spawned before the main process is
     #    forked are NOT CLEANED UP IN THE CHILDREN BY DEFAULT even if
-    #    --enable-threads is on. One has to also explicitly provide
+    #    --enable-threads is on. One has to explicitly provide
     #    --py-call-uwsgi-fork-hooks to force uWSGI to run regular cpython
     #    after-fork hooks that take care of cleaning up stale thread data.
     try:
@@ -159,11 +160,24 @@ def check_uwsgi_thread_support():
     except ImportError:
         return True
 
+    def enabled(option):
+        value = opt.get(option, False)
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, bytes):
+            try:
+                value = value.decode()
+            except:  # noqa: E722
+                pass
+
+        return value and str(value).lower() not in FALSE_VALUES
+
     # When `threads` is passed in as a uwsgi option,
     # `enable-threads` is implied on.
-    threads_enabled = bool("threads" in opt or opt.get("enable-threads"))
-    fork_hooks_on = bool(opt.get("py-call-uwsgi-fork-hooks"))
-    lazy_mode = bool(opt.get("lazy-apps") or opt.get("lazy"))
+    threads_enabled = "threads" in opt or enabled("enable-threads")
+    fork_hooks_on = enabled("py-call-uwsgi-fork-hooks")
+    lazy_mode = enabled("lazy-apps") or enabled("lazy")
 
     if lazy_mode and not threads_enabled:
         from warnings import warn
@@ -179,7 +193,7 @@ def check_uwsgi_thread_support():
 
         return False
 
-    elif not lazy_mode and not (threads_enabled and fork_hooks_on):
+    elif not lazy_mode and (not threads_enabled or not fork_hooks_on):
         from warnings import warn
 
         warn(
