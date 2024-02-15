@@ -191,4 +191,4 @@ def test_user_reset(sentry_init, capture_events):
     capture_exception(NameError(), scope=scope)
 
     (event,) = events
-    assert not event["user"]
+    assert "user" not in event
