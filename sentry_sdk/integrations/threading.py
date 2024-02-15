@@ -27,18 +27,17 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(self, propagate_hub=None, propagate_scope=False):
+    def __init__(self, propagate_hub=None, propagate_scope=True):
         # type: (Optional[bool], bool) -> None
         if propagate_hub is not None:
             logger.warning(
-                "Deprecated: propagate_hub is deprecated. Use propagate_scope instead. This will be removed in the future."
+                "Deprecated: propagate_hub is deprecated. This will be removed in the future."
             )
+        
+        # Note: propagate_hub did not have any effect on propagation of scope data
+        # scope data was always propagated no matter what the value of propagate_hub was
+            
         self.propagate_scope = propagate_scope
-
-        # For backwards compatiblity when users set propagate_hub use this as propagate_scope.
-        # Remove this when propagate_hub is removed.
-        if propagate_hub is not None:
-            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once():
@@ -70,8 +69,8 @@ class ThreadingIntegration(Integration):
         Thread.start = sentry_start  # type: ignore
 
 
-def _wrap_run(scope, old_run_func):
-    # type: (Optional[Scope], F) -> F
+def _wrap_run(scope_to_use, old_run_func):
+    # type: (Scope, F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any
@@ -83,11 +82,11 @@ def _wrap_run(scope, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-        if scope is not None:
-            with use_isolation_scope(scope):
-                return _run_old_run_func()
-        else:
+        if scope_to_use is None:
             return _run_old_run_func()
+        else:
+            with use_isolation_scope(scope_to_use):
+                return _run_old_run_func()
 
     return run  # type: ignore
 
