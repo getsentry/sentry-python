@@ -168,7 +168,7 @@ def check_uwsgi_thread_support():
         if isinstance(value, bytes):
             try:
                 value = value.decode()
-            except:  # noqa: E722
+            except Exception:
                 pass
 
         return value and str(value).lower() not in FALSE_VALUES
