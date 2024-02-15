@@ -509,11 +509,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             "Hub.start_span()",
         )
         scope = Scope.get_isolation_scope()
-
-        # For backwards compatibility, we allow passing the scope as the hub.
-        # We need a major release to make this nice. (if someone searches the code: deprecated)
-        kwargs["hub"] = scope
-
         return scope.start_span(span=span, instrumenter=instrumenter, **kwargs)
 
     def start_transaction(

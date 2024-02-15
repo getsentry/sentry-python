@@ -106,6 +106,7 @@ class Span:
         "_context_manager_state",
         "_containing_transaction",
         "_local_aggregator",
+        "scope",
     )
 
     def __new__(cls, **kwargs):
@@ -131,11 +132,12 @@ class Span:
         sampled=None,  # type: Optional[bool]
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
-        hub=None,  # type: Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]]
+        hub=None,  # type: Optional[sentry_sdk.Hub]  # deprecated
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
+        scope=None,  # type: Optional[sentry_sdk.Scope]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -147,6 +149,7 @@ class Span:
         self.description = description
         self.status = status
         self.hub = hub
+        self.scope = scope
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
@@ -199,14 +202,10 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        scope = sentry_sdk.Scope.get_isolation_scope()
-        # For backwards compatibility, we allow passing the scope as the hub.
-        # We need a major release to make this nice. (if someone searches the code: deprecated)
-        hub = self.hub or scope
-
+        scope = self.scope or sentry_sdk.Scope.get_isolation_scope()
         old_span = scope.span
         scope.span = self
-        self._context_manager_state = (hub, scope, old_span)
+        self._context_manager_state = (scope, old_span)
         return self
 
     def __exit__(self, ty, value, tb):
@@ -214,9 +213,9 @@ class Span:
         if value is not None:
             self.set_status("internal_error")
 
-        hub, scope, old_span = self._context_manager_state
+        scope, old_span = self._context_manager_state
         del self._context_manager_state
-        self.finish(hub)
+        self.finish(scope)
         scope.span = old_span
 
     @property
@@ -447,30 +446,27 @@ class Span:
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
-        # Note: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
-        # to incompatible return types for Span.finish and Transaction.finish.
-        """Sets the end timestamp of the span.
+    def finish(self, scope=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
+        """
+        Sets the end timestamp of the span.
+
         Additionally it also creates a breadcrumb from the span,
         if the span represents a database or HTTP request.
 
-        :param hub: The hub to use for this transaction.
-            If not provided, the current hub will be used.
+        :param scope: The scope to use for this transaction.
+            If not provided, the active isolation scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
 
         :return: Always ``None``. The type is ``Optional[str]`` to match
             the return value of :py:meth:`sentry_sdk.tracing.Transaction.finish`.
         """
-
         if self.timestamp is not None:
             # This span is already finished, ignore.
             return None
 
-        # For backwards compatibility, we allow passing the scope as the hub.
-        # We need a major release to make this nice. (if someone searches the code: deprecated)
-        hub = hub or self.hub or sentry_sdk.Scope.get_isolation_scope()
+        scope = scope or sentry_sdk.Scope.get_isolation_scope()
 
         try:
             if end_timestamp:
@@ -485,7 +481,7 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        maybe_create_breadcrumbs_from_span(hub, self)
+        maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
 

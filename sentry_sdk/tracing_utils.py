@@ -148,27 +148,17 @@ def record_sql_queries(
         yield span
 
 
-def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (Union[sentry_sdk.Hub, sentry_sdk.Scope], sentry_sdk.tracing.Span) -> None
-
-    if type(hub) is sentry_sdk.Hub:
-        # For backwards compatibility, we allow passing the scope as the hub.
-        # We need a major release to make this nice. (if someone searches the code: deprecated)
-        # In the SDKs codebase a Hub that is not Hub.current is never passed in here, but it is probably
-        # done by users.
-        logger.warning(
-            "Deprecated: The Hub will be replaced by the Scope. Please use the Scope instead of the Hub."
-        )
-        hub = sentry_sdk.Scope.get_isolation_scope()
+def maybe_create_breadcrumbs_from_span(scope, span):
+    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
 
     if span.op == OP.DB_REDIS:
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
     elif span.op == OP.HTTP_CLIENT:
-        hub.add_breadcrumb(type="http", category="httplib", data=span._data)
+        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             type="subprocess",
             category="subprocess",
             message=span.description,
@@ -526,7 +516,7 @@ def start_child_span_decorator(func):
         async def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span = get_current_span(sentry_sdk.Hub.current)
+            span = get_current_span(sentry_sdk.Scope.get_isolation_scope())
 
             if span is None:
                 logger.warning(
@@ -549,7 +539,7 @@ def start_child_span_decorator(func):
         def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span = get_current_span(sentry_sdk.Hub.current)
+            span = get_current_span(sentry_sdk.Scope.get_isolation_scope())
 
             if span is None:
                 logger.warning(
@@ -568,15 +558,13 @@ def start_child_span_decorator(func):
     return func_with_tracing
 
 
-def get_current_span(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Optional[Span]
+def get_current_span(scope=None):
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    if hub is None:
-        hub = sentry_sdk.Hub.current
-
-    current_span = hub.scope.span
+    scope = scope or sentry_sdk.Scope.get_isolation_scope()
+    current_span = scope.span
     return current_span
 
 

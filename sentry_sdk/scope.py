@@ -156,6 +156,7 @@ class Scope(object):
         "_propagation_context",
         "client",
         "_type",
+        "_last_event_id",
     )
 
     def __init__(self, ty=None, client=None):
@@ -167,6 +168,7 @@ class Scope(object):
 
         self._name = None  # type: Optional[str]
         self._propagation_context = None  # type: Optional[Dict[str, Any]]
+        self._last_event_id = None  # type: Optional[str]  # deprecated
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -278,6 +280,16 @@ class Scope(object):
             _global_scope = Scope(ty=ScopeType.GLOBAL)
 
         return _global_scope
+
+    def last_event_id(self):
+        # type: () -> Optional[str]
+        """
+        .. deprecated:: 2.0.0
+            This function is deprecated and will be removed in a future release.
+
+        Returns the last event ID.
+        """
+        return self._last_event_id
 
     @classmethod
     def _merge_scopes(cls, additional_scope=None, additional_scope_kwargs=None):
@@ -903,6 +915,8 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
+        kwargs.setdefault("scope", self)
+
         client = Scope.get_client()
 
         configuration_instrumenter = client.options["instrumenter"]
@@ -953,6 +967,8 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
+        kwargs.setdefault("scope", self)
+
         client = Scope.get_client()
 
         configuration_instrumenter = client.options["instrumenter"]
@@ -1040,7 +1056,15 @@ class Scope(object):
         """
         scope = Scope._merge_scopes(scope, scope_kwargs)
 
-        return Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
+        last_event_id = Scope.get_client().capture_event(
+            event=event, hint=hint, scope=scope
+        )
+
+        is_transaction = event.get("type") == "transaction"
+        if last_event_id is not None and not is_transaction:
+            self._last_event_id = last_event_id
+
+        return last_event_id
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]

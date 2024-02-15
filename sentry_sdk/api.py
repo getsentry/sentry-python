@@ -243,10 +243,10 @@ def flush(
     return Scope.get_client().flush(timeout=timeout, callback=callback)
 
 
-@hubmethod
+@scopemethod
 def last_event_id():
     # type: () -> Optional[str]
-    return Hub.current.last_event_id()
+    return Scope.get_current_scope().last_event_id()
 
 
 @scopemethod
@@ -255,7 +255,7 @@ def start_span(
     **kwargs  # type: Any
 ):
     # type: (...) -> Span
-    return Hub.current.start_span(span=span, **kwargs)
+    return Scope.get_isolation_scope().start_span(span=span, **kwargs)
 
 
 @scopemethod
@@ -264,7 +264,7 @@ def start_transaction(
     **kwargs  # type: Any
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
-    return Hub.current.start_transaction(transaction, **kwargs)
+    return Scope.get_isolation_scope().start_transaction(transaction, **kwargs)
 
 
 def set_measurement(name, value, unit=""):
@@ -274,12 +274,12 @@ def set_measurement(name, value, unit=""):
         transaction.set_measurement(name, value, unit)
 
 
-def get_current_span(hub=None):
-    # type: (Optional[Hub]) -> Optional[Span]
+def get_current_span(scope=None):
+    # type: (Optional[Scope]) -> Optional[Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    return tracing_utils.get_current_span(hub)
+    return tracing_utils.get_current_span(scope)
 
 
 def get_traceparent():
