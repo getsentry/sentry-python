@@ -40,7 +40,6 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
-@minimum_python_37
 @pytest.mark.parametrize("propagate_hub", (True, False))
 def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     sentry_init(
@@ -78,7 +77,6 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
         assert "stage1" not in event.get("tags", {})
 
 
-@minimum_python_37
 @pytest.mark.parametrize("propagate_hub", (True, False))
 def test_propagates_threadpool_hub(sentry_init, capture_events, propagate_hub):
     sentry_init(

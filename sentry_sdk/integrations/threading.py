@@ -36,8 +36,12 @@ class ThreadingIntegration(Integration):
 
         # Note: propagate_hub did not have any effect on propagation of scope data
         # scope data was always propagated no matter what the value of propagate_hub was
+        # This is why the default for propagate_scope is True
 
         self.propagate_scope = propagate_scope
+
+        if propagate_hub is not None:
+            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once():
