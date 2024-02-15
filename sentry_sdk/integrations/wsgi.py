@@ -11,6 +11,7 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.sessions import (
     auto_session_tracking_scope as auto_session_tracking,
 )  # When the Hub is removed, this should be renamed (see comment in sentry_sdk/sessions.py)
+from sentry_sdk.scope import use_isolation_scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ContextVar,
@@ -194,7 +195,7 @@ def _capture_exception():
 
 class _ScopedResponse:
     """
-    Creates a scope for each response chunk.
+    Users a separate scope for each response chunk.
 
     This will make WSGI apps more tolerant against:
     - WSGI servers streaming responses from a different thread/from
@@ -215,7 +216,7 @@ class _ScopedResponse:
         iterator = iter(self._response)
 
         while True:
-            with sentry_sdk.isolation_scope(self._scope):
+            with use_isolation_scope(self._scope):
                 try:
                     chunk = next(iterator)
                 except StopIteration:
@@ -227,7 +228,7 @@ class _ScopedResponse:
 
     def close(self):
         # type: () -> None
-        with sentry_sdk.isolation_scope(self._scope):
+        with use_isolation_scope(self._scope):
             try:
                 self._response.close()  # type: ignore
             except AttributeError:

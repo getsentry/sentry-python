@@ -1472,13 +1472,12 @@ def new_scope(scope=None):
 
 
 @contextmanager
-def isolation_scope(isolation_scope=None):
-    # type: (Optional[Scope]) -> Generator[Scope, None, None]
+def isolation_scope():
+    # type: () -> Generator[Scope, None, None]
     """
     .. versionadded:: 2.0.0
 
-    Context manager that either uses the given `isolation_scope` or
-    forks the current isolation scope and runs the wrapped code in it.
+    Context manager that forks the current isolation scope and runs the wrapped code in it.
     The current scope is also forked.
     After the wrapped code is executed, the original scopes are restored.
 
@@ -1500,14 +1499,9 @@ def isolation_scope(isolation_scope=None):
     forked_current_scope = current_scope.fork()
     current_token = _current_scope.set(forked_current_scope)
 
-    if isolation_scope is not None:
-        # use given scope
-        new_isolation_scope = isolation_scope
-    else:
-        # fork isolation scope
-        isolation_scope = Scope.get_isolation_scope()
-        new_isolation_scope = isolation_scope.fork()
-
+    # fork isolation scope
+    isolation_scope = Scope.get_isolation_scope()
+    new_isolation_scope = isolation_scope.fork()
     isolation_token = _isolation_scope.set(new_isolation_scope)
 
     try:
@@ -1518,6 +1512,38 @@ def isolation_scope(isolation_scope=None):
         _current_scope.reset(current_token)
         _isolation_scope.reset(isolation_token)
 
+
+@contextmanager
+def use_isolation_scope(isolation_scope):
+    # type: (Scope) -> Generator[Scope, None, None]
+    """
+    .. versionadded:: 2.0.0
+
+    Context manager that uses the given `isolation_scope` and runs the wrapped code in it.
+    After the wrapped code is executed, the original isolation scope is restored.
+
+    Example Usage:
+
+    .. code-block:: python
+
+        import sentry_sdk
+
+        with sentry_sdk.isolation_scope() as scope:
+            scope.set_tag("color", "green")
+            sentry_sdk.capture_message("hello") # will include `color` tag.
+
+        sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
+
+    """
+    # set given scope as isolation scope
+    isolation_token = _isolation_scope.set(isolation_scope)
+
+    try:
+        yield isolation_scope
+
+    finally:
+        # restore original scope
+        _isolation_scope.reset(isolation_token)
 
 # Circular imports
 from sentry_sdk.client import NonRecordingClient

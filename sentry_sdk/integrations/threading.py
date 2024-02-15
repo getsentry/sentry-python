@@ -5,7 +5,7 @@ from threading import Thread, current_thread
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, use_isolation_scope
 from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
@@ -84,7 +84,7 @@ def _wrap_run(scope, old_run_func):
                 reraise(*_capture_exception())
 
         if scope is not None:
-            with sentry_sdk.isolation_scope(scope):
+            with use_isolation_scope(scope):
                 return _run_old_run_func()
         else:
             return _run_old_run_func()
