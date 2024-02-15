@@ -1331,10 +1331,12 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
         # lazy mode, no enable-threads, warning
         [{"lazy-apps": True}, ["--enable-threads"]],
         [{"enable-threads": b"false", "lazy-apps": True}, ["--enable-threads"]],
+        [{"enable-threads": b"0", "lazy": True}, ["--enable-threads"]],
         # preforking mode, no enable-threads or py-call-uwsgi-fork-hooks, warning
         [{}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
         [{"processes": b"2"}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
         [{"enable-threads": True}, ["--py-call-uwsgi-fork-hooks"]],
+        [{"enable-threads": b"1"}, ["--py-call-uwsgi-fork-hooks"]],
         [
             {"enable-threads": b"false"},
             ["--enable-threads", "--py-call-uwsgi-fork-hooks"],
