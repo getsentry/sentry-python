@@ -3,7 +3,6 @@ import contextlib
 from datetime import datetime, timedelta
 from functools import wraps
 
-from sentry_sdk.consts import FALSE_VALUES
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -160,7 +159,10 @@ def check_uwsgi_thread_support():
     except ImportError:
         return True
 
+    from sentry_sdk.consts import FALSE_VALUES
+
     def enabled(option):
+        # type: (str) -> bool
         value = opt.get(option, False)
         if isinstance(value, bool):
             return value
