@@ -154,3 +154,41 @@ def test_load_trace_data_from_env(env, excepted_value):
         s = Scope()
         incoming_trace_data = s._load_trace_data_from_env()
         assert incoming_trace_data == excepted_value
+
+
+def test_user_update(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    scope = Scope()
+    assert scope._user is None
+
+    scope.set_user({"id": 23})
+    assert scope._user == {"id": 23}
+
+    scope.set_user({"email": "lucy@dogs.com"})
+    assert scope._user == {"id": 23, "email": "lucy@dogs.com"}
+
+    capture_exception(NameError(), scope=scope)
+
+    (event,) = events
+    assert event["user"] == {"id": 23, "email": "lucy@dogs.com"}
+
+
+def test_user_reset(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    scope = Scope()
+    assert scope._user is None
+
+    scope.set_user({"email": "lucy@dogs.com"})
+    assert scope._user == {"id": 23, "email": "lucy@dogs.com"}
+
+    scope.set_user({})
+    assert scope._user is None
+
+    capture_exception(NameError(), scope=scope)
+
+    (event,) = events
+    assert not event["user"]

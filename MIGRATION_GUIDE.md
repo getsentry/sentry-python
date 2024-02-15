@@ -8,6 +8,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
 ## Changed
 
+- Subsequent calls to `sentry_sdk.set_user` will now update existing user data instead of overwriting it. To erase user data, call the function with an empty dictionary: `sentry_sdk.set_user({})`
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 - Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
