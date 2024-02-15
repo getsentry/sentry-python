@@ -1,6 +1,5 @@
 import copy
 import sys
-
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
