@@ -171,7 +171,7 @@ def check_uwsgi_thread_support():
         warn(
             Warning(
                 "We detected the use of uWSGI without thread support. "
-                "This might lead to unexpected issues with the Sentry SDK. "
+                "This might lead to unexpected issues. "
                 'Please run uWSGI with "--enable-threads" for full support.'
             )
         )
