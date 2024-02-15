@@ -185,7 +185,7 @@ def check_uwsgi_thread_support():
             Warning(
                 "We detected the use of uWSGI in preforking mode without "
                 "thread support. This might lead to crashing workers. "
-                'Please run uWSGI with the both "--enable-threads" and '
+                'Please run uWSGI with both "--enable-threads" and '
                 '"--py-call-uwsgi-fork-hooks" for full support.'
             )
         )
