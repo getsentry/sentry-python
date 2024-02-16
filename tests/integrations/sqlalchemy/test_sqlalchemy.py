@@ -450,7 +450,10 @@ def test_query_source(sentry_init, capture_events):
         raise AssertionError("No db span found")
 
 
-def test_query_source_with_edited_sys_path(sentry_init, capture_events):
+def test_query_source_with_module_in_search_path(sentry_init, capture_events):
+    """
+    Test that query source is relative to the path of the module it ran in
+    """
     sentry_init(
         integrations=[SqlalchemyIntegration()],
         enable_tracing=True,

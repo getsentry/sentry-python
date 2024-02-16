@@ -171,7 +171,10 @@ def test_query_source(sentry_init, client, capture_events):
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_with_edited_sys_path(sentry_init, client, capture_events):
+def test_query_source_with_module_in_search_path(sentry_init, client, capture_events):
+    """
+    Test that query source is relative to the path of the module it ran in
+    """
     client = Client(application)
 
     sentry_init(
