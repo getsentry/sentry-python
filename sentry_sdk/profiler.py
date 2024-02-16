@@ -882,7 +882,7 @@ class ThreadScheduler(Scheduler):
 
     def __init__(self, frequency):
         # type: (int) -> None
-        super(ThreadScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -982,7 +982,7 @@ class GeventScheduler(Scheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False

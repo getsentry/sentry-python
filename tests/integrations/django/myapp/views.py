@@ -126,7 +126,7 @@ class ClassBasedView(ListView):
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
-        return super(ClassBasedView, self).dispatch(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
     def head(self, *args, **kwargs):
         sentry_sdk.capture_message("hi")
