@@ -6,11 +6,11 @@ from unittest import mock
 from sentry_sdk import scope
 from sentry_sdk import (
     capture_exception,
-    new_scope,
     isolation_scope,
+    new_scope,
 )
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.scope import Scope, ScopeType
+from sentry_sdk.scope import Scope, ScopeType, use_isolation_scope, use_scope
 
 
 @pytest.fixture
@@ -268,7 +268,7 @@ def test_get_global_scope_tags(clean_scopes):
     assert not global_scope2.client.is_active()
 
 
-def test_get_global_with_scope():
+def test_get_global_with_scope(clean_scopes):
     original_global_scope = Scope.get_global_scope()
 
     with new_scope() as scope:
@@ -281,7 +281,7 @@ def test_get_global_with_scope():
     assert after_with_global_scope is original_global_scope
 
 
-def test_get_global_with_isolation_scope():
+def test_get_global_with_isolation_scope(clean_scopes):
     original_global_scope = Scope.get_global_scope()
 
     with isolation_scope() as scope:
@@ -313,25 +313,7 @@ def test_get_isolation_scope_tags(clean_scopes):
     assert not isolation_scope2.client.is_active()
 
 
-def test_with_isolation_scope():
-    original_current_scope = Scope.get_current_scope()
-    original_isolation_scope = Scope.get_isolation_scope()
-
-    with isolation_scope() as scope:
-        in_with_current_scope = Scope.get_current_scope()
-        in_with_isolation_scope = Scope.get_isolation_scope()
-
-        assert scope is in_with_isolation_scope
-        assert in_with_current_scope is not original_current_scope
-        assert in_with_isolation_scope is not original_isolation_scope
-
-    after_with_current_scope = Scope.get_current_scope()
-    after_with_isolation_scope = Scope.get_isolation_scope()
-    assert after_with_current_scope is original_current_scope
-    assert after_with_isolation_scope is original_isolation_scope
-
-
-def test_get_current_scope_tags():
+def test_get_current_scope_tags(clean_scopes):
     scope1 = Scope.get_current_scope()
     scope2 = Scope.get_current_scope()
     assert id(scope1) == id(scope2)
@@ -350,11 +332,243 @@ def test_get_current_scope_tags():
     assert not scope2.client.is_active()
 
 
-def test_with_new_scope():
+def test_with_isolation_scope(clean_scopes):
+    original_current_scope = Scope.get_current_scope()
+    original_isolation_scope = Scope.get_isolation_scope()
+
+    with isolation_scope() as scope:
+        assert scope._type == ScopeType.ISOLATION
+
+        in_with_current_scope = Scope.get_current_scope()
+        in_with_isolation_scope = Scope.get_isolation_scope()
+
+        assert scope is in_with_isolation_scope
+        assert in_with_current_scope is not original_current_scope
+        assert in_with_isolation_scope is not original_isolation_scope
+
+    after_with_current_scope = Scope.get_current_scope()
+    after_with_isolation_scope = Scope.get_isolation_scope()
+    assert after_with_current_scope is original_current_scope
+    assert after_with_isolation_scope is original_isolation_scope
+
+
+def test_with_isolation_scope_data(clean_scopes):
+    """
+    When doing `with isolation_scope()` the isolation *and* the current scope are forked,
+    to prevent that by setting tags on the current scope in the context manager, data
+    bleads to the outer current scope.
+    """
+    isolation_scope_before = Scope.get_isolation_scope()
+    current_scope_before = Scope.get_current_scope()
+
+    isolation_scope_before.set_tag("before_isolation_scope", 1)
+    current_scope_before.set_tag("before_current_scope", 1)
+
+    with isolation_scope() as scope:
+        assert scope._type == ScopeType.ISOLATION
+
+        isolation_scope_in = Scope.get_isolation_scope()
+        current_scope_in = Scope.get_current_scope()
+
+        assert isolation_scope_in._tags == {"before_isolation_scope": 1}
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {"before_isolation_scope": 1}
+
+        scope.set_tag("in_with_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_scope": 1,
+        }
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {"before_isolation_scope": 1, "in_with_scope": 1}
+
+        isolation_scope_in.set_tag("in_with_isolation_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {
+            "before_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+
+        current_scope_in.set_tag("in_with_current_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {
+            "before_current_scope": 1,
+            "in_with_current_scope": 1,
+        }
+        assert scope._tags == {
+            "before_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+
+    isolation_scope_after = Scope.get_isolation_scope()
+    current_scope_after = Scope.get_current_scope()
+
+    isolation_scope_after.set_tag("after_isolation_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {"before_current_scope": 1}
+
+    current_scope_after.set_tag("after_current_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {
+        "before_current_scope": 1,
+        "after_current_scope": 1,
+    }
+
+
+def test_with_use_isolation_scope(clean_scopes):
+    original_isolation_scope = Scope.get_isolation_scope()
+    original_current_scope = Scope.get_current_scope()
+    custom_isolation_scope = Scope()
+
+    with use_isolation_scope(custom_isolation_scope) as scope:
+        assert scope._type is None  # our custom scope has not type set
+
+        in_with_isolation_scope = Scope.get_isolation_scope()
+        in_with_current_scope = Scope.get_current_scope()
+
+        assert scope is custom_isolation_scope
+        assert scope is in_with_isolation_scope
+        assert scope is not in_with_current_scope
+        assert scope is not original_isolation_scope
+        assert scope is not original_current_scope
+        assert in_with_isolation_scope is not original_isolation_scope
+        assert in_with_current_scope is not original_current_scope
+
+    after_with_current_scope = Scope.get_current_scope()
+    after_with_isolation_scope = Scope.get_isolation_scope()
+
+    assert after_with_isolation_scope is original_isolation_scope
+    assert after_with_current_scope is original_current_scope
+    assert after_with_isolation_scope is not custom_isolation_scope
+    assert after_with_current_scope is not custom_isolation_scope
+
+
+def test_with_use_isolation_scope_data(clean_scopes):
+    isolation_scope_before = Scope.get_isolation_scope()
+    current_scope_before = Scope.get_current_scope()
+    custom_isolation_scope = Scope()
+
+    isolation_scope_before.set_tag("before_isolation_scope", 1)
+    current_scope_before.set_tag("before_current_scope", 1)
+    custom_isolation_scope.set_tag("before_custom_isolation_scope", 1)
+
+    with use_isolation_scope(custom_isolation_scope) as scope:
+        assert scope._type is None  # our custom scope has not type set
+
+        isolation_scope_in = Scope.get_isolation_scope()
+        current_scope_in = Scope.get_current_scope()
+
+        assert isolation_scope_in._tags == {"before_custom_isolation_scope": 1}
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {"before_custom_isolation_scope": 1}
+
+        scope.set_tag("in_with_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_custom_isolation_scope": 1,
+            "in_with_scope": 1,
+        }
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {"before_custom_isolation_scope": 1, "in_with_scope": 1}
+
+        isolation_scope_in.set_tag("in_with_isolation_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_custom_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {
+            "before_custom_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+
+        current_scope_in.set_tag("in_with_current_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_custom_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {
+            "before_current_scope": 1,
+            "in_with_current_scope": 1,
+        }
+        assert scope._tags == {
+            "before_custom_isolation_scope": 1,
+            "in_with_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+
+    assert custom_isolation_scope._tags == {
+        "before_custom_isolation_scope": 1,
+        "in_with_scope": 1,
+        "in_with_isolation_scope": 1,
+    }
+    isolation_scope_after = Scope.get_isolation_scope()
+    current_scope_after = Scope.get_current_scope()
+
+    isolation_scope_after.set_tag("after_isolation_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {"before_current_scope": 1}
+    assert custom_isolation_scope._tags == {
+        "before_custom_isolation_scope": 1,
+        "in_with_scope": 1,
+        "in_with_isolation_scope": 1,
+    }
+
+    current_scope_after.set_tag("after_current_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {
+        "before_current_scope": 1,
+        "after_current_scope": 1,
+    }
+    assert custom_isolation_scope._tags == {
+        "before_custom_isolation_scope": 1,
+        "in_with_scope": 1,
+        "in_with_isolation_scope": 1,
+    }
+
+
+def test_with_new_scope(clean_scopes):
     original_current_scope = Scope.get_current_scope()
     original_isolation_scope = Scope.get_isolation_scope()
 
     with new_scope() as scope:
+        assert scope._type == ScopeType.CURRENT
+
         in_with_current_scope = Scope.get_current_scope()
         in_with_isolation_scope = Scope.get_isolation_scope()
 
@@ -366,3 +580,178 @@ def test_with_new_scope():
     after_with_isolation_scope = Scope.get_isolation_scope()
     assert after_with_current_scope is original_current_scope
     assert after_with_isolation_scope is original_isolation_scope
+
+
+def test_with_new_scope_data(clean_scopes):
+    """
+    When doing `with new_scope()` the current scope is forked but the isolation
+    scope stays untouched.
+    """
+    isolation_scope_before = Scope.get_isolation_scope()
+    current_scope_before = Scope.get_current_scope()
+
+    isolation_scope_before.set_tag("before_isolation_scope", 1)
+    current_scope_before.set_tag("before_current_scope", 1)
+
+    with new_scope() as scope:
+        assert scope._type == ScopeType.CURRENT
+
+        isolation_scope_in = Scope.get_isolation_scope()
+        current_scope_in = Scope.get_current_scope()
+
+        assert isolation_scope_in._tags == {"before_isolation_scope": 1}
+        assert current_scope_in._tags == {"before_current_scope": 1}
+        assert scope._tags == {"before_current_scope": 1}
+
+        scope.set_tag("in_with_scope", 1)
+
+        assert isolation_scope_in._tags == {"before_isolation_scope": 1}
+        assert current_scope_in._tags == {"before_current_scope": 1, "in_with_scope": 1}
+        assert scope._tags == {"before_current_scope": 1, "in_with_scope": 1}
+
+        isolation_scope_in.set_tag("in_with_isolation_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {"before_current_scope": 1, "in_with_scope": 1}
+        assert scope._tags == {"before_current_scope": 1, "in_with_scope": 1}
+
+        current_scope_in.set_tag("in_with_current_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {
+            "before_current_scope": 1,
+            "in_with_scope": 1,
+            "in_with_current_scope": 1,
+        }
+        assert scope._tags == {
+            "before_current_scope": 1,
+            "in_with_scope": 1,
+            "in_with_current_scope": 1,
+        }
+
+    isolation_scope_after = Scope.get_isolation_scope()
+    current_scope_after = Scope.get_current_scope()
+
+    isolation_scope_after.set_tag("after_isolation_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "in_with_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {"before_current_scope": 1}
+
+    current_scope_after.set_tag("after_current_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "in_with_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {
+        "before_current_scope": 1,
+        "after_current_scope": 1,
+    }
+
+
+def test_with_use_scope_data(clean_scopes):
+    isolation_scope_before = Scope.get_isolation_scope()
+    current_scope_before = Scope.get_current_scope()
+    custom_current_scope = Scope()
+
+    isolation_scope_before.set_tag("before_isolation_scope", 1)
+    current_scope_before.set_tag("before_current_scope", 1)
+    custom_current_scope.set_tag("before_custom_current_scope", 1)
+
+    with use_scope(custom_current_scope) as scope:
+        assert scope._type is None  # our custom scope has not type set
+
+        isolation_scope_in = Scope.get_isolation_scope()
+        current_scope_in = Scope.get_current_scope()
+
+        assert isolation_scope_in._tags == {"before_isolation_scope": 1}
+        assert current_scope_in._tags == {"before_custom_current_scope": 1}
+        assert scope._tags == {"before_custom_current_scope": 1}
+
+        scope.set_tag("in_with_scope", 1)
+
+        assert isolation_scope_in._tags == {"before_isolation_scope": 1}
+        assert current_scope_in._tags == {
+            "before_custom_current_scope": 1,
+            "in_with_scope": 1,
+        }
+        assert scope._tags == {"before_custom_current_scope": 1, "in_with_scope": 1}
+
+        isolation_scope_in.set_tag("in_with_isolation_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {
+            "before_custom_current_scope": 1,
+            "in_with_scope": 1,
+        }
+        assert scope._tags == {"before_custom_current_scope": 1, "in_with_scope": 1}
+
+        current_scope_in.set_tag("in_with_current_scope", 1)
+
+        assert isolation_scope_in._tags == {
+            "before_isolation_scope": 1,
+            "in_with_isolation_scope": 1,
+        }
+        assert current_scope_in._tags == {
+            "before_custom_current_scope": 1,
+            "in_with_scope": 1,
+            "in_with_current_scope": 1,
+        }
+        assert scope._tags == {
+            "before_custom_current_scope": 1,
+            "in_with_scope": 1,
+            "in_with_current_scope": 1,
+        }
+
+    assert custom_current_scope._tags == {
+        "before_custom_current_scope": 1,
+        "in_with_scope": 1,
+        "in_with_current_scope": 1,
+    }
+    isolation_scope_after = Scope.get_isolation_scope()
+    current_scope_after = Scope.get_current_scope()
+
+    isolation_scope_after.set_tag("after_isolation_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "after_isolation_scope": 1,
+        "in_with_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {"before_current_scope": 1}
+    assert custom_current_scope._tags == {
+        "before_custom_current_scope": 1,
+        "in_with_scope": 1,
+        "in_with_current_scope": 1,
+    }
+
+    current_scope_after.set_tag("after_current_scope", 1)
+
+    assert isolation_scope_after._tags == {
+        "before_isolation_scope": 1,
+        "in_with_isolation_scope": 1,
+        "after_isolation_scope": 1,
+    }
+    assert current_scope_after._tags == {
+        "before_current_scope": 1,
+        "after_current_scope": 1,
+    }
+    assert custom_current_scope._tags == {
+        "before_custom_current_scope": 1,
+        "in_with_scope": 1,
+        "in_with_current_scope": 1,
+    }
