@@ -1496,13 +1496,46 @@ def new_scope(scope=None):
 
 
 @contextmanager
+def use_scope(scope):
+    # type: (Scope) -> Generator[Scope, None, None]
+    """
+    .. versionadded:: 2.0.0
+
+    Context manager that uses the given `scope` and runs the wrapped code in it.
+    After the wrapped code is executed, the original scope is restored.
+
+    Example Usage:
+
+    .. code-block:: python
+
+        import sentry_sdk
+
+        with sentry_sdk.new_scope() as scope:
+            scope.set_tag("color", "green")
+            sentry_sdk.capture_message("hello") # will include `color` tag.
+
+        sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
+
+    """
+    # set given scope as current scope
+    token = _current_scope.set(scope)
+
+    try:
+        yield scope
+
+    finally:
+        # restore original scope
+        _current_scope.reset(token)
+
+
+@contextmanager
 def isolation_scope():
     # type: () -> Generator[Scope, None, None]
     """
     .. versionadded:: 2.0.0
 
     Context manager that forks the current isolation scope and runs the wrapped code in it.
-    The current scope is also forked.
+    The current scope is also forked to not bleed data into the existing current scope.
     After the wrapped code is executed, the original scopes are restored.
 
     Example Usage:
@@ -1544,7 +1577,8 @@ def use_isolation_scope(isolation_scope):
     .. versionadded:: 2.0.0
 
     Context manager that uses the given `isolation_scope` and runs the wrapped code in it.
-    After the wrapped code is executed, the original isolation scope is restored.
+    The current scope is also forked to not bleed data into the existing current scope.
+    After the wrapped code is executed, the original scopes are restored.
 
     Example Usage:
 
@@ -1559,6 +1593,11 @@ def use_isolation_scope(isolation_scope):
         sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
 
     """
+    # fork current scope
+    current_scope = Scope.get_current_scope()
+    forked_current_scope = current_scope.fork()
+    current_token = _current_scope.set(forked_current_scope)
+
     # set given scope as isolation scope
     isolation_token = _isolation_scope.set(isolation_scope)
 
@@ -1566,7 +1605,8 @@ def use_isolation_scope(isolation_scope):
         yield isolation_scope
 
     finally:
-        # restore original scope
+        # restore original scopes
+        _current_scope.reset(current_token)
         _isolation_scope.reset(isolation_token)
 
 
