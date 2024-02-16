@@ -593,7 +593,7 @@ class Profile:
         old_profile = scope.profile
         scope.profile = self
 
-        self._context_manager_state = (None, scope, old_profile)
+        self._context_manager_state = (scope, old_profile)
 
         self.start()
 
@@ -603,7 +603,7 @@ class Profile:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.stop()
 
-        _, scope, old_profile = self._context_manager_state
+        scope, old_profile = self._context_manager_state
         del self._context_manager_state
 
         scope.profile = old_profile
