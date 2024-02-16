@@ -80,7 +80,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     def __new__(cls):
         # type: () -> SentrySpanProcessor
         if not hasattr(cls, "instance"):
-            cls.instance = super(SentrySpanProcessor, cls).__new__(cls)
+            cls.instance = super().__new__(cls)
 
         return cls.instance
 

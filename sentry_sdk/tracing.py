@@ -587,7 +587,7 @@ class Transaction(Span):
             )
             name = kwargs.pop("transaction")
 
-        super(Transaction, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.name = name
         self.source = source
@@ -616,7 +616,7 @@ class Transaction(Span):
 
     def __enter__(self):
         # type: () -> Transaction
-        super(Transaction, self).__enter__()
+        super().__enter__()
 
         if self._profile is not None:
             self._profile.__enter__()
@@ -628,7 +628,7 @@ class Transaction(Span):
         if self._profile is not None:
             self._profile.__exit__(ty, value, tb)
 
-        super(Transaction, self).__exit__(ty, value, tb)
+        super().__exit__(ty, value, tb)
 
     @property
     def containing_transaction(self):
@@ -689,7 +689,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        super(Transaction, self).finish(hub, end_timestamp)
+        super().finish(hub, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -761,13 +761,13 @@ class Transaction(Span):
         """Sets the status of the Transaction according to the given HTTP status.
 
         :param http_status: The HTTP status code."""
-        super(Transaction, self).set_http_status(http_status)
+        super().set_http_status(http_status)
         self.set_context("response", {"status_code": http_status})
 
     def to_json(self):
         # type: () -> Dict[str, Any]
         """Returns a JSON-compatible representation of the transaction."""
-        rv = super(Transaction, self).to_json()
+        rv = super().to_json()
 
         rv["name"] = self.name
         rv["source"] = self.source
