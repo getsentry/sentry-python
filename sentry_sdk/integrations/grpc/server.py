@@ -20,7 +20,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
         self._find_method_name = find_name or ServerInterceptor._find_name
 
-        super(ServerInterceptor, self).__init__()
+        super().__init__()
 
     def intercept_service(self, continuation, handler_call_details):
         # type: (ServerInterceptor, Callable[[HandlerCallDetails], RpcMethodHandler], HandlerCallDetails) -> RpcMethodHandler
