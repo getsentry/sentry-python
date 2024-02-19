@@ -356,7 +356,7 @@ def test_with_isolation_scope_data(clean_scopes):
     """
     When doing `with isolation_scope()` the isolation *and* the current scope are forked,
     to prevent that by setting tags on the current scope in the context manager, data
-    bleads to the outer current scope.
+    bleeds to the outer current scope.
     """
     isolation_scope_before = Scope.get_isolation_scope()
     current_scope_before = Scope.get_current_scope()
