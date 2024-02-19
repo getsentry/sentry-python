@@ -5,7 +5,7 @@ from threading import Thread, current_thread
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope, use_isolation_scope
+from sentry_sdk.scope import Scope, use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     event_from_exception,
     capture_internal_exceptions,
@@ -54,9 +54,11 @@ class ThreadingIntegration(Integration):
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration is not None:
                 if integration.propagate_scope:
-                    scope = sentry_sdk.Scope.get_isolation_scope()
+                    isolation_scope = sentry_sdk.Scope.get_isolation_scope()
+                    current_scope = sentry_sdk.Scope.get_current_scope()
                 else:
-                    scope = None
+                    isolation_scope = None
+                    current_scope = None
 
                 # Patching instance methods in `start()` creates a reference cycle if
                 # done in a naive way. See
@@ -65,7 +67,7 @@ class ThreadingIntegration(Integration):
                 # In threading module, using current_thread API will access current thread instance
                 # without holding it to avoid a reference cycle in an easier way.
                 with capture_internal_exceptions():
-                    new_run = _wrap_run(scope, getattr(self.run, "__func__", self.run))
+                    new_run = _wrap_run(isolation_scope, current_scope, getattr(self.run, "__func__", self.run))
                     self.run = new_run  # type: ignore
 
             return old_start(self, *a, **kw)
@@ -73,8 +75,8 @@ class ThreadingIntegration(Integration):
         Thread.start = sentry_start  # type: ignore
 
 
-def _wrap_run(scope_to_use, old_run_func):
-    # type: (Optional[Scope], F) -> F
+def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
+    # type: (Optional[Scope], Optional[Scope], F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any
@@ -86,11 +88,12 @@ def _wrap_run(scope_to_use, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-        if scope_to_use is None:
+        if isolation_scope_to_use is None and current_scope_to_use is None:
             return _run_old_run_func()
         else:
-            with use_isolation_scope(scope_to_use):
-                return _run_old_run_func()
+            with use_isolation_scope(isolation_scope_to_use):
+                with use_scope(current_scope_to_use):
+                    return _run_old_run_func()
 
     return run  # type: ignore
 
