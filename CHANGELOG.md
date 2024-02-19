@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.40.5
+
+### Various fixes & improvements
+
+- Deprecate `last_event_id()`. (#2749) by @antonpirker
+- ref(uwsgi): Warn if uWSGI is set up without proper thread support (#2738) by @sentrivana
+- fix(aiohttp): `parsed_url` can be `None` (#2734) by @sentrivana
+- Python 3.7 is not supported anymore by Lambda, so removed it and added 3.12 (#2729) by @antonpirker
+
 ## 1.40.4
 
 ### Various fixes & improvements
