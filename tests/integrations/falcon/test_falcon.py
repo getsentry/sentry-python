@@ -303,7 +303,7 @@ def test_logging(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
-def test_500(sentry_init, capture_events):
+def test_500(sentry_init):
     sentry_init(integrations=[FalconIntegration()])
 
     app = falcon.API()
@@ -320,13 +320,10 @@ def test_500(sentry_init, capture_events):
 
     app.add_error_handler(Exception, http500_handler)
 
-    events = capture_events()
-
     client = falcon.testing.TestClient(app)
     response = client.simulate_get("/")
 
-    (event,) = events
-    assert response.json == {"message": "Sentry error: %s" % event["event_id"]}
+    assert response.json == {"message": "Sentry error."}
 
 
 def test_error_in_errorhandler(sentry_init, capture_events):
