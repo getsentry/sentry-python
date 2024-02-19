@@ -5,8 +5,15 @@
 ### Various fixes & improvements
 
 - Deprecate `last_event_id()`. (#2749) by @antonpirker
-- ref(uwsgi): Warn if uWSGI is set up without proper thread support (#2738) by @sentrivana
-- fix(aiohttp): `parsed_url` can be `None` (#2734) by @sentrivana
+- Warn if uWSGI is set up without proper thread support (#2738) by @sentrivana
+
+    uWSGI has to be run in threaded mode for the SDK to run properly. If this is
+    not the case, the consequences could range from features not working unexpectedly
+    to uWSGI workers crashing.
+
+    Please make sure to run uWSGI with both `--enable-threads` and `--py-call-uwsgi-fork-hooks`.
+
+- `parsed_url` can be `None` (#2734) by @sentrivana
 - Python 3.7 is not supported anymore by Lambda, so removed it and added 3.12 (#2729) by @antonpirker
 
 ## 1.40.4
