@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.api - sentry-python 1.40.4 documentation</title>
+      <title>sentry_sdk.api - sentry-python 1.40.5 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
 
   <script>
@@ -371,85 +371,86 @@
 </span><span id="1-205"><span class="nd">@hubmethod</span>
 </span><span id="1-206"><span class="k">def</span> <span class="nf">last_event_id</span><span class="p">():</span>
 </span><span id="1-207">    <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span id="1-208">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span>
-</span><span id="1-209">
+</span><span id="1-208">
+</span><span id="1-209">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span>
 </span><span id="1-210">
+</span><span id="1-211">
 <div class="viewcode-block" id="start_span">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.start_span">[docs]</a>
-</span><span id="1-211"><span class="nd">@hubmethod</span>
-</span><span id="1-212"><span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span>
-</span><span id="1-213">    <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Span]</span>
-</span><span id="1-214">    <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
-</span><span id="1-215"><span class="p">):</span>
-</span><span id="1-216">    <span class="c1"># type: (...) -&gt; Span</span>
-</span><span id="1-217">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="n">span</span><span class="o">=</span><span class="n">span</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</span><span id="1-212"><span class="nd">@hubmethod</span>
+</span><span id="1-213"><span class="k">def</span> <span class="nf">start_span</span><span class="p">(</span>
+</span><span id="1-214">    <span class="n">span</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Span]</span>
+</span><span id="1-215">    <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
+</span><span id="1-216"><span class="p">):</span>
+</span><span id="1-217">    <span class="c1"># type: (...) -&gt; Span</span>
+</span><span id="1-218">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">start_span</span><span class="p">(</span><span class="n">span</span><span class="o">=</span><span class="n">span</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
-</span><span id="1-218">
 </span><span id="1-219">
+</span><span id="1-220">
 <div class="viewcode-block" id="start_transaction">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.start_transaction">[docs]</a>
-</span><span id="1-220"><span class="nd">@hubmethod</span>
-</span><span id="1-221"><span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
-</span><span id="1-222">    <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Transaction]</span>
-</span><span id="1-223">    <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
-</span><span id="1-224"><span class="p">):</span>
-</span><span id="1-225">    <span class="c1"># type: (...) -&gt; Union[Transaction, NoOpSpan]</span>
-</span><span id="1-226">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">transaction</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</span><span id="1-221"><span class="nd">@hubmethod</span>
+</span><span id="1-222"><span class="k">def</span> <span class="nf">start_transaction</span><span class="p">(</span>
+</span><span id="1-223">    <span class="n">transaction</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Transaction]</span>
+</span><span id="1-224">    <span class="o">**</span><span class="n">kwargs</span>  <span class="c1"># type: Any</span>
+</span><span id="1-225"><span class="p">):</span>
+</span><span id="1-226">    <span class="c1"># type: (...) -&gt; Union[Transaction, NoOpSpan]</span>
+</span><span id="1-227">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span><span class="n">transaction</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
-</span><span id="1-227">
 </span><span id="1-228">
-</span><span id="1-229"><span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
-</span><span id="1-230">    <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
-</span><span id="1-231">    <span class="n">transaction</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">transaction</span>
-</span><span id="1-232">    <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-233">        <span class="n">transaction</span><span class="o">.</span><span class="n">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
-</span><span id="1-234">
+</span><span id="1-229">
+</span><span id="1-230"><span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span id="1-231">    <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
+</span><span id="1-232">    <span class="n">transaction</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">transaction</span>
+</span><span id="1-233">    <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-234">        <span class="n">transaction</span><span class="o">.</span><span class="n">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
 </span><span id="1-235">
+</span><span id="1-236">
 <div class="viewcode-block" id="get_current_span">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_current_span">[docs]</a>
-</span><span id="1-236"><span class="k">def</span> <span class="nf">get_current_span</span><span class="p">(</span><span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-237">    <span class="c1"># type: (Optional[Hub]) -&gt; Optional[Span]</span>
-</span><span id="1-238"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-239"><span class="sd">    Returns the currently active span if there is one running, otherwise `None`</span>
-</span><span id="1-240"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-241">    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-242">        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
-</span><span id="1-243">
-</span><span id="1-244">    <span class="n">current_span</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
-</span><span id="1-245">    <span class="k">return</span> <span class="n">current_span</span></div>
+</span><span id="1-237"><span class="k">def</span> <span class="nf">get_current_span</span><span class="p">(</span><span class="n">hub</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-238">    <span class="c1"># type: (Optional[Hub]) -&gt; Optional[Span]</span>
+</span><span id="1-239"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-240"><span class="sd">    Returns the currently active span if there is one running, otherwise `None`</span>
+</span><span id="1-241"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-242">    <span class="k">if</span> <span class="n">hub</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-243">        <span class="n">hub</span> <span class="o">=</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span>
+</span><span id="1-244">
+</span><span id="1-245">    <span class="n">current_span</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">scope</span><span class="o">.</span><span class="n">span</span>
+</span><span id="1-246">    <span class="k">return</span> <span class="n">current_span</span></div>
 
-</span><span id="1-246">
 </span><span id="1-247">
+</span><span id="1-248">
 <div class="viewcode-block" id="get_traceparent">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_traceparent">[docs]</a>
-</span><span id="1-248"><span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">():</span>
-</span><span id="1-249">    <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span id="1-250"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-251"><span class="sd">    Returns the traceparent either from the active span or from the scope.</span>
-</span><span id="1-252"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-253">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
+</span><span id="1-249"><span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">():</span>
+</span><span id="1-250">    <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span id="1-251"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-252"><span class="sd">    Returns the traceparent either from the active span or from the scope.</span>
+</span><span id="1-253"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-254">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
 
-</span><span id="1-254">
 </span><span id="1-255">
+</span><span id="1-256">
 <div class="viewcode-block" id="get_baggage">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_baggage">[docs]</a>
-</span><span id="1-256"><span class="k">def</span> <span class="nf">get_baggage</span><span class="p">():</span>
-</span><span id="1-257">    <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span id="1-258"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-259"><span class="sd">    Returns Baggage either from the active span or from the scope.</span>
-</span><span id="1-260"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-261">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span></div>
+</span><span id="1-257"><span class="k">def</span> <span class="nf">get_baggage</span><span class="p">():</span>
+</span><span id="1-258">    <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span id="1-259"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-260"><span class="sd">    Returns Baggage either from the active span or from the scope.</span>
+</span><span id="1-261"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-262">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span></div>
 
-</span><span id="1-262">
 </span><span id="1-263">
+</span><span id="1-264">
 <div class="viewcode-block" id="continue_trace">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.continue_trace">[docs]</a>
-</span><span id="1-264"><span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-265">    <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -&gt; Transaction</span>
-</span><span id="1-266"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-267"><span class="sd">    Sets the propagation context from environment or headers and returns a transaction.</span>
-</span><span id="1-268"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-269">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span></div>
+</span><span id="1-265"><span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-266">    <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -&gt; Transaction</span>
+</span><span id="1-267"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-268"><span class="sd">    Sets the propagation context from environment or headers and returns a transaction.</span>
+</span><span id="1-269"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-270">    <span class="k">return</span> <span class="n">Hub</span><span class="o">.</span><span class="n">current</span><span class="o">.</span><span class="n">continue_trace</span><span class="p">(</span><span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span></div>
 
 </span></pre></div>
         </article>
@@ -483,7 +484,7 @@
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=b88b670c"></script>
+      <script src="../../_static/documentation_options.js?v=1cf3e315"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=ccb09f80"></script>
