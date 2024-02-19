@@ -67,7 +67,11 @@ class ThreadingIntegration(Integration):
                 # In threading module, using current_thread API will access current thread instance
                 # without holding it to avoid a reference cycle in an easier way.
                 with capture_internal_exceptions():
-                    new_run = _wrap_run(isolation_scope, current_scope, getattr(self.run, "__func__", self.run))
+                    new_run = _wrap_run(
+                        isolation_scope,
+                        current_scope,
+                        getattr(self.run, "__func__", self.run),
+                    )
                     self.run = new_run  # type: ignore
 
             return old_start(self, *a, **kw)
@@ -88,12 +92,12 @@ def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
             except Exception:
                 reraise(*_capture_exception())
 
-        if isolation_scope_to_use is None and current_scope_to_use is None:
-            return _run_old_run_func()
-        else:
+        if isolation_scope_to_use is not None and current_scope_to_use is not None:
             with use_isolation_scope(isolation_scope_to_use):
                 with use_scope(current_scope_to_use):
                     return _run_old_run_func()
+        else:
+            return _run_old_run_func()
 
     return run  # type: ignore
 

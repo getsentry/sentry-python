@@ -1,5 +1,4 @@
 import gc
-import sys
 from concurrent import futures
 from threading import Thread
 
@@ -11,10 +10,6 @@ from sentry_sdk.integrations.threading import ThreadingIntegration
 
 original_start = Thread.start
 original_run = Thread.run
-
-minimum_python_37 = pytest.mark.skipif(
-    sys.version_info < (3, 7), reason="Test needs Python >= 3.7"
-)
 
 
 @pytest.mark.parametrize("integrations", [[ThreadingIntegration()], []])
