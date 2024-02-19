@@ -316,7 +316,7 @@ def test_500(sentry_init, capture_events):
 
     def http500_handler(ex, req, resp, params):
         sentry_sdk.capture_exception(ex)
-        resp.media = {"message": "Sentry error: %s" % sentry_sdk.last_event_id()}
+        resp.media = {"message": "Sentry error."}
 
     app.add_error_handler(Exception, http500_handler)
 

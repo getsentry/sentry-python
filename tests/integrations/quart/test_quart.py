@@ -9,7 +9,6 @@ from sentry_sdk import (
     configure_scope,
     capture_message,
     capture_exception,
-    last_event_id,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
@@ -313,7 +312,7 @@ def test_cli_commands_raise(app):
 
 
 @pytest.mark.asyncio
-async def test_500(sentry_init, capture_events, app):
+async def test_500(sentry_init, app):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
 
     @app.route("/")
@@ -322,17 +321,12 @@ async def test_500(sentry_init, capture_events, app):
 
     @app.errorhandler(500)
     async def error_handler(err):
-        return "Sentry error: %s" % last_event_id()
-
-    events = capture_events()
+        return "Sentry error."
 
     client = app.test_client()
     response = await client.get("/")
 
-    (event,) = events
-    assert (await response.get_data(as_text=True)) == "Sentry error: %s" % event[
-        "event_id"
-    ]
+    assert (await response.get_data(as_text=True)) == "Sentry error."
 
 
 @pytest.mark.asyncio

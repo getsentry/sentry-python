@@ -10,7 +10,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import last_event_id, capture_exception, capture_message
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
@@ -813,30 +813,6 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         assert span["description"].startswith(expected[idx]["description"])
         assert span["tags"] == expected[idx]["tags"]
         idx += 1
-
-
-def test_last_event_id(sentry_init, capture_events):
-    sentry_init(
-        integrations=[StarletteIntegration()],
-    )
-    events = capture_events()
-
-    def handler(request, exc):
-        capture_exception(exc)
-        return starlette.responses.PlainTextResponse(last_event_id(), status_code=500)
-
-    app = starlette_app_factory(debug=False)
-    app.add_exception_handler(500, handler)
-
-    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
-    response = client.get("/custom_error")
-    assert response.status_code == 500
-
-    event = events[0]
-    assert response.content.strip().decode("ascii") == event["event_id"]
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "Too Hot"
 
 
 def test_legacy_setup(

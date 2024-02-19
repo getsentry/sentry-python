@@ -33,7 +33,6 @@ __all__ = [  # noqa
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
-    "last_event_id",
     "new_scope",
     "push_scope",
     "set_context",

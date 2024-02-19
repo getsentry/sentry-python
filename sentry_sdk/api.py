@@ -52,7 +52,6 @@ __all__ = [
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
-    "last_event_id",
     "new_scope",
     "push_scope",
     "set_context",
@@ -280,12 +279,6 @@ def flush(
 ):
     # type: (...) -> None
     return Scope.get_client().flush(timeout=timeout, callback=callback)
-
-
-@scopemethod
-def last_event_id():
-    # type: () -> Optional[str]
-    return Scope.get_current_scope().last_event_id()
 
 
 @scopemethod

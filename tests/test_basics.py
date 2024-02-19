@@ -16,7 +16,6 @@ from sentry_sdk import (
     capture_message,
     start_transaction,
     add_breadcrumb,
-    last_event_id,
     Hub,
 )
 from sentry_sdk.integrations import (
@@ -106,27 +105,6 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
             )
             for record in caplog.records
         ), "Problem with checking auto enabling {}".format(import_string)
-
-
-def test_event_id(sentry_init, capture_events):
-    sentry_init()
-    events = capture_events()
-
-    try:
-        raise ValueError("aha!")
-    except Exception:
-        event_id = capture_exception()
-        int(event_id, 16)
-        assert len(event_id) == 32
-
-    (event,) = events
-    assert event["event_id"] == event_id
-    assert last_event_id() == event_id
-
-    new_event_id = Hub.current.capture_event({"type": "transaction"})
-    assert new_event_id is not None
-    assert new_event_id != event_id
-    assert last_event_id() == event_id
 
 
 def test_generic_mechanism(sentry_init, capture_events):
