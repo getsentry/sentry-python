@@ -171,9 +171,6 @@ def configure_scope(  # noqa: F811
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
     """
-    .. deprecated:: 2.0.0
-        This function is deprecated and will be removed in a future release.
-
     Reconfigures the scope.
 
     :param callback: If provided, call the callback with the current scope.
@@ -216,9 +213,6 @@ def push_scope(  # noqa: F811
 ):
     # type: (...) -> Optional[ContextManager[Scope]]
     """
-    .. deprecated:: 2.0.0
-        This function is deprecated and will be removed in a future release.
-
     Pushes a new layer on the scope stack.
 
     :param callback: If provided, this method pushes a scope, calls
