@@ -5,6 +5,7 @@ environment variable with a key of 'SENTRY_INITIAL_HANDLER' along with the 'DSN'
 Then the Handler function sstring should be replaced with
 'sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler'
 """
+
 import os
 import sys
 import re
