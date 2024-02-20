@@ -1434,13 +1434,12 @@ class Scope(object):
 
 
 @contextmanager
-def new_scope(scope=None):
-    # type: (Optional[Scope]) -> Generator[Scope, None, None]
+def new_scope():
+    # type: () -> Generator[Scope, None, None]
     """
     .. versionadded:: 2.0.0
 
-    Context manager that either uses the given `scope` or
-    forks the current scope and runs the wrapped code in it.
+    Context manager that forks the current scope and runs the wrapped code in it.
     After the wrapped code is executed, the original scope is restored.
 
     Example Usage:
@@ -1456,14 +1455,9 @@ def new_scope(scope=None):
         sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
 
     """
-    if scope is not None:
-        # use given scope
-        new_scope = scope
-    else:
-        # fork current scope
-        current_scope = Scope.get_current_scope()
-        new_scope = current_scope.fork()
-
+    # fork current scope
+    current_scope = Scope.get_current_scope()
+    new_scope = current_scope.fork()
     token = _current_scope.set(new_scope)
 
     try:
