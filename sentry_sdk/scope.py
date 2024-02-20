@@ -279,12 +279,9 @@ class Scope(object):
 
         return _global_scope
 
-    @classmethod
-    def _merge_scopes(cls, additional_scope=None, additional_scope_kwargs=None):
+    def _merge_scopes(self, additional_scope=None, additional_scope_kwargs=None):
         # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
         """
-        .. versionadded:: 2.0.0
-
         Merges global, isolation and current scope into a new scope and
         adds the given additional scope or additional scope kwargs to it.
         """
@@ -301,6 +298,8 @@ class Scope(object):
         current_scope = _current_scope.get()
         if current_scope is not None:
             final_scope.update_from_scope(current_scope)
+
+        final_scope.update_from_scope(self)
 
         if additional_scope is not None:
             if callable(additional_scope):
@@ -1042,7 +1041,7 @@ class Scope(object):
 
         :returns: An `event_id` if the SDK decided to send the event (see :py:meth:`sentry_sdk.client._Client.capture_event`).
         """
-        scope = Scope._merge_scopes(scope, scope_kwargs)
+        scope = self._merge_scopes(scope, scope_kwargs)
 
         return Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
 
