@@ -41,7 +41,6 @@ def parse_metrics(bytes):
     return rv
 
 
-@pytest.mark.forked
 def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release",
@@ -93,7 +92,6 @@ def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     }
 
 
-@pytest.mark.forked
 def test_timing(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
@@ -153,7 +151,6 @@ def test_timing(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     )
 
 
-@pytest.mark.forked
 def test_timing_decorator(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -248,7 +245,6 @@ def test_timing_decorator(
     assert line.strip() == "assert amazing() == 42"
 
 
-@pytest.mark.forked
 def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
@@ -302,7 +298,6 @@ def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     }
 
 
-@pytest.mark.forked
 def test_distribution(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
@@ -364,7 +359,6 @@ def test_distribution(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     )
 
 
-@pytest.mark.forked
 def test_set(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
@@ -417,7 +411,6 @@ def test_set(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     }
 
 
-@pytest.mark.forked
 def test_gauge(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
@@ -450,7 +443,6 @@ def test_gauge(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     }
 
 
-@pytest.mark.forked
 def test_multiple(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
@@ -504,7 +496,6 @@ def test_multiple(sentry_init, capture_envelopes):
     }
 
 
-@pytest.mark.forked
 def test_transaction_name(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -544,7 +535,6 @@ def test_transaction_name(
     }
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize("sample_rate", [1.0, None])
 def test_metric_summaries(
     sentry_init, capture_envelopes, sample_rate, maybe_monkeypatched_threading
@@ -654,7 +644,6 @@ def test_metric_summaries(
     }
 
 
-@pytest.mark.forked
 def test_metrics_summary_disabled(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -698,7 +687,6 @@ def test_metrics_summary_disabled(
     assert "_metrics_summary" not in t["spans"][0]
 
 
-@pytest.mark.forked
 def test_metrics_summary_filtered(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -767,7 +755,6 @@ def test_metrics_summary_filtered(
     } in t["d:foo@second"]
 
 
-@pytest.mark.forked
 def test_tag_normalization(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -810,7 +797,6 @@ def test_tag_normalization(
     }
 
 
-@pytest.mark.forked
 def test_before_emit_metric(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -853,7 +839,6 @@ def test_before_emit_metric(
     }
 
 
-@pytest.mark.forked
 def test_aggregator_flush(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -873,7 +858,6 @@ def test_aggregator_flush(
     assert Hub.current.client.metrics_aggregator.buckets == {}
 
 
-@pytest.mark.forked
 def test_tag_serialization(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
@@ -913,7 +897,6 @@ def test_tag_serialization(
     }
 
 
-@pytest.mark.forked
 def test_flush_recursion_protection(
     sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
 ):
@@ -945,7 +928,6 @@ def test_flush_recursion_protection(
     assert m[0][1] == "counter@none"
 
 
-@pytest.mark.forked
 def test_flush_recursion_protection_background_flush(
     sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
 ):
