@@ -246,6 +246,7 @@ def test_no_stackoverflows(celery):
         # in the task and here is the same.
         assert scope._tags == {"foo": "bar"}
 
+
 def test_simple_no_propagation(capture_events, init_celery):
     celery = init_celery(propagate_traces=False)
     events = capture_events()

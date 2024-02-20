@@ -10,7 +10,7 @@ from functools import wraps
 from itertools import chain
 
 from sentry_sdk.attachments import Attachment
-from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
 from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -847,7 +847,7 @@ class Scope(object):
             return
 
         before_breadcrumb = client.options.get("before_breadcrumb")
-        max_breadcrumbs = client.options.get("max_breadcrumbs")
+        max_breadcrumbs = client.options.get("max_breadcrumbs", DEFAULT_MAX_BREADCRUMBS)
 
         crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
