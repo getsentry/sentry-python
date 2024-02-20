@@ -287,7 +287,7 @@ def start_span(
     **kwargs  # type: Any
 ):
     # type: (...) -> Span
-    return Scope.get_isolation_scope().start_span(span=span, **kwargs)
+    return Scope.get_current_scope().start_span(span=span, **kwargs)
 
 
 @scopemethod
@@ -296,12 +296,12 @@ def start_transaction(
     **kwargs  # type: Any
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
-    return Scope.get_isolation_scope().start_transaction(transaction, **kwargs)
+    return Scope.get_current_scope().start_transaction(transaction, **kwargs)
 
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
-    transaction = Scope.get_isolation_scope().transaction
+    transaction = Scope.get_current_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
 
