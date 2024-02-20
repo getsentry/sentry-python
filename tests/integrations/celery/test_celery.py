@@ -155,6 +155,10 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
             error_event["contexts"]["trace"]["trace_id"]
             == scope._propagation_context["trace_id"]
         )
+        assert (
+            error_event["contexts"]["trace"]["span_id"]
+            != scope._propagation_context["span_id"]
+        )        
         assert error_event["transaction"] == "dummy_task"
         assert "celery_task_id" in error_event["tags"]
         assert error_event["extra"]["celery-job"] == dict(
@@ -262,6 +266,18 @@ def test_simple_no_propagation(capture_events, init_celery):
     assert exception["type"] == "ZeroDivisionError"
 
 
+def test_ignore_expected(capture_events, celery):
+    events = capture_events()
+
+    @celery.task(name="dummy_task", throws=(ZeroDivisionError,))
+    def dummy_task(x, y):
+        return x / y
+
+    dummy_task.delay(1, 2)
+    dummy_task.delay(1, 0)
+    assert not events
+
+
 @pytest.mark.skip(
     reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
 )
@@ -299,18 +315,6 @@ def test_broken_prerun(init_celery, connect_signal):
         assert stack_lengths == [2]
     else:
         assert stack_lengths == [2, 2]
-
-
-def test_ignore_expected(capture_events, celery):
-    events = capture_events()
-
-    @celery.task(name="dummy_task", throws=(ZeroDivisionError,))
-    def dummy_task(x, y):
-        return x / y
-
-    dummy_task.delay(1, 2)
-    dummy_task.delay(1, 0)
-    assert not events
 
 
 @pytest.mark.xfail(
