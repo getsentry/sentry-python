@@ -846,8 +846,8 @@ class Scope(object):
             logger.info("Dropped breadcrumb because no client bound")
             return
 
-        before_breadcrumb = client.options["before_breadcrumb"]
-        max_breadcrumbs = client.options["max_breadcrumbs"]
+        before_breadcrumb = client.options.get("before_breadcrumb")
+        max_breadcrumbs = client.options.get("max_breadcrumbs")
 
         crumb = dict(crumb or ())  # type: Breadcrumb
         crumb.update(kwargs)
@@ -1125,8 +1125,8 @@ class Scope(object):
 
         client = Scope.get_client()
         self._session = Session(
-            release=client.options["release"],
-            environment=client.options["environment"],
+            release=client.options.get("release"),
+            environment=client.options.get("environment"),
             user=self._user,
             session_mode=session_mode,
         )
