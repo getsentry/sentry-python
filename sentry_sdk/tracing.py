@@ -202,7 +202,7 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        scope = self.scope or sentry_sdk.Scope.get_current_scope()
+        scope = self.scope or sentry_sdk.Scope.get_isolation_scope()
         old_span = scope.span
         scope.span = self
         self._context_manager_state = (scope, old_span)
@@ -455,7 +455,7 @@ class Span:
         if the span represents a database or HTTP request.
 
         :param scope: The scope to use for this transaction.
-            If not provided, the current scope will be used.
+            If not provided, the active isolation scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
 
@@ -466,7 +466,7 @@ class Span:
             # This span is already finished, ignore.
             return None
 
-        scope = scope or sentry_sdk.Scope.get_current_scope()
+        scope = scope or sentry_sdk.Scope.get_isolation_scope()
 
         try:
             if end_timestamp:
