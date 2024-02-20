@@ -246,7 +246,6 @@ def test_no_stackoverflows(celery):
         # in the task and here is the same.
         assert scope._tags == {"foo": "bar"}
 
-
 def test_simple_no_propagation(capture_events, init_celery):
     celery = init_celery(propagate_traces=False)
     events = capture_events()
@@ -263,6 +262,45 @@ def test_simple_no_propagation(capture_events, init_celery):
     assert event["transaction"] == "dummy_task"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
+
+
+@pytest.mark.skip(
+    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
+)
+def test_broken_prerun(init_celery, connect_signal):
+    from celery.signals import task_prerun
+
+    stack_lengths = []
+
+    def crash(*args, **kwargs):
+        # scope should exist in prerun
+        stack_lengths.append(len(Hub.current._stack))
+        1 / 0
+
+    # Order here is important to reproduce the bug: In Celery 3, a crashing
+    # prerun would prevent other preruns from running.
+
+    connect_signal(task_prerun, crash)
+    celery = init_celery()
+
+    assert len(Hub.current._stack) == 1
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        stack_lengths.append(len(Hub.current._stack))
+        return x / y
+
+    if VERSION >= (4,):
+        dummy_task.delay(2, 2)
+    else:
+        with pytest.raises(ZeroDivisionError):
+            dummy_task.delay(2, 2)
+
+    assert len(Hub.current._stack) == 1
+    if VERSION < (4,):
+        assert stack_lengths == [2]
+    else:
+        assert stack_lengths == [2, 2]
 
 
 def test_ignore_expected(capture_events, celery):
