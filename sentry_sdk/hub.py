@@ -494,7 +494,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
-        scope = Scope.get_current_scope()
+        scope = Scope.get_isolation_scope()
 
         # For backwards compatibility, we allow passing the scope as the hub.
         # We need a major release to make this nice. (if someone searches the code: deprecated)
@@ -600,7 +600,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: If no callback is provided, returns a context manager that returns the scope.
         """
-        scope = Scope.get_isolation_scope()
+        scope = Scope.get_current_scope()
 
         if continue_trace:
             scope.generate_propagation_context()

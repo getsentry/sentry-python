@@ -300,7 +300,7 @@ def start_transaction(
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
-    transaction = Scope.get_isolation_scope().transaction
+    transaction = Scope.get_current_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
 
