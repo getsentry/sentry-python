@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections import deque
 
 import sentry_sdk
@@ -756,7 +757,7 @@ class Profile:
         return True
 
 
-class Scheduler:
+class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
@@ -778,17 +779,20 @@ class Scheduler:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.teardown()
 
+    @abstractmethod
     def setup(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def teardown(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def ensure_running(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
