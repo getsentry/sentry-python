@@ -46,7 +46,6 @@ if TYPE_CHECKING:
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
-            "force_enable_metrics": Optional[bool],
             "metrics_summary_sample_rate": Optional[float],
             "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
@@ -317,4 +316,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.40.4"
+VERSION = "1.40.5"

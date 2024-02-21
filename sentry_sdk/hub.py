@@ -1,6 +1,5 @@
 import copy
 import sys
-
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
@@ -284,7 +283,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def last_event_id(self):
         # type: () -> Optional[str]
-        """Returns the last event ID."""
+        """
+        Returns the last event ID.
+
+        .. deprecated:: 1.40.5
+            This function is deprecated and will be removed in a future release. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly.
+        """
+        logger.warning(
+            "Deprecated: last_event_id is deprecated. This will be removed in the future. The functions `capture_event`, `capture_message`, and `capture_exception` return the event ID directly."
+        )
         return self._last_event_id
 
     def bind_client(
