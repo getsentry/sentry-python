@@ -438,6 +438,70 @@ def test_query_source(sentry_init, capture_events):
         raise AssertionError("No db span found")
 
 
+def test_query_source_with_module_in_search_path(sentry_init, capture_events):
+    """
+    Test that query source is relative to the path of the module it ran in
+    """
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        enable_tracing=True,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+    )
+    events = capture_events()
+
+    from sqlalchemy_helpers.helpers import (
+        add_model_to_session,
+        query_first_model_from_session,
+    )
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+
+        add_model_to_session(bob, session)
+
+        assert query_first_model_from_session(Person, session) == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
+            assert type(data.get(SPANDATA.CODE_LINENO)) == int
+            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
+            assert data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
+            assert data.get(SPANDATA.CODE_FUNCTION) == "query_first_model_from_session"
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
 def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
