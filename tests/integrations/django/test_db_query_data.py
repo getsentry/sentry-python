@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime
 from unittest import mock
 
+from sentry_sdk._compat import PY2
 from django import VERSION as DJANGO_VERSION
 from django.db import connections
 
@@ -152,6 +153,62 @@ def test_query_source(sentry_init, client, capture_events):
             assert data.get(SPANDATA.CODE_FILEPATH).endswith(
                 "tests/integrations/django/myapp/views.py"
             )
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
+            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_query_source_with_module_in_search_path(sentry_init, client, capture_events):
+    """
+    Test that query source is relative to the path of the module it ran in
+    """
+    client = Client(application)
+
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    _, status, _ = unpack_werkzeug_response(
+        client.get(reverse("postgres_select_slow_from_supplement"))
+    )
+    assert status == "200 OK"
+
+    (event,) = events
+    for span in event["spans"]:
+        if span.get("op") == "db" and "auth_user" in span.get("description"):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
+            assert type(data.get(SPANDATA.CODE_LINENO)) == int
+            assert data.get(SPANDATA.CODE_LINENO) > 0
+
+            if not PY2:
+                assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+                assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
