@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -326,7 +326,9 @@ def test_on_start_transaction():
             parent_span_id="abcdef1234567890",
             trace_id="1234567890abcdef1234567890abcdef",
             baggage=None,
-            start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
+            start_timestamp=datetime.fromtimestamp(
+                otel_span.start_time / 1e9, timezone.utc
+            ),
             instrumenter="otel",
         )
 
@@ -371,7 +373,9 @@ def test_on_start_child():
         fake_span.start_child.assert_called_once_with(
             span_id="1234567890abcdef",
             description="Sample OTel Span",
-            start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
+            start_timestamp=datetime.fromtimestamp(
+                otel_span.start_time / 1e9, timezone.utc
+            ),
             instrumenter="otel",
         )
 

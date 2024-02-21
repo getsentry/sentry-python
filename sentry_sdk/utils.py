@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -27,7 +28,7 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -305,17 +306,8 @@ class Auth:
         self.version = version
         self.client = client
 
-    @property
-    def store_api_url(self):
-        # type: () -> str
-        """Returns the API url for storing events.
-
-        Deprecated: use get_api_url instead.
-        """
-        return self.get_api_url(type="store")
-
     def get_api_url(
-        self, type="store"  # type: EndpointType
+        self, type=EndpointType.ENVELOPE  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""
@@ -324,7 +316,7 @@ class Auth:
             self.host,
             self.path,
             self.project_id,
-            type,
+            type.value,
         )
 
     def to_header(self):
@@ -352,6 +344,13 @@ class AnnotatedValue:
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
 
     @classmethod
     def removed_because_raw_data(cls):
@@ -1060,6 +1059,24 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
+def _truncate_by_bytes(string, max_bytes):
+    # type: (str, int) -> str
+    """
+    Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
+    """
+    truncated = string.encode("utf-8")[: max_bytes - 3].decode("utf-8", errors="ignore")
+
+    return truncated + "..."
+
+
+def _get_size_in_bytes(value):
+    # type: (str) -> Optional[int]
+    try:
+        return len(value.encode("utf-8"))
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     if not value:
@@ -1068,17 +1085,25 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value.encode("utf-8"))
+    byte_size = _get_size_in_bytes(value)
+    text_size = len(value)
 
-    if length > max_length:
-        return AnnotatedValue(
-            value=value[: max_length - 3] + "...",
-            metadata={
-                "len": length,
-                "rem": [["!limit", "x", max_length - 3, max_length]],
-            },
-        )
-    return value
+    if byte_size is not None and byte_size > max_length:
+        # truncate to max_length bytes, preserving code points
+        truncated_value = _truncate_by_bytes(value, max_length)
+    elif text_size is not None and text_size > max_length:
+        # fallback to truncating by string length
+        truncated_value = value[: max_length - 3] + "..."
+    else:
+        return value
+
+    return AnnotatedValue(
+        value=truncated_value,
+        metadata={
+            "len": byte_size or text_size,
+            "rem": [["!limit", "x", max_length - 3, max_length]],
+        },
+    )
 
 
 def parse_version(version):
@@ -1190,24 +1215,49 @@ def _make_threadlocal_contextvars(local):
     class ContextVar:
         # Super-limited impl of ContextVar
 
-        def __init__(self, name):
-            # type: (str) -> None
+        def __init__(self, name, default=None):
+            # type: (str, Any) -> None
             self._name = name
+            self._default = default
             self._local = local()
+            self._original_local = local()
 
-        def get(self, default):
+        def get(self, default=None):
             # type: (Any) -> Any
-            return getattr(self._local, "value", default)
+            return getattr(self._local, "value", default or self._default)
 
         def set(self, value):
-            # type: (Any) -> None
+            # type: (Any) -> Any
+            token = str(random.getrandbits(64))
+            original_value = self.get()
+            setattr(self._original_local, token, original_value)
             self._local.value = value
+            return token
+
+        def reset(self, token):
+            # type: (Any) -> None
+            self._local.value = getattr(self._original_local, token)
+            del self._original_local[token]
 
     return ContextVar
 
 
+def _make_noop_copy_context():
+    # type: () -> Callable[[], Any]
+    class NoOpContext:
+        def run(self, func, *args, **kwargs):
+            # type: (Callable[..., Any], *Any, **Any) -> Any
+            return func(*args, **kwargs)
+
+    def copy_context():
+        # type: () -> NoOpContext
+        return NoOpContext()
+
+    return copy_context
+
+
 def _get_contextvars():
-    # type: () -> Tuple[bool, type]
+    # type: () -> Tuple[bool, type, Callable[[], Any]]
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1223,17 +1273,17 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
 
@@ -1241,10 +1291,10 @@ def _get_contextvars():
 
     from threading import local
 
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(local), _make_noop_copy_context()
 
 
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+HAS_REAL_CONTEXTVARS, ContextVar, copy_context = _get_contextvars()
 
 CONTEXTVARS_ERROR_MESSAGE = """
 
@@ -1530,6 +1580,7 @@ def _generate_installed_modules():
     try:
         from importlib import metadata
 
+        yielded = set()
         for dist in metadata.distributions():
             name = dist.metadata["Name"]
             # `metadata` values may be `None`, see:
@@ -1537,9 +1588,10 @@ def _generate_installed_modules():
             # and
             # https://github.com/python/importlib_metadata/issues/371
             if name is not None:
-                version = metadata.version(name)
-                if version is not None:
-                    yield _normalize_module_name(name), version
+                normalized_name = _normalize_module_name(name)
+                if dist.version is not None and normalized_name not in yielded:
+                    yield normalized_name, dist.version
+                    yielded.add(normalized_name)
 
     except ImportError:
         # < py3.8
@@ -1599,3 +1651,18 @@ else:
 def now():
     # type: () -> float
     return time.perf_counter()
+
+
+try:
+    from gevent.monkey import is_module_patched
+except ImportError:
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
+
+
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")

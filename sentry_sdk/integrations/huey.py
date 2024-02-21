@@ -71,12 +71,16 @@ def _make_event_processor(task):
             extra = event.setdefault("extra", {})
             extra["huey-job"] = {
                 "task": task.name,
-                "args": task.args
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
-                "kwargs": task.kwargs
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
+                "args": (
+                    task.args
+                    if _should_send_default_pii()
+                    else SENSITIVE_DATA_SUBSTITUTE
+                ),
+                "kwargs": (
+                    task.kwargs
+                    if _should_send_default_pii()
+                    else SENSITIVE_DATA_SUBSTITUTE
+                ),
                 "retry": (task.default_retries or 0) - task.retries,
             }
 

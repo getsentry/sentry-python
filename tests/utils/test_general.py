@@ -17,6 +17,7 @@ from sentry_sdk.utils import (
     strip_string,
     AnnotatedValue,
 )
+from sentry_sdk.consts import EndpointType
 
 
 try:
@@ -81,31 +82,27 @@ def test_filename():
 
 
 @pytest.mark.parametrize(
-    "given,expected_store,expected_envelope",
+    "given,expected_envelope",
     [
         (
             "https://foobar@sentry.io/123",
-            "https://sentry.io/api/123/store/",
             "https://sentry.io/api/123/envelope/",
         ),
         (
             "https://foobar@sentry.io/bam/123",
-            "https://sentry.io/bam/api/123/store/",
             "https://sentry.io/bam/api/123/envelope/",
         ),
         (
             "https://foobar@sentry.io/bam/baz/123",
-            "https://sentry.io/bam/baz/api/123/store/",
             "https://sentry.io/bam/baz/api/123/envelope/",
         ),
     ],
 )
-def test_parse_dsn_paths(given, expected_store, expected_envelope):
+def test_parse_dsn_paths(given, expected_envelope):
     dsn = Dsn(given)
     auth = dsn.to_auth()
-    assert auth.store_api_url == expected_store
-    assert auth.get_api_url("store") == expected_store
-    assert auth.get_api_url("envelope") == expected_envelope
+    assert auth.get_api_url() == expected_envelope
+    assert auth.get_api_url(EndpointType.ENVELOPE) == expected_envelope
 
 
 @pytest.mark.parametrize(
@@ -560,20 +557,28 @@ def test_failed_base64_conversion(input):
         assert to_base64(input) is None
 
 
-def test_strip_string():
-    # If value is None returns None.
-    assert strip_string(None) is None
-
-    # If max_length is not passed, returns the full text (up to 1024 bytes).
-    text_1024_long = "a" * 1024
-    assert strip_string(text_1024_long).count("a") == 1024
-
-    # If value exceeds the max_length, returns an AnnotatedValue.
-    text_1025_long = "a" * 1025
-    stripped_text = strip_string(text_1025_long)
-    assert isinstance(stripped_text, AnnotatedValue)
-    assert stripped_text.value.count("a") == 1021  # + '...' is 1024
-
-    # If text has unicode characters, it counts bytes and not number of characters.
-    text_with_unicode_character = "éê"
-    assert strip_string(text_with_unicode_character, max_length=2).value == "é..."
+@pytest.mark.parametrize(
+    "input,max_length,result",
+    [
+        [None, None, None],
+        ["a" * 256, None, "a" * 256],
+        [
+            "a" * 257,
+            256,
+            AnnotatedValue(
+                value="a" * 253 + "...",
+                metadata={"len": 257, "rem": [["!limit", "x", 253, 256]]},
+            ),
+        ],
+        ["éééé", None, "éééé"],
+        [
+            "éééé",
+            5,
+            AnnotatedValue(
+                value="é...", metadata={"len": 8, "rem": [["!limit", "x", 2, 5]]}
+            ),
+        ],
+    ],
+)
+def test_strip_string(input, max_length, result):
+    assert strip_string(input, max_length) == result

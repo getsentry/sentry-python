@@ -3,6 +3,8 @@ import time
 import linecache
 from unittest import mock
 
+import pytest
+
 from sentry_sdk import Hub, metrics, push_scope, start_transaction
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
@@ -39,7 +41,8 @@ def parse_metrics(bytes):
     return rv
 
 
-def test_incr(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
@@ -90,7 +93,8 @@ def test_incr(sentry_init, capture_envelopes):
     }
 
 
-def test_timing(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_timing(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -149,7 +153,10 @@ def test_timing(sentry_init, capture_envelopes):
     )
 
 
-def test_timing_decorator(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_timing_decorator(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -241,7 +248,8 @@ def test_timing_decorator(sentry_init, capture_envelopes):
     assert line.strip() == "assert amazing() == 42"
 
 
-def test_timing_basic(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -256,7 +264,6 @@ def test_timing_basic(sentry_init, capture_envelopes):
     metrics.timing("timing", 3.0, tags={"a": "b"}, timestamp=ts)
     Hub.current.flush()
 
-    (envelope,) = envelopes
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
 
@@ -295,7 +302,8 @@ def test_timing_basic(sentry_init, capture_envelopes):
     }
 
 
-def test_distribution(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_distribution(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -356,7 +364,8 @@ def test_distribution(sentry_init, capture_envelopes):
     )
 
 
-def test_set(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_set(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -408,11 +417,12 @@ def test_set(sentry_init, capture_envelopes):
     }
 
 
-def test_gauge(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_gauge(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -440,11 +450,12 @@ def test_gauge(sentry_init, capture_envelopes):
     }
 
 
+@pytest.mark.forked
 def test_multiple(sentry_init, capture_envelopes):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -493,11 +504,14 @@ def test_multiple(sentry_init, capture_envelopes):
     }
 
 
-def test_transaction_name(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_transaction_name(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -530,12 +544,19 @@ def test_transaction_name(sentry_init, capture_envelopes):
     }
 
 
-def test_metric_summaries(sentry_init, capture_envelopes):
+@pytest.mark.forked
+@pytest.mark.parametrize("sample_rate", [1.0, None])
+def test_metric_summaries(
+    sentry_init, capture_envelopes, sample_rate, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 1.0},
+        _experiments={
+            "enable_metrics": True,
+            "metrics_summary_sample_rate": sample_rate,
+        },
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -633,12 +654,15 @@ def test_metric_summaries(sentry_init, capture_envelopes):
     }
 
 
-def test_metrics_summary_disabled(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_metrics_summary_disabled(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 0.0},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -674,7 +698,10 @@ def test_metrics_summary_disabled(sentry_init, capture_envelopes):
     assert "_metrics_summary" not in t["spans"][0]
 
 
-def test_metrics_summary_filtered(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_metrics_summary_filtered(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     def should_summarize_metric(key, tags):
         return key == "foo"
 
@@ -740,11 +767,14 @@ def test_metrics_summary_filtered(sentry_init, capture_envelopes):
     } in t["d:foo@second"]
 
 
-def test_tag_normalization(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_tag_normalization(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -780,7 +810,10 @@ def test_tag_normalization(sentry_init, capture_envelopes):
     }
 
 
-def test_before_emit_metric(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_before_emit_metric(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     def before_emit(key, tags):
         if key == "removed-metric":
             return False
@@ -795,6 +828,7 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
         environment="not-fun-env",
         _experiments={
             "enable_metrics": True,
+            "metric_code_locations": False,
             "before_emit_metric": before_emit,
         },
     )
@@ -819,7 +853,10 @@ def test_before_emit_metric(sentry_init, capture_envelopes):
     }
 
 
-def test_aggregator_flush(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_aggregator_flush(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
@@ -836,11 +873,14 @@ def test_aggregator_flush(sentry_init, capture_envelopes):
     assert Hub.current.client.metrics_aggregator.buckets == {}
 
 
-def test_tag_serialization(sentry_init, capture_envelopes):
+@pytest.mark.forked
+def test_tag_serialization(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
-        _experiments={"enable_metrics": True},
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
     envelopes = capture_envelopes()
 
@@ -873,7 +913,10 @@ def test_tag_serialization(sentry_init, capture_envelopes):
     }
 
 
-def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch):
+@pytest.mark.forked
+def test_flush_recursion_protection(
+    sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
+):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
@@ -902,8 +945,9 @@ def test_flush_recursion_protection(sentry_init, capture_envelopes, monkeypatch)
     assert m[0][1] == "counter@none"
 
 
+@pytest.mark.forked
 def test_flush_recursion_protection_background_flush(
-    sentry_init, capture_envelopes, monkeypatch
+    sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
 ):
     monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.1)
     sentry_init(

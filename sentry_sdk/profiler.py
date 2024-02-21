@@ -175,8 +175,14 @@ def has_profiling_enabled(options):
         return True
 
     profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None and profiles_sample_rate > 0:
-        return True
+    if profiles_sample_rate is not None:
+        logger.warning(
+            "_experiments['profiles_sample_rate'] is deprecated. "
+            "Please use the non-experimental profiles_sample_rate option "
+            "directly."
+        )
+        if profiles_sample_rate > 0:
+            return True
 
     return False
 
@@ -203,10 +209,13 @@ def setup_profiler(options):
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
     else:
-        profiler_mode = (
-            options.get("_experiments", {}).get("profiler_mode")
-            or default_profiler_mode
-        )
+        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
+        if profiler_mode is not None:
+            logger.warning(
+                "_experiments['profiler_mode'] is deprecated. Please use the "
+                "non-experimental profiler_mode option directly."
+            )
+        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -486,7 +495,7 @@ class Profile:
         # type: (SamplingContext) -> None
         """
         Sets the profile's sampling decision according to the following
-        precdence rules:
+        precedence rules:
 
         1. If the transaction to be profiled is not sampled, that decision
         will be used, regardless of anything else.
@@ -873,7 +882,7 @@ class ThreadScheduler(Scheduler):
 
     def __init__(self, frequency):
         # type: (int) -> None
-        super(ThreadScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -973,7 +982,7 @@ class GeventScheduler(Scheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False

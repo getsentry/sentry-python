@@ -68,20 +68,33 @@ _DEFAULT_INTEGRATIONS = [
 
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
+    "sentry_sdk.integrations.ariadne.AriadneIntegration",
+    "sentry_sdk.integrations.arq.ArqIntegration",
+    "sentry_sdk.integrations.asyncpg.AsyncPGIntegration",
     "sentry_sdk.integrations.boto3.Boto3Integration",
     "sentry_sdk.integrations.bottle.BottleIntegration",
     "sentry_sdk.integrations.celery.CeleryIntegration",
+    "sentry_sdk.integrations.chalice.ChaliceIntegration",
+    "sentry_sdk.integrations.clickhouse_driver.ClickhouseDriverIntegration",
     "sentry_sdk.integrations.django.DjangoIntegration",
     "sentry_sdk.integrations.falcon.FalconIntegration",
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
     "sentry_sdk.integrations.flask.FlaskIntegration",
+    "sentry_sdk.integrations.gql.GQLIntegration",
+    "sentry_sdk.integrations.graphene.GrapheneIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
+    "sentry_sdk.integrations.huey.HueyIntegration",
+    "sentry_sdk.integrations.loguru.LoguruIntegration",
+    "sentry_sdk.integrations.pymongo.PyMongoIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
+    "sentry_sdk.integrations.quart.QuartIntegration",
     "sentry_sdk.integrations.redis.RedisIntegration",
     "sentry_sdk.integrations.rq.RqIntegration",
     "sentry_sdk.integrations.sanic.SanicIntegration",
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.starlette.StarletteIntegration",
+    "sentry_sdk.integrations.starlite.StarliteIntegration",
+    "sentry_sdk.integrations.strawberry.StrawberryIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
@@ -130,16 +143,6 @@ def setup_integrations(
                 )
                 try:
                     type(integration).setup_once()
-                except NotImplementedError:
-                    if getattr(integration, "install", None) is not None:
-                        logger.warning(
-                            "Integration %s: The install method is "
-                            "deprecated. Use `setup_once`.",
-                            identifier,
-                        )
-                        integration.install()  # type: ignore
-                    else:
-                        raise
                 except DidNotEnable as e:
                     if identifier not in used_as_default_integration:
                         raise

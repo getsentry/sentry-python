@@ -1,8 +1,10 @@
 import contextlib
 import inspect
+import os
 import re
 import sys
 from collections.abc import Mapping
+from datetime import timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
 
@@ -175,13 +177,13 @@ def add_query_source(hub, span):
     if span.timestamp is None or span.start_timestamp is None:
         return
 
-    should_add_query_source = client.options.get("enable_db_query_source", False)
+    should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
-    slow_query = duration.microseconds > threshold * 1000
+    slow_query = duration / timedelta(milliseconds=1) > threshold
 
     if not slow_query:
         return
@@ -248,7 +250,10 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            in_app_path = filepath.replace(project_root, "")
+            if project_root is not None and filepath.startswith(project_root):
+                in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
+            else:
+                in_app_path = filepath
             span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
 
         try:
@@ -390,10 +395,6 @@ class Baggage:
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = options["traces_sample_rate"]
 
-        user = (scope and scope._user) or {}
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
-
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
@@ -411,7 +412,6 @@ class Baggage:
             return Baggage(sentry_items)
 
         options = client.options or {}
-        user = (hub.scope and hub.scope._user) or {}
 
         sentry_items["trace_id"] = transaction.trace_id
 
@@ -429,9 +429,6 @@ class Baggage:
             and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
         ):
             sentry_items["transaction"] = transaction.name
-
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
 
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)

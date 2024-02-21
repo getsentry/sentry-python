@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from opentelemetry.context import get_value  # type: ignore
 from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
@@ -80,7 +80,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     def __new__(cls):
         # type: () -> SentrySpanProcessor
         if not hasattr(cls, "instance"):
-            cls.instance = super(SentrySpanProcessor, cls).__new__(cls)
+            cls.instance = super().__new__(cls)
 
         return cls.instance
 
@@ -126,7 +126,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             sentry_span = sentry_parent_span.start_child(
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
-                start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
+                start_timestamp=datetime.fromtimestamp(
+                    otel_span.start_time / 1e9, timezone.utc
+                ),
                 instrumenter=INSTRUMENTER.OTEL,
             )
         else:
@@ -136,7 +138,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 parent_span_id=parent_span_id,
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
-                start_timestamp=datetime.fromtimestamp(otel_span.start_time / 1e9),
+                start_timestamp=datetime.fromtimestamp(
+                    otel_span.start_time / 1e9, timezone.utc
+                ),
                 instrumenter=INSTRUMENTER.OTEL,
             )
 
@@ -175,7 +179,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             self._update_span_with_otel_data(sentry_span, otel_span)
 
         sentry_span.finish(
-            end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9)
+            end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9, timezone.utc)
         )
 
     def _is_sentry_span(self, hub, otel_span):

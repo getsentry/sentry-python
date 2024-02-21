@@ -240,7 +240,7 @@ def run_lambda_function(
             FunctionName=full_fn_name,
         )
         print(
-            "Lambda function in AWS already existing, taking it (and do not create a local one)"
+            f"Lambda function {full_fn_name} in AWS already existing, taking it (and do not create a local one)"
         )
     except client.exceptions.ResourceNotFoundException:
         function_exists_in_aws = False
@@ -251,9 +251,14 @@ def run_lambda_function(
         dir_already_existing = os.path.isdir(base_dir)
 
         if dir_already_existing:
-            print("Local Lambda function directory already exists, skipping creation")
+            print(
+                f"Local Lambda function directory ({base_dir}) already exists, skipping creation"
+            )
 
         if not dir_already_existing:
+            print(
+                f"Creating Lambda function package ({full_fn_name}) locally in directory {base_dir}"
+            )
             os.mkdir(base_dir)
             _create_lambda_package(
                 base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
@@ -316,9 +321,10 @@ def run_lambda_function(
 
                 waiter = client.get_waiter("function_active_v2")
                 waiter.wait(FunctionName=full_fn_name)
+                print(f"Created Lambda function in AWS: {full_fn_name}")
         except client.exceptions.ResourceConflictException:
             print(
-                "Lambda function already exists, this is fine, we will just invoke it."
+                f"Lambda function ({full_fn_name}) already existing in AWS, this is fine, we will just invoke it."
             )
 
     response = client.invoke(
@@ -386,12 +392,14 @@ else:
                 _REPL_CODE.format(line=line),
                 b"",
                 cleanup.append,
-                subprocess_kwargs={
-                    "stdout": subprocess.DEVNULL,
-                    "stderr": subprocess.DEVNULL,
-                }
-                if not verbose
-                else {},
+                subprocess_kwargs=(
+                    {
+                        "stdout": subprocess.DEVNULL,
+                        "stderr": subprocess.DEVNULL,
+                    }
+                    if not verbose
+                    else {}
+                ),
             )
 
             for line in base64.b64decode(response["LogResult"]).splitlines():

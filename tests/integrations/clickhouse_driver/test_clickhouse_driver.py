@@ -4,6 +4,7 @@ Tests need a local clickhouse instance running, this can best be done using
 docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=262144:262144 --rm clickhouse/clickhouse-server
 ```
 """
+
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 

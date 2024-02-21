@@ -128,7 +128,7 @@ def test_transport_works(
     assert capturing_server.captured
     assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
-    assert any("Sending event" in record.msg for record in caplog.records) == debug
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.parametrize(
@@ -273,7 +273,7 @@ def test_data_category_limits(
     client.flush()
 
     assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/store/"
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
@@ -352,7 +352,8 @@ def test_data_category_limits_reporting(
 
     assert len(capturing_server.captured) == 2
 
-    event = capturing_server.captured[0].event
+    assert len(capturing_server.captured[0].envelope.items) == 1
+    event = capturing_server.captured[0].envelope.items[0].get_event()
     assert event["type"] == "error"
     assert event["release"] == "foo"
 

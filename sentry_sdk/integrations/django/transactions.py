@@ -4,6 +4,7 @@ Copied from raven-python.
 Despite being called "legacy" in some places this resolver is very much still
 in use.
 """
+
 import re
 
 from sentry_sdk._types import TYPE_CHECKING

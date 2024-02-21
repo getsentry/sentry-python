@@ -5,6 +5,7 @@ import socket
 from datetime import datetime, timezone
 from importlib import import_module
 
+from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -17,8 +18,8 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace, has_tracing_enabled
-from sentry_sdk.transport import make_transport
+from sentry_sdk.tracing import trace
+from sentry_sdk.transport import HttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
@@ -43,7 +44,10 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
     from typing import Sequence
+    from typing import Type
+    from typing import Union
 
+    from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
     from sentry_sdk.session import Session
@@ -77,26 +81,6 @@ def _get_options(*args, **kwargs):
 
     for key, value in options.items():
         if key not in rv:
-            # Option "with_locals" was renamed to "include_local_variables"
-            if key == "with_locals":
-                msg = (
-                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
-                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["include_local_variables"] = value
-                continue
-
-            # Option "request_bodies" was renamed to "max_request_body_size"
-            if key == "request_bodies":
-                msg = (
-                    "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. "
-                    "Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["max_request_body_size"] = value
-                continue
-
             raise TypeError("Unknown option %r" % (key,))
 
         rv[key] = value
@@ -153,6 +137,8 @@ class _Client:
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
+
+    Alias of :py:class:`Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
@@ -244,13 +230,13 @@ class _Client:
 
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
-            if experiments.get("enable_metrics"):
+            if experiments.get("enable_metrics", True):
                 from sentry_sdk.metrics import MetricsAggregator
 
                 self.metrics_aggregator = MetricsAggregator(
                     capture_func=_capture_envelope,
                     enable_code_locations=bool(
-                        experiments.get("metric_code_locations")
+                        experiments.get("metric_code_locations", True)
                     ),
                 )
 
@@ -297,6 +283,16 @@ class _Client:
             _client_init_debug.set(old_debug)
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
+
+        if (
+            self.monitor
+            or self.metrics_aggregator
+            or has_profiling_enabled(self.options)
+            or isinstance(self.transport, HttpTransport)
+        ):
+            # If we have anything on that could spawn a background thread, we
+            # need to check if it's safe to use them.
+            check_uwsgi_thread_support()
 
     @property
     def dsn(self):
@@ -563,8 +559,8 @@ class _Client:
 
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
-        :param scope: An optional scope to use for determining whether this event
-            should be captured.
+        :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
+            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
@@ -603,58 +599,40 @@ class _Client:
         ):
             return None
 
-        tracing_enabled = has_tracing_enabled(self.options)
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
         dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
-        # If tracing is enabled all events should go to /envelope endpoint.
-        # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
-        should_use_envelope_endpoint = (
-            tracing_enabled
-            or is_transaction
-            or is_checkin
-            or bool(attachments)
-            or bool(self.spotlight)
-        )
-        if should_use_envelope_endpoint:
-            headers = {
-                "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime.now(timezone.utc)),
-            }
+        headers = {
+            "event_id": event_opt["event_id"],
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }
 
-            if dynamic_sampling_context:
-                headers["trace"] = dynamic_sampling_context
+        if dynamic_sampling_context:
+            headers["trace"] = dynamic_sampling_context
 
-            envelope = Envelope(headers=headers)
+        envelope = Envelope(headers=headers)
 
-            if is_transaction:
-                if profile is not None:
-                    envelope.add_profile(profile.to_json(event_opt, self.options))
-                envelope.add_transaction(event_opt)
-            elif is_checkin:
-                envelope.add_checkin(event_opt)
-            else:
-                envelope.add_event(event_opt)
-
-            for attachment in attachments or ():
-                envelope.add_item(attachment.to_envelope_item())
-
-            if self.spotlight:
-                self.spotlight.capture_envelope(envelope)
-
-            if self.transport is None:
-                return None
-
-            self.transport.capture_envelope(envelope)
-
+        if is_transaction:
+            if profile is not None:
+                envelope.add_profile(profile.to_json(event_opt, self.options))
+            envelope.add_transaction(event_opt)
+        elif is_checkin:
+            envelope.add_checkin(event_opt)
         else:
-            if self.transport is None:
-                return None
+            envelope.add_event(event_opt)
 
-            # All other events go to the legacy /store/ endpoint (will be removed in the future).
-            self.transport.capture_event(event_opt)
+        for attachment in attachments or ():
+            envelope.add_item(attachment.to_envelope_item())
+
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is None:
+            return None
+
+        self.transport.capture_envelope(envelope)
 
         return event_id
 
@@ -666,6 +644,22 @@ class _Client:
             logger.info("Discarded session update because of missing release")
         else:
             self.session_flusher.add_session(session)
+
+    def get_integration(
+        self, name_or_class  # type: Union[str, Type[Integration]]
+    ):
+        # type: (...) -> Any
+        """Returns the integration for this client by name or class.
+        If the client does not have that integration then `None` is returned.
+        """
+        if isinstance(name_or_class, str):
+            integration_name = name_or_class
+        elif name_or_class.identifier is not None:
+            integration_name = name_or_class.identifier
+        else:
+            raise ValueError("Integration has no name")
+
+        return self.integrations.get(integration_name)
 
     def close(
         self,

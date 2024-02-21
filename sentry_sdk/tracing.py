@@ -10,14 +10,20 @@ from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from typing import Any
     from typing import Dict
     from typing import Iterator
     from typing import List
     from typing import Optional
+    from typing import overload
+    from typing import ParamSpec
     from typing import Tuple
     from typing import Union
+    from typing import TypeVar
+
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
@@ -256,14 +262,6 @@ class Span:
             span_recorder.add(child)
 
         return child
-
-    def new_span(self, **kwargs):
-        # type: (**Any) -> Span
-        """DEPRECATED: use :py:meth:`sentry_sdk.tracing.Span.start_child` instead."""
-        logger.warning(
-            "Deprecated: use Span.start_child instead of Span.new_span. This will be removed in the future."
-        )
-        return self.start_child(**kwargs)
 
     @classmethod
     def continue_from_environ(
@@ -534,9 +532,9 @@ class Span:
             rv["status"] = self.status
 
         if self.containing_transaction:
-            rv[
-                "dynamic_sampling_context"
-            ] = self.containing_transaction.get_baggage().dynamic_sampling_context()
+            rv["dynamic_sampling_context"] = (
+                self.containing_transaction.get_baggage().dynamic_sampling_context()
+            )
 
         return rv
 
@@ -589,7 +587,7 @@ class Transaction(Span):
             )
             name = kwargs.pop("transaction")
 
-        super(Transaction, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.name = name
         self.source = source
@@ -618,7 +616,7 @@ class Transaction(Span):
 
     def __enter__(self):
         # type: () -> Transaction
-        super(Transaction, self).__enter__()
+        super().__enter__()
 
         if self._profile is not None:
             self._profile.__enter__()
@@ -630,7 +628,7 @@ class Transaction(Span):
         if self._profile is not None:
             self._profile.__exit__(ty, value, tb)
 
-        super(Transaction, self).__exit__(ty, value, tb)
+        super().__exit__(ty, value, tb)
 
     @property
     def containing_transaction(self):
@@ -691,7 +689,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        super(Transaction, self).finish(hub, end_timestamp)
+        super().finish(hub, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -763,13 +761,13 @@ class Transaction(Span):
         """Sets the status of the Transaction according to the given HTTP status.
 
         :param http_status: The HTTP status code."""
-        super(Transaction, self).set_http_status(http_status)
+        super().set_http_status(http_status)
         self.set_context("response", {"status_code": http_status})
 
     def to_json(self):
         # type: () -> Dict[str, Any]
         """Returns a JSON-compatible representation of the transaction."""
-        rv = super(Transaction, self).to_json()
+        rv = super().to_json()
 
         rv["name"] = self.name
         rv["source"] = self.source
@@ -911,10 +909,6 @@ class NoOpSpan(Span):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
 
-    def new_span(self, **kwargs):
-        # type: (**Any) -> NoOpSpan
-        return self.start_child(**kwargs)
-
     def to_traceparent(self):
         # type: () -> str
         return ""
@@ -980,8 +974,21 @@ class NoOpSpan(Span):
         pass
 
 
+if TYPE_CHECKING:
+
+    @overload
+    def trace(func=None):
+        # type: (None) -> Callable[[Callable[P, R]], Callable[P, R]]
+        pass
+
+    @overload
+    def trace(func):
+        # type: (Callable[P, R]) -> Callable[P, R]
+        pass
+
+
 def trace(func=None):
-    # type: (Any) -> Any
+    # type: (Optional[Callable[P, R]]) -> Union[Callable[P, R], Callable[[Callable[P, R]], Callable[P, R]]]
     """
     Decorator to start a child span under the existing current transaction.
     If there is no current transaction, then nothing will be traced.

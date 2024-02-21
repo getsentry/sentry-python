@@ -17,12 +17,10 @@ from sentry_sdk import (
     capture_message,
     capture_exception,
     capture_event,
-    start_transaction,
     set_tag,
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import logger, reraise
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk._types import TYPE_CHECKING
@@ -33,13 +31,13 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
 
-class EventCapturedError(Exception):
+class EnvelopeCapturedError(Exception):
     pass
 
 
 class _TestTransport(Transport):
-    def capture_event(self, event):
-        raise EventCapturedError(event)
+    def capture_envelope(self, envelope):
+        raise EnvelopeCapturedError(envelope)
 
 
 def test_transport_option(monkeypatch):
@@ -52,7 +50,7 @@ def test_transport_option(monkeypatch):
     assert Client().dsn is None
 
     monkeypatch.setenv("SENTRY_DSN", dsn)
-    transport = Transport({"dsn": dsn2})
+    transport = _TestTransport({"dsn": dsn2})
     assert str(transport.parsed_dsn) == dsn2
     assert str(Client(transport=transport).dsn) == dsn
 
@@ -344,77 +342,28 @@ def test_simple_transport(sentry_init):
 
 
 def test_ignore_errors(sentry_init, capture_events):
-    class MyDivisionError(ZeroDivisionError):
-        pass
+    with mock.patch(
+        "sentry_sdk.scope.Scope._capture_internal_exception"
+    ) as mock_capture_internal_exception:
 
-    def raise_it(exc_info):
-        reraise(*exc_info)
+        class MyDivisionError(ZeroDivisionError):
+            pass
 
-    sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
-    Hub.current._capture_internal_exception = raise_it
+        sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
 
-    def e(exc):
-        try:
-            raise exc
-        except Exception:
-            capture_exception()
+        def e(exc):
+            try:
+                raise exc
+            except Exception:
+                capture_exception()
 
-    e(ZeroDivisionError())
-    e(MyDivisionError())
-    pytest.raises(EventCapturedError, lambda: e(ValueError()))
+        e(ZeroDivisionError())
+        e(MyDivisionError())
+        e(ValueError())
 
-
-def test_with_locals_deprecation_enabled(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(with_locals=True)
-
-        client = Hub.current.client
-        assert "with_locals" not in client.options
-        assert "include_local_variables" in client.options
-        assert client.options["include_local_variables"]
-
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-        )
-
-
-def test_with_locals_deprecation_disabled(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(with_locals=False)
-
-        client = Hub.current.client
-        assert "with_locals" not in client.options
-        assert "include_local_variables" in client.options
-        assert not client.options["include_local_variables"]
-
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-        )
-
-
-def test_include_local_variables_deprecation(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(include_local_variables=False)
-
-        client = Hub.current.client
-        assert "with_locals" not in client.options
-        assert "include_local_variables" in client.options
-        assert not client.options["include_local_variables"]
-
-        fake_warning.assert_not_called()
-
-
-def test_request_bodies_deprecation(sentry_init):
-    with mock.patch.object(logger, "warning", mock.Mock()) as fake_warning:
-        sentry_init(request_bodies="small")
-
-        client = Hub.current.client
-        assert "request_bodies" not in client.options
-        assert "max_request_body_size" in client.options
-        assert client.options["max_request_body_size"] == "small"
-
-        fake_warning.assert_called_once_with(
-            "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
+        assert mock_capture_internal_exception.call_count == 1
+        assert (
+            mock_capture_internal_exception.call_args[0][0][0] == EnvelopeCapturedError
         )
 
 
@@ -573,8 +522,8 @@ def test_attach_stacktrace_disabled(sentry_init, capture_events):
 
 def test_capture_event_works(sentry_init):
     sentry_init(transport=_TestTransport())
-    pytest.raises(EventCapturedError, lambda: capture_event({}))
-    pytest.raises(EventCapturedError, lambda: capture_event({}))
+    pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
+    pytest.raises(EnvelopeCapturedError, lambda: capture_event({}))
 
 
 @pytest.mark.parametrize("num_messages", [10, 20])
@@ -586,11 +535,13 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     import time
     from sentry_sdk import init, transport, capture_message
 
-    def send_event(self, event):
+    def capture_envelope(self, envelope):
         time.sleep(0.1)
-        print(event["message"])
+        event = envelope.get_event() or dict()
+        message = event.get("message", "")
+        print(message)
 
-    transport.HttpTransport._send_event = send_event
+    transport.HttpTransport.capture_envelope = capture_envelope
     init("http://foobar@localhost/123", shutdown_timeout={num_messages})
 
     for _ in range({num_messages}):
@@ -1000,91 +951,6 @@ def test_init_string_types(dsn, sentry_init):
     )
 
 
-def test_sending_events_with_tracing():
-    """
-    Tests for calling the right transport method (capture_event vs
-    capture_envelope) from the SDK client for different data types.
-    """
-
-    envelopes = []
-    events = []
-
-    class CustomTransport(Transport):
-        def capture_envelope(self, envelope):
-            envelopes.append(envelope)
-
-        def capture_event(self, event):
-            events.append(event)
-
-    with Hub(Client(enable_tracing=True, transport=CustomTransport())):
-        try:
-            1 / 0
-        except Exception:
-            event_id = capture_exception()
-
-        # Assert error events get passed in via capture_envelope
-        assert not events
-        envelope = envelopes.pop()
-        (item,) = envelope.items
-        assert item.data_category == "error"
-        assert item.headers.get("type") == "event"
-        assert item.get_event()["event_id"] == event_id
-
-        with start_transaction(name="foo"):
-            pass
-
-        # Assert transactions get passed in via capture_envelope
-        assert not events
-        envelope = envelopes.pop()
-
-        (item,) = envelope.items
-        assert item.data_category == "transaction"
-        assert item.headers.get("type") == "transaction"
-
-    assert not envelopes
-    assert not events
-
-
-def test_sending_events_with_no_tracing():
-    """
-    Tests for calling the right transport method (capture_event vs
-    capture_envelope) from the SDK client for different data types.
-    """
-
-    envelopes = []
-    events = []
-
-    class CustomTransport(Transport):
-        def capture_envelope(self, envelope):
-            envelopes.append(envelope)
-
-        def capture_event(self, event):
-            events.append(event)
-
-    with Hub(Client(enable_tracing=False, transport=CustomTransport())):
-        try:
-            1 / 0
-        except Exception:
-            event_id = capture_exception()
-
-        # Assert error events get passed in via capture_event
-        assert not envelopes
-        event = events.pop()
-
-        assert event["event_id"] == event_id
-        assert "type" not in event
-
-        with start_transaction(name="foo"):
-            pass
-
-        # Assert transactions get passed in via capture_envelope
-        assert not events
-        assert not envelopes
-
-    assert not envelopes
-    assert not events
-
-
 @pytest.mark.parametrize(
     "sdk_options, expected_breadcrumbs",
     [({}, DEFAULT_MAX_BREADCRUMBS), ({"max_breadcrumbs": 50}, 50)],
@@ -1296,3 +1162,43 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
 
         # Ensure two arguments (the event and hint) were passed to the sampler function
         assert len(test_config.sampler_function_mock.call_args[0]) == 2
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "opt,missing_flags",
+    [
+        # lazy mode with enable-threads, no warning
+        [{"enable-threads": True, "lazy-apps": True}, []],
+        [{"enable-threads": "true", "lazy-apps": b"1"}, []],
+        # preforking mode with enable-threads and py-call-uwsgi-fork-hooks, no warning
+        [{"enable-threads": True, "py-call-uwsgi-fork-hooks": True}, []],
+        [{"enable-threads": b"true", "py-call-uwsgi-fork-hooks": b"on"}, []],
+        # lazy mode, no enable-threads, warning
+        [{"lazy-apps": True}, ["--enable-threads"]],
+        [{"enable-threads": b"false", "lazy-apps": True}, ["--enable-threads"]],
+        [{"enable-threads": b"0", "lazy": True}, ["--enable-threads"]],
+        # preforking mode, no enable-threads or py-call-uwsgi-fork-hooks, warning
+        [{}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
+        [{"processes": b"2"}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
+        [{"enable-threads": True}, ["--py-call-uwsgi-fork-hooks"]],
+        [{"enable-threads": b"1"}, ["--py-call-uwsgi-fork-hooks"]],
+        [
+            {"enable-threads": b"false"},
+            ["--enable-threads", "--py-call-uwsgi-fork-hooks"],
+        ],
+        [{"py-call-uwsgi-fork-hooks": True}, ["--enable-threads"]],
+    ],
+)
+def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
+    uwsgi = mock.MagicMock()
+    uwsgi.opt = opt
+    with mock.patch.dict("sys.modules", uwsgi=uwsgi):
+        sentry_init(profiles_sample_rate=1.0)
+        if missing_flags:
+            assert len(recwarn) == 1
+            record = recwarn.pop()
+            for flag in missing_flags:
+                assert flag in str(record.message)
+        else:
+            assert not recwarn
