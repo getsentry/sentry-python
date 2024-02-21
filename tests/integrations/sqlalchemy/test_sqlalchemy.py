@@ -490,11 +490,8 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
 
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
-            if not PY2:
-                assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
-                assert (
-                    data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
-                )
+            assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
+            assert data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
