@@ -15,6 +15,18 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - Setting the parameter `propagate_hub` to `True` in `ThreadingIntegration(propagate_hub=True)` only works on Python 3.7+.
 - The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
+- The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
+  <details>
+    <summary><b>Show table</b></summary>
+
+  | Class                                 | Abstract methods                          |
+  | ------------------------------------- | ----------------------------------------- |
+  | `sentry_sdk.integrations.Integration` | `setup_once`                              |
+  | `sentry_sdk.metrics.Metric`           | `add`, `serialize_value`, and `weight`    |
+  | `sentry_sdk.profiler.Scheduler`       | `ensure_running`, `setup`, and `teardown` |
+  | `sentry_sdk.transport.Transport`      | `capture_envelope`                        |
+
+    </details>
 
 ## Removed
 
