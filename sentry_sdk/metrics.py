@@ -123,6 +123,11 @@ def metrics_noop(func):
 class Metric(ABC):
     __slots__ = ()
 
+    @abstractmethod
+    def __init__(self, first):
+        # type: (MetricValue) -> None
+        pass
+
     @property
     @abstractmethod
     def weight(self):
@@ -335,7 +340,7 @@ METRIC_TYPES = {
     "g": GaugeMetric,
     "d": DistributionMetric,
     "s": SetMetric,
-}
+}  # type: dict[MetricType, type[Metric]]
 
 # some of these are dumb
 TIMING_FUNCTIONS = {
