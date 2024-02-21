@@ -32,6 +32,7 @@ import random
 import sys
 import threading
 import time
+import warnings
 import uuid
 from abc import ABC, abstractmethod
 from collections import deque
@@ -588,7 +589,6 @@ class Profile:
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
     def __enter__(self):
@@ -799,9 +799,14 @@ class Scheduler(ABC):
         self.ensure_running()
         self.new_profiles.append(profile)
 
-    def stop_profiling(self, profile):
-        # type: (Profile) -> None
-        pass
+    def stop_profiling(self, _):
+        # type: (...) -> None
+        warnings.warn(
+            "stop_profiling is deprecated and will be removed in the next major release. "
+            "This method does nothing, so please remove any calls to it from your code.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
