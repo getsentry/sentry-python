@@ -4,7 +4,6 @@ import pytest
 from datetime import datetime
 from unittest import mock
 
-from sentry_sdk._compat import PY2
 from django import VERSION as DJANGO_VERSION
 from django.db import connections
 
@@ -205,10 +204,8 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
 
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
-
-            if not PY2:
-                assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
-                assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
+            assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+            assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path

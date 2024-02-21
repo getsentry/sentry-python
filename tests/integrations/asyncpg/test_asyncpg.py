@@ -18,8 +18,6 @@ PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "bar")
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
 PG_PORT = 5432
 
-
-from sentry_sdk._compat import PY2
 import datetime
 from contextlib import contextmanager
 from unittest import mock
@@ -627,9 +625,8 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 
     assert type(data.get(SPANDATA.CODE_LINENO)) == int
     assert data.get(SPANDATA.CODE_LINENO) > 0
-    if not PY2:
-        assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
-        assert data.get(SPANDATA.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
+    assert data.get(SPANDATA.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
 
     is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
     assert is_relative_path

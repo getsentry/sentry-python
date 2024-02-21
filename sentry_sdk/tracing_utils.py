@@ -252,7 +252,7 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            if namespace is not None and not PY2:
+            if namespace is not None:
                 in_app_path = filename_for_module(namespace, filepath)
             elif project_root is not None and filepath.startswith(project_root):
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
