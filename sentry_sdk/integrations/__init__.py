@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from threading import Lock
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -177,7 +178,7 @@ class DidNotEnable(Exception):  # noqa: N818
     """
 
 
-class Integration:
+class Integration(ABC):
     """Baseclass for all integrations.
 
     To accept options for an integration, implement your own constructor that
@@ -191,6 +192,7 @@ class Integration:
     """String unique ID of integration type"""
 
     @staticmethod
+    @abstractmethod
     def setup_once():
         # type: () -> None
         """
@@ -203,4 +205,4 @@ class Integration:
         Inside those hooks `Integration.current` can be used to access the
         instance again.
         """
-        raise NotImplementedError()
+        pass
