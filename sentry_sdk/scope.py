@@ -454,7 +454,8 @@ class Scope(object):
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
-        Makes sure `_propagation_context` is set.
+        Makes sure the propagation context (`_propagation_context`) is set.
+        The propagation context only lives on the current scope.
         If there is `incoming_data` overwrite existing `_propagation_context`.
         if there is no `incoming_data` create new `_propagation_context`, but do NOT overwrite if already existing.
         """
@@ -468,7 +469,7 @@ class Scope(object):
                     self._propagation_context,
                 )
 
-        if self._propagation_context is None and self._type != ScopeType.CURRENT:
+        if self._propagation_context is None and self._type == ScopeType.CURRENT:
             self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):

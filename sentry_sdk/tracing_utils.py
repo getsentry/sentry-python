@@ -566,7 +566,7 @@ def get_current_span(scope=None):
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    scope = scope or sentry_sdk.Scope.get_isolation_scope()
+    scope = scope or sentry_sdk.Scope.get_current_scope()
     current_span = scope.span
     return current_span
 

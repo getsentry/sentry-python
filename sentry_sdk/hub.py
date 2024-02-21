@@ -280,7 +280,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             This property is deprecated and will be removed in a future release.
             Returns the current scope on the hub.
         """
-        return Scope.get_isolation_scope()
+        return Scope.get_current_scope()
 
     def last_event_id(self):
         # type: () -> Optional[str]

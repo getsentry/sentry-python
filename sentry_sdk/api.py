@@ -176,7 +176,7 @@ def configure_scope(  # noqa: F811
 
     :returns: If no callback is provided, returns a context manager that returns the scope.
     """
-    scope = Scope.get_isolation_scope()
+    scope = Scope.get_current_scope()
     scope.generate_propagation_context()
 
     if callback is not None:
@@ -228,7 +228,7 @@ def push_scope(  # noqa: F811
 
         def __enter__(self):
             # type: () -> Scope
-            return Scope.get_isolation_scope()
+            return Scope.get_current_scope()
 
         def __exit__(self, exc_type, exc_value, tb):
             # type: (Any, Any, Any) -> None
@@ -318,7 +318,7 @@ def get_traceparent():
     """
     Returns the traceparent either from the active span or from the scope.
     """
-    return Scope.get_isolation_scope().get_traceparent()
+    return Scope.get_current_scope().get_traceparent()
 
 
 def get_baggage():
@@ -326,7 +326,7 @@ def get_baggage():
     """
     Returns Baggage either from the active span or from the scope.
     """
-    baggage = Scope.get_isolation_scope().get_baggage()
+    baggage = Scope.get_current_scope().get_baggage()
 
     if baggage is not None:
         return baggage.serialize()
@@ -339,6 +339,6 @@ def continue_trace(environ_or_headers, op=None, name=None, source=None):
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
-    return Scope.get_isolation_scope().continue_trace(
+    return Scope.get_current_scope().continue_trace(
         environ_or_headers, op, name, source
     )
