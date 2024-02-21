@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 import zlib
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps, partial
@@ -119,23 +120,24 @@ def metrics_noop(func):
     return new_func
 
 
-class Metric:
+class Metric(ABC):
     __slots__ = ()
 
     @property
+    @abstractmethod
     def weight(self):
-        # type: (...) -> int
-        raise NotImplementedError()
+        # type: () -> int
+        pass
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
-        raise NotImplementedError()
+    @abstractmethod
+    def add(self, value):
+        # type: (MetricValue) -> None
+        pass
 
+    @abstractmethod
     def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
-        raise NotImplementedError()
+        # type: () -> Iterable[FlushedMetricValue]
+        pass
 
 
 class CounterMetric(Metric):
