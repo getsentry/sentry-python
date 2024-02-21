@@ -145,7 +145,7 @@ class _ScopeManager:
 
     def __enter__(self):
         # type: () -> Scope
-        return Scope.get_isolation_scope()
+        return Scope.get_current_scope()
 
     def __exit__(self, exc_type, exc_value, tb):
         # type: (Any, Any, Any) -> None

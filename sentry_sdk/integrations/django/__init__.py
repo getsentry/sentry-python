@@ -8,7 +8,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
 from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import Scope, add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -82,7 +82,6 @@ if TYPE_CHECKING:
     from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.tracing import Span
-    from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
 
@@ -408,13 +407,13 @@ def _before_get_response(request):
 
     _patch_drf()
 
-    with hub.configure_scope() as scope:
-        # Rely on WSGI middleware to start a trace
-        _set_transaction_name_and_source(scope, integration.transaction_style, request)
+    scope = Scope.get_current_scope()
+    # Rely on WSGI middleware to start a trace
+    _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
-        scope.add_event_processor(
-            _make_wsgi_request_event_processor(weakref.ref(request), integration)
-        )
+    scope.add_event_processor(
+        _make_wsgi_request_event_processor(weakref.ref(request), integration)
+    )
 
 
 def _attempt_resolve_again(request, scope, transaction_style):

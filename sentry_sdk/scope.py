@@ -1402,10 +1402,11 @@ class Scope(object):
 
     def __repr__(self):
         # type: () -> str
-        return "<%s id=%s name=%s>" % (
+        return "<%s id=%s name=%s type=%s>" % (
             self.__class__.__name__,
             hex(id(self)),
             self._name,
+            self._type,
         )
 
 

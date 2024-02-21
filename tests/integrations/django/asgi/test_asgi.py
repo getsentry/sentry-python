@@ -107,7 +107,6 @@ async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, applic
         await comm.wait()
 
         data = json.loads(response["body"])
-
         envelopes = [envelope for envelope in envelopes]
         assert len(envelopes) == 1
 
