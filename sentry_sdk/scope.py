@@ -989,21 +989,23 @@ class Scope(object):
             logger.warning(deprecation_msg)
             return span
 
-        active_span = self.span
-        if active_span is not None:
-            new_child_span = active_span.start_child(**kwargs)
-            return new_child_span
+        scope = Scope.get_current_scope()
+        span = scope.span
 
-        # If there is already a trace_id in the propagation context, use it.
-        # This does not need to be done for `start_child` above because it takes
-        # the trace_id from the parent span.
-        if "trace_id" not in kwargs:
-            traceparent = self.get_traceparent()
-            trace_id = traceparent.split("-")[0] if traceparent else None
-            if trace_id is not None:
-                kwargs["trace_id"] = trace_id
+        if span is None:
+            # New spans get the `trace_id`` from the scope
+            if "trace_id" not in kwargs:
+                traceparent = self.get_traceparent()
+                trace_id = traceparent.split("-")[0] if traceparent else None
+                if trace_id is not None:
+                    kwargs["trace_id"] = trace_id
 
-        return Span(**kwargs)
+            span = Span(**kwargs)
+        else:
+            # Children take `trace_id`` from the parnent.
+            span = span.start_child(**kwargs)
+
+        return span
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
         # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
