@@ -32,7 +32,6 @@ import random
 import sys
 import threading
 import time
-import warnings
 import uuid
 from abc import ABC, abstractmethod
 from collections import deque
@@ -798,15 +797,6 @@ class Scheduler(ABC):
         # type: (Profile) -> None
         self.ensure_running()
         self.new_profiles.append(profile)
-
-    def stop_profiling(self, _):
-        # type: (...) -> None
-        warnings.warn(
-            "stop_profiling is deprecated and will be removed in the next major release. "
-            "This method does nothing, so please remove any calls to it from your code.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
