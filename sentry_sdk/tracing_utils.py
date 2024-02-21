@@ -7,6 +7,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    filename_for_module,
     Dsn,
     match_regex_list,
     to_string,
@@ -255,7 +256,9 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            if project_root is not None and filepath.startswith(project_root):
+            if namespace is not None and not PY2:
+                in_app_path = filename_for_module(namespace, filepath)
+            elif project_root is not None and filepath.startswith(project_root):
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
