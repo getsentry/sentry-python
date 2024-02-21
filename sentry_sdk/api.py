@@ -108,7 +108,7 @@ def capture_event(
     event,  # type: Event
     hint=None,  # type: Optional[Hint]
     scope=None,  # type: Optional[Any]
-    **scope_kwargs  # type: Any
+    **scope_kwargs,  # type: Any
 ):
     # type: (...) -> Optional[str]
     return Scope.get_current_scope().capture_event(
@@ -121,7 +121,7 @@ def capture_message(
     message,  # type: str
     level=None,  # type: Optional[str]
     scope=None,  # type: Optional[Any]
-    **scope_kwargs  # type: Any
+    **scope_kwargs,  # type: Any
 ):
     # type: (...) -> Optional[str]
     return Scope.get_current_scope().capture_message(
@@ -133,7 +133,7 @@ def capture_message(
 def capture_exception(
     error=None,  # type: Optional[Union[BaseException, ExcInfo]]
     scope=None,  # type: Optional[Any]
-    **scope_kwargs  # type: Any
+    **scope_kwargs,  # type: Any
 ):
     # type: (...) -> Optional[str]
     return Scope.get_current_scope().capture_exception(
@@ -145,7 +145,7 @@ def capture_exception(
 def add_breadcrumb(
     crumb=None,  # type: Optional[Breadcrumb]
     hint=None,  # type: Optional[BreadcrumbHint]
-    **kwargs  # type: Any
+    **kwargs,  # type: Any
 ):
     # type: (...) -> None
     return Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
@@ -283,17 +283,16 @@ def flush(
 
 @scopemethod
 def start_span(
-    span=None,  # type: Optional[Span]
-    **kwargs  # type: Any
+    **kwargs,  # type: Any
 ):
     # type: (...) -> Span
-    return Scope.get_current_scope().start_span(span=span, **kwargs)
+    return Scope.get_current_scope().start_span(**kwargs)
 
 
 @scopemethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    **kwargs  # type: Any
+    **kwargs,  # type: Any
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
     return Scope.get_current_scope().start_transaction(transaction, **kwargs)

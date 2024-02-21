@@ -438,8 +438,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
-    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (Optional[Span], str, Any) -> Span
+    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (str, Any) -> Span
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -460,7 +460,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         scope = Scope.get_isolation_scope()
-        return scope.start_span(span=span, instrumenter=instrumenter, **kwargs)
+        return scope.start_span(instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs

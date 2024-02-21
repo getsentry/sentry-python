@@ -937,8 +937,8 @@ class Scope(object):
 
         return transaction
 
-    def start_span(self, span=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (Optional[Span], str, Any) -> Span
+    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+        # type: (str, Any) -> Span
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -962,32 +962,6 @@ class Scope(object):
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
-
-        # THIS BLOCK IS DEPRECATED
-        # TODO: consider removing this in a future release.
-        # This is for backwards compatibility with releases before
-        # start_transaction existed, to allow for a smoother transition.
-        if isinstance(span, Transaction) or "transaction" in kwargs:
-            deprecation_msg = (
-                "Deprecated: use start_transaction to start transactions and "
-                "Transaction.start_child to start spans."
-            )
-
-            if isinstance(span, Transaction):
-                logger.warning(deprecation_msg)
-                return self.start_transaction(span, **kwargs)
-
-            if "transaction" in kwargs:
-                logger.warning(deprecation_msg)
-                name = kwargs.pop("transaction")
-                return self.start_transaction(name=name, **kwargs)
-
-        # THIS BLOCK IS DEPRECATED
-        # We do not pass a span into start_span in our code base, so I deprecate this.
-        if span is not None:
-            deprecation_msg = "Deprecated: passing a span into `start_span` is deprecated and will be removed in the future."
-            logger.warning(deprecation_msg)
-            return span
 
         scope = Scope.get_current_scope()
         span = scope.span
