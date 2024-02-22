@@ -59,19 +59,36 @@ DEFAULT_DENYLIST = [
 
 
 class EventScrubber(object):
-    def __init__(self, denylist=None):
+    def __init__(self, denylist=None, recursive=False):
         # type: (Optional[List[str]]) -> None
         self.denylist = DEFAULT_DENYLIST if denylist is None else denylist
         self.denylist = [x.lower() for x in self.denylist]
+        self.recursive = recursive
+
+    def scrub_list(self, lst):
+        # type: (List) -> None
+        if not isinstance(lst, list):
+            return
+
+        for v in lst:
+            if isinstance(v, dict):
+                self.scrub_dict(v)
+            elif isinstance(v, list):
+                self.scrub_list(v)
 
     def scrub_dict(self, d):
         # type: (Dict[str, Any]) -> None
         if not isinstance(d, dict):
             return
 
-        for k in d.keys():
+        for k, v in d.items():
             if isinstance(k, string_types) and k.lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
+            elif self.recursive:
+                if isinstance(v, dict):
+                    self.scrub_dict(v)
+                elif isinstance(v, list):
+                    self.scrub_list(v)
 
     def scrub_request(self, event):
         # type: (Event) -> None

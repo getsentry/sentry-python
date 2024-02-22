@@ -2,7 +2,7 @@ import sys
 import logging
 
 from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import event_from_exception, AnnotatedValue
 from sentry_sdk.scrubber import EventScrubber
 
 
@@ -169,3 +169,22 @@ def test_scrubbing_doesnt_affect_local_vars(sentry_init, capture_events):
     (frame,) = frames
     assert frame["vars"]["password"] == "[Filtered]"
     assert password == "cat123"
+
+
+def test_recursive_EventScrubber(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+    customScrubber = EventScrubber(recursive=True)
+    complex_structure = {
+        "deep": {
+            "deeper": [{"deepest": {"password": "my_darkest_secret"}}],
+        },
+    }
+
+    capture_event({"extra": complex_structure})
+
+    (event,) = events
+    customScrubber.scrub_event(event)
+    assert isinstance(
+        event["extra"]["deep"]["deeper"][0]["deepest"]["password"], AnnotatedValue
+    )
