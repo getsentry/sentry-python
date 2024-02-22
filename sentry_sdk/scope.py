@@ -469,7 +469,7 @@ class Scope(object):
                     self._propagation_context,
                 )
 
-        if self._propagation_context is None and self._type == ScopeType.CURRENT:
+        if self._propagation_context is None and self._type != ScopeType.CURRENT:
             self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
@@ -615,6 +615,21 @@ class Scope(object):
         else:
             for header in self.iter_headers():
                 yield header
+
+    def get_active_propagation_context(self):
+        # type: () -> Dict[str, Any]
+        if self._propagation_context is not None:
+            return self._propagation_context
+
+        current_scope = Scope.get_current_scope()
+        if current_scope._propagation_context is not None:
+            return current_scope._propagation_context
+
+        isolation_scope = Scope.get_isolation_scope()
+        if isolation_scope._propagation_context is not None:
+            return isolation_scope._propagation_context
+
+        return {}
 
     def clear(self):
         # type: () -> None
@@ -964,20 +979,20 @@ class Scope(object):
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
-        scope = Scope.get_current_scope()
-        span = scope.span
+        # get current span or transaction
+        span = self.span or Scope.get_isolation_scope().span
 
         if span is None:
             # New spans get the `trace_id`` from the scope
             if "trace_id" not in kwargs:
-                traceparent = self.get_traceparent()
-                trace_id = traceparent.split("-")[0] if traceparent else None
+
+                trace_id = self.get_active_propagation_context().get("trace_id")
                 if trace_id is not None:
                     kwargs["trace_id"] = trace_id
 
             span = Span(**kwargs)
         else:
-            # Children take `trace_id`` from the parnent.
+            # Children take `trace_id`` from the parent span.
             span = span.start_child(**kwargs)
 
         return span
