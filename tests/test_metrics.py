@@ -957,7 +957,7 @@ def test_flush_recursion_protection(
 def test_flush_recursion_protection_background_flush(
     sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
 ):
-    monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.1)
+    monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.01)
     sentry_init(
         release="fun-release",
         environment="not-fun-env",

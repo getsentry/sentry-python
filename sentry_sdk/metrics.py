@@ -53,16 +53,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-try:
-    from gevent.threadpool import ThreadPool  # type: ignore
-except ImportError:
-    import importlib
-
-    def get_original(module, name):
-        # type: (str, str) -> Any
-        return getattr(importlib.import_module(module), name)
-
-
 _in_metrics = ContextVar("in_metrics")
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
@@ -422,7 +412,6 @@ class MetricsAggregator(object):
         self._lock = threading.Lock()
 
         self._flush_event = threading.Event()  # type: threading.Event
-
         self._force_flush = False
 
         # The aggregator shifts its flushing by up to an entire rollup window to
@@ -433,7 +422,7 @@ class MetricsAggregator(object):
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Union[threading.Thread, ThreadPool]]
+        self._flusher = None  # type: Optional[threading.Thread]
         self._flusher_pid = None  # type: Optional[int]
 
     def _ensure_thread(self):
