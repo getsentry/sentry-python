@@ -54,7 +54,7 @@ def test_just_log(
     if not created_event:
         assert not events
 
-        breadcrumbs = sentry_sdk.Hub.current.scope._breadcrumbs
+        breadcrumbs = sentry_sdk.Scope.get_isolation_scope()._breadcrumbs
         if (
             not disable_breadcrumbs and created_event is not None
         ):  # not None == not TRACE or DEBUG level
