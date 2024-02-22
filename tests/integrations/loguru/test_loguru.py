@@ -92,7 +92,7 @@ def test_breadcrumb_format(sentry_init, capture_events):
     logger.info("test")
     formatted_message = "test"
 
-    breadcrumbs = sentry_sdk.Hub.current.scope._breadcrumbs
+    breadcrumbs = sentry_sdk.Scope.get_isolation_scope()._breadcrumbs
     (breadcrumb,) = breadcrumbs
     assert breadcrumb["message"] == formatted_message
 
