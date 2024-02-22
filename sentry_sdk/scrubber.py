@@ -60,7 +60,7 @@ DEFAULT_DENYLIST = [
 
 class EventScrubber(object):
     def __init__(self, denylist=None, recursive=False):
-        # type: (Optional[List[str]]) -> None
+        # type: (Optional[List[str]], bool) -> None
         self.denylist = DEFAULT_DENYLIST if denylist is None else denylist
         self.denylist = [x.lower() for x in self.denylist]
         self.recursive = recursive
