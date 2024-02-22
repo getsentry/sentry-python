@@ -456,7 +456,8 @@ class MetricsAggregator(object):
 
             self._flusher_pid = pid
 
-            self._flusher = threading.Thread(target=self._flush_loop, daemon=True)
+            self._flusher = threading.Thread(target=self._flush_loop)
+            self._flusher.daemon = True
 
             try:
                 self._flusher.start()
