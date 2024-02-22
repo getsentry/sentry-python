@@ -13,7 +13,6 @@ from sentry_sdk import (
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 
 
@@ -66,7 +65,7 @@ def test_traceparent_with_tracing_enabled(sentry_init):
 def test_traceparent_with_tracing_disabled(sentry_init):
     sentry_init()
 
-    propagation_context = Hub.current.scope._propagation_context
+    propagation_context = Scope.get_isolation_scope()._propagation_context
     expected_traceparent = "%s-%s" % (
         propagation_context["trace_id"],
         propagation_context["span_id"],
@@ -77,7 +76,7 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 @pytest.mark.forked
 def test_baggage_with_tracing_disabled(sentry_init):
     sentry_init(release="1.0.0", environment="dev")
-    propagation_context = Hub.current.scope._propagation_context
+    propagation_context = Scope.get_isolation_scope()._propagation_context
     expected_baggage = (
         "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
             propagation_context["trace_id"]
@@ -113,9 +112,7 @@ def test_continue_trace(sentry_init):
     with start_transaction(transaction):
         assert transaction.name == "some name"
 
-        propagation_context = (
-            Hub.current.scope._propagation_context
-        )  # TODO: because this is the current scope and continue_trace was done on isolation scope.
+        propagation_context = Scope.get_isolation_scope()._propagation_context
         assert propagation_context["trace_id"] == transaction.trace_id == trace_id
         assert propagation_context["parent_span_id"] == parent_span_id
         assert propagation_context["parent_sampled"] == parent_sampled

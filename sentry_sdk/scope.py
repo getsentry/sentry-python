@@ -501,14 +501,16 @@ class Scope(object):
         if has_tracing_enabled(client.options) and self.span is not None:
             return self.span.to_traceparent()
 
-        if self._propagation_context is None:
-            return None
+        # If this scope has a propagation context, return traceparent from there
+        if self._propagation_context is not None:
+            traceparent = "%s-%s" % (
+                self._propagation_context["trace_id"],
+                self._propagation_context["span_id"],
+            )
+            return traceparent
 
-        traceparent = "%s-%s" % (
-            self._propagation_context["trace_id"],
-            self._propagation_context["span_id"],
-        )
-        return traceparent
+        # Fall back to isolation scope's traceparent. It always has one
+        return Scope.get_isolation_scope().get_traceparent()
 
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
@@ -522,16 +524,18 @@ class Scope(object):
         if has_tracing_enabled(client.options) and self.span is not None:
             return self.span.to_baggage()
 
-        if self._propagation_context is None:
-            return None
+        # If this scope has a propagation context, return baggage from there
+        if self._propagation_context is not None:
+            dynamic_sampling_context = self._propagation_context.get(
+                "dynamic_sampling_context"
+            )
+            if dynamic_sampling_context is None:
+                return Baggage.from_options(self)
+            else:
+                return Baggage(dynamic_sampling_context)
 
-        dynamic_sampling_context = self._propagation_context.get(
-            "dynamic_sampling_context"
-        )
-        if dynamic_sampling_context is None:
-            return Baggage.from_options(self)
-        else:
-            return Baggage(dynamic_sampling_context)
+        # Fall back to isolation scope's baggage. It always has one
+        return Scope.get_isolation_scope().get_baggage()
 
     def get_trace_context(self):
         # type: () -> Any
