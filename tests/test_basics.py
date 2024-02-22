@@ -17,6 +17,7 @@ from sentry_sdk import (
     start_transaction,
     add_breadcrumb,
     Hub,
+    Scope,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -375,8 +376,7 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    with configure_scope() as scope:
-        scope.clear()  # TODO: This clears the current scope, but the breadcrumbs are on the isolation scope
+    Scope.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
