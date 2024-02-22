@@ -519,7 +519,7 @@ def start_child_span_decorator(func):
         async def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span = get_current_span(sentry_sdk.Scope.get_isolation_scope())
+            span = get_current_span()
 
             if span is None:
                 logger.warning(
@@ -542,7 +542,7 @@ def start_child_span_decorator(func):
         def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span = get_current_span(sentry_sdk.Scope.get_isolation_scope())
+            span = get_current_span()
 
             if span is None:
                 logger.warning(
