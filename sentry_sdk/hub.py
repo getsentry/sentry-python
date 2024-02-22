@@ -736,7 +736,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         from the span representing the request, if available, or the current
         span on the scope if not.
         """
-        return Scope.get_current_scope().iter_trace_propagation_headers(
+        return Scope.get_isolation_scope().iter_trace_propagation_headers(
             span=span,
         )
 
