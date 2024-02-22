@@ -894,7 +894,7 @@ class Transaction(Span):
 class NoOpSpan(Span):
     def __repr__(self):
         # type: () -> str
-        return self.__class__.__name__
+        return "<%s>" % self.__class__.__name__
 
     @property
     def containing_transaction(self):

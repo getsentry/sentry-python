@@ -695,7 +695,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns the traceparent either from the active span or from the scope.
         """
-        return Scope.get_current_scope().get_traceparent()
+        current_scope = Scope.get_current_scope()
+        traceparent = current_scope.get_traceparent()
+
+        if traceparent is None:
+            isolation_scope = Scope.get_isolation_scope()
+            traceparent = isolation_scope.get_traceparent()
+
+        return traceparent
 
     def get_baggage(self):
         # type: () -> Optional[str]
@@ -706,7 +713,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         Returns Baggage either from the active span or from the scope.
         """
-        baggage = Scope.get_current_scope().get_baggage()
+        current_scope = Scope.get_current_scope()
+        baggage = current_scope.get_baggage()
+
+        if baggage is None:
+            isolation_scope = Scope.get_isolation_scope()
+            baggage = isolation_scope.get_baggage()
 
         if baggage is not None:
             return baggage.serialize()

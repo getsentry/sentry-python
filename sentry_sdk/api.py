@@ -295,7 +295,7 @@ def start_transaction(
     **kwargs,  # type: Any
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
-    return Scope.get_isolation_scope().start_transaction(transaction, **kwargs)
+    return Scope.get_current_scope().start_transaction(transaction, **kwargs)
 
 
 def set_measurement(name, value, unit=""):
@@ -318,7 +318,14 @@ def get_traceparent():
     """
     Returns the traceparent either from the active span or from the scope.
     """
-    return Scope.get_isolation_scope().get_traceparent()
+    current_scope = Scope.get_current_scope()
+    traceparent = current_scope.get_traceparent()
+
+    if traceparent is None:
+        isolation_scope = Scope.get_isolation_scope()
+        traceparent = isolation_scope.get_traceparent()
+
+    return traceparent
 
 
 def get_baggage():
@@ -326,7 +333,12 @@ def get_baggage():
     """
     Returns Baggage either from the active span or from the scope.
     """
-    baggage = Scope.get_isolation_scope().get_baggage()
+    current_scope = Scope.get_current_scope()
+    baggage = current_scope.get_baggage()
+
+    if baggage is None:
+        isolation_scope = Scope.get_isolation_scope()
+        baggage = isolation_scope.get_baggage()
 
     if baggage is not None:
         return baggage.serialize()
