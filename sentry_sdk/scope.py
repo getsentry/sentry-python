@@ -617,8 +617,23 @@ class Scope(object):
             for header in span.iter_headers():
                 yield header
         else:
-            for header in self.iter_headers():
-                yield header
+            # If this scope has a propagation context, return headers from there
+            # (it could be that self is not the current scope nor the isolation scope)
+            if self._propagation_context is not None:
+                for header in self.iter_headers():
+                    yield header
+            else:
+                # otherwise try headers from current scope
+                current_scope = Scope.get_current_scope()
+                if current_scope._propagation_context is not None:
+                    for header in current_scope.iter_headers():
+                        yield header
+                else:
+                    # otherwise fall back to headers from isolation scope
+                    isolation_scope = Scope.get_isolation_scope()
+                    if isolation_scope._propagation_context is not None:
+                        for header in isolation_scope.iter_headers():
+                            yield header
 
     def get_active_propagation_context(self):
         # type: () -> Dict[str, Any]
