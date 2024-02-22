@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import wraps, partial
 
 import sentry_sdk
-from sentry_sdk._compat import PY2, text_type, utc_from_timestamp, iteritems
+from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
     ContextVar,
     now,
@@ -19,7 +19,6 @@ from sentry_sdk.utils import (
     to_timestamp,
     serialize_frame,
     json_dumps,
-    is_gevent,
 )
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
@@ -55,7 +54,6 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent.monkey import get_original  # type: ignore
     from gevent.threadpool import ThreadPool  # type: ignore
 except ImportError:
     import importlib
@@ -423,15 +421,7 @@ class MetricsAggregator(object):
         self._running = True
         self._lock = threading.Lock()
 
-        if is_gevent() and PY2:
-            # get_original on threading.Event in Python 2 incorrectly returns
-            # the gevent-patched class. Luckily, threading.Event is just an alias
-            # for threading._Event in Python 2, and get_original on
-            # threading._Event correctly gets us the stdlib original.
-            event_cls = get_original("threading", "_Event")
-        else:
-            event_cls = get_original("threading", "Event")
-        self._flush_event = event_cls()  # type: threading.Event
+        self._flush_event = threading.Event()  # type: threading.Event
 
         self._force_flush = False
 
@@ -466,16 +456,10 @@ class MetricsAggregator(object):
 
             self._flusher_pid = pid
 
-            if not is_gevent():
-                self._flusher = threading.Thread(target=self._flush_loop)
-                self._flusher.daemon = True
-                start_flusher = self._flusher.start
-            else:
-                self._flusher = ThreadPool(1)
-                start_flusher = partial(self._flusher.spawn, func=self._flush_loop)
+            self._flusher = threading.Thread(target=self._flush_loop, daemon=True)
 
             try:
-                start_flusher()
+                self._flusher.start()
             except RuntimeError:
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
