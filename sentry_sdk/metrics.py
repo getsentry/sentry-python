@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-_in_metrics = ContextVar("in_metrics")
+_in_metrics = ContextVar("in_metrics", default=False)
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 _set = set  # set is shadowed below
@@ -84,7 +84,7 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
-    old_in_metrics = _in_metrics.get(False)
+    old_in_metrics = _in_metrics.get()
     _in_metrics.set(True)
     try:
         yield old_in_metrics
