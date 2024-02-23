@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import Hub, metrics, push_scope, start_transaction
+from sentry_sdk import Hub, Scope, metrics, start_transaction
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
 
@@ -516,12 +516,12 @@ def test_transaction_name(
     ts = time.time()
     envelopes = capture_envelopes()
 
-    with push_scope() as scope:
-        scope.set_transaction_name("/user/{user_id}", source="route")
-        metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
+    scope = Scope.get_current_scope()
+    scope.set_transaction_name("/user/{user_id}", source="route")
+    metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
 
     Hub.current.flush()
 
