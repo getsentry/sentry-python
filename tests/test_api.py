@@ -2,7 +2,6 @@ import pytest
 from unittest import mock
 
 from sentry_sdk import (
-    configure_scope,
     continue_trace,
     get_baggage,
     get_client,

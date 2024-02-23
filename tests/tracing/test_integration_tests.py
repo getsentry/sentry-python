@@ -6,11 +6,10 @@ import random
 
 from sentry_sdk import (
     capture_message,
-    configure_scope,
     Hub,
+    Scope,
     start_span,
     start_transaction,
-    Scope,
 )
 from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
