@@ -2,6 +2,8 @@ import json
 import threading
 
 from django import VERSION
+from django.core import signals
+from django.dispatch import receiver
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -253,3 +255,24 @@ else:
     my_async_view = None
     thread_ids_async = None
     post_echo_async = None
+
+
+myapp_custom_signal = signals.Signal()
+myapp_custom_signal_silenced = signals.Signal()
+
+
+@receiver(myapp_custom_signal)
+def signal_handler(sender, **kwargs):
+    assert sender == "hello"
+
+
+@receiver(myapp_custom_signal_silenced)
+def signal_handler_silenced(sender, **kwargs):
+    assert sender == "hello"
+
+
+@csrf_exempt
+def send_myapp_custom_signal(request):
+    myapp_custom_signal.send(sender="hello")
+    myapp_custom_signal_silenced.send(sender="hello")
+    return HttpResponse("ok")
