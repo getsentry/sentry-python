@@ -176,7 +176,7 @@ def configure_scope(  # noqa: F811
 
     :returns: If no callback is provided, returns a context manager that returns the scope.
     """
-    scope = Scope.get_current_scope()
+    scope = Scope.get_isolation_scope()
     scope.generate_propagation_context()
 
     if callback is not None:
