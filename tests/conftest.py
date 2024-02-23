@@ -55,6 +55,19 @@ else:
     del pytest_benchmark
 
 
+from sentry_sdk import scope
+
+
+@pytest.fixture(autouse=True)
+def clean_scopes():
+    """
+    Resets the scopes for every test to avoid leaking data between tests.
+    """
+    scope._global_scope = None
+    scope._isolation_scope.set(None)
+    scope._current_scope.set(None)
+
+
 @pytest.fixture(autouse=True)
 def internal_exceptions(request, monkeypatch):
     errors = []
@@ -163,9 +176,9 @@ def reset_integrations():
 def sentry_init(request):
     def inner(*a, **kw):
         # Clear scopes to not leak scope data between tests
-        sentry_sdk.scope._global_scope = None
-        sentry_sdk.scope._isolation_scope.set(None)
-        sentry_sdk.scope._current_scope.set(None)
+        # sentry_sdk.scope._global_scope = None
+        # sentry_sdk.scope._isolation_scope.set(None)
+        # sentry_sdk.scope._current_scope.set(None)
 
         hub = sentry_sdk.Hub.current
         kw.setdefault("transport", TestTransport())

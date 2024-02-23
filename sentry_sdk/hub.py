@@ -1,9 +1,8 @@
-import copy
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, _ScopeManager
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
     NoOpSpan,
@@ -138,20 +137,6 @@ class HubMeta(type):
         return GLOBAL_HUB
 
 
-class _ScopeManager:
-    def __init__(self, hub):
-        # type: (Hub) -> None
-        pass
-
-    def __enter__(self):
-        # type: () -> Scope
-        return Scope.get_current_scope()
-
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
-        pass
-
-
 class Hub(with_metaclass(HubMeta)):  # type: ignore
     """
     .. deprecated:: 2.0.0
@@ -180,24 +165,24 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     ):
         # type: (...) -> None
         if isinstance(client_or_hub, Hub):
-            hub = client_or_hub
-            client, other_scope = hub._stack[-1]
+            client = Scope.get_client()
             if scope is None:
-                scope = copy.copy(other_scope)
+                # hub cloning is going on, we use a fork of the isolation scope for context manager
+                scope = Scope.get_isolation_scope().fork()
         else:
-            client = client_or_hub
+            client = client_or_hub  # type: ignore
             Scope.get_global_scope().set_client(client)
 
-        if scope is None:
-            scope = Scope()
+        if scope is None:  # so there is no Hub cloning going on
+            # just the current isolation scope is used for context manager
+            scope = Scope.get_isolation_scope()
 
-        self._stack = [(client, scope)]
+        self._stack = [(client, scope)]  # type: ignore
         self._last_event_id = None  # type: Optional[str]
         self._old_hubs = []  # type: List[Hub]
 
-        # This forked isolation scope if the hub is used as a context manager
-        self._scope = Scope.get_isolation_scope().fork()
         self._old_scopes = []  # type: List[Scope]
+        self._scope = scope  # type: Scope
 
     def __enter__(self):
         # type: () -> Hub
@@ -280,7 +265,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             This property is deprecated and will be removed in a future release.
             Returns the current scope on the hub.
         """
-        return Scope.get_current_scope()
+        return Scope.get_isolation_scope()
 
     def last_event_id(self):
         # type: () -> Optional[str]
@@ -600,7 +585,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         :returns: If no callback is provided, returns a context manager that returns the scope.
         """
-        scope = Scope.get_current_scope()
+        scope = Scope.get_isolation_scope()
 
         if continue_trace:
             scope.generate_propagation_context()

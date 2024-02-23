@@ -95,6 +95,28 @@ class ScopeType(Enum):
     MERGED = "merged"
 
 
+class _ScopeManager:
+    def __init__(self, hub=None):
+        # type: (Optional[Any]) -> None
+        self._old_scopes = []  # type: List[Scope]
+
+    def __enter__(self):
+        # type: () -> Scope
+        isolation_scope = Scope.get_isolation_scope()
+
+        self._old_scopes.append(isolation_scope)
+
+        forked_scope = isolation_scope.fork()
+        _isolation_scope.set(forked_scope)
+
+        return forked_scope
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
+        old_scope = self._old_scopes.pop()
+        _isolation_scope.set(old_scope)
+
+
 def add_global_event_processor(processor):
     # type: (EventProcessor) -> None
     global_event_processors.append(processor)

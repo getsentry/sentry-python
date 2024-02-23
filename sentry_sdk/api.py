@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.scope import Scope, new_scope, isolation_scope
+from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
@@ -220,20 +220,6 @@ def push_scope(  # noqa: F811
     :returns: If no `callback` is provided, a context manager that should
         be used to pop the scope again.
     """
-
-    class _ScopeManager:
-        def __init__(self):
-            # type: () -> None
-            pass
-
-        def __enter__(self):
-            # type: () -> Scope
-            return Scope.get_current_scope()
-
-        def __exit__(self, exc_type, exc_value, tb):
-            # type: (Any, Any, Any) -> None
-            pass
-
     if callback is not None:
         with push_scope() as scope:
             callback(scope)

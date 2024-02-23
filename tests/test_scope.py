@@ -4,7 +4,6 @@ import pytest
 from unittest import mock
 
 import sentry_sdk
-from sentry_sdk import scope
 from sentry_sdk import (
     capture_exception,
     isolation_scope,
@@ -12,13 +11,6 @@ from sentry_sdk import (
 )
 from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import Scope, ScopeType, use_isolation_scope, use_scope
-
-
-@pytest.fixture
-def clean_scopes():
-    scope._global_scope = None
-    scope._isolation_scope.set(None)
-    scope._current_scope.set(None)
 
 
 def test_copying():
@@ -205,7 +197,7 @@ def test_get_global_scope():
     assert scope._type == ScopeType.GLOBAL
 
 
-def test_get_client(clean_scopes):
+def test_get_client():
     client = Scope.get_client()
     assert client is not None
     assert client.__class__ == NonRecordingClient
@@ -250,7 +242,7 @@ def test_fork():
     assert scope != forked_scope
 
 
-def test_get_global_scope_tags(clean_scopes):
+def test_get_global_scope_tags():
     global_scope1 = Scope.get_global_scope()
     global_scope2 = Scope.get_global_scope()
     assert global_scope1 == global_scope2
@@ -269,7 +261,7 @@ def test_get_global_scope_tags(clean_scopes):
     assert not global_scope2.client.is_active()
 
 
-def test_get_global_with_scope(clean_scopes):
+def test_get_global_with_scope():
     original_global_scope = Scope.get_global_scope()
 
     with new_scope() as scope:
@@ -282,7 +274,7 @@ def test_get_global_with_scope(clean_scopes):
     assert after_with_global_scope is original_global_scope
 
 
-def test_get_global_with_isolation_scope(clean_scopes):
+def test_get_global_with_isolation_scope():
     original_global_scope = Scope.get_global_scope()
 
     with isolation_scope() as scope:
@@ -295,7 +287,7 @@ def test_get_global_with_isolation_scope(clean_scopes):
     assert after_with_global_scope is original_global_scope
 
 
-def test_get_isolation_scope_tags(clean_scopes):
+def test_get_isolation_scope_tags():
     isolation_scope1 = Scope.get_isolation_scope()
     isolation_scope2 = Scope.get_isolation_scope()
     assert isolation_scope1 == isolation_scope2
@@ -314,7 +306,7 @@ def test_get_isolation_scope_tags(clean_scopes):
     assert not isolation_scope2.client.is_active()
 
 
-def test_get_current_scope_tags(clean_scopes):
+def test_get_current_scope_tags():
     scope1 = Scope.get_current_scope()
     scope2 = Scope.get_current_scope()
     assert id(scope1) == id(scope2)
@@ -333,7 +325,7 @@ def test_get_current_scope_tags(clean_scopes):
     assert not scope2.client.is_active()
 
 
-def test_with_isolation_scope(clean_scopes):
+def test_with_isolation_scope():
     original_current_scope = Scope.get_current_scope()
     original_isolation_scope = Scope.get_isolation_scope()
 
@@ -353,7 +345,7 @@ def test_with_isolation_scope(clean_scopes):
     assert after_with_isolation_scope is original_isolation_scope
 
 
-def test_with_isolation_scope_data(clean_scopes):
+def test_with_isolation_scope_data():
     """
     When doing `with isolation_scope()` the isolation *and* the current scope are forked,
     to prevent that by setting tags on the current scope in the context manager, data
@@ -438,7 +430,7 @@ def test_with_isolation_scope_data(clean_scopes):
     }
 
 
-def test_with_use_isolation_scope(clean_scopes):
+def test_with_use_isolation_scope():
     original_isolation_scope = Scope.get_isolation_scope()
     original_current_scope = Scope.get_current_scope()
     custom_isolation_scope = Scope()
@@ -466,7 +458,7 @@ def test_with_use_isolation_scope(clean_scopes):
     assert after_with_current_scope is not custom_isolation_scope
 
 
-def test_with_use_isolation_scope_data(clean_scopes):
+def test_with_use_isolation_scope_data():
     isolation_scope_before = Scope.get_isolation_scope()
     current_scope_before = Scope.get_current_scope()
     custom_isolation_scope = Scope()
@@ -563,7 +555,7 @@ def test_with_use_isolation_scope_data(clean_scopes):
     }
 
 
-def test_with_new_scope(clean_scopes):
+def test_with_new_scope():
     original_current_scope = Scope.get_current_scope()
     original_isolation_scope = Scope.get_isolation_scope()
 
@@ -583,7 +575,7 @@ def test_with_new_scope(clean_scopes):
     assert after_with_isolation_scope is original_isolation_scope
 
 
-def test_with_new_scope_data(clean_scopes):
+def test_with_new_scope_data():
     """
     When doing `with new_scope()` the current scope is forked but the isolation
     scope stays untouched.
@@ -661,7 +653,7 @@ def test_with_new_scope_data(clean_scopes):
     }
 
 
-def test_with_use_scope_data(clean_scopes):
+def test_with_use_scope_data():
     isolation_scope_before = Scope.get_isolation_scope()
     current_scope_before = Scope.get_current_scope()
     custom_current_scope = Scope()
