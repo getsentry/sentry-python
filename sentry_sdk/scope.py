@@ -990,32 +990,33 @@ class Scope(object):
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
-        kwargs.setdefault("scope", self)
+        with new_scope():
+            kwargs.setdefault("scope", self)
 
-        client = Scope.get_client()
+            client = Scope.get_client()
 
-        configuration_instrumenter = client.options["instrumenter"]
+            configuration_instrumenter = client.options["instrumenter"]
 
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
+            if instrumenter != configuration_instrumenter:
+                return NoOpSpan()
 
-        # get current span or transaction
-        span = self.span or Scope.get_isolation_scope().span
+            # get current span or transaction
+            span = self.span or Scope.get_isolation_scope().span
 
-        if span is None:
-            # New spans get the `trace_id`` from the scope
-            if "trace_id" not in kwargs:
+            if span is None:
+                # New spans get the `trace_id`` from the scope
+                if "trace_id" not in kwargs:
 
-                trace_id = self.get_active_propagation_context().get("trace_id")
-                if trace_id is not None:
-                    kwargs["trace_id"] = trace_id
+                    trace_id = self.get_active_propagation_context().get("trace_id")
+                    if trace_id is not None:
+                        kwargs["trace_id"] = trace_id
 
-            span = Span(**kwargs)
-        else:
-            # Children take `trace_id`` from the parent span.
-            span = span.start_child(**kwargs)
+                span = Span(**kwargs)
+            else:
+                # Children take `trace_id`` from the parent span.
+                span = span.start_child(**kwargs)
 
-        return span
+            return span
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
         # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
