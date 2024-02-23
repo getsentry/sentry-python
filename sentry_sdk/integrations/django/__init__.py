@@ -436,8 +436,8 @@ def _after_get_response(request):
     if integration is None or integration.transaction_style != "url":
         return
 
-    with hub.configure_scope() as scope:
-        _attempt_resolve_again(request, scope, integration.transaction_style)
+    scope = Scope.get_current_scope()
+    _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
 def _patch_get_response():
@@ -505,8 +505,8 @@ def _got_request_exception(request=None, **kwargs):
     integration = hub.get_integration(DjangoIntegration)
     if integration is not None:
         if request is not None and integration.transaction_style == "url":
-            with hub.configure_scope() as scope:
-                _attempt_resolve_again(request, scope, integration.transaction_style)
+            scope = Scope.get_current_scope()
+            _attempt_resolve_again(request, scope, integration.transaction_style)
 
         # If an integration is there, a client has to be there.
         client = hub.client  # type: Any

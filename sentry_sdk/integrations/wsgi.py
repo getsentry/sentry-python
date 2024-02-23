@@ -95,7 +95,7 @@ class SentryWsgiMiddleware:
                         source=TRANSACTION_SOURCE_ROUTE,
                     )
 
-                    with scope.start_transaction(
+                    with sentry_sdk.start_transaction(
                         transaction, custom_sampling_context={"wsgi_environ": environ}
                     ):
                         try:
