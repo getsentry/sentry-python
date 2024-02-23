@@ -10,6 +10,7 @@ from sentry_sdk import (
     Hub,
     start_span,
     start_transaction,
+    Scope,
 )
 from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
@@ -97,10 +98,9 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     # be tagged with the trace id (since it happens while the transaction is
     # open)
     with start_transaction(child_transaction):
-        with configure_scope() as scope:
-            # change the transaction name from "WRONG" to make sure the change
-            # is reflected in the final data
-            scope.transaction = "ho"
+        # change the transaction name from "WRONG" to make sure the change
+        # is reflected in the final data
+        Scope.get_current_scope().transaction = "ho"
         capture_message("hello")
 
     # in this case the child transaction won't be captured

@@ -32,11 +32,11 @@ def test_get_current_span_default_hub(sentry_init):
 
     assert get_current_span() is None
 
-    with configure_scope() as scope:
-        fake_span = mock.MagicMock()
-        scope.span = fake_span
+    scope = Scope.get_current_scope()
+    fake_span = mock.MagicMock()
+    scope.span = fake_span
 
-        assert get_current_span() == fake_span
+    assert get_current_span() == fake_span
 
 
 @pytest.mark.forked

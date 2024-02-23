@@ -164,11 +164,15 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
+
+        current_scope = None
+
         if isinstance(client_or_hub, Hub):
             client = Scope.get_client()
             if scope is None:
-                # hub cloning is going on, we use a fork of the isolation scope for context manager
+                # hub cloning is going on, we use a fork of the current/isolation scope for context manager
                 scope = Scope.get_isolation_scope().fork()
+                current_scope = Scope.get_current_scope().fork()
         else:
             client = client_or_hub  # type: ignore
             Scope.get_global_scope().set_client(client)
@@ -176,12 +180,19 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         if scope is None:  # so there is no Hub cloning going on
             # just the current isolation scope is used for context manager
             scope = Scope.get_isolation_scope()
+            current_scope = Scope.get_current_scope()
+
+        if current_scope is None:
+            # just the current current scope is used for context manager
+            current_scope = Scope.get_current_scope()
 
         self._stack = [(client, scope)]  # type: ignore
         self._last_event_id = None  # type: Optional[str]
         self._old_hubs = []  # type: List[Hub]
 
-        self._old_scopes = []  # type: List[Scope]
+        self._old_current_scopes = []  # type: List[Scope]
+        self._old_isolation_scopes = []  # type: List[Scope]
+        self._current_scope = current_scope  # type: Scope
         self._scope = scope  # type: Scope
 
     def __enter__(self):
@@ -189,8 +200,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         self._old_hubs.append(Hub.current)
         _local.set(self)
 
+        current_scope = Scope.get_current_scope()
+        self._old_current_scopes.append(current_scope)
+        scope._current_scope.set(self._current_scope)
+
         isolation_scope = Scope.get_isolation_scope()
-        self._old_scopes.append(isolation_scope)
+        self._old_isolation_scopes.append(isolation_scope)
         scope._isolation_scope.set(self._scope)
 
         return self
@@ -205,8 +220,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         old = self._old_hubs.pop()
         _local.set(old)
 
-        old_scope = self._old_scopes.pop()
-        scope._isolation_scope.set(old_scope)
+        old_current_scope = self._old_current_scopes.pop()
+        scope._current_scope.set(old_current_scope)
+
+        old_isolation_scope = self._old_isolation_scopes.pop()
+        scope._isolation_scope.set(old_isolation_scope)
 
     def run(
         self, callback  # type: Callable[[], T]
