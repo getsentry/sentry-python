@@ -19,12 +19,12 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   <details>
     <summary><b>Show table</b></summary>
 
-  | Class                                 | Abstract methods                          |
-  | ------------------------------------- | ----------------------------------------- |
-  | `sentry_sdk.integrations.Integration` | `setup_once`                              |
-  | `sentry_sdk.metrics.Metric`           | `add`, `serialize_value`, and `weight`    |
-  | `sentry_sdk.profiler.Scheduler`       | `ensure_running`, `setup`, and `teardown` |
-  | `sentry_sdk.transport.Transport`      | `capture_envelope`                        |
+  | Class                                 | Abstract methods                       |
+  | ------------------------------------- | -------------------------------------- |
+  | `sentry_sdk.integrations.Integration` | `setup_once`                           |
+  | `sentry_sdk.metrics.Metric`           | `add`, `serialize_value`, and `weight` |
+  | `sentry_sdk.profiler.Scheduler`       | `setup` and `teardown`                 |
+  | `sentry_sdk.transport.Transport`      | `capture_envelope`                     |
 
     </details>
 

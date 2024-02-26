@@ -788,10 +788,14 @@ class Scheduler(ABC):
         # type: () -> None
         pass
 
-    @abstractmethod
     def ensure_running(self):
+        """
+        Ensure the scheduler is running. By default, this method is a no-op.
+        The method should be overridden by any implementation for which it is
+        relevant.
+        """
         # type: () -> None
-        pass
+        return None
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
