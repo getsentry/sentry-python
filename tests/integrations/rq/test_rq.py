@@ -4,7 +4,7 @@ import pytest
 import rq
 from fakeredis import FakeStrictRedis
 
-from sentry_sdk import Scope, start_transaction
+from sentry_sdk import configure_scope, start_transaction
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import parse_version
 
@@ -178,17 +178,19 @@ def test_tracing_disabled(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    scope = Scope.get_isolation_scope()
-    queue.enqueue(crashing_job, foo=None)
-    worker.work(burst=True)
+    with configure_scope() as scope:
+        queue.enqueue(crashing_job, foo=None)
+        worker.work(burst=True)
 
-    (error_event,) = events
+        (error_event,) = events
 
-    assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == scope._propagation_context["trace_id"]
-    )
+        assert (
+            error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+        )
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == scope._propagation_context["trace_id"]
+        )
 
 
 def test_transaction_no_error(
