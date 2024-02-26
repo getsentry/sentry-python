@@ -1013,3 +1013,28 @@ def test_flush_recursion_protection_background_flush(
     m = parse_metrics(envelope.items[0].payload.get_bytes())
     assert len(m) == 1
     assert m[0][1] == "counter@none"
+
+
+@pytest.mark.skipif(
+    not gevent or sys.version_info >= (3, 7),
+    reason="Python 3.6 or lower and gevent required",
+)
+def test_disable_metrics_for_old_python_with_gevent(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
+    if maybe_monkeypatched_threading != "greenlet":
+        pytest.skip()
+
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    envelopes = capture_envelopes()
+
+    metrics.incr("counter")
+
+    Hub.current.flush()
+
+    assert Hub.current.client.metrics_aggregator is None
+    assert not envelopes
