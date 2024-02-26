@@ -66,7 +66,7 @@ class EventScrubber(object):
         self.recursive = recursive
 
     def scrub_list(self, lst):
-        # type: (List) -> None
+        # type: (List[Any]) -> None
         if not isinstance(lst, list):
             return
 
