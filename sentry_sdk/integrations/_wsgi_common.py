@@ -38,7 +38,7 @@ SENSITIVE_HEADERS = tuple(
 
 
 def request_body_within_bounds(client, content_length):
-    # type: (Optional[sentry_sdk.Client], int) -> bool
+    # type: (Optional[sentry_sdk.client.BaseClient], int) -> bool
     if client is None:
         return False
 

@@ -55,6 +55,19 @@ else:
     del pytest_benchmark
 
 
+from sentry_sdk import scope
+
+
+@pytest.fixture(autouse=True)
+def clean_scopes():
+    """
+    Resets the scopes for every test to avoid leaking data between tests.
+    """
+    scope._global_scope = None
+    scope._isolation_scope.set(None)
+    scope._current_scope.set(None)
+
+
 @pytest.fixture(autouse=True)
 def internal_exceptions(request, monkeypatch):
     errors = []

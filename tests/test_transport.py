@@ -13,7 +13,7 @@ from werkzeug.wrappers import Request, Response
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
@@ -156,6 +156,13 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
         # Make sure we cannot create events from our own logging
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
     )
+
+    # I am not sure why, but "werkzeug" logger makes an INFO log on sending
+    # the message "hi" and does creates an infinite look.
+    # Ignoring this for breaking the infinite loop and still we can test
+    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
+    # to an infinite loop
+    ignore_logger("werkzeug")
 
     with Hub(client):
         capture_message("hi")

@@ -6,6 +6,7 @@ from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -109,9 +110,10 @@ class RqIntegration(Integration):
             # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
-                if hub.scope.span is not None:
+                scope = Scope.get_current_scope()
+                if scope.span is not None:
                     job.meta["_sentry_trace_headers"] = dict(
-                        hub.iter_trace_propagation_headers()
+                        scope.iter_trace_propagation_headers()
                     )
 
             return old_enqueue_job(self, job, **kwargs)

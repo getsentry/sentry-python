@@ -278,6 +278,9 @@ def test_ignore_expected(capture_events, celery):
     assert not events
 
 
+@pytest.mark.skip(
+    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
+)
 def test_broken_prerun(init_celery, connect_signal):
     from celery.signals import task_prerun
 

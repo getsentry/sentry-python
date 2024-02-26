@@ -149,16 +149,17 @@ def record_sql_queries(
         yield span
 
 
-def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def maybe_create_breadcrumbs_from_span(scope, span):
+    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
+
     if span.op == OP.DB_REDIS:
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
     elif span.op == OP.HTTP_CLIENT:
-        hub.add_breadcrumb(type="http", category="httplib", data=span._data)
+        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             type="subprocess",
             category="subprocess",
             message=span.description,
@@ -171,8 +172,8 @@ def add_query_source(hub, span):
     """
     Adds OTel compatible source code information to the span
     """
-    client = hub.client
-    if client is None:
+    client = sentry_sdk.Scope.get_client()
+    if not client.is_active():
         return
 
     if span.timestamp is None or span.start_timestamp is None:
@@ -407,11 +408,10 @@ class Baggage:
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-        hub = transaction.hub or sentry_sdk.Hub.current
-        client = hub.client
+        client = sentry_sdk.Scope.get_client()
         sentry_items = {}  # type: Dict[str, str]
 
-        if not client:
+        if not client.is_active():
             return Baggage(sentry_items)
 
         options = client.options or {}
@@ -519,7 +519,7 @@ def start_child_span_decorator(func):
         async def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span = get_current_span(sentry_sdk.Hub.current)
+            span = get_current_span()
 
             if span is None:
                 logger.warning(
@@ -542,7 +542,7 @@ def start_child_span_decorator(func):
         def func_with_tracing(*args, **kwargs):
             # type: (*Any, **Any) -> Any
 
-            span = get_current_span(sentry_sdk.Hub.current)
+            span = get_current_span()
 
             if span is None:
                 logger.warning(
@@ -561,15 +561,13 @@ def start_child_span_decorator(func):
     return func_with_tracing
 
 
-def get_current_span(hub=None):
-    # type: (Optional[sentry_sdk.Hub]) -> Optional[Span]
+def get_current_span(scope=None):
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    if hub is None:
-        hub = sentry_sdk.Hub.current
-
-    current_span = hub.scope.span
+    scope = scope or sentry_sdk.Scope.get_current_scope()
+    current_span = scope.span
     return current_span
 
 

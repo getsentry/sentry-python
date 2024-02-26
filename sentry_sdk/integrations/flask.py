@@ -120,11 +120,15 @@ def _request_started(app, **kwargs):
     if integration is None:
         return
 
+    request = flask_request._get_current_object()
+
+    # Set the transaction name and source here,
+    # but rely on WSGI middleware to actually start the transaction
+    _set_transaction_name_and_source(
+        Scope.get_current_scope(), integration.transaction_style, request
+    )
+
     with hub.configure_scope() as scope:
-        # Set the transaction name and source here,
-        # but rely on WSGI middleware to actually start the transaction
-        request = flask_request._get_current_object()
-        _set_transaction_name_and_source(scope, integration.transaction_style, request)
         evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 

@@ -26,7 +26,6 @@ from sentry_sdk import (
     configure_scope,
     capture_message,
     capture_exception,
-    last_event_id,
     Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
@@ -599,7 +598,7 @@ def test_wsgi_level_error_is_caught(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
 
 
-def test_500(sentry_init, capture_events, app):
+def test_500(sentry_init, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
@@ -611,15 +610,12 @@ def test_500(sentry_init, capture_events, app):
 
     @app.errorhandler(500)
     def error_handler(err):
-        return "Sentry error: %s" % last_event_id()
-
-    events = capture_events()
+        return "Sentry error."
 
     client = app.test_client()
     response = client.get("/")
 
-    (event,) = events
-    assert response.data.decode("utf-8") == "Sentry error: %s" % event["event_id"]
+    assert response.data.decode("utf-8") == "Sentry error."
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app):

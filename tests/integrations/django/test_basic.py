@@ -337,17 +337,14 @@ def test_custom_error_handler_request_context(sentry_init, client, capture_event
     }
 
 
-def test_500(sentry_init, client, capture_events):
+def test_500(sentry_init, client):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    events = capture_events()
 
     content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
     content = content.decode("utf-8")
 
-    (event,) = events
-    event_id = event["event_id"]
-    assert content == "Sentry error: %s" % event_id
+    assert content == "Sentry error."
 
 
 @pytest.mark.forked

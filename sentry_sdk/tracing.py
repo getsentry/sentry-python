@@ -106,6 +106,7 @@ class Span:
         "_context_manager_state",
         "_containing_transaction",
         "_local_aggregator",
+        "scope",
     )
 
     def __new__(cls, **kwargs):
@@ -131,11 +132,12 @@ class Span:
         sampled=None,  # type: Optional[bool]
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
-        hub=None,  # type: Optional[sentry_sdk.Hub]
+        hub=None,  # type: Optional[sentry_sdk.Hub]  # deprecated
         status=None,  # type: Optional[str]
         transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
+        scope=None,  # type: Optional[sentry_sdk.Scope]
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -147,6 +149,7 @@ class Span:
         self.description = description
         self.status = status
         self.hub = hub
+        self.scope = scope
         self._tags = {}  # type: Dict[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
@@ -199,12 +202,10 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        hub = self.hub or sentry_sdk.Hub.current
-
-        _, scope = hub._stack[-1]
+        scope = self.scope or sentry_sdk.Scope.get_current_scope()
         old_span = scope.span
         scope.span = self
-        self._context_manager_state = (hub, scope, old_span)
+        self._context_manager_state = (scope, old_span)
         return self
 
     def __exit__(self, ty, value, tb):
@@ -212,10 +213,9 @@ class Span:
         if value is not None:
             self.set_status("internal_error")
 
-        hub, scope, old_span = self._context_manager_state
+        scope, old_span = self._context_manager_state
         del self._context_manager_state
-
-        self.finish(hub)
+        self.finish(scope)
         scope.span = old_span
 
     @property
@@ -239,9 +239,9 @@ class Span:
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-        configuration_instrumenter = client and client.options["instrumenter"]
+        configuration_instrumenter = sentry_sdk.Scope.get_client().options[
+            "instrumenter"
+        ]
 
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
@@ -446,28 +446,25 @@ class Span:
         # type: () -> bool
         return self.status == "ok"
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
-        # Note: would be type: (Optional[sentry_sdk.Hub]) -> None, but that leads
-        # to incompatible return types for Span.finish and Transaction.finish.
-        """Sets the end timestamp of the span.
+    def finish(self, scope=None, end_timestamp=None):
+        # type: (Optional[sentry_sdk.Scope], Optional[Union[float, datetime]]) -> Optional[str]
+        """
+        Sets the end timestamp of the span.
+
         Additionally it also creates a breadcrumb from the span,
         if the span represents a database or HTTP request.
 
-        :param hub: The hub to use for this transaction.
-            If not provided, the current hub will be used.
+        :param scope: The scope to use for this transaction.
+            If not provided, the current scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
 
         :return: Always ``None``. The type is ``Optional[str]`` to match
             the return value of :py:meth:`sentry_sdk.tracing.Transaction.finish`.
         """
-
         if self.timestamp is not None:
             # This span is already finished, ignore.
             return None
-
-        hub = hub or self.hub or sentry_sdk.Hub.current
 
         try:
             if end_timestamp:
@@ -482,7 +479,8 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        maybe_create_breadcrumbs_from_span(hub, self)
+        scope = scope or sentry_sdk.Scope.get_current_scope()
+        maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
 
@@ -643,7 +641,7 @@ class Transaction(Span):
         return self
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
+        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
 
@@ -660,10 +658,10 @@ class Transaction(Span):
             return None
 
         hub = hub or self.hub or sentry_sdk.Hub.current
-        client = hub.client
+        client = sentry_sdk.Scope.get_client()
 
-        if client is None:
-            # We have no client and therefore nowhere to send this transaction.
+        if not client.is_active():
+            # We have no active client and therefore nowhere to send this transaction.
             return None
 
         # This is a de facto proxy for checking if sampled = False
@@ -809,16 +807,14 @@ class Transaction(Span):
         4. If `traces_sampler` is not defined and there's no parent sampling
         decision, `traces_sample_rate` will be used.
         """
+        client = sentry_sdk.Scope.get_client()
 
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-        options = (client and client.options) or {}
         transaction_description = "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
         )
 
-        # nothing to do if there's no client or if tracing is disabled
-        if not client or not has_tracing_enabled(options):
+        # nothing to do if tracing is disabled
+        if not has_tracing_enabled(client.options):
             self.sampled = False
             return
 
@@ -832,13 +828,13 @@ class Transaction(Span):
         # `traces_sample_rate` were defined, so one of these should work; prefer
         # the hook if so
         sample_rate = (
-            options["traces_sampler"](sampling_context)
-            if callable(options.get("traces_sampler"))
+            client.options["traces_sampler"](sampling_context)
+            if callable(client.options.get("traces_sampler"))
             else (
                 # default inheritance behavior
                 sampling_context["parent_sampled"]
                 if sampling_context["parent_sampled"] is not None
-                else options["traces_sample_rate"]
+                else client.options["traces_sample_rate"]
             )
         )
 
@@ -867,7 +863,7 @@ class Transaction(Span):
                     transaction_description=transaction_description,
                     reason=(
                         "traces_sampler returned 0 or False"
-                        if callable(options.get("traces_sampler"))
+                        if callable(client.options.get("traces_sampler"))
                         else "traces_sample_rate is set to 0"
                     ),
                 )
@@ -898,7 +894,7 @@ class Transaction(Span):
 class NoOpSpan(Span):
     def __repr__(self):
         # type: () -> str
-        return self.__class__.__name__
+        return "<%s>" % self.__class__.__name__
 
     @property
     def containing_transaction(self):
@@ -954,7 +950,7 @@ class NoOpSpan(Span):
         return {}
 
     def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[sentry_sdk.Hub], Optional[Union[float, datetime]]) -> Optional[str]
+        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
         pass
 
     def set_measurement(self, name, value, unit=""):

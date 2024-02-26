@@ -163,8 +163,8 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with auto_session_tracking(hub, session_mode="request"):
-                with hub:
+            with hub:
+                with auto_session_tracking(hub, session_mode="request"):
                     with hub.configure_scope() as sentry_scope:
                         sentry_scope.clear_breadcrumbs()
                         sentry_scope._name = "asgi"

@@ -520,11 +520,8 @@ class Profile:
             self.sampled = False
             return
 
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-
-        # The client is None, so we can't get the sample rate.
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             self.sampled = False
             return
 
@@ -592,13 +589,11 @@ class Profile:
 
     def __enter__(self):
         # type: () -> Profile
-        hub = self.hub or sentry_sdk.Hub.current
-
-        _, scope = hub._stack[-1]
+        scope = sentry_sdk.scope.Scope.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
-        self._context_manager_state = (hub, scope, old_profile)
+        self._context_manager_state = (scope, old_profile)
 
         self.start()
 
@@ -608,7 +603,7 @@ class Profile:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.stop()
 
-        _, scope, old_profile = self._context_manager_state
+        scope, old_profile = self._context_manager_state
         del self._context_manager_state
 
         scope.profile = old_profile
@@ -730,9 +725,8 @@ class Profile:
 
     def valid(self):
         # type: () -> bool
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             return False
 
         if not has_profiling_enabled(client.options):

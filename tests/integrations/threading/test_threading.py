@@ -12,7 +12,6 @@ original_start = Thread.start
 original_run = Thread.run
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize("integrations", [[ThreadingIntegration()], []])
 def test_handles_exceptions(sentry_init, capture_events, integrations):
     sentry_init(default_integrations=False, integrations=integrations)
@@ -36,7 +35,6 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize("propagate_hub", (True, False))
 def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     sentry_init(
@@ -126,7 +124,6 @@ def test_circular_references(sentry_init, request):
     assert unreachable_objects == 0
 
 
-@pytest.mark.forked
 def test_double_patching(sentry_init, capture_events):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
     events = capture_events()

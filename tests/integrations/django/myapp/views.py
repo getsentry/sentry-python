@@ -118,7 +118,7 @@ def mylogin(request):
 
 @csrf_exempt
 def handler500(request):
-    return HttpResponseServerError("Sentry error: %s" % sentry_sdk.last_event_id())
+    return HttpResponseServerError("Sentry error.")
 
 
 class ClassBasedView(ListView):

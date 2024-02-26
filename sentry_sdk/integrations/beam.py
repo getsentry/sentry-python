@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from typing import Optional
     from typing import Callable
 
-    from sentry_sdk.client import Client
+    from sentry_sdk.client import BaseClient
     from sentry_sdk._types import ExcInfo
 
     T = TypeVar("T")
@@ -155,7 +155,7 @@ def _capture_exception(exc_info, hub):
 
 
 def raise_exception(client):
-    # type: (Optional[Client]) -> None
+    # type: (Optional[BaseClient]) -> None
     """
     Raise an exception. If the client is not in the hub, rebind it.
     """
@@ -169,7 +169,7 @@ def raise_exception(client):
 
 
 def _wrap_generator_call(gen, client):
-    # type: (Iterator[T], Optional[Client]) -> Iterator[T]
+    # type: (Iterator[T], Optional[BaseClient]) -> Iterator[T]
     """
     Wrap the generator to handle any failures.
     """

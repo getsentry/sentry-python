@@ -6,10 +6,12 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.hub import Hub
+from sentry_sdk import isolation_scope
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -244,7 +246,7 @@ def _wrap_tracer(task, f):
         if hub.get_integration(CeleryIntegration) is None:
             return f(*args, **kwargs)
 
-        with hub.push_scope() as scope:
+        with isolation_scope() as scope:
             scope._name = "celery"
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
@@ -366,9 +368,9 @@ def _capture_exception(task, exc_info):
 def _set_status(hub, status):
     # type: (Hub, str) -> None
     with capture_internal_exceptions():
-        with hub.configure_scope() as scope:
-            if scope.span is not None:
-                scope.span.set_status(status)
+        scope = Scope.get_current_scope()
+        if scope.span is not None:
+            scope.span.set_status(status)
 
 
 def _patch_worker_exit():

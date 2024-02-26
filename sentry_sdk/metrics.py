@@ -732,7 +732,7 @@ def _get_aggregator_and_update_tags(key, tags):
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
-    scope = hub.scope
+    scope = sentry_sdk.Scope.get_current_scope()
     local_aggregator = None
 
     # We go with the low-level API here to access transaction information as

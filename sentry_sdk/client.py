@@ -47,10 +47,12 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk.integrations import Integration
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.integrations import Integration
+    from sentry_sdk.metrics import MetricsAggregator
+    from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
+    from sentry_sdk.transport import Transport
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -132,19 +134,101 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class _Client:
-    """The client is internally responsible for capturing the events and
+class BaseClient:
+    """
+    .. versionadded:: 2.0.0
+
+    The basic definition of a client that is used for sending data to Sentry.
+    """
+
+    def __init__(self, options=None):
+        # type: (Optional[Dict[str, Any]]) -> None
+        self.options = (
+            options if options is not None else DEFAULT_OPTIONS
+        )  # type: Dict[str, Any]
+
+        self.transport = None  # type: Optional[Transport]
+        self.monitor = None  # type: Optional[Monitor]
+        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+
+    def __getstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return {"options": {}}
+
+    def __setstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        pass
+
+    @property
+    def dsn(self):
+        # type: () -> Optional[str]
+        return None
+
+    def should_send_default_pii(self):
+        # type: () -> bool
+        return False
+
+    def is_active(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
+        """
+        return False
+
+    def capture_event(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Optional[str]
+        return None
+
+    def capture_session(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def get_integration(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return None
+
+    def close(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def flush(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def __enter__(self):
+        # type: () -> BaseClient
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
+        return None
+
+
+class NonRecordingClient(BaseClient):
+    """
+    .. versionadded:: 2.0.0
+
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+    """
+
+    pass
+
+
+class _Client(BaseClient):
+    """
+    The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
-
+        super(_Client, self).__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self):
@@ -293,6 +377,15 @@ class _Client:
             # If we have anything on that could spawn a background thread, we
             # need to check if it's safe to use them.
             check_uwsgi_thread_support()
+
+    def is_active(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
+        """
+        return True
 
     @property
     def dsn(self):
@@ -560,7 +653,6 @@ class _Client:
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
-            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
