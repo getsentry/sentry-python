@@ -162,18 +162,18 @@ async def _request_websocket_started(app, **kwargs):
     if integration is None:
         return
 
+    if has_request_context():
+        request_websocket = request._get_current_object()
+    if has_websocket_context():
+        request_websocket = websocket._get_current_object()
+
+    # Set the transaction name here, but rely on ASGI middleware
+    # to actually start the transaction
+    _set_transaction_name_and_source(
+        Scope.get_current_scope(), integration.transaction_style, request_websocket
+    )
+
     with hub.configure_scope() as scope:
-        if has_request_context():
-            request_websocket = request._get_current_object()
-        if has_websocket_context():
-            request_websocket = websocket._get_current_object()
-
-        # Set the transaction name here, but rely on ASGI middleware
-        # to actually start the transaction
-        _set_transaction_name_and_source(
-            scope, integration.transaction_style, request_websocket
-        )
-
         evt_processor = _make_request_event_processor(
             app, request_websocket, integration
         )

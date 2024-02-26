@@ -77,10 +77,10 @@ class PyramidIntegration(Integration):
             integration = hub.get_integration(PyramidIntegration)
 
             if integration is not None:
+                _set_transaction_name_and_source(
+                    Scope.get_current_scope(), integration.transaction_style, request
+                )
                 with hub.configure_scope() as scope:
-                    _set_transaction_name_and_source(
-                        scope, integration.transaction_style, request
-                    )
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
