@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import Scope
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
@@ -165,11 +166,10 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                with Hub.current.configure_scope() as scope:
-                    scope.set_transaction_name(
-                        name,
-                        source=SOURCE_FOR_STYLE[integration.transaction_style],
-                    )
+                Scope.get_current_scope().set_transaction_name(
+                    name,
+                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                )
 
             return rv
 
