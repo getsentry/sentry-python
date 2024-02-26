@@ -5,6 +5,7 @@ import random
 import socket
 
 from sentry_sdk._compat import (
+    PY37,
     datetime_utcnow,
     string_types,
     text_type,
@@ -20,6 +21,7 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
+    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -256,14 +258,26 @@ class _Client(object):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
+                if is_gevent():
+                    # Context vars are not working correctly even with
+                    # gevent-patched Python 3.6 and lower.
+                    metrics_supported = PY37
+                else:
+                    metrics_supported = True
 
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
+                if metrics_supported:
+                    from sentry_sdk.metrics import MetricsAggregator
+
+                    self.metrics_aggregator = MetricsAggregator(
+                        capture_func=_capture_envelope,
+                        enable_code_locations=bool(
+                            experiments.get("metric_code_locations", True)
+                        ),
+                    )
+                else:
+                    logger.info(
+                        "Metrics not supported on Python 3.6 and lower with gevent."
+                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
