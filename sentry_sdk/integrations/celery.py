@@ -368,7 +368,7 @@ def _capture_exception(task, exc_info):
 def _set_status(hub, status):
     # type: (Hub, str) -> None
     with capture_internal_exceptions():
-        scope = Scope.get_current_scope()    
+        scope = Scope.get_current_scope()
         if scope.span is not None:
             scope.span.set_status(status)
 

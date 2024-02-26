@@ -7,6 +7,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -91,19 +92,19 @@ def _make_event_processor(task):
 
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
-    hub = Hub.current
+    scope = Scope.get_current_scope()
 
     if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        hub.scope.transaction.set_status("aborted")
+        scope.transaction.set_status("aborted")
         return
 
-    hub.scope.transaction.set_status("internal_error")
+    scope.transaction.set_status("internal_error")
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options if hub.client else None,
+        client_options=Scope.get_client().options,
         mechanism={"type": HueyIntegration.identifier, "handled": False},
     )
-    hub.capture_event(event, hint=hint)
+    scope.capture_event(event, hint=hint)
 
 
 def _wrap_task_execute(func):
