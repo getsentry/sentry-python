@@ -258,13 +258,9 @@ class _Client(object):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                if is_gevent():
-                    # Context vars are not working correctly on Python <=3.6
-                    # with gevent.
-                    metrics_supported = PY37
-                else:
-                    metrics_supported = True
-
+                # Context vars are not working correctly on Python <=3.6
+                # with gevent.
+                metrics_supported = not is_gevent() or PY37
                 if metrics_supported:
                     from sentry_sdk.metrics import MetricsAggregator
 
