@@ -321,7 +321,7 @@ class Scope(object):
         if current_scope is not None:
             final_scope.update_from_scope(current_scope)
 
-        if current_scope != self:
+        if self != current_scope and self != isolation_scope:
             final_scope.update_from_scope(self)
 
         if additional_scope is not None:
