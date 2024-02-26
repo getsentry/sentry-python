@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections import deque
 
 import sentry_sdk
@@ -584,7 +585,6 @@ class Profile:
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
     def __enter__(self):
@@ -750,7 +750,7 @@ class Profile:
         return True
 
 
-class Scheduler:
+class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
@@ -772,26 +772,29 @@ class Scheduler:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.teardown()
 
+    @abstractmethod
     def setup(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def teardown(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
     def ensure_running(self):
         # type: () -> None
-        raise NotImplementedError
+        """
+        Ensure the scheduler is running. By default, this method is a no-op.
+        The method should be overridden by any implementation for which it is
+        relevant.
+        """
+        return None
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
         self.ensure_running()
         self.new_profiles.append(profile)
-
-    def stop_profiling(self, profile):
-        # type: (Profile) -> None
-        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]

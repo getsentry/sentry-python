@@ -37,6 +37,18 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
     scope = sentry_sdk.Scope.get_current_scope()
     scope.set_transaction_name("new-transaction-name")
     ```
+- The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
+  <details>
+    <summary><b>Show table</b></summary>
+
+  | Class                                 | Abstract methods                       |
+  | ------------------------------------- | -------------------------------------- |
+  | `sentry_sdk.integrations.Integration` | `setup_once`                           |
+  | `sentry_sdk.metrics.Metric`           | `add`, `serialize_value`, and `weight` |
+  | `sentry_sdk.profiler.Scheduler`       | `setup` and `teardown`                 |
+  | `sentry_sdk.transport.Transport`      | `capture_envelope`                     |
+
+    </details>
 
 ## Removed
 
@@ -55,17 +67,18 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Removed `sentry_sdk.utils.Auth.store_api_url`.
 - `sentry_sdk.utils.Auth.get_api_url`'s now accepts a `sentry_sdk.consts.EndpointType` enum instead of a string as its only parameter. We recommend omitting this argument when calling the function, since the parameter's default value is the only possible `sentry_sdk.consts.EndpointType` value. The parameter exists for future compatibility.
 - Removed `tracing_utils_py2.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
+- Removed the `sentry_sdk.profiler.Scheduler.stop_profiling` method. Any calls to this method can simply be removed, since this was a no-op method.
 
 ## Deprecated
 
 - `profiler_mode` and `profiles_sample_rate` have been deprecated as `_experiments` options. Use them as top level options instead:
-    ```python
-    sentry_sdk.init(
-        ...,
-        profiler_mode="thread",
-        profiles_sample_rate=1.0,
-    )
-    ```
+  ```python
+  sentry_sdk.init(
+      ...,
+      profiler_mode="thread",
+      profiles_sample_rate=1.0,
+  )
+  ```
 - Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
