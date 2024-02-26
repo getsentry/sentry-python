@@ -20,11 +20,10 @@ This is the official Python SDK for [Sentry](http://sentry.io/)
 
 **Sentry SDK 2.0a1** is alpha software and not yet ready for production.
 
-Please give it a spin and test it with your project. If you have any questions or feedback please contact us on [Discord](https://discord.gg/Ww9hbqr) in the [#python](https://discord.com/channels/621778831602221064/621783758739079168) channel or create a [GitHub Issue](https://github.com/getsentry/sentry-python/issues) or start a [GitHub Discussion](https://github.com/getsentry/sentry-python/discussions). 
+Please give it a spin and test it with your project. If you have any questions or feedback please contact us on [Discord](https://discord.gg/Ww9hbqr) in the [#python](https://discord.com/channels/621778831602221064/621783758739079168) channel or create a [GitHub Issue](https://github.com/getsentry/sentry-python/issues) or start a [GitHub Discussion](https://github.com/getsentry/sentry-python/discussions).
 
 Thanks!
 
-https://discord.com/channels/621778831602221064/621783758739079168
 
 ## Getting Started
 
