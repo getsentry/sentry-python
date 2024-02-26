@@ -6,7 +6,7 @@ from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _get_headers,
-    _wrap_apply_async,
+    _wrap_task_run,
 )
 
 from sentry_sdk._compat import text_type
@@ -34,7 +34,7 @@ def init_celery(sentry_init, request):
     def inner(propagate_traces=True, backend="always_eager", **kwargs):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
-            **kwargs
+            **kwargs,
         )
         celery = Celery(__name__)
 
@@ -359,9 +359,12 @@ def test_retry(celery, capture_events):
 
 
 # TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
-@pytest.mark.skip
+# @pytest.mark.skip
 @pytest.mark.forked
-def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
+@pytest.mark.parametrize("execution_way", ["apply_async", "send_task"])
+def test_redis_backend_trace_propagation(
+    init_celery, capture_events_forksafe, execution_way
+):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
 
     events = capture_events_forksafe()
@@ -369,13 +372,18 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     runs = []
 
     @celery.task(name="dummy_task", bind=True)
-    def dummy_task(self):
+    def dummy_task(self, x, y):
         runs.append(1)
         1 / 0
 
     with start_transaction(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-        res = dummy_task.apply_async()
+        if execution_way == "apply_async":
+            res = dummy_task.apply_async(kwargs={"x": 1, "y": 0})
+        elif execution_way == "send_task":
+            res = celery.send_task("dummy_task", kwargs={"x": 1, "y": 0})
+        else:  # pragma: no cover
+            raise ValueError(execution_way)
 
     with pytest.raises(Exception):  # noqa: B017
         # Celery 4.1 raises a gibberish exception
@@ -571,7 +579,7 @@ def test_apply_async_manually_span(sentry_init):
         assert "sentry-trace" in headers
         assert "baggage" in headers
 
-    wrapped = _wrap_apply_async(dummy_function)
+    wrapped = _wrap_task_run(dummy_function)
     wrapped(mock.MagicMock(), (), headers={})
 
 
@@ -585,7 +593,7 @@ def test_apply_async_from_beat_no_span(sentry_init):
         assert "sentry-trace" not in headers
         assert "baggage" not in headers
 
-    wrapped = _wrap_apply_async(dummy_function)
+    wrapped = _wrap_task_run(dummy_function)
     wrapped(
         mock.MagicMock(),
         [
