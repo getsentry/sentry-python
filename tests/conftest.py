@@ -175,11 +175,6 @@ def reset_integrations():
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
-        # Clear scopes to not leak scope data between tests
-        # sentry_sdk.scope._global_scope = None
-        # sentry_sdk.scope._isolation_scope.set(None)
-        # sentry_sdk.scope._current_scope.set(None)
-
         hub = sentry_sdk.Hub.current
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
