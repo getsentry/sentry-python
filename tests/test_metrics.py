@@ -1019,6 +1019,7 @@ def test_flush_recursion_protection_background_flush(
     not gevent or sys.version_info >= (3, 7),
     reason="Python 3.6 or lower and gevent required",
 )
+@pytest.mark.forked
 def test_disable_metrics_for_old_python_with_gevent(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
