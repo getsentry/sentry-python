@@ -205,6 +205,7 @@ def flush(
 @hubmethod
 def last_event_id():
     # type: () -> Optional[str]
+
     return Hub.current.last_event_id()
 
 

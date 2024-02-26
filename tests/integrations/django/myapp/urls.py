@@ -26,6 +26,7 @@ except ImportError:
 
 
 from . import views
+from django_helpers import views as helper_views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
@@ -59,6 +60,11 @@ urlpatterns = [
     path("template-test3", views.template_test3, name="template_test3"),
     path("postgres-select", views.postgres_select, name="postgres_select"),
     path("postgres-select-slow", views.postgres_select_orm, name="postgres_select_orm"),
+    path(
+        "postgres-select-slow-from-supplement",
+        helper_views.postgres_select_orm,
+        name="postgres_select_slow_from_supplement",
+    ),
     path(
         "permission-denied-exc",
         views.permission_denied_exc,

@@ -490,7 +490,7 @@ class Profile(object):
         # type: (SamplingContext) -> None
         """
         Sets the profile's sampling decision according to the following
-        precdence rules:
+        precedence rules:
 
         1. If the transaction to be profiled is not sampled, that decision
         will be used, regardless of anything else.

@@ -59,6 +59,11 @@ class ClickhouseDriverIntegration(Integration):
         clickhouse_driver.client.Client.receive_end_of_query = _wrap_end(
             clickhouse_driver.client.Client.receive_end_of_query
         )
+        if hasattr(clickhouse_driver.client.Client, "receive_end_of_insert_query"):
+            # In 0.2.7, insert queries are handled separately via `receive_end_of_insert_query`
+            clickhouse_driver.client.Client.receive_end_of_insert_query = _wrap_end(
+                clickhouse_driver.client.Client.receive_end_of_insert_query
+            )
         clickhouse_driver.client.Client.receive_result = _wrap_end(
             clickhouse_driver.client.Client.receive_result
         )

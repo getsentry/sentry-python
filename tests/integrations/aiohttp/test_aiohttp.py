@@ -256,6 +256,36 @@ async def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.asyncio
+async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_events):
+    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    with mock.patch(
+        "sentry_sdk.integrations.aiohttp.parse_url", side_effect=ValueError
+    ):
+        resp = await client.get("/")
+
+    assert resp.status == 200
+
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert (
+        event["transaction"]
+        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparseable_url.<locals>.hello"
+    )
+
+
 @pytest.mark.asyncio
 async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
