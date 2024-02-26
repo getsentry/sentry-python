@@ -599,6 +599,7 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     assert "OK" not in caplog.text
 
 
+@pytest.mark.skip(reason="New behavior in SDK 2.0: You have a scope before init and add data to it.")
 def test_scope_initialized_before_client(sentry_init, capture_events):
     """
     This is a consequence of how configure_scope() works. We must
