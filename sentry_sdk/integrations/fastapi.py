@@ -11,7 +11,6 @@ from sentry_sdk.utils import transaction_from_function, logger
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict
-    from sentry_sdk.scope import Scope
 
 try:
     from sentry_sdk.integrations.starlette import (
