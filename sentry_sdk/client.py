@@ -259,8 +259,8 @@ class _Client(object):
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
                 if is_gevent():
-                    # Context vars are not working correctly even with
-                    # gevent-patched Python 3.6 and lower.
+                    # Context vars are not working correctly on Python <=3.6
+                    # with gevent.
                     metrics_supported = PY37
                 else:
                     metrics_supported = True
