@@ -8,13 +8,35 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
 ## Changed
 
-- Setting the parameter `propagate_hub` to `True` in `ThreadingIntegration(propagate_hub=True)` only works on Python 3.7+.
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
+- The `_ScopeManager` was moved from `sentry_sdk.hub` to `sentry_sdk.scope`.
 - Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
+- `sentry_sdk.tracing_utils.get_current_span()` does now take a `scope` instead of a `hub` as parameter.
+- `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.
+- If you create a transaction manually and later mutate the transaction in a `configure_scope` block this does not work anymore. Here is a recipe on how to change your code to make it work:
+    Your existing implementation:
+    ```python
+    transaction = sentry_sdk.transaction(...)
+    
+    # later in the code execution:
+
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_transaction_name("new-transaction-name")
+    ```
+
+    needs to be changed to this:
+    ```python
+    transaction = sentry_sdk.transaction(...)
+    
+    # later in the code execution:
+
+    scope = sentry_sdk.Scope.get_current_scope()
+    scope.set_transaction_name("new-transaction-name")
+    ```
 
 ## Removed
 
@@ -46,3 +68,4 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
     ```
 - Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
+- The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
