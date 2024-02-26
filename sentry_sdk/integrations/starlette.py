@@ -11,6 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_COMPONENT,
@@ -108,13 +109,12 @@ def _enable_span_for_middleware(middleware_class):
             middleware_name = app.__class__.__name__
 
             # Update transaction name with middleware name
-            with hub.configure_scope() as sentry_scope:
-                name, source = _get_transaction_from_middleware(app, scope, integration)
-                if name is not None:
-                    sentry_scope.set_transaction_name(
-                        name,
-                        source=source,
-                    )
+            name, source = _get_transaction_from_middleware(app, scope, integration)
+            if name is not None:
+                Scope.get_current_scope().set_transaction_name(
+                    name,
+                    source=source,
+                )
 
             with hub.start_span(
                 op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
@@ -393,13 +393,13 @@ def patch_request_response():
                 if integration is None:
                     return await old_func(*args, **kwargs)
 
+                request = args[0]
+
+                _set_transaction_name_and_source(
+                    Scope.get_current_scope(), integration.transaction_style, request
+                )
+
                 with hub.configure_scope() as sentry_scope:
-                    request = args[0]
-
-                    _set_transaction_name_and_source(
-                        sentry_scope, integration.transaction_style, request
-                    )
-
                     extractor = StarletteRequestExtractor(request)
                     info = await extractor.extract_request_info()
 
