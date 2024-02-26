@@ -5,7 +5,7 @@ import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
 
-from sentry_sdk import Hub, Scope, configure_scope, start_transaction, get_current_span
+from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _get_headers,
@@ -145,30 +145,30 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
         foo = 42  # noqa
         return x / y
 
-    scope = Scope.get_isolation_scope()
-    celery_invocation(dummy_task, 1, 2)
-    _, expected_context = celery_invocation(dummy_task, 1, 0)
+    with configure_scope() as scope:
+        celery_invocation(dummy_task, 1, 2)
+        _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-    (error_event,) = events
+        (error_event,) = events
 
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == scope._propagation_context["trace_id"]
-    )
-    assert (
-        error_event["contexts"]["trace"]["span_id"]
-        != scope._propagation_context["span_id"]
-    )
-    assert error_event["transaction"] == "dummy_task"
-    assert "celery_task_id" in error_event["tags"]
-    assert error_event["extra"]["celery-job"] == dict(
-        task_name="dummy_task", **expected_context
-    )
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == scope._propagation_context["trace_id"]
+        )
+        assert (
+            error_event["contexts"]["trace"]["span_id"]
+            != scope._propagation_context["span_id"]
+        )
+        assert error_event["transaction"] == "dummy_task"
+        assert "celery_task_id" in error_event["tags"]
+        assert error_event["extra"]["celery-job"] == dict(
+            task_name="dummy_task", **expected_context
+        )
 
-    (exception,) = error_event["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
-    assert exception["mechanism"]["type"] == "celery"
-    assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+        (exception,) = error_event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
+        assert exception["mechanism"]["type"] == "celery"
+        assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
