@@ -1023,7 +1023,7 @@ def test_disable_metrics_for_old_python_with_gevent(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
     if maybe_monkeypatched_threading != "greenlet":
-        pytest.skip()
+        pytest.skip("Test specifically for gevent/greenlet")
 
     sentry_init(
         release="fun-release",
