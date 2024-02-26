@@ -16,6 +16,14 @@ This is the official Python SDK for [Sentry](http://sentry.io/)
 
 ---
 
+## Note about SDK 2.0a1
+
+**Sentry SDK 2.0a1** is alpha software and not yet ready for production.
+
+Please give it a spin and test it with your project. If you have any questions or feedback please contact us on [Discord](https://discord.gg/Ww9hbqr) in the `#python` channel or create a [GitHub Issue](https://github.com/getsentry/sentry-python/issues) or start a [GitHub Discussion](https://github.com/getsentry/sentry-python/discussions). 
+
+Thanks!
+
 ## Getting Started
 
 ### Install
