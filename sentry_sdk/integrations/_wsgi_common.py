@@ -51,6 +51,15 @@ def request_body_within_bounds(client, content_length):
 
 
 class RequestExtractor:
+    """
+    Base class for request extraction.
+    """
+
+    # It does not make sense to make this class an ABC because it is not used
+    # for typing, only so that child classes can inherit common methods from
+    # it. Only some child classes implement all methods that raise
+    # NotImplementedError in this class.
+
     def __init__(self, request):
         # type: (Any) -> None
         self.request = request
