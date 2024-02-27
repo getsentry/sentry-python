@@ -107,8 +107,8 @@ def test_event(sentry_init, capture_envelopes):
 
     with sentry_sdk.start_transaction(
         name="test_transaction", op="test_transaction_op"
-    ):
-        with sentry_sdk.start_span(op="test_span"):
+    ) as trx:
+        with sentry_sdk.start_span(op="test_span") as span:
             with sentry_sdk.configure_scope() as scope:  # configure scope
                 _generate_event_data(scope)
                 _faulty_function()
@@ -170,14 +170,14 @@ def test_event(sentry_init, capture_envelopes):
                 "attack_type": "melee",
             },
             "trace": {
-                "trace_id": mock.ANY,
-                "span_id": mock.ANY,
-                "parent_span_id": mock.ANY,
+                "trace_id": trx.trace_id,
+                "span_id": span.span_id,
+                "parent_span_id": span.parent_span_id,
                 "op": "test_span",
                 "description": None,
             },
             "runtime": {
-                "name": mock.ANY,
+                "name": "CPython",
                 "version": mock.ANY,
                 "build": mock.ANY,
             },
@@ -249,8 +249,8 @@ def test_event(sentry_init, capture_envelopes):
         "transaction_info": {"source": "custom"},
         "contexts": {
             "trace": {
-                "trace_id": mock.ANY,
-                "span_id": mock.ANY,
+                "trace_id": trx.trace_id,
+                "span_id": trx.span_id,
                 "parent_span_id": None,
                 "op": "test_transaction_op",
                 "description": None,
@@ -271,9 +271,9 @@ def test_event(sentry_init, capture_envelopes):
         "start_timestamp": mock.ANY,
         "spans": [
             {
-                "trace_id": mock.ANY,
-                "span_id": mock.ANY,
-                "parent_span_id": mock.ANY,
+                "trace_id": trx.trace_id,
+                "span_id": span.span_id,
+                "parent_span_id": span.parent_span_id,
                 "same_process_as_parent": True,
                 "op": "test_span",
                 "description": None,
