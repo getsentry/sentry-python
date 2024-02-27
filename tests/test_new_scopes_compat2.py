@@ -85,7 +85,10 @@ def _faulty_function():
 
 
 def test_event(sentry_init, capture_envelopes):
-    """ """
+    """ 
+    Create transaction containing a span and then add lots of data that should be 
+    attached to the error event and transaction event.
+    """
     sentry_init(
         environment="checking-compatibility-with-sdk1",
         release="0.1.2rc3",
@@ -100,7 +103,6 @@ def test_event(sentry_init, capture_envelopes):
         traces_sample_rate=1.0,
     )
 
-    # events = capture_events()
     envelopes = capture_envelopes()
 
     with sentry_sdk.start_transaction(
