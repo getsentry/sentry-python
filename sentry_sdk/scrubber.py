@@ -1,3 +1,5 @@
+from typing import cast
+
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     AnnotatedValue,
@@ -8,8 +10,6 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event
-    from typing import Any
-    from typing import Dict
     from typing import List
     from typing import Optional
 
@@ -65,12 +65,14 @@ class EventScrubber(object):
         self.denylist = [x.lower() for x in self.denylist]
 
     def scrub_dict(self, d):
-        # type: (Dict[str, Any]) -> None
+        # type: (object) -> None
         if not isinstance(d, dict):
             return
 
         for k in d.keys():
-            if isinstance(k, string_types) and k.lower() in self.denylist:
+            # The cast is needed because mypy is not smart enough to figure out that k must be a
+            # string after the isinstance check.
+            if isinstance(k, string_types) and cast(str, k).lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
 
     def scrub_request(self, event):
