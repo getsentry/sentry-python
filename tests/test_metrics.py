@@ -822,7 +822,7 @@ def test_tag_normalization(
 
     assert len(m) == 3
     assert m[0][4] == {
-        "foo-bar": "_$foo",
+        "foo-bar": "$foo",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
