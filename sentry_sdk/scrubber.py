@@ -67,6 +67,12 @@ class EventScrubber(object):
 
     def scrub_list(self, lst):
         # type: (List[Any]) -> None
+        """
+        If a list is passed to this method, the method recursively searches the list and any
+        nested lists for any dictionaries. The method calls scrub_dict on all dictionaries
+        it finds.
+        If the parameter passed to this method is not a list, the method does nothing.
+        """
         if not isinstance(lst, list):
             return
 
