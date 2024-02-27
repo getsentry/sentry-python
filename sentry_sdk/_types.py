@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 try:
     from typing import TYPE_CHECKING
 except ImportError:
@@ -11,6 +12,9 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from datetime import datetime
+    from sentry_sdk.profiler import Profile
+
     from types import TracebackType
     from typing import Any
     from typing import Callable
@@ -30,6 +34,7 @@ if TYPE_CHECKING:
         breadcrumbs: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
+        contexts: dict[object, object]
         dist: str
         environment: str
         errors: list[dict[str, object]]  # TODO: We can expand on this type
@@ -41,12 +46,15 @@ if TYPE_CHECKING:
         level: Literal["fatal", "error", "warning", "info", "debug"]
         logger: str
         modules: dict[str, str]
+        profile: Profile
         release: str
         request: dict[str, object]
         server_name: str
+        spans: list[dict[str, object]]
         stacktrace: dict[
             str, object
         ]  # We access this key in the code, but I am unsure whether we ever set it
+        start_timestamp: Union[datetime, int]
         tags: Union[
             list[str], dict[str, object]
         ]  # Tags must be less than 200 characters each
@@ -54,6 +62,8 @@ if TYPE_CHECKING:
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
         transaction: str
+        transaction_info: dict[str, object]  # TODO: We can expand on this type
+        type: Literal["transaction"]  # Only set this key for transaction events
         user: dict[str, object]
 
     ExcInfo = Tuple[
