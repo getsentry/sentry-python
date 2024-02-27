@@ -5,7 +5,7 @@ import socket
 from datetime import datetime, timezone
 from importlib import import_module
 
-from sentry_sdk._compat import check_uwsgi_thread_support
+from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
+    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -315,14 +316,22 @@ class _Client(BaseClient):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
+                # Context vars are not working correctly on Python <=3.6
+                # with gevent.
+                metrics_supported = not is_gevent() or PY37
+                if metrics_supported:
+                    from sentry_sdk.metrics import MetricsAggregator
 
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
+                    self.metrics_aggregator = MetricsAggregator(
+                        capture_func=_capture_envelope,
+                        enable_code_locations=bool(
+                            experiments.get("metric_code_locations", True)
+                        ),
+                    )
+                else:
+                    logger.info(
+                        "Metrics not supported on Python 3.6 and lower with gevent."
+                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:

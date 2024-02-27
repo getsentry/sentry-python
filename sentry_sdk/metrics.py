@@ -19,7 +19,6 @@ from sentry_sdk.utils import (
     to_timestamp,
     serialize_frame,
     json_dumps,
-    is_gevent,
 )
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
@@ -54,18 +53,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-try:
-    from gevent.monkey import get_original  # type: ignore
-    from gevent.threadpool import ThreadPool  # type: ignore
-except ImportError:
-    import importlib
-
-    def get_original(module, name):
-        # type: (str, str) -> Any
-        return getattr(importlib.import_module(module), name)
-
-
-_in_metrics = ContextVar("in_metrics")
+_in_metrics = ContextVar("in_metrics", default=False)
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
 _sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
 _set = set  # set is shadowed below
@@ -96,7 +84,7 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
-    old_in_metrics = _in_metrics.get(False)
+    old_in_metrics = _in_metrics.get()
     _in_metrics.set(True)
     try:
         yield old_in_metrics
@@ -429,9 +417,7 @@ class MetricsAggregator:
         self._running = True
         self._lock = threading.Lock()
 
-        event_cls = get_original("threading", "Event")
-        self._flush_event = event_cls()  # type: threading.Event
-
+        self._flush_event = threading.Event()  # type: threading.Event
         self._force_flush = False
 
         # The aggregator shifts its flushing by up to an entire rollup window to
@@ -442,7 +428,7 @@ class MetricsAggregator:
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Union[threading.Thread, ThreadPool]]
+        self._flusher = None  # type: Optional[threading.Thread]
         self._flusher_pid = None  # type: Optional[int]
 
     def _ensure_thread(self):
@@ -465,16 +451,11 @@ class MetricsAggregator:
 
             self._flusher_pid = pid
 
-            if not is_gevent():
-                self._flusher = threading.Thread(target=self._flush_loop)
-                self._flusher.daemon = True
-                start_flusher = self._flusher.start
-            else:
-                self._flusher = ThreadPool(1)
-                start_flusher = partial(self._flusher.spawn, func=self._flush_loop)
+            self._flusher = threading.Thread(target=self._flush_loop)
+            self._flusher.daemon = True
 
             try:
-                start_flusher()
+                self._flusher.start()
             except RuntimeError:
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
