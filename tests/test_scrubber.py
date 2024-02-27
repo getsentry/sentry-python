@@ -169,3 +169,18 @@ def test_scrubbing_doesnt_affect_local_vars(sentry_init, capture_events):
     (frame,) = frames
     assert frame["vars"]["password"] == "[Filtered]"
     assert password == "cat123"
+
+
+def test_recursive_event_scrubber(sentry_init, capture_events):
+    sentry_init(event_scrubber=EventScrubber(recursive=True))
+    events = capture_events()
+    complex_structure = {
+        "deep": {
+            "deeper": [{"deepest": {"password": "my_darkest_secret"}}],
+        },
+    }
+
+    capture_event({"extra": complex_structure})
+
+    (event,) = events
+    assert event["extra"]["deep"]["deeper"][0]["deepest"]["password"] == "'[Filtered]'"
