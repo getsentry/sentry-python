@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         logger: str
         modules: dict[str, str]
         release: str
+        request: dict[str, object]
         server_name: str
         tags: Union[
             list[str], dict[str, object]
