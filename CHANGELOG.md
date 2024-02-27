@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.40.6
+
+### Various fixes & improvements
+
+- Fix compatibility with `greenlet`/`gevent` (#2756) by @sentrivana
+- Fix query source relative filepath (#2717) by @gggritso
+- Support `clickhouse-driver==0.2.7` (#2752) by @sentrivana
+- Bump `checkouts/data-schemas` from `6121fd3` to `eb941c2` (#2747) by @dependabot
+
 ## 1.40.5
 
 ### Various fixes & improvements
