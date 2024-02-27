@@ -243,6 +243,8 @@ def test_event(sentry_init, capture_envelopes):
         "type": "attachment",
         "content_type": "text/plain",
     }
+    assert attachment.payload.bytes == b"Hello World"
+
     assert transaction == {
         "type": "transaction",
         "transaction": "test_transaction changed by before_send_transaction",
