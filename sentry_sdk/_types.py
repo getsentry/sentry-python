@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     class Event(TypedDict, total=False):
         breadcrumbs: dict[
-            str, list[dict[str, object]]
+            Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
         event_id: Required[str]
         platform: Required[Literal["python"]]
@@ -33,6 +33,9 @@ if TYPE_CHECKING:
         dist: str
         environment: str
         errors: list[dict[str, object]]  # TODO: We can expand on this type
+        exception: dict[
+            Literal["values"], list[dict[str, object]]
+        ]  # TODO: We can expand on this type
         extra: dict[object, object]
         fingerprint: list[str]
         level: Literal["fatal", "error", "warning", "info", "debug"]
@@ -41,9 +44,15 @@ if TYPE_CHECKING:
         release: str
         request: dict[str, object]
         server_name: str
+        stacktrace: dict[
+            str, object
+        ]  # We access this key in the code, but I am unsure whether we ever set it
         tags: Union[
             list[str], dict[str, object]
         ]  # Tags must be less than 200 characters each
+        threads: dict[
+            Literal["values"], list[dict[str, object]]
+        ]  # TODO: We can expand on this type
         transaction: str
         user: dict[str, object]
 
