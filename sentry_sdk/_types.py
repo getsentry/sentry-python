@@ -24,6 +24,9 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     class Event(TypedDict, total=False):
+        breadcrumbs: dict[
+            str, list[dict[str, object]]
+        ]  # TODO: We can expand on this type
         event_id: Required[str]
         platform: Required[Literal["python"]]
         timestamp: Required[Union[str, int, float]]
@@ -42,6 +45,7 @@ if TYPE_CHECKING:
             list[str], dict[str, object]
         ]  # Tags must be less than 200 characters each
         transaction: str
+        user: dict[str, object]
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
