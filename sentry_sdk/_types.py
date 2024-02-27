@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         fingerprint: list[str]
         level: Literal["fatal", "error", "warning", "info", "debug"]
         logger: str
+        measurements: dict[str, object]
         modules: dict[str, str]
         profile: Profile
         release: str
@@ -65,6 +66,7 @@ if TYPE_CHECKING:
         transaction_info: dict[str, object]  # TODO: We can expand on this type
         type: Literal["transaction"]  # Only set this key for transaction events
         user: dict[str, object]
+        _metrics_summary: dict[str, object]
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
