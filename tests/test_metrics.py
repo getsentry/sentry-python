@@ -13,6 +13,17 @@ try:
 except ImportError:
     import mock  # python < 3.3
 
+try:
+    import gevent
+except ImportError:
+    gevent = None
+
+
+minimum_python_37_with_gevent = pytest.mark.skipif(
+    gevent and sys.version_info < (3, 7),
+    reason="Require Python 3.7 or higher with gevent",
+)
+
 
 def parse_metrics(bytes):
     rv = []
@@ -45,6 +56,7 @@ def parse_metrics(bytes):
     return rv
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
@@ -97,6 +109,7 @@ def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_timing(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
@@ -157,6 +170,7 @@ def test_timing(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     )
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_timing_decorator(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -252,6 +266,7 @@ def test_timing_decorator(
     assert line.strip() == "assert amazing() == 42"
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
@@ -306,6 +321,7 @@ def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_distribution(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
@@ -368,6 +384,7 @@ def test_distribution(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     )
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_set(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
@@ -421,6 +438,7 @@ def test_set(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_gauge(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
@@ -454,6 +472,7 @@ def test_gauge(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_multiple(sentry_init, capture_envelopes):
     sentry_init(
@@ -508,6 +527,7 @@ def test_multiple(sentry_init, capture_envelopes):
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_transaction_name(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -548,6 +568,7 @@ def test_transaction_name(
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 @pytest.mark.parametrize("sample_rate", [1.0, None])
 def test_metric_summaries(
@@ -658,6 +679,7 @@ def test_metric_summaries(
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_metrics_summary_disabled(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -702,6 +724,7 @@ def test_metrics_summary_disabled(
     assert "_metrics_summary" not in t["spans"][0]
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_metrics_summary_filtered(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -771,6 +794,7 @@ def test_metrics_summary_filtered(
     } in t["d:foo@second"]
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_tag_normalization(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -818,6 +842,7 @@ def test_tag_normalization(
     # fmt: on
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_before_emit_metric(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -861,6 +886,7 @@ def test_before_emit_metric(
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_aggregator_flush(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -881,6 +907,7 @@ def test_aggregator_flush(
     assert Hub.current.client.metrics_aggregator.buckets == {}
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_tag_serialization(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
@@ -921,6 +948,7 @@ def test_tag_serialization(
     }
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_flush_recursion_protection(
     sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
@@ -953,11 +981,12 @@ def test_flush_recursion_protection(
     assert m[0][1] == "counter@none"
 
 
+@minimum_python_37_with_gevent
 @pytest.mark.forked
 def test_flush_recursion_protection_background_flush(
     sentry_init, capture_envelopes, monkeypatch, maybe_monkeypatched_threading
 ):
-    monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.1)
+    monkeypatch.setattr(metrics.MetricsAggregator, "FLUSHER_SLEEP_TIME", 0.01)
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
@@ -984,3 +1013,29 @@ def test_flush_recursion_protection_background_flush(
     m = parse_metrics(envelope.items[0].payload.get_bytes())
     assert len(m) == 1
     assert m[0][1] == "counter@none"
+
+
+@pytest.mark.skipif(
+    not gevent or sys.version_info >= (3, 7),
+    reason="Python 3.6 or lower and gevent required",
+)
+@pytest.mark.forked
+def test_disable_metrics_for_old_python_with_gevent(
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+):
+    if maybe_monkeypatched_threading != "greenlet":
+        pytest.skip("Test specifically for gevent/greenlet")
+
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+        _experiments={"enable_metrics": True},
+    )
+    envelopes = capture_envelopes()
+
+    metrics.incr("counter")
+
+    Hub.current.flush()
+
+    assert Hub.current.client.metrics_aggregator is None
+    assert not envelopes

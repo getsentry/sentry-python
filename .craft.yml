@@ -8,7 +8,9 @@ targets:
       pypi:sentry-sdk:
   - name: github
   - name: aws-lambda-layer
-    includeNames: /^sentry-python-serverless-\d+(\.\d+)*\.zip$/
+    # This regex that matches the version is taken from craft:
+    # https://github.com/getsentry/craft/blob/8d77c38ddbe4be59f98f61b6e42952ca087d3acd/src/utils/version.ts#L11
+    includeNames: /^sentry-python-serverless-\bv?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-?([\da-z-]+(?:\.[\da-z-]+)*))?(?:\+([\da-z-]+(?:\.[\da-z-]+)*))?\b.zip$/
     layerName: SentryPythonServerlessSDK
     compatibleRuntimes:
       - name: python
