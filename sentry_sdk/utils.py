@@ -75,7 +75,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import EndpointType, Event, ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -975,7 +975,7 @@ def to_string(value):
 
 
 def iter_event_stacktraces(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -989,14 +989,14 @@ def iter_event_stacktraces(event):
 
 
 def iter_event_frames(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
+    # type: (Event, Optional[List[str]], Optional[List[str]], Optional[str]) -> Event
     for stacktrace in iter_event_stacktraces(event):
         set_in_app_in_frames(
             stacktrace.get("frames"),
