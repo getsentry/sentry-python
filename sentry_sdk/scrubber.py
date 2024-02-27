@@ -71,10 +71,8 @@ class EventScrubber(object):
             return
 
         for v in lst:
-            if isinstance(v, dict):
-                self.scrub_dict(v)
-            elif isinstance(v, list):
-                self.scrub_list(v)
+            self.scrub_dict(v)
+            self.scrub_list(v)
 
     def scrub_dict(self, d):
         # type: (object) -> None
@@ -87,10 +85,8 @@ class EventScrubber(object):
             if isinstance(k, string_types) and cast(str, k).lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
-                if isinstance(v, dict):
-                    self.scrub_dict(v)
-                elif isinstance(v, list):
-                    self.scrub_list(v)
+                self.scrub_dict(v)
+                self.scrub_list(v)
 
     def scrub_request(self, event):
         # type: (Event) -> None
