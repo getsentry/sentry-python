@@ -11,6 +11,7 @@ if TYPE_CHECKING:
         timestamp: Required[Union[str, int, float]]
         dist: str
         environment: str
+        errors: list[dict[str, object]]  # TODO: We can expand on this type
         extra: dict[object, object]
         fingerprint: list[str]
         level: Literal["fatal", "error", "warning", "info", "debug"]
