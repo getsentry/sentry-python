@@ -65,8 +65,14 @@ class EventScrubber(object):
         self.denylist = [x.lower() for x in self.denylist]
         self.recursive = recursive
 
-    def scrub_list_recursively(self, lst):
+    def scrub_list(self, lst):
         # type: (List[Any]) -> None
+        """
+        If a list is passed to this method, the method recursively searches the list and any
+        nested lists for any dictionaries. The method calls scrub_dict on all dictionaries
+        it finds.
+        If the parameter passed to this method is not a list, the method does nothing.
+        """
         if not isinstance(lst, list):
             return
 
@@ -74,7 +80,7 @@ class EventScrubber(object):
             if isinstance(v, dict):
                 self.scrub_dict(v)
             elif isinstance(v, list):
-                self.scrub_list_recursively(v)
+                self.scrub_list(v)
 
     def scrub_dict(self, d):
         # type: (Dict[str, Any]) -> None
@@ -88,7 +94,7 @@ class EventScrubber(object):
                 if isinstance(v, dict):
                     self.scrub_dict(v)
                 elif isinstance(v, list):
-                    self.scrub_list_recursively(v)
+                    self.scrub_list(v)
 
     def scrub_request(self, event):
         # type: (Event) -> None
