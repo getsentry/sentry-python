@@ -1,6 +1,4 @@
-from __future__ import (
-    annotations,
-)  # dict/list subscripting support in older Python versions
+from __future__ import annotations
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -11,17 +9,17 @@ if TYPE_CHECKING:
         "Event",
         {
             "event_id": Required[str],
-            "timestamp": Required[Union[str, int, float]],
             "platform": Required[Literal["python"]],
-            "level": Literal["fatal", "error", "warning", "info", "debug"],
-            "transaction": str,
-            "server_name": str,
-            "release": str,
+            "timestamp": Required[Union[str, int, float]],
             "dist": str,
             "environment": str,
-            "modules": dict[str, str],
             "extra": dict[object, object],
             "fingerprint": list[str],
+            "level": Literal["fatal", "error", "warning", "info", "debug"],
+            "modules": dict[str, str],
+            "release": str,
+            "server_name": str,
+            "transaction": str,
         },
         total=False,
     )
