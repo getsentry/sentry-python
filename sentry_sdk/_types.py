@@ -24,12 +24,12 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, Required, TypedDict
 
     class Event(TypedDict, total=False):
-        breadcrumbs: dict[
-            Literal["values"], list[dict[str, object]]
-        ]  # TODO: We can expand on this type
         event_id: Required[str]
         platform: Required[Literal["python"]]
         timestamp: Required[Union[str, int, float]]
+        breadcrumbs: dict[
+            Literal["values"], list[dict[str, object]]
+        ]  # TODO: We can expand on this type
         dist: str
         environment: str
         errors: list[dict[str, object]]  # TODO: We can expand on this type
