@@ -33,7 +33,7 @@ def expected_error():
                             "frames": [
                                 {
                                     "filename": "tests/test_new_scopes_compat_event.py",
-                                    "abs_path": "/Users/antonpirker/code/sentry-python/tests/test_new_scopes_compat_event.py",
+                                    "abs_path": mock.ANY,
                                     "function": "_faulty_function",
                                     "module": "tests.test_new_scopes_compat_event",
                                     "lineno": 236,
@@ -317,9 +317,9 @@ def _init_sentry_sdk(sentry_init):
     )
 
 
-###
-### The actual Tests start here!
-###
+#
+# The actual Tests start here!
+#
 
 
 def test_event(sentry_init, capture_envelopes, expected_error, expected_transaction):
@@ -357,17 +357,17 @@ def test_event2(sentry_init, capture_envelopes, expected_error, expected_transac
     envelopes = capture_envelopes()
 
     with Hub(Hub.current):
-        sentry_sdk.set_tag("A", 1) # will not be added
+        sentry_sdk.set_tag("A", 1)  # will not be added
 
     with Hub.current:  # with hub
         with sentry_sdk.push_scope() as scope:
-            scope.set_tag("B", 1) # will not be added
+            scope.set_tag("B", 1)  # will not be added
 
         with sentry_sdk.start_transaction(
             name="test_transaction", op="test_transaction_op"
         ) as trx:
             with sentry_sdk.start_span(op="test_span") as span:
-                with sentry_sdk.configure_scope() as scope:  # configure scope        
+                with sentry_sdk.configure_scope() as scope:  # configure scope
                     _generate_event_data(scope)
                     _faulty_function()
 
@@ -393,13 +393,13 @@ def test_event3(sentry_init, capture_envelopes, expected_error, expected_transac
     envelopes = capture_envelopes()
 
     with Hub(Hub.current):
-        sentry_sdk.set_tag("A", 1) # will not be added
+        sentry_sdk.set_tag("A", 1)  # will not be added
 
     with Hub.current:  # with hub
         with sentry_sdk.push_scope() as scope:
-            scope.set_tag("B", 1) # will not be added
+            scope.set_tag("B", 1)  # will not be added
 
-        with sentry_sdk.push_scope() as scope:  # push scope        
+        with sentry_sdk.push_scope() as scope:  # push scope
             with sentry_sdk.start_transaction(
                 name="test_transaction", op="test_transaction_op"
             ) as trx:
@@ -429,17 +429,17 @@ def test_event4(sentry_init, capture_envelopes, expected_error, expected_transac
     envelopes = capture_envelopes()
 
     with Hub(Hub.current):
-        sentry_sdk.set_tag("A", 1) # will not be added
+        sentry_sdk.set_tag("A", 1)  # will not be added
 
     with Hub(Hub.current):  # with hub clone
         with sentry_sdk.push_scope() as scope:
-            scope.set_tag("B", 1) # will not be added
+            scope.set_tag("B", 1)  # will not be added
 
         with sentry_sdk.start_transaction(
             name="test_transaction", op="test_transaction_op"
         ) as trx:
             with sentry_sdk.start_span(op="test_span") as span:
-                with sentry_sdk.configure_scope() as scope:  # configure scope      
+                with sentry_sdk.configure_scope() as scope:  # configure scope
                     _generate_event_data(scope)
                     _faulty_function()
 
@@ -465,13 +465,13 @@ def test_event5(sentry_init, capture_envelopes, expected_error, expected_transac
     envelopes = capture_envelopes()
 
     with Hub(Hub.current):
-        sentry_sdk.set_tag("A", 1) # will not be added
+        sentry_sdk.set_tag("A", 1)  # will not be added
 
     with Hub(Hub.current):  # with hub clone
         with sentry_sdk.push_scope() as scope:
-            scope.set_tag("B", 1) # will not be added
+            scope.set_tag("B", 1)  # will not be added
 
-        with sentry_sdk.push_scope() as scope:  # push scope      
+        with sentry_sdk.push_scope() as scope:  # push scope
             with sentry_sdk.start_transaction(
                 name="test_transaction", op="test_transaction_op"
             ) as trx:
