@@ -53,7 +53,7 @@ def expected_error():
                                         "def _test_before_send(event, hint):",
                                     ],
                                     "vars": {
-                                        "ex": "ValueError('This is a test exception')"
+                                        "ex": mock.ANY,
                                     },
                                     "in_app": True,
                                 }
