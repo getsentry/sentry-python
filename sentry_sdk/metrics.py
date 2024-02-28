@@ -55,7 +55,7 @@ if TYPE_CHECKING:
 
 _in_metrics = ContextVar("in_metrics", default=False)
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
-_sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
+_sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "")
 _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
