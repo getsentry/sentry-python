@@ -807,6 +807,8 @@ def test_tag_normalization(
     metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
     metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
     metrics.distribution("c", 1.0, tags={"foö-bar": "snöwmän"}, timestamp=ts)
+    metrics.distribution("d", 1.0, tags={"route": "GET /foo"}, timestamp=ts)
+
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -815,23 +817,26 @@ def test_tag_normalization(
     assert envelope.items[0].headers["type"] == "statsd"
     m = parse_metrics(envelope.items[0].payload.get_bytes())
 
-    assert len(m) == 3
+    assert len(m) == 4
     assert m[0][4] == {
-        "foo-bar": "_$foo",
+        "foo-bar": "$foo",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
-
     assert m[1][4] == {
         "foo_bar": "blah{}",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
-
     assert m[2][4] == {
         "fo_-bar": "snöwmän",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
+    }
+    assert m[3][4] == {
+        "release": "fun-release@1.0.0",
+        "environment": "not-fun-env",
+        "route": "GET /foo",
     }
 
 
