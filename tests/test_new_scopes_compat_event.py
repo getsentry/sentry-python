@@ -200,7 +200,7 @@ def expected_transaction():
             },
             "release": "0.1.2rc3",
             "environment": "checking-compatibility-with-sdk1",
-            "server_name": "Y7CYJ0XDQY.local",
+            "server_name": mock.ANY,
             "sdk": {
                 "name": "sentry.python",
                 "version": mock.ANY,
