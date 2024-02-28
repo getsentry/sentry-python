@@ -811,7 +811,7 @@ def test_tag_normalization(
     metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
     metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
     metrics.distribution("c", 1.0, tags={u"foö-bar": u"snöwmän"}, timestamp=ts)
-    metrics.distribution("c", 1.0, tags={u"route": u"GET /foo"}, timestamp=ts)
+    metrics.distribution("d", 1.0, tags={"route": "GET /foo"}, timestamp=ts)
     # fmt: on
     Hub.current.flush()
 
