@@ -221,6 +221,8 @@ async def test_stream_unary(grpc_server):
 
 class TestService(gRPCTestServiceServicer):
     class TestException(Exception):
+        __test__ = False
+
         def __init__(self):
             super().__init__("test")
 
