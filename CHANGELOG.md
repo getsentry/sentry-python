@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.0.0a2
+
+### Various fixes & improvements
+
+- Fork test_tracedecorator_async (#2778) by @sentrivana
+- More compatibility tests (#2772) by @antonpirker
+- Allow to configure merge target for releases (#2777) by @sentrivana
+- fix(docs): allow empty character in metric tags values (#2775) by @viglia
+- fix(metrics): Replace invalid tag values with an empty string instead of _ (#2773) by @markushi
+- docs: Add documentation comment to `scrub_list` (#2769) by @szokeasaurusrex
+- ref(scrubber): Add recursive scrubbing to EventScrubber (#2755) by @Cheapshot003
+- Fixed regex to parse version in lambda package file (#2767) by @sentrivana
+- Temporarily disable tests for alpha release (fa5f50b0) by @antonpirker
+- channel link (0594cfa5) by @antonpirker
+- Added note to README (cdf4f901) by @antonpirker
+- Updated migration guide (ad4ff19c) by @antonpirker
+- ref(api): Abstract base classes (#2667) by @szokeasaurusrex
+- Scope refactoring (merge Hubs and Scopes) (#2610) by @antonpirker
+- docs: Update readme, migration guide (#2754) by @sentrivana
+- Remove PY2 (8aa95995) by @sentrivana
+- Added last_event_id() to the stuff that has been removed. (93f89e00) by @antonpirker
+- ref: Use new-style super() (#2744) by @sentrivana
+- ref(docs): Tweak migration guide (#2742) by @sentrivana
+- fix(metrics): Fix typo (#2735) by @sentrivana
+- Deprecate profiler `_experiments` options (#2737) by @sentrivana
+- Remove `user.segment` (#2726) by @sentrivana
+- ref(transport): Remove compatibility import (#2698) by @sentrivana
+- Typo (#2690) by @sentrivana
+
+_Plus 22 more_
+
 ## 1.40.6
 
 ### Various fixes & improvements
