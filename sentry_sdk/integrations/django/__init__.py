@@ -545,12 +545,12 @@ def _clean_event(
     """
     exc_info = exc_info_from_error(error)
     exception_idx = 0
-    for _, _, tbs in walk_exception_chain(exc_info):
+    for _, (_, _, tbs) in enumerate(walk_exception_chain(exc_info)):
         sensitive_variables = None
         frame_idx = 0
-        for tb in iter_stacks(tbs):
+        for _, tb in enumerate(iter_stacks(tbs)):
             frame = tb.tb_frame
-            if sensitive_variables:
+            if sensitive_variables is not None:
                 _cleanse_sensitive_vars(
                     request, event, sensitive_variables, exception_idx, frame_idx
                 )
@@ -574,30 +574,29 @@ def _cleanse_sensitive_vars(
     frame_idx,  # type: int
 ):
     # type: (...) -> None
-    if "exception" in event:
-        exceptions = event["exception"].get("values", ())
-        if len(exceptions) > 0:
-            exception_idx = len(exceptions) - reverse_exception_idx - 1
-            if 0 <= exception_idx and exception_idx < len(exceptions):
-                exception = exceptions[exception_idx]
-                if "stacktrace" in exception:
-                    frames = exception["stacktrace"].get("frames", ())
-                    if frame_idx < len(frames):
-                        frame = frames[frame_idx]
-                        clean_vars = {}
-                        if sensitive_variables == "__ALL__":
-                            for name in frame.get("vars", ()):
-                                clean_vars[name] = SENSITIVE_DATA_SUBSTITUTE
-                        else:
-                            # Clean specified variables
-                            for name, value in frame.get("vars", {}).items():
-                                if name in sensitive_variables:
-                                    value = SENSITIVE_DATA_SUBSTITUTE
-                                else:
-                                    # clean multivaluedicts in frames with sensitive post parameters
-                                    value = _cleanse_special_types(request, value)
-                                clean_vars[name] = value
-                        frame["vars"] = clean_vars
+    exception_values = event.get("exception", {}).get("values", [])
+    if not exception_values:
+        return
+
+    exception_idx = len(exception_values) - reverse_exception_idx - 1
+    if exception_idx < 0 or exception_idx >= len(exception_values):
+        return
+
+    exception = exception_values[exception_idx]
+    stacktrace = exception.get("stacktrace", {})
+    frames = stacktrace.get("frames", [])
+    if frame_idx >= len(frames):
+        return
+
+    frame = frames[frame_idx]
+    clean_vars = {}
+    for name, value in frame.get("vars", {}).items():
+        if sensitive_variables == "__ALL__" or name in sensitive_variables:
+            value = SENSITIVE_DATA_SUBSTITUTE
+        else:
+            value = _cleanse_special_types(request, value)
+        clean_vars[name] = value
+    frame["vars"] = clean_vars
 
 
 def _got_request_exception(request=None, **kwargs):
@@ -655,19 +654,12 @@ class DjangoRequestExtractor(RequestExtractor):
         sensitive_post_parameters = getattr(
             self.request, "sensitive_post_parameters", []
         )
-        if sensitive_post_parameters:
-            cleansed_request = self.request.POST.copy()
-            if sensitive_post_parameters == "__ALL__":
-                # Cleanse all parameters.
-                for k in cleansed_request:
-                    cleansed_request[k] = SENSITIVE_DATA_SUBSTITUTE
-            else:
-                # Cleanse only the specified parameters.
-                for param in sensitive_post_parameters:
-                    if param in cleansed_request:
-                        cleansed_request[param] = SENSITIVE_DATA_SUBSTITUTE
-            return cleansed_request
-        return self.request.POST
+        if sensitive_post_parameters == "__ALL__":
+            sensitive_post_parameters = self.request.POST.keys()
+        return {
+            k: SENSITIVE_DATA_SUBSTITUTE if k in sensitive_post_parameters else v
+            for k, v in self.request.POST.items()
+        }
 
     def files(self):
         # type: () -> MultiValueDict
