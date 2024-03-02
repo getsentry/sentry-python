@@ -282,6 +282,7 @@ def test_minimum_unique_samples_required(
     assert reports == [("insufficient_data", "profile")]
 
 
+@pytest.mark.forked
 @requires_python_version(3, 3)
 def test_profile_captured(
     sentry_init,
@@ -393,9 +394,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().instance_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrame.instance_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrame.instance_method_wrapped.<locals>.wrapped"
+            ),
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -405,9 +408,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().class_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrame.class_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrame.class_method_wrapped.<locals>.wrapped"
+            ),
             id="class_method_wrapped",
         ),
         pytest.param(
@@ -422,9 +427,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_instance_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped"
+            ),
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -434,16 +441,20 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_class_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped"
+            ),
             id="inherited_class_method_wrapped",
         ),
         pytest.param(
             GetFrame().inherited_static_method(),
-            "inherited_static_method"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_static_method",
+            (
+                "inherited_static_method"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_static_method"
+            ),
             id="inherited_static_method",
         ),
     ],
@@ -658,6 +669,51 @@ def test_thread_scheduler_single_background_thread(scheduler_class):
     scheduler.teardown()
 
     # once finished, the thread should stop
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+
+@requires_python_version(3, 3)
+@pytest.mark.parametrize(
+    ("scheduler_class",),
+    [
+        pytest.param(ThreadScheduler, id="thread scheduler"),
+        pytest.param(
+            GeventScheduler,
+            marks=[
+                requires_gevent,
+                pytest.mark.skip(
+                    reason="cannot find this thread via threading.enumerate()"
+                ),
+            ],
+            id="gevent scheduler",
+        ),
+    ],
+)
+def test_thread_scheduler_no_thread_on_shutdown(scheduler_class):
+    scheduler = scheduler_class(frequency=1000)
+
+    # not yet setup, no scheduler threads yet
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    scheduler.setup()
+
+    # setup but no profiles started so still no threads
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    # mock RuntimeError as if the 3.12 intepreter was shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        scheduler.ensure_running()
+
+    assert scheduler.running is False
+
+    # still no thread
+    assert len(get_scheduler_threads(scheduler)) == 0
+
+    scheduler.teardown()
+
     assert len(get_scheduler_threads(scheduler)) == 0
 
 

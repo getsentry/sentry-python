@@ -46,7 +46,10 @@ if TYPE_CHECKING:
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
+            "metrics_summary_sample_rate": Optional[float],
+            "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "metric_code_locations": Optional[bool],
         },
         total=False,
     )
@@ -163,6 +166,30 @@ class SPANDATA:
     Example: 16456
     """
 
+    CODE_FILEPATH = "code.filepath"
+    """
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
+    """
+
+    CODE_LINENO = "code.lineno"
+    """
+    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_FUNCTION = "code.function"
+    """
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
+    Example: "server_request"
+    """
+
+    CODE_NAMESPACE = "code.namespace"
+    """
+    The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
+    Example: "http.handler"
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
@@ -263,6 +290,9 @@ class ClientConstructor(object):
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
         enable_backpressure_handling=True,  # type: bool
         error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
+        enable_db_query_source=True,  # type: bool
+        db_query_source_threshold_ms=100,  # type: int
+        spotlight=None,  # type: Optional[Union[bool, str]]
     ):
         # type: (...) -> None
         pass
@@ -286,4 +316,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.32.0"
+VERSION = "1.40.6"

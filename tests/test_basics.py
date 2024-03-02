@@ -5,6 +5,8 @@ import time
 
 import pytest
 
+from tests.conftest import patch_start_tracing_child
+
 from sentry_sdk import (
     Client,
     push_scope,
@@ -17,15 +19,50 @@ from sentry_sdk import (
     last_event_id,
     Hub,
 )
-from sentry_sdk._compat import reraise
-from sentry_sdk.integrations import _AUTO_ENABLING_INTEGRATIONS
+from sentry_sdk._compat import reraise, PY2
+from sentry_sdk.integrations import (
+    _AUTO_ENABLING_INTEGRATIONS,
+    Integration,
+    setup_integrations,
+)
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
 from sentry_sdk.utils import get_sdk_name
 from sentry_sdk.tracing_utils import has_tracing_enabled
+
+
+def _redis_installed():  # type: () -> bool
+    """
+    Determines whether Redis is installed.
+    """
+    try:
+        import redis  # noqa: F401
+    except ImportError:
+        return False
+
+    return True
+
+
+class NoOpIntegration(Integration):
+    """
+    A simple no-op integration for testing purposes.
+    """
+
+    identifier = "noop"
+
+    @staticmethod
+    def setup_once():  # type: () -> None
+        pass
+
+    def __eq__(self, __value):  # type: (object) -> bool
+        """
+        All instances of NoOpIntegration should be considered equal to each other.
+        """
+        return type(__value) == type(self)
 
 
 def test_processors(sentry_init, capture_events):
@@ -59,8 +96,8 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
     sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
-        # Ignore redis in the test case, because it is installed as a
-        # dependency for running tests, and therefore always enabled.
+        # Ignore redis in the test case, because it does not raise a DidNotEnable
+        # exception on import; rather, it raises the exception upon enabling.
         if _AUTO_ENABLING_INTEGRATIONS[redis_index] == import_string:
             continue
 
@@ -686,3 +723,74 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
     assert len(event["spans"]) == 2
     assert event["spans"][0]["description"] == "tests.test_basics.WorldGreeter.greet"
     assert event["spans"][1]["description"] == "tests.test_basics.WorldGreeter.greet"
+
+
+@pytest.mark.skipif(_redis_installed(), reason="skipping because redis is installed")
+def test_redis_disabled_when_not_installed(sentry_init):
+    sentry_init()
+
+    assert Hub.current.get_integration(RedisIntegration) is None
+
+
+def test_multiple_setup_integrations_calls():
+    first_call_return = setup_integrations([NoOpIntegration()], with_defaults=False)
+    assert first_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
+
+    second_call_return = setup_integrations([NoOpIntegration()], with_defaults=False)
+    assert second_call_return == {NoOpIntegration.identifier: NoOpIntegration()}
+
+
+class TracingTestClass:
+    @staticmethod
+    def static(arg):
+        return arg
+
+    @classmethod
+    def class_(cls, arg):
+        return cls, arg
+
+
+def test_staticmethod_tracing(sentry_init):
+    test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
+    if not PY2:
+        # Skip this check on Python 2 since __qualname__ is available in Python 3 only. Skipping is okay,
+        # since the assertion would be expected to fail in Python 3 if there is any problem.
+        assert (
+            ".".join(
+                [
+                    TracingTestClass.static.__module__,
+                    TracingTestClass.static.__qualname__,
+                ]
+            )
+            == test_staticmethod_name
+        ), "The test static method was moved or renamed. Please update the name accordingly"
+
+    sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
+
+    for instance_or_class in (TracingTestClass, TracingTestClass()):
+        with patch_start_tracing_child() as fake_start_child:
+            assert instance_or_class.static(1) == 1
+            assert fake_start_child.call_count == 1
+
+
+def test_classmethod_tracing(sentry_init):
+    test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
+    if not PY2:
+        # Skip this check on Python 2 since __qualname__ is available in Python 3 only. Skipping is okay,
+        # since the assertion would be expected to fail in Python 3 if there is any problem.
+        assert (
+            ".".join(
+                [
+                    TracingTestClass.class_.__module__,
+                    TracingTestClass.class_.__qualname__,
+                ]
+            )
+            == test_classmethod_name
+        ), "The test class method was moved or renamed. Please update the name accordingly"
+
+    sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
+
+    for instance_or_class in (TracingTestClass, TracingTestClass()):
+        with patch_start_tracing_child() as fake_start_child:
+            assert instance_or_class.class_(1) == (TracingTestClass, 1)
+            assert fake_start_child.call_count == 1

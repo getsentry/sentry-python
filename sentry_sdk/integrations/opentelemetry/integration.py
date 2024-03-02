@@ -3,14 +3,14 @@ IMPORTANT: The contents of this file are part of a proof of concept and as such
 are experimental and not suitable for production use. They may be changed or
 removed at any time without prior notice.
 """
+
 import sys
 from importlib import import_module
 
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.modules import _get_installed_modules
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, _get_installed_modules
 from sentry_sdk._types import TYPE_CHECKING
 
 try:

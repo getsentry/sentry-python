@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -21,7 +22,6 @@ try:
     from urllib.parse import urlencode
     from urllib.parse import urlsplit
     from urllib.parse import urlunsplit
-
 except ImportError:
     # Python 2
     from cgi import parse_qs  # type: ignore
@@ -29,6 +29,13 @@ except ImportError:
     from urllib import urlencode  # type: ignore
     from urlparse import urlsplit  # type: ignore
     from urlparse import urlunsplit  # type: ignore
+
+try:
+    # Python 3
+    FileNotFoundError
+except NameError:
+    # Python 2
+    FileNotFoundError = IOError
 
 try:
     # Python 3.11
@@ -76,6 +83,7 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
+_installed_modules = None
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
@@ -94,16 +102,11 @@ def _get_debug_hub():
     pass
 
 
-def get_default_release():
+def get_git_revision():
     # type: () -> Optional[str]
-    """Try to guess a default release."""
-    release = os.environ.get("SENTRY_RELEASE")
-    if release:
-        return release
-
-    with open(os.path.devnull, "w+") as null:
-        try:
-            release = (
+    try:
+        with open(os.path.devnull, "w+") as null:
+            revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
                     stdout=subprocess.PIPE,
@@ -114,11 +117,22 @@ def get_default_release():
                 .strip()
                 .decode("utf-8")
             )
-        except (OSError, IOError):
-            pass
+    except (OSError, IOError, FileNotFoundError):
+        return None
 
-        if release:
-            return release
+    return revision
+
+
+def get_default_release():
+    # type: () -> Optional[str]
+    """Try to guess a default release."""
+    release = os.environ.get("SENTRY_RELEASE")
+    if release:
+        return release
+
+    release = get_git_revision()
+    if release:
+        return release
 
     for var in (
         "HEROKU_SLUG_COMMIT",
@@ -368,6 +382,13 @@ class AnnotatedValue(object):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
 
     @classmethod
     def removed_because_raw_data(cls):
@@ -1105,6 +1126,39 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
+def _truncate_by_bytes(string, max_bytes):
+    # type: (str, int) -> str
+    """
+    Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
+    """
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if isinstance(string, bytes):
+        truncated = string[: max_bytes - 3]
+    else:
+        truncated = string.encode("utf-8")[: max_bytes - 3].decode(
+            "utf-8", errors="ignore"
+        )
+
+    return truncated + "..."
+
+
+def _get_size_in_bytes(value):
+    # type: (str) -> Optional[int]
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if not isinstance(value, (bytes, text_type)):
+        return None
+
+    if isinstance(value, bytes):
+        return len(value)
+
+    try:
+        return len(value.encode("utf-8"))
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     if not value:
@@ -1113,17 +1167,79 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value.encode("utf-8"))
+    byte_size = _get_size_in_bytes(value)
+    text_size = None
+    if isinstance(value, text_type):
+        text_size = len(value)
 
-    if length > max_length:
-        return AnnotatedValue(
-            value=value[: max_length - 3] + "...",
-            metadata={
-                "len": length,
-                "rem": [["!limit", "x", max_length - 3, max_length]],
-            },
+    if byte_size is not None and byte_size > max_length:
+        # truncate to max_length bytes, preserving code points
+        truncated_value = _truncate_by_bytes(value, max_length)
+    elif text_size is not None and text_size > max_length:
+        # fallback to truncating by string length
+        truncated_value = value[: max_length - 3] + "..."
+    else:
+        return value
+
+    return AnnotatedValue(
+        value=truncated_value,
+        metadata={
+            "len": byte_size or text_size,
+            "rem": [["!limit", "x", max_length - 3, max_length]],
+        },
+    )
+
+
+def parse_version(version):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    """
+    Parses a version string into a tuple of integers.
+    This uses the parsing loging from PEP 440:
+    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+    """
+    VERSION_PATTERN = r"""  # noqa: N806
+        v?
+        (?:
+            (?:(?P<epoch>[0-9]+)!)?                           # epoch
+            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+            (?P<pre>                                          # pre-release
+                [-_\.]?
+                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+                [-_\.]?
+                (?P<pre_n>[0-9]+)?
+            )?
+            (?P<post>                                         # post release
+                (?:-(?P<post_n1>[0-9]+))
+                |
+                (?:
+                    [-_\.]?
+                    (?P<post_l>post|rev|r)
+                    [-_\.]?
+                    (?P<post_n2>[0-9]+)?
+                )
+            )?
+            (?P<dev>                                          # dev release
+                [-_\.]?
+                (?P<dev_l>dev)
+                [-_\.]?
+                (?P<dev_n>[0-9]+)?
+            )?
         )
-    return value
+        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+    """
+
+    pattern = re.compile(
+        r"^\s*" + VERSION_PATTERN + r"\s*$",
+        re.VERBOSE | re.IGNORECASE,
+    )
+
+    try:
+        release = pattern.match(version).groupdict()["release"]  # type: ignore
+        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+    return release_tuple
 
 
 def _is_contextvars_broken():
@@ -1183,24 +1299,49 @@ def _make_threadlocal_contextvars(local):
     class ContextVar(object):
         # Super-limited impl of ContextVar
 
-        def __init__(self, name):
-            # type: (str) -> None
+        def __init__(self, name, default=None):
+            # type: (str, Any) -> None
             self._name = name
+            self._default = default
             self._local = local()
+            self._original_local = local()
 
-        def get(self, default):
+        def get(self, default=None):
             # type: (Any) -> Any
-            return getattr(self._local, "value", default)
+            return getattr(self._local, "value", default or self._default)
 
         def set(self, value):
-            # type: (Any) -> None
+            # type: (Any) -> Any
+            token = str(random.getrandbits(64))
+            original_value = self.get()
+            setattr(self._original_local, token, original_value)
             self._local.value = value
+            return token
+
+        def reset(self, token):
+            # type: (Any) -> None
+            self._local.value = getattr(self._original_local, token)
+            del self._original_local[token]
 
     return ContextVar
 
 
+def _make_noop_copy_context():
+    # type: () -> Callable[[], Any]
+    class NoOpContext:
+        def run(self, func, *args, **kwargs):
+            # type: (Callable[..., Any], *Any, **Any) -> Any
+            return func(*args, **kwargs)
+
+    def copy_context():
+        # type: () -> NoOpContext
+        return NoOpContext()
+
+    return copy_context
+
+
 def _get_contextvars():
-    # type: () -> Tuple[bool, type]
+    # type: () -> Tuple[bool, type, Callable[[], Any]]
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1216,17 +1357,17 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
 
@@ -1234,10 +1375,10 @@ def _get_contextvars():
 
     from threading import local
 
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(local), _make_noop_copy_context()
 
 
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+HAS_REAL_CONTEXTVARS, ContextVar, copy_context = _get_contextvars()
 
 CONTEXTVARS_ERROR_MESSAGE = """
 
@@ -1520,56 +1661,56 @@ def is_sentry_url(hub, url):
     )
 
 
-def parse_version(version):
-    # type: (str) -> Optional[Tuple[int, ...]]
-    """
-    Parses a version string into a tuple of integers.
-    This uses the parsing loging from PEP 440:
-    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
-    """
-    VERSION_PATTERN = r"""  # noqa: N806
-        v?
-        (?:
-            (?:(?P<epoch>[0-9]+)!)?                           # epoch
-            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
-            (?P<pre>                                          # pre-release
-                [-_\.]?
-                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
-                [-_\.]?
-                (?P<pre_n>[0-9]+)?
-            )?
-            (?P<post>                                         # post release
-                (?:-(?P<post_n1>[0-9]+))
-                |
-                (?:
-                    [-_\.]?
-                    (?P<post_l>post|rev|r)
-                    [-_\.]?
-                    (?P<post_n2>[0-9]+)?
-                )
-            )?
-            (?P<dev>                                          # dev release
-                [-_\.]?
-                (?P<dev_l>dev)
-                [-_\.]?
-                (?P<dev_n>[0-9]+)?
-            )?
-        )
-        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
-    """
-
-    pattern = re.compile(
-        r"^\s*" + VERSION_PATTERN + r"\s*$",
-        re.VERBOSE | re.IGNORECASE,
-    )
-
+def _generate_installed_modules():
+    # type: () -> Iterator[Tuple[str, str]]
     try:
-        release = pattern.match(version).groupdict()["release"]  # type: ignore
-        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
-    except (TypeError, ValueError, AttributeError):
+        from importlib import metadata
+
+        yielded = set()
+        for dist in metadata.distributions():
+            name = dist.metadata["Name"]
+            # `metadata` values may be `None`, see:
+            # https://github.com/python/cpython/issues/91216
+            # and
+            # https://github.com/python/importlib_metadata/issues/371
+            if name is not None:
+                normalized_name = _normalize_module_name(name)
+                if dist.version is not None and normalized_name not in yielded:
+                    yield normalized_name, dist.version
+                    yielded.add(normalized_name)
+
+    except ImportError:
+        # < py3.8
+        try:
+            import pkg_resources
+        except ImportError:
+            return
+
+        for info in pkg_resources.working_set:
+            yield _normalize_module_name(info.key), info.version
+
+
+def _normalize_module_name(name):
+    # type: (str) -> str
+    return name.lower()
+
+
+def _get_installed_modules():
+    # type: () -> Dict[str, str]
+    global _installed_modules
+    if _installed_modules is None:
+        _installed_modules = dict(_generate_installed_modules())
+    return _installed_modules
+
+
+def package_version(package):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    installed_packages = _get_installed_modules()
+    version = installed_packages.get(package)
+    if version is None:
         return None
 
-    return release_tuple
+    return parse_version(version)
 
 
 if PY37:
@@ -1602,3 +1743,18 @@ else:
     def now():
         # type: () -> float
         return time.perf_counter()
+
+
+try:
+    from gevent.monkey import is_module_patched
+except ImportError:
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
+
+
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")

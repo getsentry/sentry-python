@@ -19,7 +19,6 @@ from sentry_sdk.integrations._asgi_common import (
     _get_request_data,
     _get_url,
 )
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -34,6 +33,7 @@ from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     logger,
     transaction_from_function,
+    _get_installed_modules,
 )
 from sentry_sdk.tracing import Transaction
 

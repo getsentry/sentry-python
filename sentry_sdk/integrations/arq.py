@@ -149,12 +149,12 @@ def _make_event_processor(ctx, *args, **kwargs):
             extra = event.setdefault("extra", {})
             extra["arq-job"] = {
                 "task": ctx["job_name"],
-                "args": args
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
-                "kwargs": kwargs
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
+                "args": (
+                    args if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
+                "kwargs": (
+                    kwargs if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
                 "retry": ctx["job_try"],
             }
 
@@ -169,7 +169,7 @@ def _wrap_coroutine(name, coroutine):
         # type: (Dict[Any, Any], *Any, **Any) -> Any
         hub = Hub.current
         if hub.get_integration(ArqIntegration) is None:
-            return await coroutine(*args, **kwargs)
+            return await coroutine(ctx, *args, **kwargs)
 
         hub.scope.add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)

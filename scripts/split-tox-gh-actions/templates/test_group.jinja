@@ -1,0 +1,103 @@
+  test-{{ lowercase_group }}-{{ category }}:
+    name: {{ group }} ({{ category }})
+    timeout-minutes: 30
+
+    {% if needs_github_secrets %}
+    needs: check-permissions
+    {% endif %}
+
+    {% if category == "py27" %}
+    runs-on: ubuntu-20.04
+    container: python:2.7
+    {% else %}
+    runs-on: {% raw %}${{ matrix.os }}{% endraw %}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [{{ py_versions.get(category)|join(",") }}]
+        # python3.6 reached EOL and is no longer being supported on
+        # new versions of hosted runners on Github Actions
+        # ubuntu-20.04 is the last version that supported python3.6
+        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
+        os: [ubuntu-20.04]
+    {% endif %}
+
+    {% if needs_postgres %}
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: sentry
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        # Maps tcp port 5432 on service container to the host
+        ports:
+          - 5432:5432
+    env:
+      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
+      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% if category == "py27" %}postgres{% else %}localhost{% endif %}
+    {% endif %}
+
+    steps:
+      - uses: actions/checkout@v4.1.1
+      {% if needs_github_secrets %}
+      {% raw %}
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+      {% endraw %}
+      {% endif %}
+      {% if category != "py27" %}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
+      {% endif %}
+      {% if needs_clickhouse %}
+      - uses: getsentry/action-clickhouse-in-ci@v1
+      {% endif %}
+
+      - name: Setup Test Env
+        run: |
+          pip install coverage "tox>=3,<4"
+          {% if needs_postgres %}
+          {% if category == "py27" %}
+          psql postgresql://postgres:sentry@postgres:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@postgres:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          {% else %}
+          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          {% endif %}
+          {% endif %}
+
+      - name: Erase coverage
+        run: |
+          coverage erase
+
+      {% for framework in frameworks %}
+      - name: Test {{ framework }} {{ category }}
+        run: |
+          set -x # print commands that are executed
+
+          {% if category == "py27" %}
+          ./scripts/runtox.sh --exclude-latest "py2.7-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          {% elif category == "pinned" %}
+          ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          {% elif category == "latest" %}
+          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          {% endif %}
+      {% endfor %}
+
+      - name: Generate coverage XML
+        run: |
+          coverage combine .coverage*
+          coverage xml -i
+
+      - uses: codecov/codecov-action@v4
+        with:
+          token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
+          files: coverage.xml

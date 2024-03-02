@@ -91,6 +91,10 @@ class LoggingIntegration(Integration):
 
         def sentry_patched_callhandlers(self, record):
             # type: (Any, LogRecord) -> Any
+            # keeping a local reference because the
+            # global might be discarded on shutdown
+            ignored_loggers = _IGNORED_LOGGERS
+
             try:
                 return old_callhandlers(self, record)
             finally:
@@ -98,7 +102,7 @@ class LoggingIntegration(Integration):
                 # the integration.  Otherwise we have a high chance of getting
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
-                if record.name not in _IGNORED_LOGGERS:
+                if ignored_loggers is not None and record.name not in ignored_loggers:
                     integration = Hub.current.get_integration(LoggingIntegration)
                     if integration is not None:
                         integration._handle_record(record)
@@ -130,6 +134,7 @@ class _BaseHandler(logging.Handler, object):
             "relativeCreated",
             "stack",
             "tags",
+            "taskName",
             "thread",
             "threadName",
             "stack_info",

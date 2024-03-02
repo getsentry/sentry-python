@@ -1,0 +1,21 @@
+  check_required_tests:
+    name: All {{ group }} tests passed
+    {% if "pinned" in categories and "py27" in categories %}
+    needs: [test-{{ group | replace(" ", "_") | lower }}-pinned, test-{{ group | replace(" ", "_") | lower }}-py27]
+    {% elif "pinned" in categories %}
+    needs: test-{{ group | replace(" ", "_") | lower }}-pinned
+    {% endif %}
+    # Always run this, even if a dependent job failed
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check for failures
+        if: contains(needs.test-{{ lowercase_group }}-pinned.result, 'failure') || contains(needs.test-{{ lowercase_group }}-pinned.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+      {% if "py27" in categories %}
+      - name: Check for 2.7 failures
+        if: contains(needs.test-{{ lowercase_group }}-py27.result, 'failure') || contains(needs.test-{{ lowercase_group }}-py27.result, 'skipped')
+        run: |
+          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+      {% endif %}

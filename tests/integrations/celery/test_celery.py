@@ -3,7 +3,11 @@ import threading
 import pytest
 
 from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
-from sentry_sdk.integrations.celery import CeleryIntegration, _get_headers
+from sentry_sdk.integrations.celery import (
+    CeleryIntegration,
+    _get_headers,
+    _wrap_apply_async,
+)
 
 from sentry_sdk._compat import text_type
 
@@ -555,3 +559,52 @@ def test_sentry_propagate_traces_override(init_celery):
             headers={"sentry-propagate-traces": False},
         ).get()
         assert transaction_trace_id != task_transaction_id
+
+
+def test_apply_async_manually_span(sentry_init):
+    sentry_init(
+        integrations=[CeleryIntegration()],
+    )
+
+    def dummy_function(*args, **kwargs):
+        headers = kwargs.get("headers")
+        assert "sentry-trace" in headers
+        assert "baggage" in headers
+
+    wrapped = _wrap_apply_async(dummy_function)
+    wrapped(mock.MagicMock(), (), headers={})
+
+
+def test_apply_async_from_beat_no_span(sentry_init):
+    sentry_init(
+        integrations=[CeleryIntegration()],
+    )
+
+    def dummy_function(*args, **kwargs):
+        headers = kwargs.get("headers")
+        assert "sentry-trace" not in headers
+        assert "baggage" not in headers
+
+    wrapped = _wrap_apply_async(dummy_function)
+    wrapped(
+        mock.MagicMock(),
+        [
+            "BEAT",
+        ],
+        headers={},
+    )
+
+
+def test_apply_async_no_args(init_celery):
+    celery = init_celery()
+
+    @celery.task
+    def example_task():
+        return "success"
+
+    try:
+        result = example_task.apply_async(None, {})
+    except TypeError:
+        pytest.fail("Calling `apply_async` without arguments raised a TypeError")
+
+    assert result.get() == "success"

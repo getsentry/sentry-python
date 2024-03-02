@@ -229,13 +229,10 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
     ]
-    print(transaction_event["spans"])
-    idx = 0
-    for span in transaction_event["spans"]:
+    for idx, span in enumerate(transaction_event["spans"]):
         assert span["op"] == expected[idx]["op"]
         assert span["description"] == expected[idx]["description"]
         assert span["tags"] == expected[idx]["tags"]
-        idx += 1
 
 
 def test_middleware_receive_send(sentry_init, capture_events):
@@ -290,12 +287,10 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
     ]
 
-    idx = 0
-    for span in transaction_event["spans"]:
+    for idx, span in enumerate(transaction_event["spans"]):
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
         assert span["tags"] == expected[idx]["tags"]
-        idx += 1
 
 
 def test_last_event_id(sentry_init, capture_events):
@@ -315,7 +310,6 @@ def test_last_event_id(sentry_init, capture_events):
     client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/custom_error")
     assert response.status_code == 500
-    print(events)
     event = events[-1]
     assert response.content.strip().decode("ascii").strip('"') == event["event_id"]
     (exception,) = event["exception"]["values"]

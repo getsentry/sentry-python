@@ -2,9 +2,16 @@ name: Enforce License Compliance
 
 on:
   push:
-    branches: [master, main, release/*]
+    branches:
+      - master
+      - main
+      - release/*
+      - sentry-sdk-2.0
   pull_request:
-    branches: [master, main]
+    branches:
+      - master
+      - main
+      - sentry-sdk-2.0
 
 jobs:
   enforce-license-compliance:

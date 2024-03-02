@@ -1,5 +1,5 @@
 try:
-    from typing import TYPE_CHECKING as TYPE_CHECKING
+    from typing import TYPE_CHECKING
 except ImportError:
     TYPE_CHECKING = False
 
@@ -54,6 +54,7 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "statsd",
+        "monitor",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
     EndpointType = Literal["store", "envelope"]
@@ -116,3 +117,4 @@ if TYPE_CHECKING:
     FlushedMetricValue = Union[int, float]
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
+    MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]

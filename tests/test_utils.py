@@ -1,11 +1,15 @@
 import pytest
 import re
 import sys
+from datetime import timedelta
 
+from sentry_sdk._compat import duration_in_milliseconds
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    get_default_release,
     get_error_message,
+    get_git_revision,
     is_valid_sample_rate,
     logger,
     match_regex_list,
@@ -15,6 +19,7 @@ from sentry_sdk.utils import (
     sanitize_url,
     serialize_frame,
     is_sentry_url,
+    _get_installed_modules,
 )
 
 import sentry_sdk
@@ -23,6 +28,24 @@ try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
+
+try:
+    # Python 3
+    FileNotFoundError
+except NameError:
+    # Python 2
+    FileNotFoundError = IOError
+
+
+def _normalize_distribution_name(name):
+    # type: (str) -> str
+    """Normalize distribution name according to PEP-0503.
+
+    See:
+    https://peps.python.org/pep-0503/#normalized-names
+    for more details.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 @pytest.mark.parametrize(
@@ -488,3 +511,99 @@ def test_get_error_message(error, expected_result):
         exc_value.detail = error
         raise Exception
     assert get_error_message(exc_value) == expected_result(exc_value)
+
+
+def test_installed_modules():
+    try:
+        from importlib.metadata import distributions, version
+
+        importlib_available = True
+    except ImportError:
+        importlib_available = False
+
+    try:
+        import pkg_resources
+
+        pkg_resources_available = True
+    except ImportError:
+        pkg_resources_available = False
+
+    installed_distributions = {
+        _normalize_distribution_name(dist): version
+        for dist, version in _get_installed_modules().items()
+    }
+
+    if importlib_available:
+        importlib_distributions = {
+            _normalize_distribution_name(dist.metadata["Name"]): version(
+                dist.metadata["Name"]
+            )
+            for dist in distributions()
+            if dist.metadata["Name"] is not None
+            and version(dist.metadata["Name"]) is not None
+        }
+        assert installed_distributions == importlib_distributions
+
+    elif pkg_resources_available:
+        pkg_resources_distributions = {
+            _normalize_distribution_name(dist.key): dist.version
+            for dist in pkg_resources.working_set
+        }
+        assert installed_distributions == pkg_resources_distributions
+    else:
+        pytest.fail("Neither importlib nor pkg_resources is available")
+
+
+def test_installed_modules_caching():
+    mock_generate_installed_modules = mock.Mock()
+    mock_generate_installed_modules.return_value = {"package": "1.0.0"}
+    with mock.patch("sentry_sdk.utils._installed_modules", None):
+        with mock.patch(
+            "sentry_sdk.utils._generate_installed_modules",
+            mock_generate_installed_modules,
+        ):
+            _get_installed_modules()
+            assert mock_generate_installed_modules.called
+            mock_generate_installed_modules.reset_mock()
+
+            _get_installed_modules()
+            mock_generate_installed_modules.assert_not_called()
+
+
+def test_devnull_inaccessible():
+    with mock.patch("sentry_sdk.utils.open", side_effect=OSError("oh no")):
+        revision = get_git_revision()
+
+    assert revision is None
+
+
+def test_devnull_not_found():
+    with mock.patch("sentry_sdk.utils.open", side_effect=FileNotFoundError("oh no")):
+        revision = get_git_revision()
+
+    assert revision is None
+
+
+def test_default_release():
+    release = get_default_release()
+    assert release is not None
+
+
+def test_default_release_empty_string():
+    with mock.patch("sentry_sdk.utils.get_git_revision", return_value=""):
+        release = get_default_release()
+
+    assert release is None
+
+
+@pytest.mark.parametrize(
+    "timedelta,expected_milliseconds",
+    [
+        [timedelta(milliseconds=132), 132.0],
+        [timedelta(hours=1, milliseconds=132), float(60 * 60 * 1000 + 132)],
+        [timedelta(days=10), float(10 * 24 * 60 * 60 * 1000)],
+        [timedelta(microseconds=100), 0.1],
+    ],
+)
+def test_duration_in_milliseconds(timedelta, expected_milliseconds):
+    assert duration_in_milliseconds(timedelta) == expected_milliseconds

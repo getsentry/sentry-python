@@ -3,6 +3,11 @@ import sentry_sdk
 from sentry_sdk import Hub
 from sentry_sdk.sessions import auto_session_tracking
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
+
 
 def sorted_aggregates(item):
     aggregates = item["aggregates"]
@@ -119,3 +124,32 @@ def test_aggregates_explicitly_disabled_session_tracking_request_mode(
     assert len(aggregates) == 1
     assert aggregates[0]["exited"] == 1
     assert "errored" not in aggregates[0]
+
+
+def test_no_thread_on_shutdown_no_errors(sentry_init):
+    sentry_init(
+        release="fun-release",
+        environment="not-fun-env",
+    )
+
+    hub = Hub.current
+
+    # make it seem like the interpreter is shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        with auto_session_tracking(session_mode="request"):
+            with sentry_sdk.push_scope():
+                try:
+                    raise Exception("all is wrong")
+                except Exception:
+                    sentry_sdk.capture_exception()
+
+        with auto_session_tracking(session_mode="request"):
+            pass
+
+        hub.start_session(session_mode="request")
+        hub.end_session()
+
+        sentry_sdk.flush()

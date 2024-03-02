@@ -195,6 +195,12 @@ def postgres_select(request, *args, **kwargs):
 
 
 @csrf_exempt
+def postgres_select_orm(request, *args, **kwargs):
+    user = User.objects.using("postgres").all().first()
+    return HttpResponse("ok {}".format(user))
+
+
+@csrf_exempt
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
 
@@ -296,7 +302,15 @@ if VERSION >= (3, 1):
     })
     return HttpResponse(response)"""
     )
+
+    exec(
+        """async def post_echo_async(request):
+    sentry_sdk.capture_message("hi")
+    return HttpResponse(request.body)
+post_echo_async.csrf_exempt = True"""
+    )
 else:
     async_message = None
     my_async_view = None
     thread_ids_async = None
+    post_echo_async = None

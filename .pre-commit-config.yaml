@@ -8,9 +8,10 @@ repos:
     -   id: end-of-file-fixer
 
 -   repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 24.1.0
     hooks:
     -   id: black
+        exclude: ^(.*_pb2.py|.*_pb2_grpc.py)
 
 -   repo: https://github.com/pycqa/flake8
     rev: 5.0.4

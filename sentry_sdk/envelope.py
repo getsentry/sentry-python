@@ -262,6 +262,8 @@ class Item(object):
             return "profile"
         elif ty == "statsd":
             return "statsd"
+        elif ty == "check_in":
+            return "monitor"
         else:
             return "default"
 

@@ -5,13 +5,13 @@ from sentry_sdk import configure_scope, start_span
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
-    parse_version,
+    package_version,
+    _get_installed_modules,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -55,8 +55,7 @@ class StrawberryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        installed_packages = _get_installed_modules()
-        version = parse_version(installed_packages["strawberry-graphql"])
+        version = package_version("strawberry-graphql")
 
         if version is None:
             raise DidNotEnable(

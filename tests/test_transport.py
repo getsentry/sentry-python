@@ -18,6 +18,10 @@ from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
+try:
+    from unittest import mock  # python 3.3 and above
+except ImportError:
+    import mock  # python < 3.3
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
@@ -163,6 +167,21 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
         client.flush()
 
     assert len(capturing_server.captured) == 1
+
+
+def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client):
+    client = make_client()
+
+    # make it seem like the interpreter is shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        with Hub(client):
+            capture_message("hi")
+
+    # nothing exploded but also no events can be sent anymore
+    assert len(capturing_server.captured) == 0
 
 
 NOW = datetime(2014, 6, 2)

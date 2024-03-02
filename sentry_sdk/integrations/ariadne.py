@@ -3,12 +3,11 @@ from importlib import import_module
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    parse_version,
+    package_version,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -33,11 +32,10 @@ class AriadneIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        installed_packages = _get_installed_modules()
-        version = parse_version(installed_packages["ariadne"])
+        version = package_version("ariadne")
 
         if version is None:
-            raise DidNotEnable("Unparsable ariadne version: {}".format(version))
+            raise DidNotEnable("Unparsable ariadne version.")
 
         if version < (0, 20):
             raise DidNotEnable("ariadne 0.20 or newer required.")
