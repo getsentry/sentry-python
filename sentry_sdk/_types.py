@@ -54,6 +54,7 @@ if TYPE_CHECKING:
         profile: Profile
         release: str
         request: dict[str, object]
+        sdk: Mapping[str, object]
         server_name: str
         spans: list[dict[str, object]]
         stacktrace: dict[
@@ -64,7 +65,7 @@ if TYPE_CHECKING:
         threads: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
-        timestamp: Union[str, int, float]
+        timestamp: datetime
         transaction: str
         transaction_info: Mapping[str, object]  # TODO: We can expand on this type
         type: Literal["check_in", "transaction"]

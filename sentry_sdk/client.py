@@ -1,8 +1,10 @@
+from collections.abc import Mapping, MutableMapping
 from importlib import import_module
 import os
 import uuid
 import random
 import socket
+from typing import cast, Literal
 
 from sentry_sdk._compat import (
     datetime_utcnow,
@@ -376,6 +378,7 @@ class _Client(object):
                 }
 
         for key in "release", "environment", "server_name", "dist":
+            key = cast(Literal["release", "environment", "server_name", "dist"], key)
             if event.get(key) is None and self.options[key] is not None:
                 event[key] = text_type(self.options[key]).strip()
         if event.get("sdk") is None:
@@ -551,7 +554,7 @@ class _Client(object):
             errored = True
             for error in exceptions:
                 mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("handled") is False:
+                if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
                     break
 
@@ -628,7 +631,10 @@ class _Client(object):
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
-        dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
+        if isinstance(trace_context, MutableMapping):
+            dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
+        else:
+            dynamic_sampling_context = {}
 
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
