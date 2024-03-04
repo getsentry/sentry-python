@@ -12,6 +12,8 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
+
     from datetime import datetime
     from sentry_sdk.profiler import Profile
 
@@ -33,7 +35,7 @@ if TYPE_CHECKING:
         breadcrumbs: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
-        contexts: dict[object, object]
+        contexts: dict[str, object]
         dist: str
         environment: str
         errors: list[dict[str, object]]  # TODO: We can expand on this type
@@ -41,7 +43,7 @@ if TYPE_CHECKING:
         exception: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
-        extra: dict[object, object]
+        extra: MutableMapping[str, object]
         fingerprint: list[str]
         level: LogLevelStr
         logger: str
@@ -58,16 +60,14 @@ if TYPE_CHECKING:
             str, object
         ]  # We access this key in the code, but I am unsure whether we ever set it
         start_timestamp: Union[datetime, int]
-        tags: Union[
-            list[str], dict[str, object]
-        ]  # Tags must be less than 200 characters each
+        tags: MutableMapping[str, object]  # Tags must be less than 200 characters each
         threads: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
         timestamp: Union[str, int, float]
         transaction: str
-        transaction_info: dict[str, object]  # TODO: We can expand on this type
-        type: Literal["transaction"]  # Only set this key for transaction events
+        transaction_info: Mapping[str, object]  # TODO: We can expand on this type
+        type: Literal["check_in", "transaction"]
         user: dict[str, object]
         _metrics_summary: dict[str, object]
 

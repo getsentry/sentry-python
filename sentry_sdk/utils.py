@@ -1074,7 +1074,7 @@ def event_from_exception(
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
