@@ -60,7 +60,7 @@ if TYPE_CHECKING:
             str, object
         ]  # We access this key in the code, but I am unsure whether we ever set it
         start_timestamp: Union[datetime, int]
-        tags: MutableMapping[str, object]  # Tags must be less than 200 characters each
+        tags: MutableMapping[str, str]  # Tags must be less than 200 characters each
         threads: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
