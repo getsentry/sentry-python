@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         EventProcessor,
         ExcInfo,
         Hint,
+        LogLevelStr,
         Type,
     )
 
@@ -848,7 +849,7 @@ class Scope(object):
     def capture_message(
         self, message, level=None, client=None, scope=None, **scope_kwargs
     ):
-        # type: (str, Optional[str], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+        # type: (str, Optional[LogLevelStr], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
 
@@ -876,7 +877,7 @@ class Scope(object):
         event = {
             "message": message,
             "level": level,
-        }
+        }  # type: Event
 
         return self.capture_event(event, client=client, scope=scope, **scope_kwargs)
 

@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal, TypedDict
 
+    LogLevelStr = Literal["fatal", "error", "warning", "info", "debug"]
+
     class Event(TypedDict, total=False):
         breadcrumbs: dict[
             Literal["values"], list[dict[str, object]]
@@ -41,9 +43,10 @@ if TYPE_CHECKING:
         ]  # TODO: We can expand on this type
         extra: dict[object, object]
         fingerprint: list[str]
-        level: Literal["fatal", "error", "warning", "info", "debug"]
+        level: LogLevelStr
         logger: str
         measurements: dict[str, object]
+        message: str
         modules: dict[str, str]
         platform: Literal["python"]
         profile: Profile
