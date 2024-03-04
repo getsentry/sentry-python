@@ -25,12 +25,9 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Type
     from typing import Union
-    from typing_extensions import Literal, Required, TypedDict
+    from typing_extensions import Literal, TypedDict
 
     class Event(TypedDict, total=False):
-        event_id: Required[str]
-        platform: Required[Literal["python"]]
-        timestamp: Required[Union[str, int, float]]
         breadcrumbs: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
@@ -38,6 +35,7 @@ if TYPE_CHECKING:
         dist: str
         environment: str
         errors: list[dict[str, object]]  # TODO: We can expand on this type
+        event_id: str
         exception: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
@@ -47,6 +45,7 @@ if TYPE_CHECKING:
         logger: str
         measurements: dict[str, object]
         modules: dict[str, str]
+        platform: Literal["python"]
         profile: Profile
         release: str
         request: dict[str, object]
@@ -62,6 +61,7 @@ if TYPE_CHECKING:
         threads: dict[
             Literal["values"], list[dict[str, object]]
         ]  # TODO: We can expand on this type
+        timestamp: Union[str, int, float]
         transaction: str
         transaction_info: dict[str, object]  # TODO: We can expand on this type
         type: Literal["transaction"]  # Only set this key for transaction events
