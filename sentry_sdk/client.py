@@ -1,5 +1,6 @@
 from importlib import import_module
 import os
+import uuid
 import random
 import socket
 
@@ -593,9 +594,11 @@ class _Client(object):
 
         if hint is None:
             hint = {}
-        event_id = event["event_id"]
+        event_id = event.get("event_id")
         hint = dict(hint or ())  # type: Hint
 
+        if event_id is None:
+            event["event_id"] = event_id = uuid.uuid4().hex
         if not self._should_capture(event, hint, scope):
             return None
 

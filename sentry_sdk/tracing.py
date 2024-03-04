@@ -736,8 +736,6 @@ class Transaction(Span):
             "timestamp": self.timestamp,
             "start_timestamp": self.start_timestamp,
             "spans": finished_spans,
-            "platform": "python",
-            "event_id": uuid.uuid4().hex,
         }  # type: Event
 
         if self._profile is not None and self._profile.valid():
