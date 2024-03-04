@@ -1195,7 +1195,7 @@ class Scope(object):
     def update_from_kwargs(
         self,
         user=None,  # type: Optional[Any]
-        level=None,  # type: Optional[str]
+        level=None,  # type: Optional[LogLevelStr]
         extras=None,  # type: Optional[Dict[str, Any]]
         contexts=None,  # type: Optional[Dict[str, Any]]
         tags=None,  # type: Optional[Dict[str, str]]

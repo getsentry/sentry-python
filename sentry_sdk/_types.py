@@ -46,6 +46,7 @@ if TYPE_CHECKING:
         extra: MutableMapping[str, object]
         fingerprint: list[str]
         level: LogLevelStr
+        logentry: Mapping[str, object]
         logger: str
         measurements: dict[str, object]
         message: str

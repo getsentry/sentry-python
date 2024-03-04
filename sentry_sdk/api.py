@@ -92,7 +92,7 @@ def capture_event(
 @hubmethod
 def capture_message(
     message,  # type: str
-    level=None,  # type: Optional[str]
+    level=None,  # type: Optional[LogLevelStr]
     scope=None,  # type: Optional[Any]
     **scope_kwargs  # type: Any
 ):

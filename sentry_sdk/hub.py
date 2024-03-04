@@ -40,6 +40,7 @@ if TYPE_CHECKING:
         Breadcrumb,
         BreadcrumbHint,
         ExcInfo,
+        LogLevelStr,
     )
     from sentry_sdk.consts import ClientConstructor
 
@@ -335,7 +336,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return last_event_id
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
+        # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
 
