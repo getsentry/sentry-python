@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         BreadcrumbHint,
         ExcInfo,
         MeasurementUnit,
+        LogLevelStr,
     )
     from sentry_sdk.tracing import Span
 
@@ -189,7 +190,7 @@ def set_user(value):
 
 @scopemethod
 def set_level(value):
-    # type: (str) -> None
+    # type: (LogLevelStr) -> None
     return Hub.current.scope.set_level(value)
 
 
