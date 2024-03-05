@@ -1,3 +1,7 @@
+from contextlib import contextmanager
+
+from sentry_sdk import start_span
+from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import (
@@ -50,10 +54,8 @@ def _patch_graphql():
         if integration is None:
             return old_graphql_sync(schema, source, *args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            scope.add_event_processor(_event_processor)
-
-        result = old_graphql_sync(schema, source, *args, **kwargs)
+        with graphql_span(hub, schema, source, kwargs):
+            result = old_graphql_sync(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
             for error in result.errors or []:
@@ -76,10 +78,8 @@ def _patch_graphql():
         if integration is None:
             return await old_graphql_async(schema, source, *args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            scope.add_event_processor(_event_processor)
-
-        result = await old_graphql_async(schema, source, *args, **kwargs)
+        with graphql_span(hub, schema, source, kwargs):
+            result = await old_graphql_async(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
             for error in result.errors or []:
@@ -109,3 +109,42 @@ def _event_processor(event, hint):
         del event["request"]["data"]
 
     return event
+
+
+@contextmanager
+def graphql_span(hub, schema, source, kwargs):
+    operation_name = kwargs.get("operation_name")
+
+    operation_type = "query"
+    op = OP.GRAPHQL_QUERY
+    if source.strip().startswith("mutation"):
+        operation_type = "mutation"
+        op = OP.GRAPHQL_MUTATION
+    elif source.strip().startswith("subscription"):
+        operation_type = "subscription"
+        op = OP.GRAPHQL_SUBSCRIPTION
+
+    hub.add_breadcrumb(
+        crumb={
+            "data": {
+                "operation_name": operation_name,
+                "operation_type": operation_type,
+            },
+            "category": "graphql.operation",
+        },
+    )
+
+    with hub.configure_scope() as scope:
+        if scope.span:
+            _graphql_span = scope.span.start_child(op=op, description=operation_name)
+        else:
+            _graphql_span = start_span(op=op, description=operation_name)
+        scope.add_event_processor(_event_processor)
+
+    _graphql_span.set_data("graphql.document", source)
+    _graphql_span.set_data("graphql.operation.name", operation_name)
+    _graphql_span.set_data("graphql.operation.type", operation_type)
+
+    yield
+
+    _graphql_span.finish()
