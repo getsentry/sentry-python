@@ -8,7 +8,6 @@ from collections import defaultdict
 
 import urllib3
 import certifi
-from urllib3.connection import HTTPConnection
 
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
 from sentry_sdk.worker import BackgroundWorker
@@ -448,9 +447,7 @@ class HttpTransport(Transport):
         }
 
         if self.options["socket_options"]:
-            options["socket_options"] = (
-                HTTPConnection.default_socket_options + self.options["socket_options"]
-            )
+            options["socket_options"] = self.options["socket_options"]
 
         return options
 
