@@ -150,8 +150,7 @@ def _get_options(*args, **kwargs):
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
-            "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format.",
-            type(rv["socket_options"]),
+            "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
         )
         rv["socket_options"] = None
 
