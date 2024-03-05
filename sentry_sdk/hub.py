@@ -19,6 +19,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+    from typing import cast
     from typing import Callable
     from typing import ContextManager
     from typing import Dict
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
 
+    from typing_extensions import Unpack
+
     from sentry_sdk.client import BaseClient
     from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
@@ -41,6 +44,8 @@ if TYPE_CHECKING:
         ExcInfo,
     )
     from sentry_sdk.consts import ClientConstructor
+    from sentry_sdk.scope import StartTransactionKwargs
+    from sentry_sdk.tracing import TransactionKwargs
 
     T = TypeVar("T")
 
@@ -468,7 +473,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -498,6 +503,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         scope = Scope.get_current_scope()
+
+        if TYPE_CHECKING:
+            kwargs = cast(StartTransactionKwargs, kwargs)
 
         # For backwards compatibility, we allow passing the scope as the hub.
         # We need a major release to make this nice. (if someone searches the code: deprecated)
