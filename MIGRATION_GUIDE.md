@@ -21,7 +21,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
     Your existing implementation:
     ```python
     transaction = sentry_sdk.transaction(...)
-    
+
     # later in the code execution:
 
     with sentry_sdk.configure_scope() as scope:
@@ -31,7 +31,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
     needs to be changed to this:
     ```python
     transaction = sentry_sdk.transaction(...)
-    
+
     # later in the code execution:
 
     scope = sentry_sdk.Scope.get_current_scope()
@@ -56,6 +56,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Removed support for Celery 3.\*.
 - Removed support for Django 1.8, 1.9, 1.10.
 - Removed support for Flask 0.\*.
+- Removed support for gRPC < 1.39.
 - Removed `last_event_id()` top level API. The last event ID is still returned by `capture_event()`, `capture_exception()` and `capture_message()` but the top level API `sentry_sdk.last_event_id()` has been removed.
 - Removed support for sending events to the `/store` endpoint. Everything is now sent to the `/envelope` endpoint. If you're on SaaS you don't have to worry about this, but if you're running Sentry yourself you'll need version `20.6.0` or higher of self-hosted Sentry.
 - The deprecated `with_locals` configuration option was removed. Use `include_local_variables` instead. See https://docs.sentry.io/platforms/python/configuration/options/#include-local-variables.
