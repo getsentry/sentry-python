@@ -3,14 +3,13 @@ import logging
 import pickle
 import gzip
 import io
-
+import socket
+from collections import namedtuple
 from datetime import datetime, timedelta
 
 import pytest
-from collections import namedtuple
-from werkzeug.wrappers import Request, Response
-
 from pytest_localserver.http import WSGIServer
+from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk._compat import datetime_utcnow
@@ -155,6 +154,19 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
+def test_socket_options(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
 def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
@@ -219,7 +231,7 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
-def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
+def test_simple_rate_limits(capturing_server, make_client):
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
 
@@ -241,7 +253,7 @@ def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits(
-    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=False)
 
@@ -288,7 +300,7 @@ def test_data_category_limits(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits_reporting(
-    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=True)
 
@@ -371,7 +383,7 @@ def test_data_category_limits_reporting(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_complex_limits_without_data_category(
-    capturing_server, capsys, caplog, response_code, make_client
+    capturing_server, response_code, make_client
 ):
     client = make_client()
     capturing_server.respond_with(
