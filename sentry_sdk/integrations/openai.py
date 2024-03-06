@@ -12,12 +12,11 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 try:
-    from openai.types.chat import ChatCompletionChunk
     from openai.resources.chat.completions import Completions
     from openai.resources import Embeddings
 
     if TYPE_CHECKING:
-        from openai.types.chat import ChatCompletionMessageParam
+        from openai.types.chat import ChatCompletionMessageParam, ChatCompletionChunk
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
@@ -129,7 +128,7 @@ def _wrap_chat_completion_create(f):
         kwargs["messages"] = list(kwargs["messages"])
         messages = kwargs["messages"]
         model = kwargs.get("model")
-        streaming = kwargs.get("stream")  # TODO handle streaming
+        streaming = kwargs.get("stream")
 
         span = hub.start_span(op="openai", description="Chat Completion")
         span.__enter__()
