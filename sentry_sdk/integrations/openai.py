@@ -12,9 +12,9 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 try:
-    from openai.types.chat import ChatCompletionChunk  # type: ignore
-    from openai.resources.chat.completions import Completions  # type: ignore
-    from openai.resources import Embeddings  # type: ignore
+    from openai.types.chat import ChatCompletionChunk
+    from openai.resources.chat.completions import Completions
+    from openai.resources import Embeddings
 
     if TYPE_CHECKING:
         from openai.types.chat import ChatCompletionMessageParam
