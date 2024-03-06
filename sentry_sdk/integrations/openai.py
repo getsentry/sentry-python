@@ -3,9 +3,8 @@ from __future__ import absolute_import
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Iterator, Any, TypeVar, Callable
-
-    F = TypeVar("F", bound=Callable[..., Any])
+    from typing import Iterator, Any, Iterable, List, Optional, Callable
+    from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import wraps
 from sentry_sdk.hub import Hub
@@ -13,14 +12,17 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import logger, capture_internal_exceptions
 
 try:
-    from openai.types.chat import ChatCompletionChunk
-    from openai.resources.chat.completions import Completions
-    from openai.resources import Embeddings
+    from openai.types.chat import ChatCompletionChunk  # type: ignore
+    from openai.resources.chat.completions import Completions  # type: ignore
+    from openai.resources import Embeddings  # type: ignore
+
+    if TYPE_CHECKING:
+        from openai.types.chat import ChatCompletionMessageParam
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
 try:
-    import tiktoken
+    import tiktoken  # type: ignore
 
     enc = tiktoken.get_encoding("cl100k_base")
 
@@ -51,7 +53,7 @@ class OpenAIIntegration(Integration):
 
     @staticmethod
     def setup_once():
-        # TODO minimum version
+        # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_enbeddings_create(Embeddings.create)
 
@@ -59,6 +61,7 @@ class OpenAIIntegration(Integration):
 def _calculate_chat_completion_usage(
     messages, response, span, streaming_message_responses=None
 ):
+    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]]) -> None
     completion_tokens = 0
     prompt_tokens = 0
     total_tokens = 0
@@ -104,7 +107,7 @@ def _calculate_chat_completion_usage(
 
 
 def _wrap_chat_completion_create(f):
-    # type: (F) -> F
+    # type: (Callable[..., Any]) -> Callable[..., Any]
     @wraps(f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -180,10 +183,11 @@ def _wrap_chat_completion_create(f):
 
 
 def _wrap_enbeddings_create(f):
-    # type: (F) -> F
+    # type: (Callable[..., Any]) -> Callable[..., Any]
 
     @wraps(f)
     def new_embeddings_create(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         hub = Hub.current
         integration = hub.get_integration(OpenAIIntegration)
         if integration is None:
