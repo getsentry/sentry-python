@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Iterator, Any, Iterable, List, Optional, Callable
+    from typing import Any, Iterable, List, Optional, Callable, Iterator
     from sentry_sdk.tracing import Span
 
 from sentry_sdk._functools import wraps
@@ -146,9 +146,11 @@ def _wrap_chat_completion_create(f):
             elif hasattr(res, "_iterator"):
                 data_buf: list[list[str]] = []  # one for each choice
 
-                old_iterator: Iterator[ChatCompletionChunk] = res._iterator
+                # type: Iterator[ChatCompletionChunk]
+                old_iterator = res._iterator
 
-                def new_iterator() -> Iterator[ChatCompletionChunk]:
+                def new_iterator():
+                    # type: () -> Iterator[ChatCompletionChunk]
                     with capture_internal_exceptions():
                         for x in old_iterator:
                             if hasattr(x, "choices"):

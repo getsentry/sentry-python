@@ -1,7 +1,8 @@
 from openai import OpenAI, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
-from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice
+from openai.types.chat.chat_completion import Choice
+from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
 from sentry_sdk import start_transaction
@@ -72,14 +73,14 @@ def test_streaming_chat_completion(sentry_init, capture_events):
     returned_stream._iterator = [
         ChatCompletionChunk(
             id="1",
-            choices=[Choice(index=0, delta=ChoiceDelta(content="hel"))],
+            choices=[DeltaChoice(index=0, delta=ChoiceDelta(content="hel"))],
             created=100000,
             model="model-id",
             object="chat.completion.chunk",
         ),
         ChatCompletionChunk(
             id="1",
-            choices=[Choice(index=1, delta=ChoiceDelta(content="lo "))],
+            choices=[DeltaChoice(index=1, delta=ChoiceDelta(content="lo "))],
             created=100000,
             model="model-id",
             object="chat.completion.chunk",
@@ -87,7 +88,7 @@ def test_streaming_chat_completion(sentry_init, capture_events):
         ChatCompletionChunk(
             id="1",
             choices=[
-                Choice(
+                DeltaChoice(
                     index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
                 )
             ],
