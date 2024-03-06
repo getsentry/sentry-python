@@ -146,8 +146,7 @@ def _wrap_chat_completion_create(f):
             elif hasattr(res, "_iterator"):
                 data_buf: list[list[str]] = []  # one for each choice
 
-                # type: Iterator[ChatCompletionChunk]
-                old_iterator = res._iterator
+                old_iterator = res._iterator  # type: Iterator[ChatCompletionChunk]
 
                 def new_iterator():
                     # type: () -> Iterator[ChatCompletionChunk]

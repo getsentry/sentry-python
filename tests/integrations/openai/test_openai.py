@@ -73,14 +73,22 @@ def test_streaming_chat_completion(sentry_init, capture_events):
     returned_stream._iterator = [
         ChatCompletionChunk(
             id="1",
-            choices=[DeltaChoice(index=0, delta=ChoiceDelta(content="hel"))],
+            choices=[
+                DeltaChoice(
+                    index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
+                )
+            ],
             created=100000,
             model="model-id",
             object="chat.completion.chunk",
         ),
         ChatCompletionChunk(
             id="1",
-            choices=[DeltaChoice(index=1, delta=ChoiceDelta(content="lo "))],
+            choices=[
+                DeltaChoice(
+                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                )
+            ],
             created=100000,
             model="model-id",
             object="chat.completion.chunk",
