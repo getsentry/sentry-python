@@ -34,7 +34,7 @@ except ImportError:
     logger.info(
         "The Sentry Python SDK requires 'tiktoken' in order to measure token usage from some OpenAI APIs"
         "Please install 'tiktoken' if you aren't receiving token usage in Sentry."
-        "See https://docs.sentry.io/platforms/python/guides/openai/ for more information."
+        "See https://docs.sentry.io/platforms/python/integrations/openai/ for more information."
     )
 
     def count_tokens(s):
