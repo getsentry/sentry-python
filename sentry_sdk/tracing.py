@@ -43,7 +43,7 @@ if TYPE_CHECKING:
         # transaction: str is deprecated, and therefore omitted here!
         containing_transaction: Optional["Transaction"]
         start_timestamp: Optional[Union[datetime, float]]
-        scope: sentry_sdk.Scope
+        scope: "sentry_sdk.Scope"
 
     class TransactionKwargs(SpanKwargs, total=False):
         name: str
