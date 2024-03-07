@@ -317,7 +317,7 @@ def run_lambda_function(
                     Code={"ZipFile": lambda_function_zip.read()},
                     Environment=environment,
                     Layers=layers,
-                    LoggingConfig= {
+                    LoggingConfig={
                         "ApplicationLogLevel": "WARN",
                         "SystemLogLevel": "WARN",
                     },
