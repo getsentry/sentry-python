@@ -219,6 +219,8 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
+    OPENAI_CHAT_COMPLETIONS_CREATE = "openai.chat_completions.create"
+    OPENAI_EMBEDDINGS_CREATE = "openai.embeddings.create"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
