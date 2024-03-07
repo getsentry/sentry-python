@@ -38,11 +38,12 @@ if TYPE_CHECKING:
         sampled: bool
         op: str
         description: str
-        hub: Optional[sentry_sdk.Hub]
+        # hub: Optional[sentry_sdk.Hub] is deprecated, and therefore omitted here!
         status: str
         # transaction: str is deprecated, and therefore omitted here!
         containing_transaction: Optional["Transaction"]
         start_timestamp: Optional[Union[datetime, float]]
+        scope: sentry_sdk.Scope
 
     class TransactionKwargs(SpanKwargs, total=False):
         name: str

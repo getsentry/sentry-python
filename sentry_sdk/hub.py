@@ -504,7 +504,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         # For backwards compatibility, we allow passing the scope as the hub.
         # We need a major release to make this nice. (if someone searches the code: deprecated)
-        kwargs["hub"] = scope
+        # Type checking disabled for this line because deprecated keys are not allowed in the type signature.
+        kwargs["hub"] = scope  # type: ignore
 
         return scope.start_transaction(
             transaction=transaction, instrumenter=instrumenter, **kwargs
