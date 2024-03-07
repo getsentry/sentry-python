@@ -96,9 +96,7 @@ def _calculate_chat_completion_usage(
 
     if prompt_tokens == 0:
         for message in messages:
-            if hasattr(message, "content"):
-                prompt_tokens += count_tokens(message.content)
-            elif "content" in message:
+            if "content" in message:
                 prompt_tokens += count_tokens(message["content"])
 
     if completion_tokens == 0:

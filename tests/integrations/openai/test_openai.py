@@ -18,7 +18,9 @@ from unittest import mock  # python 3.3 and above
 
 
 def test_nonstreaming_chat_completion(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
+    )
     events = capture_events()
 
     client = OpenAI(api_key="z")
@@ -64,7 +66,9 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events):
 
 # noinspection PyTypeChecker
 def test_streaming_chat_completion(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
+    )
     events = capture_events()
 
     client = OpenAI(api_key="z")
@@ -130,7 +134,9 @@ def test_streaming_chat_completion(sentry_init, capture_events):
 
 
 def test_bad_chat_completion(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
+    )
     events = capture_events()
 
     client = OpenAI(api_key="z")
@@ -147,7 +153,9 @@ def test_bad_chat_completion(sentry_init, capture_events):
 
 
 def test_embeddings_create(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
+    )
     events = capture_events()
 
     client = OpenAI(api_key="z")
