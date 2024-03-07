@@ -50,9 +50,9 @@ TOTAL_TOKENS_USED = "ai.total_tоkens.used"
 class OpenAIIntegration(Integration):
     identifier = "openai"
 
-    def __init__(self, exclude_prompts=False):
+    def __init__(self, include_prompts=False):
         # type: (OpenAIIntegration, bool) -> None
-        self.exclude_prompts = exclude_prompts
+        self.include_prompts = include_prompts
 
     @staticmethod
     def setup_once():
@@ -161,13 +161,13 @@ def _wrap_chat_completion_create(f):
             raise e from None
 
         with capture_internal_exceptions():
-            if _should_send_default_pii() or not integration.exclude_prompts:
+            if _should_send_default_pii() or integration.include_prompts:
                 span.set_data("ai.input_messages", messages)
             span.set_data("ai.model_id", model)
             span.set_data("ai.streaming", streaming)
 
             if hasattr(res, "choices"):
-                if _should_send_default_pii() or not integration.exclude_prompts:
+                if _should_send_default_pii() or integration.include_prompts:
                     span.set_data(
                         "ai.responses", list(map(lambda x: x.message, res.choices))
                     )
@@ -200,7 +200,7 @@ def _wrap_chat_completion_create(f):
                             )
                             if (
                                 _should_send_default_pii()
-                                or not integration.exclude_prompts
+                                or integration.include_prompts
                             ):
                                 span.set_data("ai.responses", all_responses)
                             _calculate_chat_completion_usage(
@@ -237,7 +237,7 @@ def _wrap_embeddings_create(f):
             description="OpenAI Embedding Creation",
         ) as span:
             if "input" in kwargs and (
-                _should_send_default_pii() or not integration.exclude_prompts
+                _should_send_default_pii() or integration.include_prompts
             ):
                 if isinstance(kwargs["input"], str):
                     span.set_data("ai.input_messages", [kwargs["input"]])
