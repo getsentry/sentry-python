@@ -304,12 +304,10 @@ def run_lambda_function(
             }
 
         try:
-            print("11")
             with open(
                 os.path.join(base_dir, "lambda-function-package.zip"), "rb"
             ) as lambda_function_zip:
-                print("22")
-                resp = client.create_function(
+                client.create_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                     FunctionName=full_fn_name,
                     Runtime=runtime,
@@ -319,18 +317,7 @@ def run_lambda_function(
                     Code={"ZipFile": lambda_function_zip.read()},
                     Environment=environment,
                     Layers=layers,
-                    # LoggingConfig={
-                    #     "ApplicationLogLevel": "WARN",
-                    #     "SystemLogLevel": "WARN",
-                    # },
-                    LoggingConfig={
-                        'LogFormat': 'Text',
-                        'ApplicationLogLevel': 'WARN',
-                        'SystemLogLevel': 'WARN',
-                    }                    
                 )
-                print("XXXXXXXX")
-                print(resp)
 
                 waiter = client.get_waiter("function_active_v2")
                 waiter.wait(FunctionName=full_fn_name)
@@ -339,9 +326,6 @@ def run_lambda_function(
             print(
                 f"Lambda function ({full_fn_name}) already existing in AWS, this is fine, we will just invoke it."
             )
-        except Exception as e:
-            print("333")
-            print(e)
 
     response = client.invoke(
         FunctionName=full_fn_name,
