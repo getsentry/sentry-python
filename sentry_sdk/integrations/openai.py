@@ -150,13 +150,15 @@ def _wrap_chat_completion_create(f):
 
         with capture_internal_exceptions():
             if _should_send_default_pii():
-                span.set_data("messages", messages)
-            span.set_data("model", model)
-            span.set_data("streaming", streaming)
+                span.set_data("ai.input_messages", messages)
+            span.set_data("ai.model_id", model)
+            span.set_data("ai.streaming", streaming)
 
             if hasattr(res, "choices"):
                 if _should_send_default_pii():
-                    span.set_data("response", res.choices[0].message)
+                    span.set_data(
+                        "ai.responses", list(map(lambda x: x.message, res.choices))
+                    )
                 _calculate_chat_completion_usage(messages, res, span)
                 span.__exit__(None, None, None)
             elif hasattr(res, "_iterator"):
@@ -185,7 +187,7 @@ def _wrap_chat_completion_create(f):
                                 map(lambda chunk: "".join(chunk), data_buf)
                             )
                             if _should_send_default_pii():
-                                span.set_data("responses", all_responses)
+                                span.set_data("ai.responses", all_responses)
                             _calculate_chat_completion_usage(
                                 messages, res, span, all_responses
                             )
@@ -210,12 +212,17 @@ def _wrap_embeddings_create(f):
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
             description="OpenAI Embedding Creation",
         ) as span:
-            if "input" in kwargs and isinstance(kwargs["input"], str):
-                span.set_data("input", kwargs["input"])
+            if "input" in kwargs:
+                if isinstance(kwargs["input"], str):
+                    span.set_data("ai.input_messages", [kwargs["input"]])
+                elif (
+                    isinstance(kwargs["input"], list)
+                    and len(kwargs["input"]) > 0
+                    and isinstance(kwargs["input"][0], str)
+                ):
+                    span.set_data("ai.input_messages", kwargs["input"])
             if "model" in kwargs:
-                span.set_data("model", kwargs["model"])
-            if "dimensions" in kwargs:
-                span.set_data("dimensions", kwargs["dimensions"])
+                span.set_data("ai.model_id", kwargs["model"])
             try:
                 response = f(*args, **kwargs)
             except Exception as e:
