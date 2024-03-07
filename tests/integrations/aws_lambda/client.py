@@ -317,10 +317,10 @@ def run_lambda_function(
                     Code={"ZipFile": lambda_function_zip.read()},
                     Environment=environment,
                     Layers=layers,
-                    LoggingConfig={
-                        "ApplicationLogLevel": "WARN",
-                        "SystemLogLevel": "WARN",
-                    },
+                    # LoggingConfig={
+                    #     "ApplicationLogLevel": "WARN",
+                    #     "SystemLogLevel": "WARN",
+                    # },
                 )
 
                 waiter = client.get_waiter("function_active_v2")
