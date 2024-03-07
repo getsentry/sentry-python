@@ -307,7 +307,7 @@ def run_lambda_function(
             with open(
                 os.path.join(base_dir, "lambda-function-package.zip"), "rb"
             ) as lambda_function_zip:
-                client.create_function(
+                resp = client.create_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                     FunctionName=full_fn_name,
                     Runtime=runtime,
@@ -321,7 +321,14 @@ def run_lambda_function(
                     #     "ApplicationLogLevel": "WARN",
                     #     "SystemLogLevel": "WARN",
                     # },
+                    LoggingConfig={
+                        'LogFormat': 'Text',
+                        'ApplicationLogLevel': 'WARN',
+                        'SystemLogLevel': 'WARN',
+                    }                    
                 )
+                print("XXXXXXXX")
+                print(resp)
 
                 waiter = client.get_waiter("function_active_v2")
                 waiter.wait(FunctionName=full_fn_name)
