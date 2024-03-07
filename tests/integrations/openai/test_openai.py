@@ -118,9 +118,15 @@ def test_streaming_chat_completion(sentry_init, capture_events):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "openai.chat_completions.create"
-    assert span["data"][COMPLETION_TOKENS_USED] == 2
-    assert span["data"][PROMPT_TOKENS_USED] == 1
-    assert span["data"][TOTAL_TOKENS_USED] == 3
+
+    try:
+        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+        assert span["data"][COMPLETION_TOKENS_USED] == 2
+        assert span["data"][PROMPT_TOKENS_USED] == 1
+        assert span["data"][TOTAL_TOKENS_USED] == 3
+    except ImportError:
+        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
 def test_bad_chat_completion(sentry_init, capture_events):
