@@ -339,6 +339,9 @@ def run_lambda_function(
             print(
                 f"Lambda function ({full_fn_name}) already existing in AWS, this is fine, we will just invoke it."
             )
+        except Exception as e:
+            print("333")
+            print(e)
 
     response = client.invoke(
         FunctionName=full_fn_name,
