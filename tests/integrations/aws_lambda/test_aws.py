@@ -662,7 +662,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
 
 @pytest.mark.xfail(
-    "The limited log output we depend on is being clogged by a new warning"
+    reason="The limited log output we depend on is being clogged by a new warning"
 )
 def test_serverless_no_code_instrumentation(run_lambda_function):
     """
@@ -709,7 +709,7 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
 
 
 @pytest.mark.xfail(
-    "The limited log output we depend on is being clogged by a new warning"
+    reason="The limited log output we depend on is being clogged by a new warning"
 )
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
     envelopes, _, _ = run_lambda_function(
@@ -774,7 +774,7 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
 
 
 @pytest.mark.xfail(
-    "The limited log output we depend on is being clogged by a new warning"
+    reason="The limited log output we depend on is being clogged by a new warning"
 )
 def test_error_has_existing_trace_context_performance_enabled(run_lambda_function):
     trace_id = "471a43a4192642f0b136d5159a501701"
