@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import uuid
 import random
 
@@ -47,14 +45,14 @@ if TYPE_CHECKING:
         hub: Optional[sentry_sdk.Hub]
         status: str
         # transaction: str is deprecated, and therefore omitted here!
-        containing_transaction: Optional[Transaction]
+        containing_transaction: Optional["Transaction"]
         start_timestamp: Optional[Union[datetime, float]]
 
     class TransactionKwargs(SpanKwargs, total=False):
         name: str
         source: str
         parent_sampled: bool
-        baggage: Baggage
+        baggage: "Baggage"
 
 
 BAGGAGE_HEADER_NAME = "baggage"
