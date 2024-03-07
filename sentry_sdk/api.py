@@ -25,7 +25,8 @@ if TYPE_CHECKING:
         ExcInfo,
         MeasurementUnit,
     )
-    from sentry_sdk.tracing import Span, TransactionKwargs
+    from sentry_sdk.scope import StartTransactionKwargs
+    from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -223,7 +224,7 @@ def start_span(
 @hubmethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    **kwargs  # type: Unpack[TransactionKwargs]
+    **kwargs  # type: Unpack[StartTransactionKwargs]
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
     return Hub.current.start_transaction(transaction, **kwargs)

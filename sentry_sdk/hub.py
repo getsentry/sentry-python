@@ -21,7 +21,6 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import cast
     from typing import Callable
     from typing import ContextManager
     from typing import Dict
@@ -46,7 +45,6 @@ if TYPE_CHECKING:
     )
     from sentry_sdk.consts import ClientConstructor
     from sentry_sdk.scope import StartTransactionKwargs
-    from sentry_sdk.tracing import TransactionKwargs
 
     T = TypeVar("T")
 
@@ -462,7 +460,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (Optional[Transaction], str, Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Unpack[StartTransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -488,9 +486,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
         client, scope = self._stack[-1]
-
-        if TYPE_CHECKING:
-            kwargs = cast(StartTransactionKwargs, kwargs)
 
         kwargs["hub"] = self
         kwargs["client"] = client
