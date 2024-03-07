@@ -259,13 +259,10 @@ def run_lambda_function(
             print(
                 f"Creating Lambda function package ({full_fn_name}) locally in directory {base_dir}"
             )
-            print("1")
             os.mkdir(base_dir)
-            print("2")
             _create_lambda_package(
                 base_dir, code, initial_handler, layer, syntax_check, subprocess_kwargs
             )
-            print("3")
 
             @add_finalizer
             def clean_up():
@@ -278,8 +275,6 @@ def run_lambda_function(
                 managers = [session._manager] + list(session._proxy_managers.values())
                 for manager in managers:
                     manager.clear()
-
-            print("4")
 
         layers = []
         environment = {}
@@ -309,9 +304,11 @@ def run_lambda_function(
             }
 
         try:
+            print("11")
             with open(
                 os.path.join(base_dir, "lambda-function-package.zip"), "rb"
             ) as lambda_function_zip:
+                print("22")
                 resp = client.create_function(
                     Description="Created as part of testsuite for getsentry/sentry-python",
                     FunctionName=full_fn_name,
