@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 import sentry_sdk
 from sentry_sdk._functools import wraps
-from sentry_sdk.hub import Hub
+from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import logger, capture_internal_exceptions, event_from_exception
 
@@ -149,12 +149,14 @@ def _wrap_chat_completion_create(f):
             raise e from None
 
         with capture_internal_exceptions():
-            span.set_data("messages", messages)
+            if _should_send_default_pii():
+                span.set_data("messages", messages)
             span.set_data("model", model)
             span.set_data("streaming", streaming)
 
             if hasattr(res, "choices"):
-                span.set_data("response", res.choices[0].message)
+                if _should_send_default_pii():
+                    span.set_data("response", res.choices[0].message)
                 _calculate_chat_completion_usage(messages, res, span)
                 span.__exit__(None, None, None)
             elif hasattr(res, "_iterator"):
@@ -182,7 +184,8 @@ def _wrap_chat_completion_create(f):
                             all_responses = list(
                                 map(lambda chunk: "".join(chunk), data_buf)
                             )
-                            span.set_data("responses", all_responses)
+                            if _should_send_default_pii():
+                                span.set_data("responses", all_responses)
                             _calculate_chat_completion_usage(
                                 messages, res, span, all_responses
                             )
