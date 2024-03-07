@@ -50,6 +50,10 @@ TOTAL_TOKENS_USED = "ai.total_tоkens.used"
 class OpenAIIntegration(Integration):
     identifier = "openai"
 
+    def __init__(self, exclude_prompts=False):
+        # type: (OpenAIIntegration, bool) -> None
+        self.exclude_prompts = exclude_prompts
+
     @staticmethod
     def setup_once():
         # type: () -> None
@@ -122,6 +126,14 @@ def _wrap_chat_completion_create(f):
     @wraps(f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        hub = Hub.current
+        if not hub:
+            return f(*args, **kwargs)
+
+        integration = hub.get_integration(OpenAIIntegration)  # type: OpenAIIntegration
+        if not integration:
+            return f(*args, **kwargs)
+
         if "messages" not in kwargs:
             # invalid call (in all versions of openai), let it return error
             return f(*args, **kwargs)
@@ -149,13 +161,13 @@ def _wrap_chat_completion_create(f):
             raise e from None
 
         with capture_internal_exceptions():
-            if _should_send_default_pii():
+            if _should_send_default_pii() or not integration.exclude_prompts:
                 span.set_data("ai.input_messages", messages)
             span.set_data("ai.model_id", model)
             span.set_data("ai.streaming", streaming)
 
             if hasattr(res, "choices"):
-                if _should_send_default_pii():
+                if _should_send_default_pii() or not integration.exclude_prompts:
                     span.set_data(
                         "ai.responses", list(map(lambda x: x.message, res.choices))
                     )
@@ -186,7 +198,10 @@ def _wrap_chat_completion_create(f):
                             all_responses = list(
                                 map(lambda chunk: "".join(chunk), data_buf)
                             )
-                            if _should_send_default_pii():
+                            if (
+                                _should_send_default_pii()
+                                or not integration.exclude_prompts
+                            ):
                                 span.set_data("ai.responses", all_responses)
                             _calculate_chat_completion_usage(
                                 messages, res, span, all_responses
@@ -208,11 +223,22 @@ def _wrap_embeddings_create(f):
     @wraps(f)
     def new_embeddings_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+
+        hub = Hub.current
+        if not hub:
+            return f(*args, **kwargs)
+
+        integration = hub.get_integration(OpenAIIntegration)  # type: OpenAIIntegration
+        if not integration:
+            return f(*args, **kwargs)
+
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
             description="OpenAI Embedding Creation",
         ) as span:
-            if "input" in kwargs:
+            if "input" in kwargs and (
+                _should_send_default_pii() or not integration.exclude_prompts
+            ):
                 if isinstance(kwargs["input"], str):
                     span.set_data("ai.input_messages", [kwargs["input"]])
                 elif (
