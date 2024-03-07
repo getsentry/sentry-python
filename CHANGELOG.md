@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.41.0
+
+### Various fixes & improvements
+
+- ref(awslambda): xfail broken tests for now (#2794) by @sentrivana
+- Removed print statements because it messes with the tests (#2789) by @antonpirker
+- build(deps): bump types-protobuf from 4.24.0.20240129 to 4.24.0.20240302 (#2782) by @dependabot
+- build(deps): bump checkouts/data-schemas from `eb941c2` to `ed078ed` (#2781) by @dependabot
+- feat(transport): Expose `socket_options` (#2786) by @sentrivana
+- Allow to configure merge target for releases (#2777) by @sentrivana
+- fix(docs): allow empty character in metric tags values (#2775) by @viglia
+- fix(metrics): Replace invalid tag values with an empty string instead of _ (#2773) by @markushi
+- docs: Add documentation comment to `scrub_list` (#2769) by @szokeasaurusrex
+- ref(scrubber): Add recursive scrubbing to EventScrubber (#2755) by @Cheapshot003
+- Fixed regex to parse version in lambda package file (#2767) by @sentrivana
+
 ## 1.40.6
 
 ### Various fixes & improvements
