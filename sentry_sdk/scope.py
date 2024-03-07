@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     import sentry_sdk
 
     class StartTransactionKwargs(TransactionKwargs, total=False):
-        client: Optional[sentry_sdk.Client]
+        client: Optional["sentry_sdk.Client"]
         custom_sampling_context: SamplingContext
 
     P = ParamSpec("P")
