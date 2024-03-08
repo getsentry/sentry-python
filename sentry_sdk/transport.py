@@ -7,12 +7,15 @@ import gzip
 import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+import certifi
+import urllib3
 from urllib.request import getproxies
 
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
+
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -417,11 +420,16 @@ class HttpTransport(Transport):
 
     def _get_pool_options(self, ca_certs):
         # type: (Optional[Any]) -> Dict[str, Any]
-        return {
+        options = {
             "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
             "ca_certs": ca_certs or certifi.where(),
         }
+
+        if self.options["socket_options"]:
+            options["socket_options"] = self.options["socket_options"]
+
+        return options
 
     def _in_no_proxy(self, parsed_dsn):
         # type: (Dsn) -> bool

@@ -650,6 +650,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     assert response["Payload"]["AssertionError raised"] is False
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_serverless_no_code_instrumentation(run_lambda_function):
     """
     Test that ensures that just by adding a lambda layer containing the
@@ -694,6 +697,9 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
     envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
@@ -756,6 +762,9 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
     )
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_error_has_existing_trace_context_performance_enabled(run_lambda_function):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
