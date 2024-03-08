@@ -32,17 +32,17 @@ if TYPE_CHECKING:
         "Event",
         {
             "breadcrumbs": dict[
-                Literal["values"], list[dict[str, object]]
+                Literal["values"], list[dict[str, Any]]
             ],  # TODO: We can expand on this type
             "check_in_id": str,
             "contexts": dict[str, object],
             "dist": str,
             "duration": Optional[float],
             "environment": str,
-            "errors": list[dict[str, object]],  # TODO: We can expand on this type
+            "errors": list[dict[str, Any]],  # TODO: We can expand on this type
             "event_id": str,
             "exception": dict[
-                Literal["values"], list[dict[str, object]]
+                Literal["values"], list[dict[str, Any]]
             ],  # TODO: We can expand on this type
             "extra": MutableMapping[str, object],
             "fingerprint": list[str],
@@ -70,13 +70,11 @@ if TYPE_CHECKING:
                 str, str
             ],  # Tags must be less than 200 characters each
             "threads": dict[
-                Literal["values"], list[dict[str, object]]
+                Literal["values"], list[dict[str, Any]]
             ],  # TODO: We can expand on this type
             "timestamp": Optional[datetime],  # Must be set before sending the event
             "transaction": str,
-            "transaction_info": Mapping[
-                str, object
-            ],  # TODO: We can expand on this type
+            "transaction_info": Mapping[str, Any],  # TODO: We can expand on this type
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_metrics_summary": dict[str, object],
