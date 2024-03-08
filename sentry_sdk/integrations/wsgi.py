@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from typing import Protocol
 
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
     WsgiResponseIter = TypeVar("WsgiResponseIter")
     WsgiResponseHeaders = TypeVar("WsgiResponseHeaders")
@@ -254,7 +254,7 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
     headers = _filter_headers(dict(_get_headers(environ)))
 
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, Dict[str, Any]) -> Event
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
