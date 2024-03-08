@@ -39,11 +39,17 @@ EXAMPLE_CHAT_COMPLETION = ChatCompletion(
 )
 
 
-def test_nonstreaming_chat_completion(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_nonstreaming_chat_completion(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
     sentry_init(
-        integrations=[OpenAIIntegration()],
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
-        send_default_pii=True,
+        send_default_pii=send_default_pii,
     )
     events = capture_events()
 
@@ -64,62 +70,31 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "ai.chat_completions.create.openai"
-    assert "the model response" in span["data"]["ai.responses"][0]
+
+    if send_default_pii and include_prompts:
+        assert "hello" in span["data"]["ai.input_messages"][0]["content"]
+        assert "the model response" in span["data"]["ai.responses"][0]
+    else:
+        assert "ai.input_messages" not in span["data"]
+        assert "ai.responses" not in span["data"]
 
     assert span["data"][COMPLETION_TOKENS_USED] == 10
     assert span["data"][PROMPT_TOKENS_USED] == 20
     assert span["data"][TOTAL_TOKENS_USED] == 30
 
 
-def test_stripped_pii_without_send_default_pii(sentry_init, capture_events):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
-
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert "ai.input_messages" not in span["data"]
-    assert "ai.responses" not in span["data"]
-
-
-def test_stripped_pii_without_send_prompts(sentry_init, capture_events):
-    sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=False)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
-
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert "ai.input_messages" not in span["data"]
-    assert "ai.responses" not in span["data"]
-
-
 # noinspection PyTypeChecker
-def test_streaming_chat_completion(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_streaming_chat_completion(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
     )
     events = capture_events()
 
@@ -175,6 +150,13 @@ def test_streaming_chat_completion(sentry_init, capture_events):
     span = tx["spans"][0]
     assert span["op"] == "ai.chat_completions.create.openai"
 
+    if send_default_pii and include_prompts:
+        assert "hello" in span["data"]["ai.input_messages"][0]["content"]
+        assert "hello world" in span["data"]["ai.responses"][0]
+    else:
+        assert "ai.input_messages" not in span["data"]
+        assert "ai.responses" not in span["data"]
+
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
@@ -202,8 +184,18 @@ def test_bad_chat_completion(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
-def test_embeddings_create(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_embeddings_create(
+    sentry_init, capture_events, send_default_pii, include_prompts
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+    )
     events = capture_events()
 
     client = OpenAI(api_key="z")
@@ -221,7 +213,7 @@ def test_embeddings_create(sentry_init, capture_events):
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
     with start_transaction(name="openai tx"):
         response = client.embeddings.create(
-            input="test", model="text-embedding-3-large"
+            input="hello", model="text-embedding-3-large"
         )
 
     assert len(response.data[0].embedding) == 3
@@ -230,6 +222,10 @@ def test_embeddings_create(sentry_init, capture_events):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "ai.embeddings.create.openai"
+    if send_default_pii and include_prompts:
+        assert "hello" in span["data"]["ai.input_messages"][0]
+    else:
+        assert "ai.input_messages" not in span["data"]
 
     assert span["data"][PROMPT_TOKENS_USED] == 20
     assert span["data"][TOTAL_TOKENS_USED] == 30
