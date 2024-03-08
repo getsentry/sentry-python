@@ -8,7 +8,6 @@ import os
 import uuid
 import random
 import socket
-from typing import cast, Literal
 
 from sentry_sdk._compat import (
     datetime_utcnow,
@@ -382,9 +381,8 @@ class _Client(object):
                 }
 
         for key in "release", "environment", "server_name", "dist":
-            key = cast(Literal["release", "environment", "server_name", "dist"], key)
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = text_type(self.options[key]).strip()
+                event[key] = text_type(self.options[key]).strip()  # type: ignore[literal-required]
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
