@@ -131,7 +131,7 @@ def _make_event_processor(weak_job):
         if job is not None:
             with capture_internal_exceptions():
                 extra = event.setdefault("extra", {})
-                extra["rq-job"] = {
+                rq_job = {
                     "job_id": job.id,
                     "func": job.func_name,
                     "args": job.args,
@@ -140,9 +140,11 @@ def _make_event_processor(weak_job):
                 }
 
                 if job.enqueued_at:
-                    extra["rq-job"]["enqueued_at"] = format_timestamp(job.enqueued_at)
+                    rq_job["enqueued_at"] = format_timestamp(job.enqueued_at)
                 if job.started_at:
-                    extra["rq-job"]["started_at"] = format_timestamp(job.started_at)
+                    rq_job["started_at"] = format_timestamp(job.started_at)
+
+                extra["rq-job"] = rq_job
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
