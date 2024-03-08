@@ -7,8 +7,6 @@ import gzip
 import time
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
-import certifi
-import urllib3
 from urllib.request import getproxies
 
 from sentry_sdk.consts import EndpointType
