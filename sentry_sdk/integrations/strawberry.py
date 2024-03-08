@@ -29,11 +29,11 @@ except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, List, Optional
+    from typing import Any, Callable, Generator, List, Optional
     from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 ignore_logger("strawberry.execution")
@@ -349,7 +349,7 @@ def _make_request_event_processor(execution_context):
     # type: (ExecutionContext) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_data = event.setdefault("request", {})
@@ -380,7 +380,7 @@ def _make_response_event_processor(response_data):
     # type: (GraphQLHTTPResponse) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 contexts = event.setdefault("contexts", {})
