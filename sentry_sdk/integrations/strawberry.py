@@ -356,14 +356,14 @@ def _make_request_event_processor(execution_context):
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    request_data["data"] = {"query": execution_context.query}
+                    data = {"query": execution_context.query}
 
                     if execution_context.variables:
-                        request_data["data"]["variables"] = execution_context.variables
+                        data["variables"] = execution_context.variables
                     if execution_context.operation_name:
-                        request_data["data"][
-                            "operationName"
-                        ] = execution_context.operation_name
+                        data["operationName"] = execution_context.operation_name
+
+                    request_data["data"] = data
 
             else:
                 try:
