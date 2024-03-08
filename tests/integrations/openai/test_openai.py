@@ -17,33 +17,39 @@ from sentry_sdk.integrations.openai import (
 from unittest import mock  # python 3.3 and above
 
 
+EXAMPLE_CHAT_COMPLETION = ChatCompletion(
+    id="chat-id",
+    choices=[
+        Choice(
+            index=0,
+            finish_reason="stop",
+            message=ChatCompletionMessage(
+                role="assistant", content="the model response"
+            ),
+        )
+    ],
+    created=10000000,
+    model="model-id",
+    object="chat.completion",
+    usage=CompletionUsage(
+        completion_tokens=10,
+        prompt_tokens=20,
+        total_tokens=30,
+    ),
+)
+
+
 def test_nonstreaming_chat_completion(sentry_init, capture_events):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
     )
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_chat = ChatCompletion(
-        id="chat-id",
-        choices=[
-            Choice(
-                index=0,
-                finish_reason="stop",
-                message=ChatCompletionMessage(role="assistant", content="response"),
-            )
-        ],
-        created=10000000,
-        model="model-id",
-        object="chat.completion",
-        usage=CompletionUsage(
-            completion_tokens=10,
-            prompt_tokens=20,
-            total_tokens=30,
-        ),
-    )
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
 
-    client.chat.completions._post = mock.Mock(return_value=returned_chat)
     with start_transaction(name="openai tx"):
         response = (
             client.chat.completions.create(
@@ -53,15 +59,61 @@ def test_nonstreaming_chat_completion(sentry_init, capture_events):
             .message.content
         )
 
-    assert response == "response"
+    assert response == "the model response"
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
-    assert span["op"] == "openai.chat_completions.create"
+    assert span["op"] == "ai.chat_completions.create.openai"
+    assert "the model response" in span["data"]["ai.responses"][0]
 
     assert span["data"][COMPLETION_TOKENS_USED] == 10
     assert span["data"][PROMPT_TOKENS_USED] == 20
     assert span["data"][TOTAL_TOKENS_USED] == 30
+
+
+def test_stripped_pii_without_send_default_pii(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model", messages=[{"role": "system", "content": "hello"}]
+        )
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert "ai.input_messages" not in span["data"]
+    assert "ai.responses" not in span["data"]
+
+
+def test_stripped_pii_without_send_prompts(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model", messages=[{"role": "system", "content": "hello"}]
+        )
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert "ai.input_messages" not in span["data"]
+    assert "ai.responses" not in span["data"]
 
 
 # noinspection PyTypeChecker
@@ -121,7 +173,7 @@ def test_streaming_chat_completion(sentry_init, capture_events):
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
-    assert span["op"] == "openai.chat_completions.create"
+    assert span["op"] == "ai.chat_completions.create.openai"
 
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
@@ -134,9 +186,7 @@ def test_streaming_chat_completion(sentry_init, capture_events):
 
 
 def test_bad_chat_completion(sentry_init, capture_events):
-    sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
-    )
+    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
     client = OpenAI(api_key="z")
@@ -153,9 +203,7 @@ def test_bad_chat_completion(sentry_init, capture_events):
 
 
 def test_embeddings_create(sentry_init, capture_events):
-    sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)], traces_sample_rate=1.0
-    )
+    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
     events = capture_events()
 
     client = OpenAI(api_key="z")
@@ -181,7 +229,7 @@ def test_embeddings_create(sentry_init, capture_events):
     tx = events[0]
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
-    assert span["op"] == "openai.embeddings.create"
+    assert span["op"] == "ai.embeddings.create.openai"
 
     assert span["data"][PROMPT_TOKENS_USED] == 20
     assert span["data"][TOTAL_TOKENS_USED] == 30
