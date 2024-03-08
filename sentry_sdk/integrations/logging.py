@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration
 from sentry_sdk._compat import iteritems, utc_from_timestamp
 
-from sentry_sdk._types import LogLevelStr, TYPE_CHECKING
+from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
+
+    from sentry_sdk._types import LogLevelStr
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
