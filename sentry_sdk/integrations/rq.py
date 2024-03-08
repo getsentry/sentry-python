@@ -27,9 +27,9 @@ except ImportError:
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
+    from typing import Any, Callable
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.utils import ExcInfo
 
     from rq.job import Job
@@ -126,7 +126,7 @@ class RqIntegration(Integration):
 def _make_event_processor(weak_job):
     # type: (Callable[[], Job]) -> EventProcessor
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():
