@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import logging
 from fnmatch import fnmatch
-from typing import cast
 
 from sentry_sdk.hub import Hub
 from sentry_sdk.utils import (
@@ -22,8 +21,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
-
-    from sentry_sdk._types import LogLevelStr
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
@@ -231,7 +228,7 @@ class EventHandler(_BaseHandler):
 
         level = self._logging_to_event_level(record)
         if level in {"debug", "info", "warning", "error", "fatal"}:
-            event["level"] = cast(LogLevelStr, level)
+            event["level"] = level  # type: ignore[typeddict-item]
         event["logger"] = record.name
 
         # Log records from `warnings` module as separate issues
