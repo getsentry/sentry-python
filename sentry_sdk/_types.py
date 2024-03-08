@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import MutableMapping
 
     from datetime import datetime
-    from sentry_sdk.profiler import Profile
 
     from types import TracebackType
     from typing import Any
@@ -178,3 +177,6 @@ if TYPE_CHECKING:
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
     MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
+
+    # Circular import
+    from sentry_sdk.profiler import Profile
