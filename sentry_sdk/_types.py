@@ -55,7 +55,7 @@ if TYPE_CHECKING:
             "monitor_config": Mapping[str, object],
             "monitor_slug": Optional[str],
             "platform": Literal["python"],
-            "profile": Profile,
+            "profile": "Profile",
             "release": str,
             "request": dict[str, object],
             "sdk": Mapping[str, object],
