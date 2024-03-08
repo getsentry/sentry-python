@@ -1,4 +1,8 @@
-from sentry_sdk.utils import event_from_exception, parse_version
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    parse_version,
+)
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 
@@ -14,7 +18,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Tuple, Union
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
     EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
 
@@ -112,7 +116,7 @@ def _patch_execute():
 def _make_gql_event_processor(client, document):
     # type: (gql.Client, DocumentNode) -> EventProcessor
     def processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         try:
             errors = hint["exc_info"][1].errors
         except (AttributeError, KeyError):
@@ -130,12 +134,13 @@ def _make_gql_event_processor(client, document):
             request["data"] = _data_from_document(document)
             contexts = event.setdefault("contexts", {})
             response = contexts.setdefault("response", {})
-            response.update(
-                {
-                    "data": {"errors": errors},
-                    "type": response,
-                }
-            )
+            with capture_internal_exceptions():
+                response.update(  # type: ignore[attr-defined]
+                    {
+                        "data": {"errors": errors},
+                        "type": response,
+                    }
+                )
 
         return event
 
