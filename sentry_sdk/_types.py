@@ -72,7 +72,7 @@ if TYPE_CHECKING:
             "threads": dict[
                 Literal["values"], list[dict[str, object]]
             ],  # TODO: We can expand on this type
-            "timestamp": datetime,
+            "timestamp": Optional[datetime],  # Must be set before sending the event
             "transaction": str,
             "transaction_info": Mapping[
                 str, object

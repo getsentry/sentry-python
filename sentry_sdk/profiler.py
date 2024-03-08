@@ -41,6 +41,7 @@ from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
+    capture_internal_exceptions,
     filename_for_module,
     is_valid_sample_rate,
     logger,
@@ -683,6 +684,10 @@ class Profile(object):
             options["project_root"],
         )
 
+        trace_id = None
+        with capture_internal_exceptions():
+            trace_id = event_opt["contexts"]["trace"]["trace_id"]  # type: ignore
+
         return {
             "environment": event_opt.get("environment"),
             "event_id": self.event_id,
@@ -713,7 +718,7 @@ class Profile(object):
                     # use the duration of the profile instead of the transaction
                     # because we end the transaction after the profile
                     "relative_end_ns": str(self.stop_ns - self.start_ns),
-                    "trace_id": event_opt["contexts"]["trace"]["trace_id"],
+                    "trace_id": trace_id,
                     "active_thread_id": str(
                         self._default_active_thread_id
                         if self.active_thread_id is None
