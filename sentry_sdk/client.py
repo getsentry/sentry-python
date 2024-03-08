@@ -1,4 +1,8 @@
-from collections.abc import Mapping, MutableMapping
+try:
+    from collections.abc import Mapping, MutableMapping
+except ImportError:
+    from collections import Mapping, MutableMapping  # type: ignore[attr-defined]
+
 from importlib import import_module
 import os
 import uuid
