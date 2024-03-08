@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 try:
     from typing import TYPE_CHECKING
 except ImportError:
