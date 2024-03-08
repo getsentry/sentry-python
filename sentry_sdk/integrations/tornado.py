@@ -164,7 +164,7 @@ def _make_event_processor(weak_handler):
 
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
-            event["transaction"] = transaction_from_function(method)
+            event["transaction"] = transaction_from_function(method) or ""
             event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
 
         with capture_internal_exceptions():
