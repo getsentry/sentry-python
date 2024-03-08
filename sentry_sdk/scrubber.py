@@ -1,4 +1,7 @@
-from typing import cast
+try:
+    from typing import cast
+except ImportError:
+    cast = lambda _, obj: obj
 
 from sentry_sdk.utils import (
     capture_internal_exceptions,
