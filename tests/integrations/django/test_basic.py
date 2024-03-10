@@ -27,6 +27,7 @@ from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.tracing import Span
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -1072,6 +1073,7 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
+@pytest.mark.forked
 @pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 def test_custom_urlconf_middleware(
     settings, sentry_init, client, capture_events, render_span_tree
@@ -1365,3 +1367,104 @@ def test_cache_spans_get_span_description(
     method_name, args, kwargs, expected_description
 ):
     assert _get_span_description(method_name, args, kwargs) == expected_description
+
+
+@pytest.mark.parametrize(
+    "route",
+    ["hide_sensitive_variables", "hide_all_sensitive_variables"],
+)
+def test_sensitive_variables_wrapper(sentry_init, client, capture_events, route):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    body = {"foo": "bar", "zoo": "car"}
+    _, status, _ = client.post(
+        reverse(route),
+        data=body,
+        content_type="application/x-www-form-urlencoded",
+    )
+    assert status.lower() == "500 internal server error"
+    (event,) = events
+
+    exception = event["exception"]["values"][-1]
+    assert exception["type"] == "ZeroDivisionError"
+
+    last_frame = exception["stacktrace"]["frames"][-1]
+    assert last_frame["vars"]["foo"].replace("'", "") == SENSITIVE_DATA_SUBSTITUTE
+    if route == "hide_sensitive_variables":
+        if PY2:
+            assert last_frame["vars"]["zoo"].replace("'", "")[1:] == body["zoo"]
+        else:
+            assert last_frame["vars"]["zoo"].replace("'", "") == body["zoo"]
+    else:
+        assert last_frame["vars"]["zoo"].replace("'", "") == SENSITIVE_DATA_SUBSTITUTE
+
+
+@pytest.mark.parametrize("route", ["hide_post_params", "hide_all_post_params"])
+@pytest.mark.parametrize(
+    "content_type, body",
+    [
+        ["application/x-www-form-urlencoded", {"foo": "bar", "zoo": "car"}],
+        ["multipart/form-data", {"foo": "bar", "zoo": "car"}],
+    ],
+)
+def test_sensitive_post_parameters(
+    sentry_init, client, capture_events, route, content_type, body
+):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+
+    _, status, _ = client.post(
+        reverse(route),
+        data=body,
+        content_type=content_type,
+    )
+    assert status.lower() == "500 internal server error"
+    (event,) = events
+
+    exception = event["exception"]["values"][-1]
+    assert exception["type"] == "ZeroDivisionError"
+
+    assert event["request"]["data"]["foo"] == SENSITIVE_DATA_SUBSTITUTE
+    if route == "hide_post_params":
+        assert event["request"]["data"]["zoo"] == body["zoo"]
+    elif route == "hide_all_post_params":
+        assert event["request"]["data"]["zoo"] == SENSITIVE_DATA_SUBSTITUTE
+
+
+def test_nested_sensitive_data(sentry_init, client, capture_events):
+    sentry_init(integrations=[DjangoIntegration()])
+    events = capture_events()
+    body = {"to_be_hidden": "sensitive", "to_not_be_hidden": "non sensitive"}
+    _, status, _ = client.post(
+        reverse("hide_nested_sensitive_data"),
+        data=body,
+        content_type="application/x-www-form-urlencoded",
+    )
+    assert status.lower() == "500 internal server error"
+    (event,) = events
+
+    exception = event["exception"]["values"][-1]
+    assert exception["type"] == "ZeroDivisionError"
+
+    # check sensitive variable nested
+    frames = exception["stacktrace"]["frames"]
+    for frame in frames:
+        if "to_be_hidden" in frame["vars"]:
+            if frame["function"] == "after_after_req":
+                if PY2:
+                    assert (
+                        frame["vars"]["to_be_hidden"].replace("'", "")[1:]
+                        == body["to_be_hidden"]
+                    )
+                else:
+                    assert (
+                        frame["vars"]["to_be_hidden"].replace("'", "")
+                        == body["to_be_hidden"]
+                    )
+            else:
+                assert (
+                    frame["vars"]["to_be_hidden"].replace("'", "")
+                    == SENSITIVE_DATA_SUBSTITUTE
+                )
+    # check sensitive post parameters
+    assert event["request"]["data"]["to_be_hidden"] == SENSITIVE_DATA_SUBSTITUTE

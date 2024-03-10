@@ -10,6 +10,7 @@ from django.shortcuts import render
 from django.template import Context, Template
 from django.template.response import TemplateResponse
 from django.utils.decorators import method_decorator
+from django.views.decorators.debug import sensitive_variables, sensitive_post_parameters
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
@@ -216,6 +217,66 @@ def thread_ids_sync(*args, **kwargs):
         }
     )
     return HttpResponse(response)
+
+
+@sensitive_variables("foo")
+@csrf_exempt
+def hide_sensitive_variables(request):
+    foo = request.POST["foo"]
+    zoo = request.POST["zoo"]
+    print("{},{}".format(foo, zoo))
+    1 / 0
+
+
+@sensitive_variables()
+@csrf_exempt
+def hide_all_sensitive_variables(request):
+    foo = request.POST["foo"]
+    zoo = request.POST["zoo"]
+    print("{},{}".format(foo, zoo))
+    1 / 0
+
+
+@sensitive_post_parameters("foo")
+@csrf_exempt
+def hide_post_params(request):
+    1 / 0
+
+
+@sensitive_post_parameters()
+@csrf_exempt
+def hide_all_post_params(request):
+    1 / 0
+
+
+def decorator_with_sensitive_data(func):
+    def wrapper(*args, **kwargs):
+        request = args[0]
+        to_be_hidden = request.POST["to_be_hidden"]
+        print("{}".format(to_be_hidden))
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+@csrf_exempt
+@sensitive_variables("to_be_hidden")
+@sensitive_post_parameters("to_be_hidden")
+@decorator_with_sensitive_data
+def hide_nested_sensitive_data(request):
+    @sensitive_variables("after_after_req_var")
+    def after_after_req(to_be_hidden):
+        after_after_req_var = "foo"
+        print("{}".format(after_after_req_var))
+        1 / 0
+
+    def after_req(to_be_hidden):
+        return after_after_req(to_be_hidden)
+
+    to_be_hidden = request.POST["to_be_hidden"]
+    to_not_be_hidden = request.POST["to_not_be_hidden"]
+    print("{}".format(to_not_be_hidden))
+    return after_req(to_be_hidden)
 
 
 if VERSION >= (3, 1):
