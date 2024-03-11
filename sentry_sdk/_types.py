@@ -25,7 +25,8 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal, TypedDict
 
-    LogLevelStr = Literal["fatal", "error", "warning", "info", "debug"]
+    # "critical" is an alias of "fatal" recognized by Relay
+    LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
 
     Event = TypedDict(
         "Event",

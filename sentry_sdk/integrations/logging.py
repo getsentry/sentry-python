@@ -227,7 +227,7 @@ class EventHandler(_BaseHandler):
         hint["log_record"] = record
 
         level = self._logging_to_event_level(record)
-        if level in {"debug", "info", "warning", "error", "fatal"}:
+        if level in {"debug", "info", "warning", "error", "critical", "fatal"}:
             event["level"] = level  # type: ignore[typeddict-item]
         event["logger"] = record.name
 
