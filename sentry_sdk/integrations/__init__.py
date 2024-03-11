@@ -78,6 +78,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
     "sentry_sdk.integrations.flask.FlaskIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
+    "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.redis.RedisIntegration",
     "sentry_sdk.integrations.rq.RqIntegration",
