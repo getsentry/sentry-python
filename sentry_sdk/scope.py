@@ -1527,12 +1527,14 @@ def use_scope(scope):
     After the wrapped code is executed, the original scope is restored.
 
     Example Usage:
+    Suppose the variable `scope` contains a `Scope` object, which is not currently
+    the active scope.
 
     .. code-block:: python
 
         import sentry_sdk
 
-        with sentry_sdk.new_scope() as scope:
+        with sentry_sdk.use_scope(scope):
             scope.set_tag("color", "green")
             sentry_sdk.capture_message("hello") # will include `color` tag.
 

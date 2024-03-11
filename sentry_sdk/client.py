@@ -124,6 +124,12 @@ def _get_options(*args, **kwargs):
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber()
 
+    if rv["socket_options"] and not isinstance(rv["socket_options"], list):
+        logger.warning(
+            "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
+        )
+        rv["socket_options"] = None
+
     return rv
 
 
