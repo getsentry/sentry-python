@@ -410,9 +410,26 @@ class Span(object):
         # type: (str, Any) -> None
         self._tags[key] = value
 
+    @staticmethod
+    def _normalize_data(data):
+        # type: (Any) -> Any
+
+        # convert pydantic data (e.g. OpenAI v1+) to json compatible format
+        if hasattr(data, "model_dump"):
+            try:
+                return data.model_dump()
+            except Exception as e:
+                logger.warning("Could not convert pydantic data to JSON: %s", e)
+                return data
+        if isinstance(data, list):
+            return list(Span._normalize_data(x) for x in data)
+        if isinstance(data, dict):
+            return {k: Span._normalize_data(v) for (k, v) in data.items()}
+        return data
+
     def set_data(self, key, value):
         # type: (str, Any) -> None
-        self._data[key] = value
+        self._data[key] = self._normalize_data(value)
 
     def set_status(self, value):
         # type: (str) -> None
