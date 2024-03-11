@@ -54,7 +54,7 @@ if TYPE_CHECKING:
             "monitor_config": Mapping[str, object],
             "monitor_slug": Optional[str],
             "platform": Literal["python"],
-            "profile": "Profile",
+            "profile": object,  # Should be sentry_sdk.profiler.Profile, but we can't import that here due to circular imports
             "release": str,
             "request": dict[str, object],
             "sdk": Mapping[str, object],
@@ -177,6 +177,3 @@ if TYPE_CHECKING:
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
     MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
-
-    # Circular import
-    from sentry_sdk.profiler import Profile
