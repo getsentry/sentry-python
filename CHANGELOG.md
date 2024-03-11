@@ -2,24 +2,6 @@
 
 ## 2.0.0rc1
 
-### Various fixes & improvements
-
-- Fixed bump-version.sh to work with version names that have chars in them (0a65f388) by @antonpirker
-- ref(api): Type hinting for start_transaction kwargs (#2796) by @szokeasaurusrex
-- fix imports (79871a8d) by @antonpirker
-- Update CHANGELOG.md (df9841ed) by @sentrivana
-- release: 1.41.0 (fc706111) by @getsentry-bot
-- ref(awslambda): xfail broken tests for now (#2794) by @sentrivana
-- Removed print statements because it messes with the tests (#2789) by @antonpirker
-- Correct `use_scope` comment (#2790) by @szokeasaurusrex
-- build(deps): bump types-protobuf from 4.24.0.20240129 to 4.24.0.20240302 (#2782) by @dependabot
-- build(deps): bump checkouts/data-schemas from `eb941c2` to `ed078ed` (#2781) by @dependabot
-- feat(docs): Add gRPC note to migration guide (a03108f5) by @sentrivana
-- Pin `grpcio` versions in CI (#2776) by @arr-ee
-- feat(transport): Expose `socket_options` (#2786) by @sentrivana
-
-## 2.0.0a2
-
 ## New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
@@ -100,6 +82,19 @@
 - Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
+
+### Various fixes & improvements
+
+- Expose `socket_options` (#2786) by @sentrivana
+- AWS Lambda: xfail broken tests for now (#2794) by @sentrivana
+- Docs: Add gRPC note to migration guide (a03108f5) by @sentrivana
+- Pin `grpcio` versions in CI (#2776) by @arr-ee
+- Dependencies: bump types-protobuf from 4.24.0.20240129 to 4.24.0.20240302 (#2782) by @dependabot
+- Dependencies: bump checkouts/data-schemas from `eb941c2` to `ed078ed` (#2781) by @dependabot
+- Removed print statements because it messes with the tests (#2789) by @antonpirker
+- Type hinting for start_transaction kwargs (#2796) by @szokeasaurusrex
+- Correct `use_scope` comment (#2790) by @szokeasaurusrex
+- Fixed bump-version.sh to work with version names that have chars in them (0a65f388) by @antonpirker
 
 ## 1.41.0
 
