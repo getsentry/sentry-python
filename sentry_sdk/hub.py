@@ -31,6 +31,8 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
 
+    from typing_extensions import Unpack
+
     from sentry_sdk.client import BaseClient
     from sentry_sdk.integrations import Integration
     from sentry_sdk._types import (
@@ -41,6 +43,7 @@ if TYPE_CHECKING:
         ExcInfo,
     )
     from sentry_sdk.consts import ClientConstructor
+    from sentry_sdk.scope import StartTransactionKwargs
 
     T = TypeVar("T")
 
@@ -468,7 +471,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Unpack[StartTransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -501,7 +504,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         # For backwards compatibility, we allow passing the scope as the hub.
         # We need a major release to make this nice. (if someone searches the code: deprecated)
-        kwargs["hub"] = scope
+        # Type checking disabled for this line because deprecated keys are not allowed in the type signature.
+        kwargs["hub"] = scope  # type: ignore
 
         return scope.start_transaction(
             transaction=transaction, instrumenter=instrumenter, **kwargs

@@ -49,6 +49,8 @@ if TYPE_CHECKING:
     from typing import TypeVar
     from typing import Union
 
+    from typing_extensions import Unpack
+
     from sentry_sdk._types import (
         Breadcrumb,
         BreadcrumbHint,
@@ -57,10 +59,17 @@ if TYPE_CHECKING:
         EventProcessor,
         ExcInfo,
         Hint,
+        SamplingContext,
         Type,
     )
 
+    from sentry_sdk.tracing import TransactionKwargs
+
     import sentry_sdk
+
+    class StartTransactionKwargs(TransactionKwargs, total=False):
+        client: Optional["sentry_sdk.Client"]
+        custom_sampling_context: SamplingContext
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -935,7 +944,7 @@ class Scope(object):
     def start_transaction(
         self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
     ):
-        # type: (Optional[Transaction], str, Any) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Unpack[StartTransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -971,9 +980,13 @@ class Scope(object):
 
         custom_sampling_context = kwargs.pop("custom_sampling_context", {})
 
+        # kwargs at this point has type TransactionKwargs, since we have removed
+        # the client and custom_sampling_context from it.
+        transaction_kwargs = kwargs  # type: TransactionKwargs
+
         # if we haven't been given a transaction, make one
         if transaction is None:
-            transaction = Transaction(**kwargs)
+            transaction = Transaction(**transaction_kwargs)
 
         # use traces_sample_rate, traces_sampler, and/or inheritance to make a
         # sampling decision

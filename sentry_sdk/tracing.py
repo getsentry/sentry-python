@@ -22,11 +22,34 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
+    from typing_extensions import TypedDict, Unpack
+
     P = ParamSpec("P")
     R = TypeVar("R")
 
     import sentry_sdk.profiler
     from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+
+    class SpanKwargs(TypedDict, total=False):
+        trace_id: str
+        span_id: str
+        parent_span_id: str
+        same_process_as_parent: bool
+        sampled: bool
+        op: str
+        description: str
+        # hub: Optional[sentry_sdk.Hub] is deprecated, and therefore omitted here!
+        status: str
+        # transaction: str is deprecated, and therefore omitted here!
+        containing_transaction: Optional["Transaction"]
+        start_timestamp: Optional[Union[datetime, float]]
+        scope: "sentry_sdk.Scope"
+
+    class TransactionKwargs(SpanKwargs, total=False):
+        name: str
+        source: str
+        parent_sampled: bool
+        baggage: "Baggage"
 
 
 BAGGAGE_HEADER_NAME = "baggage"
@@ -252,7 +275,7 @@ class Span:
             trace_id=self.trace_id,
             parent_span_id=self.span_id,
             containing_transaction=self.containing_transaction,
-            **kwargs
+            **kwargs,
         )
 
         span_recorder = (
@@ -267,7 +290,7 @@ class Span:
     def continue_from_environ(
         cls,
         environ,  # type: Mapping[str, str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -293,7 +316,7 @@ class Span:
     def continue_from_headers(
         cls,
         headers,  # type: Mapping[str, str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Transaction
         """
@@ -349,7 +372,7 @@ class Span:
     def from_traceparent(
         cls,
         traceparent,  # type: Optional[str]
-        **kwargs  # type: Any
+        **kwargs,  # type: Any
     ):
         # type: (...) -> Optional[Transaction]
         """
@@ -559,7 +582,7 @@ class Transaction(Span):
         parent_sampled=None,  # type: Optional[bool]
         baggage=None,  # type: Optional[Baggage]
         source=TRANSACTION_SOURCE_CUSTOM,  # type: str
-        **kwargs  # type: Any
+        **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
         """Constructs a new Transaction.
@@ -583,7 +606,7 @@ class Transaction(Span):
                 "Deprecated: use Transaction(name=...) to create transactions "
                 "instead of Span(transaction=...)."
             )
-            name = kwargs.pop("transaction")
+            name = kwargs.pop("transaction")  # type: ignore
 
         super().__init__(**kwargs)
 

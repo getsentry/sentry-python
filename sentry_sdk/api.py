@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from typing import ContextManager
     from typing import Union
 
+    from typing_extensions import Unpack
+
     from sentry_sdk.client import BaseClient
     from sentry_sdk._types import (
         Event,
@@ -26,6 +28,7 @@ if TYPE_CHECKING:
         ExcInfo,
         MeasurementUnit,
     )
+    from sentry_sdk.scope import StartTransactionKwargs
     from sentry_sdk.tracing import Span
 
     T = TypeVar("T")
@@ -278,7 +281,7 @@ def start_span(
 @scopemethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    **kwargs,  # type: Any
+    **kwargs,  # type: Unpack[StartTransactionKwargs]
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
     return Scope.get_current_scope().start_transaction(transaction, **kwargs)
