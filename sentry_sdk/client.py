@@ -43,7 +43,7 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.profiler import has_profiling_enabled, Profile, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
@@ -675,7 +675,7 @@ class _Client(object):
             envelope = Envelope(headers=headers)
 
             if is_transaction:
-                if profile is not None:
+                if isinstance(profile, Profile):
                     envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
             elif is_checkin:
