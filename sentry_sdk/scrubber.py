@@ -1,3 +1,8 @@
+try:
+    from typing import cast
+except ImportError:
+    cast = lambda _, obj: obj
+
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     AnnotatedValue,
@@ -8,8 +13,6 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event
-    from typing import Any
-    from typing import Dict
     from typing import List
     from typing import Optional
 
@@ -66,7 +69,7 @@ class EventScrubber(object):
         self.recursive = recursive
 
     def scrub_list(self, lst):
-        # type: (List[Any]) -> None
+        # type: (object) -> None
         """
         If a list is passed to this method, the method recursively searches the list and any
         nested lists for any dictionaries. The method calls scrub_dict on all dictionaries
@@ -77,24 +80,28 @@ class EventScrubber(object):
             return
 
         for v in lst:
-            if isinstance(v, dict):
-                self.scrub_dict(v)
-            elif isinstance(v, list):
-                self.scrub_list(v)
+            self.scrub_dict(v)  # no-op unless v is a dict
+            self.scrub_list(v)  # no-op unless v is a list
 
     def scrub_dict(self, d):
-        # type: (Dict[str, Any]) -> None
+        # type: (object) -> None
+        """
+        If a dictionary is passed to this method, the method scrubs the dictionary of any
+        sensitive data. The method calls itself recursively on any nested dictionaries (
+        including dictionaries nested in lists) if self.recursive is True.
+        This method does nothing if the parameter passed to it is not a dictionary.
+        """
         if not isinstance(d, dict):
             return
 
         for k, v in d.items():
-            if isinstance(k, string_types) and k.lower() in self.denylist:
+            # The cast is needed because mypy is not smart enough to figure out that k must be a
+            # string after the isinstance check.
+            if isinstance(k, string_types) and cast(str, k).lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
-                if isinstance(v, dict):
-                    self.scrub_dict(v)
-                elif isinstance(v, list):
-                    self.scrub_list(v)
+                self.scrub_dict(v)  # no-op unless v is a dict
+                self.scrub_list(v)  # no-op unless v is a list
 
     def scrub_request(self, event):
         # type: (Event) -> None
