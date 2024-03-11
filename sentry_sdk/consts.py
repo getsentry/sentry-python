@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Any
     from typing import Sequence
+    from typing import Tuple
     from typing_extensions import TypedDict
 
     from sentry_sdk.integrations import Integration
@@ -260,6 +261,7 @@ class ClientConstructor(object):
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
+        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -316,4 +318,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.40.5"
+VERSION = "1.41.0"

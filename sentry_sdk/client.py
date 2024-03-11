@@ -10,6 +10,7 @@ import random
 import socket
 
 from sentry_sdk._compat import (
+    PY37,
     datetime_utcnow,
     string_types,
     text_type,
@@ -25,6 +26,7 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
+    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -151,6 +153,12 @@ def _get_options(*args, **kwargs):
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber()
 
+    if rv["socket_options"] and not isinstance(rv["socket_options"], list):
+        logger.warning(
+            "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
+        )
+        rv["socket_options"] = None
+
     return rv
 
 
@@ -261,14 +269,22 @@ class _Client(object):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
+                # Context vars are not working correctly on Python <=3.6
+                # with gevent.
+                metrics_supported = not is_gevent() or PY37
+                if metrics_supported:
+                    from sentry_sdk.metrics import MetricsAggregator
 
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
+                    self.metrics_aggregator = MetricsAggregator(
+                        capture_func=_capture_envelope,
+                        enable_code_locations=bool(
+                            experiments.get("metric_code_locations", True)
+                        ),
+                    )
+                else:
+                    logger.info(
+                        "Metrics not supported on Python 3.6 and lower with gevent."
+                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
