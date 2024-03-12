@@ -35,7 +35,7 @@ if TYPE_CHECKING:
                 Literal["values"], list[dict[str, Any]]
             ],  # TODO: We can expand on this type
             "check_in_id": str,
-            "contexts": dict[str, object],
+            "contexts": dict[str, dict[str, object]],
             "dist": str,
             "duration": Optional[float],
             "environment": str,

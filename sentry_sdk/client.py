@@ -1,7 +1,7 @@
 try:
-    from collections.abc import Mapping, MutableMapping
+    from collections.abc import Mapping
 except ImportError:
-    from collections import Mapping, MutableMapping  # type: ignore[attr-defined]
+    from collections import Mapping  # type: ignore[attr-defined]
 
 from importlib import import_module
 import os
@@ -649,10 +649,7 @@ class _Client(object):
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
-        if isinstance(trace_context, MutableMapping):
-            dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
-        else:
-            dynamic_sampling_context = {}
+        dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
         # If tracing is enabled all events should go to /envelope endpoint.
         # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
@@ -667,7 +664,7 @@ class _Client(object):
             headers = {
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime_utcnow()),
-            }
+            }  # type: dict[str, object]
 
             if dynamic_sampling_context:
                 headers["trace"] = dynamic_sampling_context
