@@ -102,7 +102,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         Prune spans that have been open for too long.
         """
         current_time_minutes = int(time() / 60)
-        for span_start_minutes in list(self.open_spans.keys()):  # making a list because we change the dict
+        for span_start_minutes in list(
+            self.open_spans.keys()
+        ):  # making a list because we change the dict
             # prune empty open spans buckets
             if self.open_spans[span_start_minutes] == set():
                 self.open_spans.pop(span_start_minutes)
