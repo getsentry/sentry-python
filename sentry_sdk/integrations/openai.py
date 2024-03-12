@@ -73,6 +73,28 @@ def _capture_exception(hub, exc):
         hub.capture_event(event, hint=hint)
 
 
+def _normalize_data(data):
+    # type: (Any) -> Any
+
+    # convert pydantic data (e.g. OpenAI v1+) to json compatible format
+    if hasattr(data, "model_dump"):
+        try:
+            return data.model_dump()
+        except Exception as e:
+            logger.warning("Could not convert pydantic data to JSON: %s", e)
+            return data
+    if isinstance(data, list):
+        return list(_normalize_data(x) for x in data)
+    if isinstance(data, dict):
+        return {k: _normalize_data(v) for (k, v) in data.items()}
+    return data
+
+
+def set_data_normalized(span, key, value):
+    # type: (Span, str, Any) -> None
+    span.set_data(key, _normalize_data(value))
+
+
 def _calculate_chat_completion_usage(
     messages, response, span, streaming_message_responses=None
 ):
@@ -112,11 +134,11 @@ def _calculate_chat_completion_usage(
         total_tokens = prompt_tokens + completion_tokens
 
     if completion_tokens != 0:
-        span.set_data(COMPLETION_TOKENS_USED, completion_tokens)
+        set_data_normalized(span, COMPLETION_TOKENS_USED, completion_tokens)
     if prompt_tokens != 0:
-        span.set_data(PROMPT_TOKENS_USED, prompt_tokens)
+        set_data_normalized(span, PROMPT_TOKENS_USED, prompt_tokens)
     if total_tokens != 0:
-        span.set_data(TOTAL_TOKENS_USED, total_tokens)
+        set_data_normalized(span, TOTAL_TOKENS_USED, total_tokens)
 
 
 def _wrap_chat_completion_create(f):
@@ -160,14 +182,17 @@ def _wrap_chat_completion_create(f):
 
         with capture_internal_exceptions():
             if _should_send_default_pii() and integration.include_prompts:
-                span.set_data("ai.input_messages", messages)
-            span.set_data("ai.model_id", model)
-            span.set_data("ai.streaming", streaming)
+                set_data_normalized(span, "ai.input_messages", messages)
+
+            set_data_normalized(span, "ai.model_id", model)
+            set_data_normalized(span, "ai.streaming", streaming)
 
             if hasattr(res, "choices"):
                 if _should_send_default_pii() and integration.include_prompts:
-                    span.set_data(
-                        "ai.responses", list(map(lambda x: x.message, res.choices))
+                    set_data_normalized(
+                        span,
+                        "ai.responses",
+                        list(map(lambda x: x.message, res.choices)),
                     )
                 _calculate_chat_completion_usage(messages, res, span)
                 span.__exit__(None, None, None)
@@ -200,7 +225,7 @@ def _wrap_chat_completion_create(f):
                                 _should_send_default_pii()
                                 and integration.include_prompts
                             ):
-                                span.set_data("ai.responses", all_responses)
+                                set_data_normalized(span, "ai.responses", all_responses)
                             _calculate_chat_completion_usage(
                                 messages, res, span, all_responses
                             )
@@ -208,7 +233,7 @@ def _wrap_chat_completion_create(f):
 
                 res._iterator = new_iterator()
             else:
-                span.set_data("unknown_response", True)
+                set_data_normalized(span, "unknown_response", True)
                 span.__exit__(None, None, None)
             return res
 
@@ -238,15 +263,15 @@ def _wrap_embeddings_create(f):
                 _should_send_default_pii() and integration.include_prompts
             ):
                 if isinstance(kwargs["input"], str):
-                    span.set_data("ai.input_messages", [kwargs["input"]])
+                    set_data_normalized(span, "ai.input_messages", [kwargs["input"]])
                 elif (
                     isinstance(kwargs["input"], list)
                     and len(kwargs["input"]) > 0
                     and isinstance(kwargs["input"][0], str)
                 ):
-                    span.set_data("ai.input_messages", kwargs["input"])
+                    set_data_normalized(span, "ai.input_messages", kwargs["input"])
             if "model" in kwargs:
-                span.set_data("ai.model_id", kwargs["model"])
+                set_data_normalized(span, "ai.model_id", kwargs["model"])
             try:
                 response = f(*args, **kwargs)
             except Exception as e:
@@ -271,8 +296,8 @@ def _wrap_embeddings_create(f):
             if total_tokens == 0:
                 total_tokens = prompt_tokens
 
-            span.set_data(PROMPT_TOKENS_USED, prompt_tokens)
-            span.set_data(TOTAL_TOKENS_USED, total_tokens)
+            set_data_normalized(span, PROMPT_TOKENS_USED, prompt_tokens)
+            set_data_normalized(span, TOTAL_TOKENS_USED, total_tokens)
 
             return response
 
