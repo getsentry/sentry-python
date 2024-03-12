@@ -147,7 +147,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             sentry_span = sentry_parent_span.start_child(
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
-                start_timestamp=utc_from_timestamp(otel_span.start_time / 1e9),
+                start_timestamp=utc_from_timestamp(
+                    otel_span.start_time / 1e9
+                ),  # OTel spans have nanosecond precision
                 instrumenter=INSTRUMENTER.OTEL,
             )
         else:
@@ -157,13 +159,17 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 parent_span_id=parent_span_id,
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
-                start_timestamp=utc_from_timestamp(otel_span.start_time / 1e9),
+                start_timestamp=utc_from_timestamp(
+                    otel_span.start_time / 1e9
+                ),  # OTel spans have nanosecond precision
                 instrumenter=INSTRUMENTER.OTEL,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
 
-        span_start_in_minutes = int(otel_span.start_time / 1e9 / 60)
+        span_start_in_minutes = int(
+            otel_span.start_time / 1e9 / 60
+        )  # OTel spans have nanosecond precision
         self.open_spans.setdefault(span_start_in_minutes, set()).add(
             trace_data["span_id"]
         )
@@ -201,9 +207,13 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
 
-        sentry_span.finish(end_timestamp=utc_from_timestamp(otel_span.end_time / 1e9))
+        sentry_span.finish(
+            end_timestamp=utc_from_timestamp(otel_span.end_time / 1e9)
+        )  # OTel spans have nanosecond precision
 
-        span_start_in_minutes = int(otel_span.start_time / 1e9 / 60)
+        span_start_in_minutes = int(
+            otel_span.start_time / 1e9 / 60
+        )  # OTel spans have nanosecond precision
         self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
         self._prune_old_spans()
 
