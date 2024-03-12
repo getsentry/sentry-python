@@ -96,7 +96,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
             # type: (Event, Hint) -> Event
             return link_trace_context_to_error_event(event, self.otel_span_map)
 
-    def prune_old_spans(self):
+    def _prune_old_spans(self):
         # type: (SentrySpanProcessor) -> None
         """
         Prune spans that have been open for too long.
@@ -167,7 +167,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         self.open_spans.setdefault(span_start_in_minutes, set()).add(
             trace_data["span_id"]
         )
-        self.prune_old_spans()
+        self._prune_old_spans()
 
     def on_end(self, otel_span):
         # type: (OTelSpan) -> None
@@ -205,7 +205,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         span_start_in_minutes = int(otel_span.start_time / 1e9 / 60)
         self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
-        self.prune_old_spans()
+        self._prune_old_spans()
 
     def _is_sentry_span(self, hub, otel_span):
         # type: (Hub, OTelSpan) -> bool
