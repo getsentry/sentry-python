@@ -64,7 +64,7 @@ if TYPE_CHECKING:
             "stacktrace": dict[
                 str, object
             ],  # We access this key in the code, but I am unsure whether we ever set it
-            "start_timestamp": Union[datetime, int],
+            "start_timestamp": datetime,
             "status": Optional[str],
             "tags": MutableMapping[
                 str, str
