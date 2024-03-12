@@ -80,7 +80,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     otel_span_map = {}  # type: Dict[str, Union[Transaction, SentrySpan]]
 
     # The currently open spans. Elements will be discarded after SPAN_MAX_TIME_OPEN_MINUTES
-    open_spans = {}  # type: Dict[int, set[str]]
+    open_spans = {}  # type: dict[int, set[str]]
 
     def __new__(cls):
         # type: () -> SentrySpanProcessor
@@ -102,7 +102,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         Prune spans that have been open for too long.
         """
         current_time_minutes = int(time() / 60)
-        for span_start_minutes in list(self.open_spans.keys()):
+        for span_start_minutes in self.open_spans:
             # prune empty open spans buckets
             if self.open_spans[span_start_minutes] == set():
                 self.open_spans.pop(span_start_minutes)
