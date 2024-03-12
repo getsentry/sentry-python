@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.40.5",
+    version="1.41.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -60,6 +60,7 @@ setup(
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "loguru": ["loguru>=0.5"],
+        "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
             "opentelemetry-distro~=0.40b0",
