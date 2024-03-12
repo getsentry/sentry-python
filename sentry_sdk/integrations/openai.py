@@ -263,7 +263,7 @@ def _wrap_embeddings_create(f):
                 _should_send_default_pii() and integration.include_prompts
             ):
                 if isinstance(kwargs["input"], str):
-                    set_data_normalized(span, "ai.input_messages", kwargs["input"])
+                    set_data_normalized(span, "ai.input_messages", [kwargs["input"]])
                 elif (
                     isinstance(kwargs["input"], list)
                     and len(kwargs["input"]) > 0
