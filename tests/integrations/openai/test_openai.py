@@ -73,7 +73,7 @@ def test_nonstreaming_chat_completion(
 
     if send_default_pii and include_prompts:
         assert "hello" in span["data"]["ai.input_messages"][0]["content"]
-        assert "the model response" in span["data"]["ai.responses"][0]
+        assert "the model response" in span["data"]["ai.responses"][0]["content"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
