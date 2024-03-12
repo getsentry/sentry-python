@@ -647,7 +647,8 @@ class _Client(BaseClient):
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for k, v in (headers or {}).items():
+            headers_dict = headers if isinstance(headers, dict) else {}
+            for k, v in headers_dict.items():
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
