@@ -59,6 +59,7 @@ setup(
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "loguru": ["loguru>=0.5"],
+        "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
             "opentelemetry-distro~=0.40b0",

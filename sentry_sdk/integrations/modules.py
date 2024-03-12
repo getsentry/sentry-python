@@ -7,8 +7,6 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
-
     from sentry_sdk._types import Event
 
 
@@ -20,7 +18,7 @@ class ModulesIntegration(Integration):
         # type: () -> None
         @add_global_event_processor
         def processor(event, hint):
-            # type: (Event, Any) -> Dict[str, Any]
+            # type: (Event, Any) -> Event
             if event.get("type") == "transaction":
                 return event
 

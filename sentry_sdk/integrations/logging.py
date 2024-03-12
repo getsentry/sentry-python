@@ -13,6 +13,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
     from logging import LogRecord
     from typing import Any
     from typing import Dict
@@ -153,7 +154,7 @@ class _BaseHandler(logging.Handler, object):
         )
 
     def _extra_from_record(self, record):
-        # type: (LogRecord) -> Dict[str, None]
+        # type: (LogRecord) -> MutableMapping[str, object]
         return {
             k: v
             for k, v in vars(record).items()
@@ -222,7 +223,9 @@ class EventHandler(_BaseHandler):
 
         hint["log_record"] = record
 
-        event["level"] = self._logging_to_event_level(record)
+        level = self._logging_to_event_level(record)
+        if level in {"debug", "info", "warning", "error", "critical", "fatal"}:
+            event["level"] = level  # type: ignore[typeddict-item]
         event["logger"] = record.name
 
         # Log records from `warnings` module as separate issues

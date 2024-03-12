@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from time import time
 
 from opentelemetry.context import get_value  # type: ignore
 from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
+SPAN_MAX_TIME_OPEN_MINUTES = 10
 
 
 def link_trace_context_to_error_event(event, otel_span_map):
@@ -77,6 +79,9 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
     # The mapping from otel span ids to sentry spans
     otel_span_map = {}  # type: Dict[str, Union[Transaction, SentrySpan]]
 
+    # The currently open spans. Elements will be discarded after SPAN_MAX_TIME_OPEN_MINUTES
+    open_spans = {}  # type: dict[int, set[str]]
+
     def __new__(cls):
         # type: () -> SentrySpanProcessor
         if not hasattr(cls, "instance"):
@@ -90,6 +95,24 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         def global_event_processor(event, hint):
             # type: (Event, Hint) -> Event
             return link_trace_context_to_error_event(event, self.otel_span_map)
+
+    def _prune_old_spans(self):
+        # type: (SentrySpanProcessor) -> None
+        """
+        Prune spans that have been open for too long.
+        """
+        current_time_minutes = int(time() / 60)
+        for span_start_minutes in list(
+            self.open_spans.keys()
+        ):  # making a list because we change the dict
+            # prune empty open spans buckets
+            if self.open_spans[span_start_minutes] == set():
+                self.open_spans.pop(span_start_minutes)
+
+            # prune old buckets
+            elif current_time_minutes - span_start_minutes > SPAN_MAX_TIME_OPEN_MINUTES:
+                for span_id in self.open_spans.pop(span_start_minutes):
+                    self.otel_span_map.pop(span_id, None)
 
     def on_start(self, otel_span, parent_context=None):
         # type: (OTelSpan, Optional[SpanContext]) -> None
@@ -128,7 +151,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 description=otel_span.name,
                 start_timestamp=datetime.fromtimestamp(
                     otel_span.start_time / 1e9, timezone.utc
-                ),
+                ),  # OTel spans have nanosecond precision
                 instrumenter=INSTRUMENTER.OTEL,
             )
         else:
@@ -140,11 +163,19 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 baggage=trace_data["baggage"],
                 start_timestamp=datetime.fromtimestamp(
                     otel_span.start_time / 1e9, timezone.utc
-                ),
+                ),  # OTel spans have nanosecond precision
                 instrumenter=INSTRUMENTER.OTEL,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
+
+        span_start_in_minutes = int(
+            otel_span.start_time / 1e9 / 60
+        )  # OTel spans have nanosecond precision
+        self.open_spans.setdefault(span_start_in_minutes, set()).add(
+            trace_data["span_id"]
+        )
+        self._prune_old_spans()
 
     def on_end(self, otel_span):
         # type: (OTelSpan) -> None
@@ -180,7 +211,13 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         sentry_span.finish(
             end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9, timezone.utc)
-        )
+        )  # OTel spans have nanosecond precision
+
+        span_start_in_minutes = int(
+            otel_span.start_time / 1e9 / 60
+        )  # OTel spans have nanosecond precision
+        self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
+        self._prune_old_spans()
 
     def _is_sentry_span(self, hub, otel_span):
         # type: (Hub, OTelSpan) -> bool
