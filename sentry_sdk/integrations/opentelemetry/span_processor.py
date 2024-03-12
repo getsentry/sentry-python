@@ -108,8 +108,8 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                 self.open_spans.pop(span_start_minutes)
 
             # prune old buckets
-            if current_time_minutes - span_start_minutes > SPAN_MAX_TIME_OPEN_MINUTES:
-                for span_id in self.open_spans.pop(span_start_minutes, set()):
+            elif current_time_minutes - span_start_minutes > SPAN_MAX_TIME_OPEN_MINUTES:
+                for span_id in self.open_spans.pop(span_start_minutes):
                     self.otel_span_map.pop(span_id, None)
 
     def on_start(self, otel_span, parent_context=None):
