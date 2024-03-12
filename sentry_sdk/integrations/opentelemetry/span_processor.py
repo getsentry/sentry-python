@@ -22,7 +22,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 )
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
-from sentry_sdk.utils import capture_internal_exceptions, Dsn
+from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
 from urllib3.util import parse_url as urlparse
@@ -63,8 +63,7 @@ def link_trace_context_to_error_event(event, otel_span_map):
         return event
 
     contexts = event.setdefault("contexts", {})
-    with capture_internal_exceptions():
-        contexts.setdefault("trace", {}).update(sentry_span.get_trace_context())  # type: ignore[attr-defined]
+    contexts.setdefault("trace", {}).update(sentry_span.get_trace_context())
 
     return event
 

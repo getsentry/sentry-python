@@ -1,8 +1,4 @@
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-    event_from_exception,
-    parse_version,
-)
+from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 
@@ -134,13 +130,12 @@ def _make_gql_event_processor(client, document):
             request["data"] = _data_from_document(document)
             contexts = event.setdefault("contexts", {})
             response = contexts.setdefault("response", {})
-            with capture_internal_exceptions():
-                response.update(  # type: ignore[attr-defined]
-                    {
-                        "data": {"errors": errors},
-                        "type": response,
-                    }
-                )
+            response.update(
+                {
+                    "data": {"errors": errors},
+                    "type": response,
+                }
+            )
 
         return event
 
