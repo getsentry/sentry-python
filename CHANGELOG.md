@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.42.0
+
+### Various fixes & improvements
+
+- **New integration:** [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/) (#2791) by @colin-sentry
+
+  We added an integration for OpenAI to capture errors and also performance data when using the OpenAI Python SDK.
+
+  Useage:
+
+  This integrations is auto-enabling, so if you have the `openai` package in your project it will be enabled. Just initialize Sentry before you create your OpenAI client.
+
+  ```python
+  from openai import OpenAI
+
+  import sentry_sdk
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+  )
+
+  client = OpenAI()
+  ```
+
+  For more information, see the documentation for [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/).
+
+- Discard open OpenTelemetry spans after 10 minutes (#2801) by @antonpirker
+- Propagate sentry-trace and baggage headers to Huey tasks (#2792) by @cnschn
+- Added Event type (#2753) by @szokeasaurusrex
+- Improve scrub_dict typing (#2768) by @szokeasaurusrex
+- Dependencies: bump types-protobuf from 4.24.0.20240302 to 4.24.0.20240311 (#2797) by @dependabot
+
 ## 1.41.0
 
 ### Various fixes & improvements
