@@ -1,12 +1,8 @@
-try:
-    from collections.abc import Mapping
-except ImportError:
-    from collections import Mapping  # type: ignore[attr-defined]
-
 import os
 import uuid
 import random
 import socket
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
 
