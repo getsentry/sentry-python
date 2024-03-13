@@ -219,7 +219,11 @@ def patch_http_route_handle() -> None:
                     tx_info = {"source": TRANSACTION_SOURCE_ROUTE}
 
                 event.update(
-                    request=request_info, transaction=tx_name, transaction_info=tx_info
+                    {
+                        "request": request_info,
+                        "transaction": tx_name,
+                        "transaction_info": tx_info,
+                    }
                 )
                 return event
 

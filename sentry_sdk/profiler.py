@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
     import sentry_sdk.tracing
-    from sentry_sdk._types import SamplingContext, ProfilerMode
+    from sentry_sdk._types import Event, SamplingContext, ProfilerMode
 
     ThreadId = str
 
@@ -673,7 +673,7 @@ class Profile:
         }
 
     def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
         set_in_app_in_frames(

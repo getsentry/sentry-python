@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import Optional
     from typing import Union
+    from sentry_sdk._types import Event
 
 
 SENSITIVE_ENV_KEYS = (
@@ -65,7 +66,7 @@ class RequestExtractor:
         self.request = request
 
     def extract_into_event(self, event):
-        # type: (Dict[str, Any]) -> None
+        # type: (Event) -> None
         client = Hub.current.client
         if client is None:
             return

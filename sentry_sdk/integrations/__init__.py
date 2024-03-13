@@ -86,6 +86,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.huey.HueyIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
+    "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.pymongo.PyMongoIntegration",
     "sentry_sdk.integrations.pyramid.PyramidIntegration",
     "sentry_sdk.integrations.quart.QuartIntegration",

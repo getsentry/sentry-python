@@ -41,6 +41,7 @@ if TYPE_CHECKING:
         Breadcrumb,
         BreadcrumbHint,
         ExcInfo,
+        LogLevelStr,
     )
     from sentry_sdk.consts import ClientConstructor
     from sentry_sdk.scope import StartTransactionKwargs
@@ -347,7 +348,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return last_event_id
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
-        # type: (str, Optional[str], Optional[Scope], Any) -> Optional[str]
+        # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
