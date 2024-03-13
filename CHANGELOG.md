@@ -2,10 +2,6 @@
 
 ## 2.0.0rc2
 
-# Sentry SDK 2.0 Migration Guide
-
-Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed.
-
 ## New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
