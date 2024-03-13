@@ -11,6 +11,7 @@ from sentry_sdk.utils import transaction_from_function, logger
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict
     from sentry_sdk.scope import Scope
+    from sentry_sdk._types import Event
 
 try:
     from sentry_sdk.integrations.starlette import (
@@ -111,9 +112,9 @@ def patch_get_request_handler():
                 info = await extractor.extract_request_info()
 
                 def _make_request_event_processor(req, integration):
-                    # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                    # type: (Any, Any) -> Callable[[Event, Dict[str, Any]], Event]
                     def event_processor(event, hint):
-                        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                        # type: (Event, Dict[str, Any]) -> Event
 
                         # Extract information from request
                         request_info = event.get("request", {})

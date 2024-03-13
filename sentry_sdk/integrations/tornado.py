@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Generator
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 class TornadoIntegration(Integration):
@@ -155,7 +155,7 @@ def _capture_exception(ty, value, tb):
 def _make_event_processor(weak_handler):
     # type: (Callable[[], RequestHandler]) -> EventProcessor
     def tornado_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         handler = weak_handler()
         if handler is None:
             return event
@@ -164,7 +164,7 @@ def _make_event_processor(weak_handler):
 
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
-            event["transaction"] = transaction_from_function(method)
+            event["transaction"] = transaction_from_function(method) or ""
             event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
 
         with capture_internal_exceptions():

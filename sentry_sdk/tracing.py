@@ -14,7 +14,7 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
-    from collections.abc import Callable
+    from collections.abc import Callable, MutableMapping
     from typing import Any
     from typing import Dict
     from typing import Iterator
@@ -151,7 +151,7 @@ class Span(object):
         self.description = description
         self.status = status
         self.hub = hub
-        self._tags = {}  # type: Dict[str, str]
+        self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         if start_timestamp is None:

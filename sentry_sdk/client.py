@@ -1,3 +1,8 @@
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping  # type: ignore[attr-defined]
+
 from importlib import import_module
 import os
 import uuid
@@ -38,7 +43,7 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.profiler import has_profiling_enabled, Profile, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
@@ -393,7 +398,7 @@ class _Client(object):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = text_type(self.options[key]).strip()
+                event[key] = text_type(self.options[key]).strip()  # type: ignore[literal-required]
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -567,7 +572,7 @@ class _Client(object):
             errored = True
             for error in exceptions:
                 mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("handled") is False:
+                if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
                     break
 
@@ -659,7 +664,7 @@ class _Client(object):
             headers = {
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime_utcnow()),
-            }
+            }  # type: dict[str, object]
 
             if dynamic_sampling_context:
                 headers["trace"] = dynamic_sampling_context
@@ -667,7 +672,7 @@ class _Client(object):
             envelope = Envelope(headers=headers)
 
             if is_transaction:
-                if profile is not None:
+                if isinstance(profile, Profile):
                     envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
             elif is_checkin:

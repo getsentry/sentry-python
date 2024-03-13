@@ -33,6 +33,8 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
+
     from typing import Any
     from typing import Callable
     from typing import Deque
@@ -53,6 +55,7 @@ if TYPE_CHECKING:
         EventProcessor,
         ExcInfo,
         Hint,
+        LogLevelStr,
         Type,
     )
 
@@ -414,15 +417,15 @@ class Scope(object):
     def clear(self):
         # type: () -> None
         """Clears the entire scope."""
-        self._level = None  # type: Optional[str]
+        self._level = None  # type: Optional[LogLevelStr]
         self._fingerprint = None  # type: Optional[List[str]]
         self._transaction = None  # type: Optional[str]
-        self._transaction_info = {}  # type: Dict[str, str]
+        self._transaction_info = {}  # type: MutableMapping[str, str]
         self._user = None  # type: Optional[Dict[str, Any]]
 
         self._tags = {}  # type: Dict[str, Any]
         self._contexts = {}  # type: Dict[str, Dict[str, Any]]
-        self._extras = {}  # type: Dict[str, Any]
+        self._extras = {}  # type: MutableMapping[str, Any]
         self._attachments = []  # type: List[Attachment]
 
         self.clear_breadcrumbs()
@@ -438,12 +441,12 @@ class Scope(object):
 
     @_attr_setter
     def level(self, value):
-        # type: (Optional[str]) -> None
+        # type: (Optional[LogLevelStr]) -> None
         """When set this overrides the level. Deprecated in favor of set_level."""
         self._level = value
 
     def set_level(self, value):
-        # type: (Optional[str]) -> None
+        # type: (Optional[LogLevelStr]) -> None
         """Sets the level for the scope."""
         self._level = value
 
@@ -848,7 +851,7 @@ class Scope(object):
     def capture_message(
         self, message, level=None, client=None, scope=None, **scope_kwargs
     ):
-        # type: (str, Optional[str], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
+        # type: (str, Optional[LogLevelStr], Optional[sentry_sdk.Client], Optional[Scope], Any) -> Optional[str]
         """
         Captures a message.
 
@@ -876,7 +879,7 @@ class Scope(object):
         event = {
             "message": message,
             "level": level,
-        }
+        }  # type: Event
 
         return self.capture_event(event, client=client, scope=scope, **scope_kwargs)
 
@@ -1079,7 +1082,7 @@ class Scope(object):
 
         # Add "reply_id" context
         try:
-            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]
+            replay_id = contexts["trace"]["dynamic_sampling_context"]["replay_id"]  # type: ignore
         except (KeyError, TypeError):
             replay_id = None
 
@@ -1192,7 +1195,7 @@ class Scope(object):
     def update_from_kwargs(
         self,
         user=None,  # type: Optional[Any]
-        level=None,  # type: Optional[str]
+        level=None,  # type: Optional[LogLevelStr]
         extras=None,  # type: Optional[Dict[str, Any]]
         contexts=None,  # type: Optional[Dict[str, Any]]
         tags=None,  # type: Optional[Dict[str, str]]
