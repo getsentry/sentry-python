@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.0.0rc2
+
+### Various fixes & improvements
+
+- Remove redundant cast (#2818) by @sentrivana
+- Remove unnecessary try/except for `collections.abc` import (#2807) by @szokeasaurusrex
+- Update changelog (#2818) by @sentrivana
+- release: 1.42.0 (#2818) by @sentrivana
+- Merge master into 2.0 branch (#2805) by @szokeasaurusrex
+- build(deps): bump types-protobuf from 4.24.0.20240302 to 4.24.0.20240311 (#2797) by @dependabot
+- ref: Event Type (#2753) by @szokeasaurusrex
+- Discard open spans after 10 minutes (#2801) by @antonpirker
+- Add a method for normalizing data passed to set_data (#2800) by @colin-sentry
+- OpenAI integration (#2791) by @colin-sentry
+- Propagate sentry-trace and baggage to huey tasks (#2792) by @cnschn
+- ref: Improve scrub_dict typing (#2768) by @szokeasaurusrex
+
 ## 2.0.0rc1
 
 ## New Features
