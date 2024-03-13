@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0rc1
+## 2.0.0rc2
 
 ## New Features
 
@@ -56,6 +56,7 @@
 - Removed support for Celery 3.\*.
 - Removed support for Django 1.8, 1.9, 1.10.
 - Removed support for Flask 0.\*.
+- Removed support for gRPC < 1.39.
 - Removed `last_event_id()` top level API. The last event ID is still returned by `capture_event()`, `capture_exception()` and `capture_message()` but the top level API `sentry_sdk.last_event_id()` has been removed.
 - Removed support for sending events to the `/store` endpoint. Everything is now sent to the `/envelope` endpoint. If you're on SaaS you don't have to worry about this, but if you're running Sentry yourself you'll need version `20.6.0` or higher of self-hosted Sentry.
 - The deprecated `with_locals` configuration option was removed. Use `include_local_variables` instead. See https://docs.sentry.io/platforms/python/configuration/options/#include-local-variables.
