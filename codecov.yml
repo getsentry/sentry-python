@@ -9,3 +9,5 @@ coverage:
 ignore:
   - "tests"
   - "sentry_sdk/_types.py"
+github_checks:
+  annotations: false
