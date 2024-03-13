@@ -21,7 +21,7 @@
     Your existing implementation:
     ```python
     transaction = sentry_sdk.transaction(...)
-    
+
     # later in the code execution:
 
     with sentry_sdk.configure_scope() as scope:
@@ -31,7 +31,7 @@
     needs to be changed to this:
     ```python
     transaction = sentry_sdk.transaction(...)
-    
+
     # later in the code execution:
 
     scope = sentry_sdk.Scope.get_current_scope()
@@ -83,18 +83,39 @@
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
 
+## 1.42.0
+
 ### Various fixes & improvements
 
-- Expose `socket_options` (#2786) by @sentrivana
-- AWS Lambda: xfail broken tests for now (#2794) by @sentrivana
-- Docs: Add gRPC note to migration guide (a03108f5) by @sentrivana
-- Pin `grpcio` versions in CI (#2776) by @arr-ee
-- Dependencies: bump types-protobuf from 4.24.0.20240129 to 4.24.0.20240302 (#2782) by @dependabot
-- Dependencies: bump checkouts/data-schemas from `eb941c2` to `ed078ed` (#2781) by @dependabot
-- Removed print statements because it messes with the tests (#2789) by @antonpirker
-- Type hinting for start_transaction kwargs (#2796) by @szokeasaurusrex
-- Correct `use_scope` comment (#2790) by @szokeasaurusrex
-- Fixed bump-version.sh to work with version names that have chars in them (0a65f388) by @antonpirker
+- **New integration:** [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/) (#2791) by @colin-sentry
+
+  We added an integration for OpenAI to capture errors and also performance data when using the OpenAI Python SDK.
+
+  Useage:
+
+  This integrations is auto-enabling, so if you have the `openai` package in your project it will be enabled. Just initialize Sentry before you create your OpenAI client.
+
+  ```python
+  from openai import OpenAI
+
+  import sentry_sdk
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+  )
+
+  client = OpenAI()
+  ```
+
+  For more information, see the documentation for [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/).
+
+- Discard open OpenTelemetry spans after 10 minutes (#2801) by @antonpirker
+- Propagate sentry-trace and baggage headers to Huey tasks (#2792) by @cnschn
+- Added Event type (#2753) by @szokeasaurusrex
+- Improve scrub_dict typing (#2768) by @szokeasaurusrex
+- Dependencies: bump types-protobuf from 4.24.0.20240302 to 4.24.0.20240311 (#2797) by @dependabot
 
 ## 1.41.0
 

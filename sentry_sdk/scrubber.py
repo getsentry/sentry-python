@@ -94,7 +94,9 @@ class EventScrubber(object):
             return
 
         for k, v in d.items():
-            if isinstance(k, str) and k.lower() in self.denylist:
+            # The cast is needed because mypy is not smart enough to figure out that k must be a
+            # string after the isinstance check.
+            if isinstance(k, str) and cast(str, k).lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
                 self.scrub_dict(v)  # no-op unless v is a dict
