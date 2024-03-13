@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Index - sentry-python 2.0.0rc1 documentation</title>
+      <title>Index - sentry-python 1.42.0 documentation</title>
     <link rel="index" title="Index" href="#" /><link rel="search" title="Search" href="search.html" />
 
   <script>
@@ -128,12 +128,10 @@
 <h2 id="B">B</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="apidocs.html#sentry_sdk.client.BaseClient">BaseClient (class in sentry_sdk.client)</a>
+      <li><a href="apidocs.html#sentry_sdk.Hub.bind_client">bind_client() (sentry_sdk.Hub method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="apidocs.html#sentry_sdk.Hub.bind_client">bind_client() (sentry_sdk.Hub method)</a>
-</li>
       <li><a href="integrations.html#sentry_sdk.integrations.logging.BreadcrumbHandler">BreadcrumbHandler (class in sentry_sdk.integrations.logging)</a>
 </li>
   </ul></td>
@@ -152,6 +150,8 @@
 
       <ul>
         <li><a href="apidocs.html#sentry_sdk.client._Client.capture_event">(sentry_sdk.client._Client method)</a>
+</li>
+        <li><a href="apidocs.html#sentry_sdk.HttpTransport.capture_event">(sentry_sdk.HttpTransport method)</a>
 </li>
         <li><a href="apidocs.html#sentry_sdk.Hub.capture_event">(sentry_sdk.Hub method)</a>
 </li>
@@ -176,10 +176,10 @@
         <li><a href="apidocs.html#sentry_sdk.Scope.capture_message">(sentry_sdk.Scope method)</a>
 </li>
       </ul></li>
-      <li><a href="apidocs.html#sentry_sdk.monitor.Monitor.check_health">check_health() (sentry_sdk.monitor.Monitor method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apidocs.html#sentry_sdk.monitor.Monitor.check_health">check_health() (sentry_sdk.monitor.Monitor method)</a>
+</li>
       <li><a href="apidocs.html#sentry_sdk.Scope.clear">clear() (sentry_sdk.Scope method)</a>
 </li>
       <li><a href="apidocs.html#sentry_sdk.Scope.clear_breadcrumbs">clear_breadcrumbs() (sentry_sdk.Scope method)</a>
@@ -268,8 +268,6 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="apidocs.html#sentry_sdk.Scope.fork">fork() (sentry_sdk.Scope method)</a>
-</li>
       <li><a href="apidocs.html#sentry_sdk.tracing.Span.from_traceparent">from_traceparent() (sentry_sdk.tracing.Span class method)</a>
 </li>
   </ul></td>
@@ -285,28 +283,16 @@
       <ul>
         <li><a href="apidocs.html#sentry_sdk.Hub.get_baggage">(sentry_sdk.Hub method)</a>
 </li>
-        <li><a href="apidocs.html#sentry_sdk.Scope.get_baggage">(sentry_sdk.Scope method)</a>
-</li>
         <li><a href="apidocs.html#sentry_sdk.tracing.Transaction.get_baggage">(sentry_sdk.tracing.Transaction method)</a>
 </li>
       </ul></li>
-      <li><a href="api.html#sentry_sdk.api.get_client">get_client() (in module sentry_sdk.api)</a>
-
-      <ul>
-        <li><a href="apidocs.html#sentry_sdk.Scope.get_client">(sentry_sdk.Scope class method)</a>
-</li>
-      </ul></li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.get_current_scope">get_current_scope() (sentry_sdk.Scope class method)</a>
-</li>
       <li><a href="api.html#sentry_sdk.api.get_current_span">get_current_span() (in module sentry_sdk.api)</a>
+</li>
+      <li><a href="apidocs.html#sentry_sdk.Scope.get_dynamic_sampling_context">get_dynamic_sampling_context() (sentry_sdk.Scope method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="apidocs.html#sentry_sdk.Scope.get_dynamic_sampling_context">get_dynamic_sampling_context() (sentry_sdk.Scope method)</a>
-</li>
       <li><a href="apidocs.html#sentry_sdk.envelope.Item.get_event">get_event() (sentry_sdk.envelope.Item method)</a>
-</li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.get_global_scope">get_global_scope() (sentry_sdk.Scope class method)</a>
 </li>
       <li><a href="apidocs.html#sentry_sdk.client._Client.get_integration">get_integration() (sentry_sdk.client._Client method)</a>
 
@@ -314,8 +300,6 @@
         <li><a href="apidocs.html#sentry_sdk.Hub.get_integration">(sentry_sdk.Hub method)</a>
 </li>
       </ul></li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.get_isolation_scope">get_isolation_scope() (sentry_sdk.Scope class method)</a>
-</li>
       <li><a href="apidocs.html#sentry_sdk.Scope.get_trace_context">get_trace_context() (sentry_sdk.Scope method)</a>
 </li>
       <li><a href="api.html#sentry_sdk.api.get_traceparent">get_traceparent() (in module sentry_sdk.api)</a>
@@ -346,16 +330,6 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="integrations.html#sentry_sdk.integrations.logging.ignore_logger">ignore_logger() (in module sentry_sdk.integrations.logging)</a>
 </li>
-      <li><a href="apidocs.html#sentry_sdk.client._Client.is_active">is_active() (sentry_sdk.client._Client method)</a>
-
-      <ul>
-        <li><a href="apidocs.html#sentry_sdk.client.BaseClient.is_active">(sentry_sdk.client.BaseClient method)</a>
-</li>
-      </ul></li>
-      <li><a href="api.html#sentry_sdk.api.is_initialized">is_initialized() (in module sentry_sdk.api)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apidocs.html#sentry_sdk.envelope.Item">Item (class in sentry_sdk.envelope)</a>
 </li>
       <li><a href="apidocs.html#sentry_sdk.Scope.iter_headers">iter_headers() (sentry_sdk.Scope method)</a>
@@ -364,6 +338,8 @@
         <li><a href="apidocs.html#sentry_sdk.tracing.Span.iter_headers">(sentry_sdk.tracing.Span method)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apidocs.html#sentry_sdk.Hub.iter_trace_propagation_headers">iter_trace_propagation_headers() (sentry_sdk.Hub method)</a>
 
       <ul>
@@ -417,11 +393,7 @@
 <h2 id="N">N</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api.html#sentry_sdk.api.new_scope">new_scope() (in module sentry_sdk.api)</a>
-</li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="apidocs.html#sentry_sdk.client.NonRecordingClient">NonRecordingClient (class in sentry_sdk.client)</a>
+      <li><a href="apidocs.html#sentry_sdk.tracing.Span.new_span">new_span() (sentry_sdk.tracing.Span method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -457,10 +429,10 @@
 </li>
       <li><a href="apidocs.html#sentry_sdk.Scope.remove_extra">remove_extra() (sentry_sdk.Scope method)</a>
 </li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.remove_tag">remove_tag() (sentry_sdk.Scope method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apidocs.html#sentry_sdk.Scope.remove_tag">remove_tag() (sentry_sdk.Scope method)</a>
+</li>
       <li><a href="apidocs.html#sentry_sdk.Hub.resume_auto_session_tracking">resume_auto_session_tracking() (sentry_sdk.Hub method)</a>
 
       <ul>
@@ -468,10 +440,6 @@
 </li>
       </ul></li>
       <li><a href="apidocs.html#sentry_sdk.Hub.run">run() (sentry_sdk.Hub method)</a>
-</li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.run_error_processors">run_error_processors() (sentry_sdk.Scope method)</a>
-</li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.run_event_processors">run_event_processors() (sentry_sdk.Scope method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -482,6 +450,8 @@
       <li><a href="apidocs.html#sentry_sdk.Scope">Scope (class in sentry_sdk)</a>
 </li>
       <li><a href="apidocs.html#sentry_sdk.Hub.scope">scope (sentry_sdk.Hub property)</a>
+</li>
+      <li><a href="apidocs.html#sentry_sdk.scrubber.EventScrubber.scrub_dict">scrub_dict() (sentry_sdk.scrubber.EventScrubber method)</a>
 </li>
       <li><a href="apidocs.html#sentry_sdk.scrubber.EventScrubber.scrub_list">scrub_list() (sentry_sdk.scrubber.EventScrubber method)</a>
 </li>
@@ -494,8 +464,6 @@
       </ul></li>
       <li><a href="apidocs.html#sentry_sdk.session.Session">Session (class in sentry_sdk.session)</a>
 </li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.set_client">set_client() (sentry_sdk.Scope method)</a>
-</li>
       <li><a href="api.html#sentry_sdk.api.set_context">set_context() (in module sentry_sdk.api)</a>
 
       <ul>
@@ -504,8 +472,6 @@
         <li><a href="apidocs.html#sentry_sdk.tracing.Transaction.set_context">(sentry_sdk.tracing.Transaction method)</a>
 </li>
       </ul></li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.set_current_scope">set_current_scope() (sentry_sdk.Scope class method)</a>
-</li>
       <li><a href="api.html#sentry_sdk.api.set_extra">set_extra() (in module sentry_sdk.api)</a>
 
       <ul>
@@ -513,8 +479,6 @@
 </li>
       </ul></li>
       <li><a href="apidocs.html#sentry_sdk.tracing.Transaction.set_http_status">set_http_status() (sentry_sdk.tracing.Transaction method)</a>
-</li>
-      <li><a href="apidocs.html#sentry_sdk.Scope.set_isolation_scope">set_isolation_scope() (sentry_sdk.Scope class method)</a>
 </li>
       <li><a href="api.html#sentry_sdk.api.set_level">set_level() (in module sentry_sdk.api)</a>
 
@@ -524,14 +488,14 @@
       </ul></li>
       <li><a href="apidocs.html#sentry_sdk.Scope.set_new_propagation_context">set_new_propagation_context() (sentry_sdk.Scope method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api.html#sentry_sdk.api.set_tag">set_tag() (in module sentry_sdk.api)</a>
 
       <ul>
         <li><a href="apidocs.html#sentry_sdk.Scope.set_tag">(sentry_sdk.Scope method)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apidocs.html#sentry_sdk.Scope.set_transaction_name">set_transaction_name() (sentry_sdk.Scope method)</a>
 </li>
       <li><a href="api.html#sentry_sdk.api.set_user">set_user() (in module sentry_sdk.api)</a>
@@ -648,7 +612,7 @@
     </div>
   </div>
 </footer></div>
-      <script src="_static/documentation_options.js?v=f2943afd"></script>
+      <script src="_static/documentation_options.js?v=a750e919"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=999236dc"></script>

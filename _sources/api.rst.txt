@@ -41,18 +41,13 @@ Distributed Tracing
 .. autofunction:: sentry_sdk.api.get_traceparent
 
 
-Client Management
-=================
-
-.. autofunction:: sentry_sdk.api.is_initialized
-.. autofunction:: sentry_sdk.api.get_client
-
-
 Managing Scope (advanced)
 =========================
 
 .. autofunction:: sentry_sdk.api.configure_scope
 .. autofunction:: sentry_sdk.api.push_scope
 
-.. autofunction:: sentry_sdk.api.new_scope
 
+.. Not documented (On purpose. Not sure if anyone should use those)
+.. last_event_id()
+.. flush()
