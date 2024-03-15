@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         BreadcrumbProcessor,
+        ContinuousProfilerMode,
         Event,
         EventProcessor,
         Hint,
@@ -40,6 +41,8 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
+            "enable_continuous_profiling": Optional[bool],
+            "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             # TODO: Remove these 2 profiling related experiments
             "profiles_sample_rate": Optional[float],
             "profiler_mode": Optional[ProfilerMode],

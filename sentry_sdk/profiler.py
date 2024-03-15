@@ -42,6 +42,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
     filename_for_module,
+    is_gevent,
     is_valid_sample_rate,
     logger,
     nanosecond_time,
@@ -127,7 +128,7 @@ if TYPE_CHECKING:
 
 try:
     from gevent import get_hub as get_gevent_hub  # type: ignore
-    from gevent.monkey import get_original, is_module_patched  # type: ignore
+    from gevent.monkey import get_original  # type: ignore
     from gevent.threadpool import ThreadPool  # type: ignore
 
     thread_sleep = get_original("time", "sleep")
@@ -139,17 +140,7 @@ except ImportError:
 
     thread_sleep = time.sleep
 
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        # unable to import from gevent means no modules have been patched
-        return False
-
     ThreadPool = None
-
-
-def is_gevent():
-    # type: () -> bool
-    return is_module_patched("threading") or is_module_patched("_thread")
 
 
 _scheduler = None  # type: Optional[Scheduler]

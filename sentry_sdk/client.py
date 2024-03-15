@@ -17,6 +17,7 @@ from sentry_sdk._compat import (
     iteritems,
     check_uwsgi_thread_support,
 )
+from sentry_sdk.continuous_profiler import has_continous_profiling_enabled, setup_continuous_profiler
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -319,11 +320,23 @@ class _Client(object):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
-            if has_profiling_enabled(self.options):
+            transaction_based_profiling_enabled = has_profiling_enabled(self.options)
+            continuous_profiling_enabled = has_continous_profiling_enabled(self.options)
+
+            if transaction_based_profiling_enabled and continuous_profiling_enabled:
+                raise ValueError(
+                    "Cannot run with continuous profiling mode along side the regular profiler."
+                )
+            elif transaction_based_profiling_enabled:
                 try:
                     setup_profiler(self.options)
                 except Exception as e:
                     logger.debug("Can not set up profiler. (%s)", e)
+            elif continuous_profiling_enabled:
+                try:
+                    setup_continuous_profiler(self.options)
+                except Exception as e:
+                    logger.debug("Can not set up continuous profiler. (%s)", e)
 
         finally:
             _client_init_debug.set(old_debug)
