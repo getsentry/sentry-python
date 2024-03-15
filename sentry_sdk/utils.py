@@ -1635,6 +1635,28 @@ def ensure_integration_enabled(
     integration,  # type: type[Integration]
     original_function,  # type: Callable[P, R]
 ):
+    """
+    Ensures a given integration is enabled prior to calling a Sentry-patched function.
+
+    The function takes as its parameters the integration that must be enabled and the original
+    function that the SDK is patching. The function returns a function that takes the
+    decorated (Sentry-patched) function as its parameter, and returns a function that, when
+    called, checks whether the given integration is enabled. If the integration is enabled, the
+    funciton calls the decorated, Sentry-patched funciton. If the integration is not enabled,
+    the original function is called.
+
+    The function also takes care of preserving the original function's signature and docstring.
+
+    Example usage:
+
+    ```python
+    @ensure_integration_enabled(MyIntegration, my_function)
+    def patch_my_function():
+        with sentry_sdk.start_transaction(...):
+            return my_function()
+    ```
+    """
+
     # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
     def patcher(sentry_patched_function):
         # type: (Callable[P, R]) -> Callable[P, R]
@@ -1655,6 +1677,12 @@ def ensure_integration_enabled_async(
     integration,  # type: type[Integration]
     original_function,  # type: Callable[P, Awaitable[R]]
 ):
+    """
+    Version of `ensure_integration_enabled` for decorating async functions.
+
+    Please refer to the `ensure_integration_enabled` documentation for more information.
+    """
+
     # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
     def patcher(sentry_patched_function):
         # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
