@@ -92,8 +92,8 @@ class Span(object):
     Spans can have multiple child spans thus forming a span tree."""
 
     __slots__ = (
-        "trace_id",
-        "span_id",
+        "_trace_id",
+        "_span_id",
         "parent_span_id",
         "same_process_as_parent",
         "sampled",
@@ -142,8 +142,8 @@ class Span(object):
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
     ):
         # type: (...) -> None
-        self.trace_id = trace_id or uuid.uuid4().hex
-        self.span_id = span_id or uuid.uuid4().hex[16:]
+        self._trace_id = trace_id
+        self._span_id = span_id
         self.parent_span_id = parent_span_id
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
@@ -178,6 +178,32 @@ class Span(object):
         # type: (int) -> None
         if self._span_recorder is None:
             self._span_recorder = _SpanRecorder(maxlen)
+
+    @property
+    def trace_id(self):
+        # type: () -> str
+        if not self._trace_id:
+            self._trace_id = uuid.uuid4().hex
+
+        return self._trace_id
+
+    @trace_id.setter
+    def trace_id(self, value):
+        # type: (str) -> None
+        self._trace_id = value
+
+    @property
+    def span_id(self):
+        # type: () -> str
+        if not self._span_id:
+            self._span_id = uuid.uuid4().hex[16:]
+
+        return self._span_id
+
+    @span_id.setter
+    def span_id(self, value):
+        # type: (str) -> None
+        self._span_id = value
 
     def _get_local_aggregator(self):
         # type: (...) -> LocalAggregator
