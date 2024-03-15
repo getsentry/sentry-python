@@ -1,18 +1,20 @@
 import sys
 import weakref
 from inspect import isawaitable
+from urllib.parse import urlsplit
 
 from sentry_sdk import continue_trace
-from sentry_sdk._compat import urlparse, reraise
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
     parse_version,
+    reraise,
 )
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
@@ -231,14 +233,11 @@ async def _hub_exit(request, response=None):
 
 async def _set_transaction(request, route, **_):
     # type: (Request, Route, **Any) -> None
-    hub = Hub.current
     if request.ctx._sentry_do_integration:
         with capture_internal_exceptions():
-            with hub.configure_scope() as scope:
-                route_name = route.name.replace(request.app.name, "").strip(".")
-                scope.set_transaction_name(
-                    route_name, source=TRANSACTION_SOURCE_COMPONENT
-                )
+            scope = Scope.get_current_scope()
+            route_name = route.name.replace(request.app.name, "").strip(".")
+            scope.set_transaction_name(route_name, source=TRANSACTION_SOURCE_COMPONENT)
 
 
 def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
@@ -365,7 +364,7 @@ def _make_request_processor(weak_request):
             extractor.extract_into_event(event)
 
             request_info = event["request"]
-            urlparts = urlparse.urlsplit(request.url)
+            urlparts = urlsplit(request.url)
 
             request_info["url"] = "%s://%s%s" % (
                 urlparts.scheme,

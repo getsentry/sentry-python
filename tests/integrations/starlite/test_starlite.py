@@ -2,16 +2,14 @@ import functools
 
 import pytest
 
-from sentry_sdk import capture_exception, capture_message, last_event_id
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlite import StarliteIntegration
 
 from typing import Any, Dict
 
-import starlite
 from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig
-from starlite.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
 from starlite.testing import TestClient
 
 
@@ -229,13 +227,10 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
     ]
-    print(transaction_event["spans"])
-    idx = 0
-    for span in transaction_event["spans"]:
+    for idx, span in enumerate(transaction_event["spans"]):
         assert span["op"] == expected[idx]["op"]
         assert span["description"] == expected[idx]["description"]
         assert span["tags"] == expected[idx]["tags"]
-        idx += 1
 
 
 def test_middleware_receive_send(sentry_init, capture_events):
@@ -290,34 +285,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
     ]
 
-    idx = 0
-    for span in transaction_event["spans"]:
+    for idx, span in enumerate(transaction_event["spans"]):
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
         assert span["tags"] == expected[idx]["tags"]
-        idx += 1
-
-
-def test_last_event_id(sentry_init, capture_events):
-    sentry_init(
-        integrations=[StarliteIntegration()],
-    )
-    events = capture_events()
-
-    def handler(request, exc):
-        capture_exception(exc)
-        return starlite.response.Response(last_event_id(), status_code=500)
-
-    app = starlite_app_factory(
-        debug=False, exception_handlers={HTTP_500_INTERNAL_SERVER_ERROR: handler}
-    )
-
-    client = TestClient(app, raise_server_exceptions=False)
-    response = client.get("/custom_error")
-    assert response.status_code == 500
-    print(events)
-    event = events[-1]
-    assert response.content.strip().decode("ascii").strip('"') == event["event_id"]
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "Too Hot"

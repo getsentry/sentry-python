@@ -1,7 +1,7 @@
 """Split Tox to GitHub Actions
 
 This is a small script to split a tox.ini config file into multiple GitHub actions configuration files.
-This way each framework defined in tox.ini will get its own GitHub actions configuration file
+This way each group of frameworks defined in tox.ini will get its own GitHub actions configuration file
 which allows them to be run in parallel in GitHub actions.
 
 This will generate/update several configuration files, that need to be commited to Git afterwards.
@@ -19,213 +19,146 @@ import configparser
 import hashlib
 import sys
 from collections import defaultdict
+from functools import reduce
 from glob import glob
 from pathlib import Path
 
+from jinja2 import Environment, FileSystemLoader
+
+
 OUT_DIR = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
 TOX_FILE = Path(__file__).resolve().parent.parent.parent / "tox.ini"
-TEMPLATE_DIR = Path(__file__).resolve().parent
-TEMPLATE_FILE = TEMPLATE_DIR / "ci-yaml.txt"
-TEMPLATE_FILE_SERVICES = TEMPLATE_DIR / "ci-yaml-services.txt"
-TEMPLATE_FILE_SETUP_DB = TEMPLATE_DIR / "ci-yaml-setup-db.txt"
-TEMPLATE_SNIPPET_TEST = TEMPLATE_DIR / "ci-yaml-test-snippet.txt"
-TEMPLATE_SNIPPET_TEST_PY27 = TEMPLATE_DIR / "ci-yaml-test-py27-snippet.txt"
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
-FRAMEWORKS_NEEDING_POSTGRES = [
+FRAMEWORKS_NEEDING_POSTGRES = {
     "django",
     "asyncpg",
-]
+}
 
-FRAMEWORKS_NEEDING_CLICKHOUSE = [
+FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
-]
+}
 
-MATRIX_DEFINITION = """
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [{{ python-version }}]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-"""
+FRAMEWORKS_NEEDING_AWS = {
+    "aws_lambda",
+}
 
-ADDITIONAL_USES_CLICKHOUSE = """\
+FRAMEWORKS_NEEDING_GITHUB_SECRETS = {
+    "aws_lambda",
+}
 
-      - uses: getsentry/action-clickhouse-in-ci@v1
-"""
-
-CHECK_NEEDS = """\
-    needs: test
-"""
-CHECK_NEEDS_PY27 = """\
-    needs: [test, test-py27]
-"""
-
-CHECK_PY27 = """\
-      - name: Check for 2.7 failures
-        if: contains(needs.test-py27.result, 'failure')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-"""
-
-
-def write_yaml_file(
-    template,
-    current_framework,
-    python_versions,
-):
-    """Write the YAML configuration file for one framework to disk."""
-    py_versions = [py.replace("py", "") for py in python_versions]
-    py27_supported = "2.7" in py_versions
-
-    test_loc = template.index("{{ test }}\n")
-    f = open(TEMPLATE_SNIPPET_TEST, "r")
-    test_snippet = f.readlines()
-    template = template[:test_loc] + test_snippet + template[test_loc + 1 :]
-    f.close()
-
-    test_py27_loc = template.index("{{ test_py27 }}\n")
-    if py27_supported:
-        f = open(TEMPLATE_SNIPPET_TEST_PY27, "r")
-        test_py27_snippet = f.readlines()
-        template = (
-            template[:test_py27_loc] + test_py27_snippet + template[test_py27_loc + 1 :]
-        )
-        f.close()
-
-        py_versions.remove("2.7")
-    else:
-        template.pop(test_py27_loc)
-
-    out = ""
-    py27_test_part = False
-    for template_line in template:
-        if template_line.strip() == "{{ strategy_matrix }}":
-            m = MATRIX_DEFINITION
-            m = m.replace("{{ framework }}", current_framework).replace(
-                "{{ python-version }}", ",".join([f'"{v}"' for v in py_versions])
-            )
-            out += m
-
-        elif template_line.strip() == "{{ services }}":
-            if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
-                f = open(TEMPLATE_FILE_SERVICES, "r")
-                lines = [
-                    line.replace(
-                        "{{ postgres_host }}",
-                        "postgres" if py27_test_part else "localhost",
-                    )
-                    for line in f.readlines()
-                ]
-                out += "".join(lines)
-                f.close()
-
-        elif template_line.strip() == "{{ setup_postgres }}":
-            if current_framework in FRAMEWORKS_NEEDING_POSTGRES:
-                f = open(TEMPLATE_FILE_SETUP_DB, "r")
-                out += "".join(f.readlines())
-
-        elif template_line.strip() == "{{ additional_uses }}":
-            if current_framework in FRAMEWORKS_NEEDING_CLICKHOUSE:
-                out += ADDITIONAL_USES_CLICKHOUSE
-
-        elif template_line.strip() == "{{ check_needs }}":
-            if py27_supported:
-                out += CHECK_NEEDS_PY27
-            else:
-                out += CHECK_NEEDS
-
-        elif template_line.strip() == "{{ check_py27 }}":
-            if py27_supported:
-                out += CHECK_PY27
-
-        else:
-            if template_line.strip() == "test-py27:":
-                py27_test_part = True
-
-            out += template_line.replace("{{ framework }}", current_framework)
-
-    # write rendered template
-    if current_framework == "common":
-        outfile_name = OUT_DIR / f"test-{current_framework}.yml"
-    else:
-        outfile_name = OUT_DIR / f"test-integration-{current_framework}.yml"
-
-    print(f"Writing {outfile_name}")
-    f = open(outfile_name, "w")
-    f.writelines(out)
-    f.close()
+# Frameworks grouped here will be tested together to not hog all GitHub runners.
+# If you add or remove a group, make sure to git rm the generated YAML file as
+# well.
+GROUPS = {
+    "Common": [
+        "common",
+    ],
+    "AWS Lambda": [
+        # this is separate from Cloud Computing because only this one test suite
+        # needs to run with access to GitHub secrets
+        "aws_lambda",
+    ],
+    "Cloud Computing": [
+        "boto3",
+        "chalice",
+        "cloud_resource_context",
+        "gcp",
+    ],
+    "Data Processing": [
+        "arq",
+        "beam",
+        "celery",
+        "huey",
+        "openai",
+        "rq",
+    ],
+    "Databases": [
+        "asyncpg",
+        "clickhouse_driver",
+        "pymongo",
+        "redis",
+        "rediscluster",
+        "sqlalchemy",
+    ],
+    "GraphQL": [
+        "ariadne",
+        "gql",
+        "graphene",
+        "strawberry",
+    ],
+    "Networking": [
+        "gevent",
+        "grpc",
+        "httpx",
+        "requests",
+    ],
+    "Web Frameworks 1": [
+        "django",
+        "flask",
+        "starlette",
+        "fastapi",
+    ],
+    "Web Frameworks 2": [
+        "aiohttp",
+        "asgi",
+        "bottle",
+        "falcon",
+        "pyramid",
+        "quart",
+        "sanic",
+        "starlite",
+        "tornado",
+    ],
+    "Miscellaneous": [
+        "loguru",
+        "opentelemetry",
+        "pure_eval",
+        "trytond",
+    ],
+}
 
 
-def get_yaml_files_hash():
-    """Calculate a hash of all the yaml configuration files"""
-
-    hasher = hashlib.md5()
-    path_pattern = (OUT_DIR / "test-integration-*.yml").as_posix()
-    for file in glob(path_pattern):
-        with open(file, "rb") as f:
-            buf = f.read()
-            hasher.update(buf)
-
-    return hasher.hexdigest()
+ENV = Environment(
+    loader=FileSystemLoader(TEMPLATE_DIR),
+)
 
 
 def main(fail_on_changes):
-    """Create one CI workflow for each framework defined in tox.ini"""
+    """Create one CI workflow for each framework defined in tox.ini."""
     if fail_on_changes:
-        old_hash = get_yaml_files_hash()
+        old_hash = get_files_hash()
 
-    print("Read GitHub actions config file template")
-    f = open(TEMPLATE_FILE, "r")
-    template = f.readlines()
-    f.close()
-
-    print("Read tox.ini")
-    config = configparser.ConfigParser()
-    config.read(TOX_FILE)
-    lines = [x for x in config["tox"]["envlist"].split("\n") if len(x) > 0]
-
-    python_versions = defaultdict(list)
-
-    print("Parse tox.ini envlist")
-
-    for line in lines:
-        # normalize lines
-        line = line.strip().lower()
-
-        # ignore comments
-        if line.startswith("#"):
-            continue
-
-        try:
-            # parse tox environment definition
-            try:
-                (raw_python_versions, framework, _) = line.split("-")
-            except ValueError:
-                (raw_python_versions, framework) = line.split("-")
-
-            # collect python versions to test the framework in
-            for python_version in (
-                raw_python_versions.replace("{", "").replace("}", "").split(",")
-            ):
-                if python_version not in python_versions[framework]:
-                    python_versions[framework].append(python_version)
-
-        except ValueError:
-            print(f"ERROR reading line {line}")
-
-    for framework in python_versions:
-        write_yaml_file(template, framework, python_versions[framework])
+    print("Parsing tox.ini...")
+    py_versions_pinned, py_versions_latest = parse_tox()
 
     if fail_on_changes:
-        new_hash = get_yaml_files_hash()
+        print("Checking if all frameworks belong in a group...")
+        missing_frameworks = find_frameworks_missing_from_groups(
+            py_versions_pinned, py_versions_latest
+        )
+        if missing_frameworks:
+            raise RuntimeError(
+                "Please add the following frameworks to the corresponding group "
+                "in `GROUPS` in `scripts/split-tox-gh-actions/split-tox-gh-actions.py: "
+                + ", ".join(missing_frameworks)
+            )
+
+    print("Rendering templates...")
+    for group, frameworks in GROUPS.items():
+        contents = render_template(
+            group, frameworks, py_versions_pinned, py_versions_latest
+        )
+        filename = write_file(contents, group)
+        print(f"Created {filename}")
+
+    if fail_on_changes:
+        new_hash = get_files_hash()
 
         if old_hash != new_hash:
             raise RuntimeError(
-                "The yaml configuration files have changed. This means that tox.ini has changed "
+                "The yaml configuration files have changed. This means that either `tox.ini` "
+                "or one of the constants in `split-tox-gh-actions.py` has changed "
                 "but the changes have not been propagated to the GitHub actions config files. "
                 "Please run `python scripts/split-tox-gh-actions/split-tox-gh-actions.py` "
                 "locally and commit the changes of the yaml configuration files to continue. "
@@ -234,8 +167,137 @@ def main(fail_on_changes):
     print("All done. Have a nice day!")
 
 
+def parse_tox():
+    config = configparser.ConfigParser()
+    config.read(TOX_FILE)
+    lines = [
+        line
+        for line in config["tox"]["envlist"].split("\n")
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+    py_versions_pinned = defaultdict(set)
+    py_versions_latest = defaultdict(set)
+
+    for line in lines:
+        # normalize lines
+        line = line.strip().lower()
+
+        try:
+            # parse tox environment definition
+            try:
+                (raw_python_versions, framework, framework_versions) = line.split("-")
+            except ValueError:
+                (raw_python_versions, framework) = line.split("-")
+                framework_versions = []
+
+            # collect python versions to test the framework in
+            raw_python_versions = set(
+                raw_python_versions.replace("{", "").replace("}", "").split(",")
+            )
+            if "latest" in framework_versions:
+                py_versions_latest[framework] |= raw_python_versions
+            else:
+                py_versions_pinned[framework] |= raw_python_versions
+
+        except ValueError:
+            print(f"ERROR reading line {line}")
+
+    py_versions_pinned = _normalize_py_versions(py_versions_pinned)
+    py_versions_latest = _normalize_py_versions(py_versions_latest)
+
+    return py_versions_pinned, py_versions_latest
+
+
+def find_frameworks_missing_from_groups(py_versions_pinned, py_versions_latest):
+    frameworks_in_a_group = _union(GROUPS.values())
+    all_frameworks = set(py_versions_pinned.keys()) | set(py_versions_latest.keys())
+    return all_frameworks - frameworks_in_a_group
+
+
+def _normalize_py_versions(py_versions):
+    def replace_and_sort(versions):
+        return sorted(
+            [py.replace("py", "") for py in versions],
+            key=lambda v: tuple(map(int, v.split("."))),
+        )
+
+    if isinstance(py_versions, dict):
+        normalized = defaultdict(set)
+        normalized |= {
+            framework: replace_and_sort(versions)
+            for framework, versions in py_versions.items()
+        }
+
+    elif isinstance(py_versions, set):
+        normalized = replace_and_sort(py_versions)
+
+    return normalized
+
+
+def get_files_hash():
+    """Calculate a hash of all the yaml configuration files"""
+    hasher = hashlib.md5()
+    path_pattern = (OUT_DIR / "test-integrations-*.yml").as_posix()
+    for file in glob(path_pattern):
+        with open(file, "rb") as f:
+            buf = f.read()
+            hasher.update(buf)
+
+    return hasher.hexdigest()
+
+
+def _union(seq):
+    return reduce(lambda x, y: set(x) | set(y), seq)
+
+
+def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
+    template = ENV.get_template("base.jinja")
+
+    categories = set()
+    py_versions = defaultdict(set)
+    for framework in frameworks:
+        if py_versions_pinned[framework]:
+            categories.add("pinned")
+            py_versions["pinned"] |= set(py_versions_pinned[framework])
+        if py_versions_latest[framework]:
+            categories.add("latest")
+            py_versions["latest"] |= set(py_versions_latest[framework])
+
+    context = {
+        "group": group,
+        "frameworks": frameworks,
+        "categories": sorted(categories),
+        "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
+        "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
+        "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
+        "needs_github_secrets": bool(
+            set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
+        ),
+        "py_versions": {
+            category: [f'"{version}"' for version in _normalize_py_versions(versions)]
+            for category, versions in py_versions.items()
+        },
+    }
+    rendered = template.render(context)
+    rendered = postprocess_template(rendered)
+    return rendered
+
+
+def postprocess_template(rendered):
+    return "\n".join([line for line in rendered.split("\n") if line.strip()]) + "\n"
+
+
+def write_file(contents, group):
+    group = group.lower().replace(" ", "-")
+    outfile = OUT_DIR / f"test-integrations-{group}.yml"
+
+    with open(outfile, "w") as file:
+        file.write(contents)
+
+    return outfile
+
+
 if __name__ == "__main__":
-    fail_on_changes = (
-        True if len(sys.argv) == 2 and sys.argv[1] == "--fail-on-changes" else False
-    )
+    fail_on_changes = len(sys.argv) == 2 and sys.argv[1] == "--fail-on-changes"
     main(fail_on_changes)

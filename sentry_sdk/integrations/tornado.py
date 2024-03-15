@@ -23,7 +23,6 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
 )
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk._compat import iteritems
 
 try:
     from tornado import version_info as TORNADO_VERSION
@@ -41,7 +40,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Generator
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 class TornadoIntegration(Integration):
@@ -155,7 +154,7 @@ def _capture_exception(ty, value, tb):
 def _make_event_processor(weak_handler):
     # type: (Callable[[], RequestHandler]) -> EventProcessor
     def tornado_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         handler = weak_handler()
         if handler is None:
             return event
@@ -164,7 +163,7 @@ def _make_event_processor(weak_handler):
 
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
-            event["transaction"] = transaction_from_function(method)
+            event["transaction"] = transaction_from_function(method) or ""
             event["transaction_info"] = {"source": TRANSACTION_SOURCE_COMPONENT}
 
         with capture_internal_exceptions():
@@ -202,7 +201,7 @@ class TornadoRequestExtractor(RequestExtractor):
 
     def cookies(self):
         # type: () -> Dict[str, str]
-        return {k: v.value for k, v in iteritems(self.request.cookies)}
+        return {k: v.value for k, v in self.request.cookies.items()}
 
     def raw_data(self):
         # type: () -> bytes
@@ -212,7 +211,7 @@ class TornadoRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, Any]
         return {
             k: [v.decode("latin1", "replace") for v in vs]
-            for k, vs in iteritems(self.request.body_arguments)
+            for k, vs in self.request.body_arguments.items()
         }
 
     def is_json(self):
@@ -221,7 +220,7 @@ class TornadoRequestExtractor(RequestExtractor):
 
     def files(self):
         # type: () -> Dict[str, Any]
-        return {k: v[0] for k, v in iteritems(self.request.files) if v}
+        return {k: v[0] for k, v in self.request.files.items() if v}
 
     def size_of_file(self, file):
         # type: (Any) -> int

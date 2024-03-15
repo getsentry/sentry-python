@@ -1,18 +1,16 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
+from functools import wraps
 
 from django.dispatch import Signal
 
 from sentry_sdk import Hub
-from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations.django import DJANGO_VERSION
 
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import List
+    from collections.abc import Callable
+    from typing import Any, Union
 
 
 def _get_receiver_name(receiver):
@@ -42,17 +40,27 @@ def _get_receiver_name(receiver):
 
 def patch_signals():
     # type: () -> None
-    """Patch django signal receivers to create a span"""
+    """
+    Patch django signal receivers to create a span.
+
+    This only wraps sync receivers. Django>=5.0 introduced async receivers, but
+    since we don't create transactions for ASGI Django, we don't wrap them.
+    """
     from sentry_sdk.integrations.django import DjangoIntegration
 
     old_live_receivers = Signal._live_receivers
 
     def _sentry_live_receivers(self, sender):
-        # type: (Signal, Any) -> List[Callable[..., Any]]
+        # type: (Signal, Any) -> Union[tuple[list[Callable[..., Any]], list[Callable[..., Any]]], list[Callable[..., Any]]]
         hub = Hub.current
-        receivers = old_live_receivers(self, sender)
 
-        def sentry_receiver_wrapper(receiver):
+        if DJANGO_VERSION >= (5, 0):
+            sync_receivers, async_receivers = old_live_receivers(self, sender)
+        else:
+            sync_receivers = old_live_receivers(self, sender)
+            async_receivers = []
+
+        def sentry_sync_receiver_wrapper(receiver):
             # type: (Callable[..., Any]) -> Callable[..., Any]
             @wraps(receiver)
             def wrapper(*args, **kwargs):
@@ -69,9 +77,12 @@ def patch_signals():
 
         integration = hub.get_integration(DjangoIntegration)
         if integration and integration.signals_spans:
-            for idx, receiver in enumerate(receivers):
-                receivers[idx] = sentry_receiver_wrapper(receiver)
+            for idx, receiver in enumerate(sync_receivers):
+                sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
 
-        return receivers
+        if DJANGO_VERSION >= (5, 0):
+            return sync_receivers, async_receivers
+        else:
+            return sync_receivers
 
     Signal._live_receivers = _sentry_live_receivers

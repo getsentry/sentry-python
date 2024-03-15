@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import socket
 from sentry_sdk import Hub
 from sentry_sdk._types import MYPY

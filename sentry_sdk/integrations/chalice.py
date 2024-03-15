@@ -1,6 +1,6 @@
 import sys
+from functools import wraps
 
-from sentry_sdk._compat import reraise
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
@@ -9,13 +9,17 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     parse_version,
+    reraise,
 )
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk._functools import wraps
 
-import chalice  # type: ignore
-from chalice import Chalice, ChaliceViewError
-from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
+try:
+    import chalice  # type: ignore
+    from chalice import __version__ as CHALICE_VERSION
+    from chalice import Chalice, ChaliceViewError
+    from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
+except ImportError:
+    raise DidNotEnable("Chalice is not installed")
 
 if TYPE_CHECKING:
     from typing import Any
@@ -24,11 +28,6 @@ if TYPE_CHECKING:
     from typing import Callable
 
     F = TypeVar("F", bound=Callable[..., Any])
-
-try:
-    from chalice import __version__ as CHALICE_VERSION
-except ImportError:
-    raise DidNotEnable("Chalice is not installed")
 
 
 class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore

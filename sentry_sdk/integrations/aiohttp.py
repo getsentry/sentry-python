@@ -2,11 +2,11 @@ import sys
 import weakref
 
 from sentry_sdk.api import continue_trace
-from sentry_sdk._compat import reraise
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import Scope
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
@@ -24,6 +24,7 @@ from sentry_sdk.utils import (
     logger,
     parse_url,
     parse_version,
+    reraise,
     transaction_from_function,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -44,18 +45,16 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp.web_request import Request
-    from aiohttp.abc import AbstractMatchInfo
+    from aiohttp.web_urldispatcher import UrlMappingMatchInfo
     from aiohttp import TraceRequestStartParams, TraceRequestEndParams
     from types import SimpleNamespace
     from typing import Any
-    from typing import Dict
     from typing import Optional
     from typing import Tuple
-    from typing import Callable
     from typing import Union
 
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
@@ -113,8 +112,9 @@ class AioHttpIntegration(Integration):
                         scope.clear_breadcrumbs()
                         scope.add_event_processor(_make_request_processor(weak_request))
 
+                    headers = dict(request.headers)
                     transaction = continue_trace(
-                        request.headers,
+                        headers,
                         op=OP.HTTP_SERVER,
                         # If this transaction name makes it to the UI, AIOHTTP's
                         # URL resolver did not find a route or died trying.
@@ -146,7 +146,7 @@ class AioHttpIntegration(Integration):
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
         async def sentry_urldispatcher_resolve(self, request):
-            # type: (UrlDispatcher, Request) -> AbstractMatchInfo
+            # type: (UrlDispatcher, Request) -> UrlMappingMatchInfo
             rv = await old_urldispatcher_resolve(self, request)
 
             hub = Hub.current
@@ -165,11 +165,10 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                with Hub.current.configure_scope() as scope:
-                    scope.set_transaction_name(
-                        name,
-                        source=SOURCE_FOR_STYLE[integration.transaction_style],
-                    )
+                Scope.get_current_scope().set_transaction_name(
+                    name,
+                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                )
 
             return rv
 
@@ -178,7 +177,7 @@ class AioHttpIntegration(Integration):
         old_client_session_init = ClientSession.__init__
 
         def init(*args, **kwargs):
-            # type: (Any, Any) -> ClientSession
+            # type: (Any, Any) -> None
             hub = Hub.current
             if hub.get_integration(AioHttpIntegration) is None:
                 return old_client_session_init(*args, **kwargs)
@@ -213,9 +212,10 @@ def create_trace_config():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
         )
         span.set_data(SPANDATA.HTTP_METHOD, method)
-        span.set_data("url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if parsed_url is not None:
+            span.set_data("url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         if should_propagate_trace(hub, str(params.url)):
             for key, value in hub.iter_trace_propagation_headers(span):
@@ -253,12 +253,12 @@ def create_trace_config():
 
 
 def _make_request_processor(weak_request):
-    # type: (Callable[[], Request]) -> EventProcessor
+    # type: (weakref.ReferenceType[Request]) -> EventProcessor
     def aiohttp_processor(
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+        event,  # type: Event
+        hint,  # type: dict[str, Tuple[type, BaseException, Any]]
     ):
-        # type: (...) -> Dict[str, Any]
+        # type: (...) -> Event
         request = weak_request()
         if request is None:
             return event

@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import ast
 
 from sentry_sdk import Hub, serializer

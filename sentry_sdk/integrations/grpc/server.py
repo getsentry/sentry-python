@@ -6,7 +6,7 @@ from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
 
 if MYPY:
     from typing import Callable, Optional
-    from google.protobuf.message import Message  # type: ignore
+    from google.protobuf.message import Message
 
 try:
     import grpc
@@ -20,7 +20,7 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         # type: (ServerInterceptor, Optional[Callable[[ServicerContext], str]]) -> None
         self._find_method_name = find_name or ServerInterceptor._find_name
 
-        super(ServerInterceptor, self).__init__()
+        super().__init__()
 
     def intercept_service(self, continuation, handler_call_details):
         # type: (ServerInterceptor, Callable[[HandlerCallDetails], RpcMethodHandler], HandlerCallDetails) -> RpcMethodHandler

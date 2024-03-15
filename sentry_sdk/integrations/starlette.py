@@ -1,10 +1,7 @@
-from __future__ import absolute_import
-
 import asyncio
 import functools
 from copy import deepcopy
 
-from sentry_sdk._compat import iteritems
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
@@ -14,6 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_COMPONENT,
@@ -33,6 +31,7 @@ if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
     from sentry_sdk.scope import Scope as SentryScope
+    from sentry_sdk._types import Event
 
 try:
     import starlette  # type: ignore
@@ -114,13 +113,12 @@ def _enable_span_for_middleware(middleware_class):
         middleware_name = app.__class__.__name__
 
         # Update transaction name with middleware name
-        with hub.configure_scope() as sentry_scope:
-            name, source = _get_transaction_from_middleware(app, scope, integration)
-            if name is not None:
-                sentry_scope.set_transaction_name(
-                    name,
-                    source=source,
-                )
+        name, source = _get_transaction_from_middleware(app, scope, integration)
+        if name is not None:
+            Scope.get_current_scope().set_transaction_name(
+                name,
+                source=source,
+            )
 
         with hub.start_span(
             op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
@@ -396,20 +394,20 @@ def patch_request_response():
                 if integration is None:
                     return await old_func(*args, **kwargs)
 
+                request = args[0]
+
+                _set_transaction_name_and_source(
+                    Scope.get_current_scope(), integration.transaction_style, request
+                )
+
                 with hub.configure_scope() as sentry_scope:
-                    request = args[0]
-
-                    _set_transaction_name_and_source(
-                        sentry_scope, integration.transaction_style, request
-                    )
-
                     extractor = StarletteRequestExtractor(request)
                     info = await extractor.extract_request_info()
 
                     def _make_request_event_processor(req, integration):
-                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
                         def event_processor(event, hint):
-                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                            # type: (Event, Dict[str, Any]) -> Event
 
                             # Add info from request to event
                             request_info = event.get("request", {})
@@ -455,9 +453,9 @@ def patch_request_response():
                     cookies = extractor.extract_cookies_from_request()
 
                     def _make_request_event_processor(req, integration):
-                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
                         def event_processor(event, hint):
-                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                            # type: (Event, dict[str, Any]) -> Event
 
                             # Extract information from request
                             request_info = event.get("request", {})
@@ -584,7 +582,7 @@ class StarletteRequestExtractor:
             form = await self.form()
             if form:
                 form_data = {}
-                for key, val in iteritems(form):
+                for key, val in form.items():
                     is_file = isinstance(val, UploadFile)
                     form_data[key] = (
                         val

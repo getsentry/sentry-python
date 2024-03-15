@@ -1,21 +1,17 @@
 import json
 import logging
 import threading
+from unittest import mock
 
 import pytest
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
 def fastapi_app_factory():
@@ -375,6 +371,28 @@ def test_transaction_name(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
+
+
+def test_route_endpoint_equal_dependant_call(sentry_init):
+    """
+    Tests that the route endpoint name is equal to the wrapped dependant call name.
+    """
+    sentry_init(
+        auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+        ],
+        traces_sample_rate=1.0,
+        debug=True,
+    )
+
+    app = fastapi_app_factory()
+
+    for route in app.router.routes:
+        if not hasattr(route, "dependant"):
+            continue
+        assert route.endpoint.__qualname__ == route.dependant.call.__qualname__
 
 
 @pytest.mark.parametrize(

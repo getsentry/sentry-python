@@ -1,6 +1,7 @@
 import asyncio
 import json
 from contextlib import suppress
+from unittest import mock
 
 import pytest
 from aiohttp import web
@@ -9,11 +10,6 @@ from aiohttp.web_request import Request
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.mark.asyncio
@@ -254,6 +250,36 @@ async def test_transaction_style(
     assert event["type"] == "transaction"
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
+
+
+@pytest.mark.tests_internal_exceptions
+@pytest.mark.asyncio
+async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_events):
+    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    with mock.patch(
+        "sentry_sdk.integrations.aiohttp.parse_url", side_effect=ValueError
+    ):
+        resp = await client.get("/")
+
+    assert resp.status == 200
+
+    (event,) = events
+
+    assert event["type"] == "transaction"
+    assert (
+        event["transaction"]
+        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparseable_url.<locals>.hello"
+    )
 
 
 @pytest.mark.asyncio

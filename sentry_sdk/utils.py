@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -11,25 +12,11 @@ import threading
 import time
 from collections import namedtuple
 from copy import copy
+from datetime import datetime
 from decimal import Decimal
-from functools import wraps
+from functools import partial, partialmethod, wraps
 from numbers import Real
-
-try:
-    # Python 3
-    from urllib.parse import parse_qs
-    from urllib.parse import unquote
-    from urllib.parse import urlencode
-    from urllib.parse import urlsplit
-    from urllib.parse import urlunsplit
-
-except ImportError:
-    # Python 2
-    from cgi import parse_qs  # type: ignore
-    from urllib import unquote  # type: ignore
-    from urllib import urlencode  # type: ignore
-    from urlparse import urlsplit  # type: ignore
-    from urlparse import urlunsplit  # type: ignore
+from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 try:
     # Python 3.11
@@ -38,21 +25,11 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
-from datetime import datetime
-from functools import partial
-
-try:
-    from functools import partialmethod
-
-    _PARTIALMETHOD_AVAILABLE = True
-except ImportError:
-    _PARTIALMETHOD_AVAILABLE = False
-
 import sentry_sdk
 import sentry_sdk.hub
-from sentry_sdk._compat import PY2, PY33, PY37, implements_str, text_type, urlparse
+from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -63,6 +40,7 @@ if TYPE_CHECKING:
         Dict,
         Iterator,
         List,
+        NoReturn,
         Optional,
         Set,
         Tuple,
@@ -71,7 +49,7 @@ if TYPE_CHECKING:
     )
     from sentry_sdk.integrations import Integration
 
-    from sentry_sdk._types import EndpointType, ExcInfo, GenericCallable
+    from sentry_sdk._types import Event, ExcInfo, GenericCallable
 
 
 epoch = datetime(1970, 1, 1)
@@ -79,6 +57,7 @@ epoch = datetime(1970, 1, 1)
 # The logger is created here but initialized in the debug support module
 logger = logging.getLogger("sentry_sdk.errors")
 
+_installed_modules = None
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
@@ -97,16 +76,11 @@ def _get_debug_hub():
     pass
 
 
-def get_default_release():
+def get_git_revision():
     # type: () -> Optional[str]
-    """Try to guess a default release."""
-    release = os.environ.get("SENTRY_RELEASE")
-    if release:
-        return release
-
-    with open(os.path.devnull, "w+") as null:
-        try:
-            release = (
+    try:
+        with open(os.path.devnull, "w+") as null:
+            revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
                     stdout=subprocess.PIPE,
@@ -117,11 +91,22 @@ def get_default_release():
                 .strip()
                 .decode("utf-8")
             )
-        except (OSError, IOError):
-            pass
+    except (OSError, IOError, FileNotFoundError):
+        return None
 
-        if release:
-            return release
+    return revision
+
+
+def get_default_release():
+    # type: () -> Optional[str]
+    """Try to guess a default release."""
+    release = os.environ.get("SENTRY_RELEASE")
+    if release:
+        return release
+
+    release = get_git_revision()
+    if release:
+        return release
 
     for var in (
         "HEROKU_SLUG_COMMIT",
@@ -170,7 +155,7 @@ def get_sdk_name(installed_integrations):
     return "sentry.python"
 
 
-class CaptureInternalException(object):
+class CaptureInternalException:
     __slots__ = ()
 
     def __enter__(self):
@@ -226,8 +211,7 @@ class BadDsn(ValueError):
     """Raised on invalid DSNs."""
 
 
-@implements_str
-class Dsn(object):
+class Dsn:
     """Represents a DSN."""
 
     def __init__(self, value):
@@ -235,7 +219,7 @@ class Dsn(object):
         if isinstance(value, Dsn):
             self.__dict__ = dict(value.__dict__)
             return
-        parts = urlparse.urlsplit(text_type(value))
+        parts = urlsplit(str(value))
 
         if parts.scheme not in ("http", "https"):
             raise BadDsn("Unsupported scheme %r" % parts.scheme)
@@ -260,7 +244,7 @@ class Dsn(object):
         path = parts.path.rsplit("/", 1)
 
         try:
-            self.project_id = text_type(int(path.pop()))
+            self.project_id = str(int(path.pop()))
         except (ValueError, TypeError):
             raise BadDsn("Invalid project in DSN (%r)" % (parts.path or "")[1:])
 
@@ -300,7 +284,7 @@ class Dsn(object):
         )
 
 
-class Auth(object):
+class Auth:
     """Helper object that represents the auth info."""
 
     def __init__(
@@ -324,17 +308,8 @@ class Auth(object):
         self.version = version
         self.client = client
 
-    @property
-    def store_api_url(self):
-        # type: () -> str
-        """Returns the API url for storing events.
-
-        Deprecated: use get_api_url instead.
-        """
-        return self.get_api_url(type="store")
-
     def get_api_url(
-        self, type="store"  # type: EndpointType
+        self, type=EndpointType.ENVELOPE  # type: EndpointType
     ):
         # type: (...) -> str
         """Returns the API url for storing events."""
@@ -343,7 +318,7 @@ class Auth(object):
             self.host,
             self.path,
             self.project_id,
-            type,
+            type.value,
         )
 
     def to_header(self):
@@ -357,7 +332,7 @@ class Auth(object):
         return "Sentry " + ", ".join("%s=%s" % (key, value) for key, value in rv)
 
 
-class AnnotatedValue(object):
+class AnnotatedValue:
     """
     Meta information for a data field in the event payload.
     This is to tell Relay that we have tampered with the fields value.
@@ -371,6 +346,13 @@ class AnnotatedValue(object):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
 
     @classmethod
     def removed_because_raw_data(cls):
@@ -544,46 +526,17 @@ def get_source_context(
 def safe_str(value):
     # type: (Any) -> str
     try:
-        return text_type(value)
+        return str(value)
     except Exception:
         return safe_repr(value)
 
 
-if PY2:
-
-    def safe_repr(value):
-        # type: (Any) -> str
-        try:
-            rv = repr(value).decode("utf-8", "replace")
-
-            # At this point `rv` contains a bunch of literal escape codes, like
-            # this (exaggerated example):
-            #
-            # u"\\x2f"
-            #
-            # But we want to show this string as:
-            #
-            # u"/"
-            try:
-                # unicode-escape does this job, but can only decode latin1. So we
-                # attempt to encode in latin1.
-                return rv.encode("latin1").decode("unicode-escape")
-            except Exception:
-                # Since usually strings aren't latin1 this can break. In those
-                # cases we just give up.
-                return rv
-        except Exception:
-            # If e.g. the call to `repr` already fails
-            return "<broken repr>"
-
-else:
-
-    def safe_repr(value):
-        # type: (Any) -> str
-        try:
-            return repr(value)
-        except Exception:
-            return "<broken repr>"
+def safe_repr(value):
+    # type: (Any) -> str
+    try:
+        return repr(value)
+    except Exception:
+        return "<broken repr>"
 
 
 def filename_for_module(module, abs_path):
@@ -951,13 +904,13 @@ def exceptions_from_error_tuple(
 def to_string(value):
     # type: (str) -> str
     try:
-        return text_type(value)
+        return str(value)
     except UnicodeDecodeError:
         return repr(value)[1:-1]
 
 
 def iter_event_stacktraces(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -971,14 +924,14 @@ def iter_event_stacktraces(event):
 
 
 def iter_event_frames(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
+    # type: (Event, Optional[List[str]], Optional[List[str]], Optional[str]) -> Event
     for stacktrace in iter_event_stacktraces(event):
         set_in_app_in_frames(
             stacktrace.get("frames"),
@@ -1056,7 +1009,7 @@ def event_from_exception(
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
@@ -1108,6 +1061,24 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
+def _truncate_by_bytes(string, max_bytes):
+    # type: (str, int) -> str
+    """
+    Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
+    """
+    truncated = string.encode("utf-8")[: max_bytes - 3].decode("utf-8", errors="ignore")
+
+    return truncated + "..."
+
+
+def _get_size_in_bytes(value):
+    # type: (str) -> Optional[int]
+    try:
+        return len(value.encode("utf-8"))
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     if not value:
@@ -1116,17 +1087,77 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value.encode("utf-8"))
+    byte_size = _get_size_in_bytes(value)
+    text_size = len(value)
 
-    if length > max_length:
-        return AnnotatedValue(
-            value=value[: max_length - 3] + "...",
-            metadata={
-                "len": length,
-                "rem": [["!limit", "x", max_length - 3, max_length]],
-            },
+    if byte_size is not None and byte_size > max_length:
+        # truncate to max_length bytes, preserving code points
+        truncated_value = _truncate_by_bytes(value, max_length)
+    elif text_size is not None and text_size > max_length:
+        # fallback to truncating by string length
+        truncated_value = value[: max_length - 3] + "..."
+    else:
+        return value
+
+    return AnnotatedValue(
+        value=truncated_value,
+        metadata={
+            "len": byte_size or text_size,
+            "rem": [["!limit", "x", max_length - 3, max_length]],
+        },
+    )
+
+
+def parse_version(version):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    """
+    Parses a version string into a tuple of integers.
+    This uses the parsing loging from PEP 440:
+    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
+    """
+    VERSION_PATTERN = r"""  # noqa: N806
+        v?
+        (?:
+            (?:(?P<epoch>[0-9]+)!)?                           # epoch
+            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+            (?P<pre>                                          # pre-release
+                [-_\.]?
+                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+                [-_\.]?
+                (?P<pre_n>[0-9]+)?
+            )?
+            (?P<post>                                         # post release
+                (?:-(?P<post_n1>[0-9]+))
+                |
+                (?:
+                    [-_\.]?
+                    (?P<post_l>post|rev|r)
+                    [-_\.]?
+                    (?P<post_n2>[0-9]+)?
+                )
+            )?
+            (?P<dev>                                          # dev release
+                [-_\.]?
+                (?P<dev_l>dev)
+                [-_\.]?
+                (?P<dev_n>[0-9]+)?
+            )?
         )
-    return value
+        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+    """
+
+    pattern = re.compile(
+        r"^\s*" + VERSION_PATTERN + r"\s*$",
+        re.VERBOSE | re.IGNORECASE,
+    )
+
+    try:
+        release = pattern.match(version).groupdict()["release"]  # type: ignore
+        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+    return release_tuple
 
 
 def _is_contextvars_broken():
@@ -1162,9 +1193,18 @@ def _is_contextvars_broken():
         pass
 
     try:
+        import greenlet  # type: ignore
         from eventlet.patcher import is_monkey_patched  # type: ignore
 
-        if is_monkey_patched("thread"):
+        greenlet_version = parse_version(greenlet.__version__)
+
+        if greenlet_version is None:
+            logger.error(
+                "Internal error in Sentry SDK: Could not parse Greenlet version from greenlet.__version__."
+            )
+            return False
+
+        if is_monkey_patched("thread") and greenlet_version < (0, 5):
             return True
     except ImportError:
         pass
@@ -1174,21 +1214,33 @@ def _is_contextvars_broken():
 
 def _make_threadlocal_contextvars(local):
     # type: (type) -> type
-    class ContextVar(object):
+    class ContextVar:
         # Super-limited impl of ContextVar
 
-        def __init__(self, name):
-            # type: (str) -> None
+        def __init__(self, name, default=None):
+            # type: (str, Any) -> None
             self._name = name
+            self._default = default
             self._local = local()
+            self._original_local = local()
 
-        def get(self, default):
+        def get(self, default=None):
             # type: (Any) -> Any
-            return getattr(self._local, "value", default)
+            return getattr(self._local, "value", default or self._default)
 
         def set(self, value):
-            # type: (Any) -> None
+            # type: (Any) -> Any
+            token = str(random.getrandbits(64))
+            original_value = self.get()
+            setattr(self._original_local, token, original_value)
             self._local.value = value
+            return token
+
+        def reset(self, token):
+            # type: (Any) -> None
+            self._local.value = getattr(self._original_local, token)
+            # delete the original value (this way it works in Python 3.6+)
+            del self._original_local.__dict__[token]
 
     return ContextVar
 
@@ -1260,10 +1312,8 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if (
-        _PARTIALMETHOD_AVAILABLE
-        and hasattr(func, "_partialmethod")
-        and isinstance(func._partialmethod, partialmethod)
+    if hasattr(func, "_partialmethod") and isinstance(
+        func._partialmethod, partialmethod
     ):
         prefix, suffix = "partialmethod(<function ", ">)"
         func = func._partialmethod.func
@@ -1514,56 +1564,64 @@ def is_sentry_url(hub, url):
     )
 
 
-def parse_version(version):
-    # type: (str) -> Optional[Tuple[int, ...]]
-    """
-    Parses a version string into a tuple of integers.
-    This uses the parsing loging from PEP 440:
-    https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
-    """
-    VERSION_PATTERN = r"""  # noqa: N806
-        v?
-        (?:
-            (?:(?P<epoch>[0-9]+)!)?                           # epoch
-            (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
-            (?P<pre>                                          # pre-release
-                [-_\.]?
-                (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
-                [-_\.]?
-                (?P<pre_n>[0-9]+)?
-            )?
-            (?P<post>                                         # post release
-                (?:-(?P<post_n1>[0-9]+))
-                |
-                (?:
-                    [-_\.]?
-                    (?P<post_l>post|rev|r)
-                    [-_\.]?
-                    (?P<post_n2>[0-9]+)?
-                )
-            )?
-            (?P<dev>                                          # dev release
-                [-_\.]?
-                (?P<dev_l>dev)
-                [-_\.]?
-                (?P<dev_n>[0-9]+)?
-            )?
-        )
-        (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
-    """
-
-    pattern = re.compile(
-        r"^\s*" + VERSION_PATTERN + r"\s*$",
-        re.VERBOSE | re.IGNORECASE,
-    )
-
+def _generate_installed_modules():
+    # type: () -> Iterator[Tuple[str, str]]
     try:
-        release = pattern.match(version).groupdict()["release"]  # type: ignore
-        release_tuple = tuple(map(int, release.split(".")[:3]))  # type: Tuple[int, ...]
-    except (TypeError, ValueError, AttributeError):
+        from importlib import metadata
+
+        yielded = set()
+        for dist in metadata.distributions():
+            name = dist.metadata["Name"]
+            # `metadata` values may be `None`, see:
+            # https://github.com/python/cpython/issues/91216
+            # and
+            # https://github.com/python/importlib_metadata/issues/371
+            if name is not None:
+                normalized_name = _normalize_module_name(name)
+                if dist.version is not None and normalized_name not in yielded:
+                    yield normalized_name, dist.version
+                    yielded.add(normalized_name)
+
+    except ImportError:
+        # < py3.8
+        try:
+            import pkg_resources
+        except ImportError:
+            return
+
+        for info in pkg_resources.working_set:
+            yield _normalize_module_name(info.key), info.version
+
+
+def _normalize_module_name(name):
+    # type: (str) -> str
+    return name.lower()
+
+
+def _get_installed_modules():
+    # type: () -> Dict[str, str]
+    global _installed_modules
+    if _installed_modules is None:
+        _installed_modules = dict(_generate_installed_modules())
+    return _installed_modules
+
+
+def package_version(package):
+    # type: (str) -> Optional[Tuple[int, ...]]
+    installed_packages = _get_installed_modules()
+    version = installed_packages.get(package)
+    if version is None:
         return None
 
-    return release_tuple
+    return parse_version(version)
+
+
+def reraise(tp, value, tb=None):
+    # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[Any]) -> NoReturn
+    assert value is not None
+    if value.__traceback__ is not tb:
+        raise value.with_traceback(tb)
+    raise value
 
 
 def integration_patched(original_function, integration=None):
@@ -1592,27 +1650,28 @@ if PY37:
         # type: () -> int
         return time.perf_counter_ns()
 
-elif PY33:
+else:
 
     def nanosecond_time():
         # type: () -> int
         return int(time.perf_counter() * 1e9)
 
-else:
 
-    def nanosecond_time():
-        # type: () -> int
-        return int(time.time() * 1e9)
+def now():
+    # type: () -> float
+    return time.perf_counter()
 
 
-if PY2:
+try:
+    from gevent.monkey import is_module_patched
+except ImportError:
 
-    def now():
-        # type: () -> float
-        return time.time()
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
 
-else:
 
-    def now():
-        # type: () -> float
-        return time.perf_counter()
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")

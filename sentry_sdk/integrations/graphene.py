@@ -1,10 +1,9 @@
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    parse_version,
+    package_version,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
     from graphql.type import GraphQLSchema  # type: ignore
+    from sentry_sdk._types import Event
 
 
 class GrapheneIntegration(Integration):
@@ -28,11 +28,10 @@ class GrapheneIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        installed_packages = _get_installed_modules()
-        version = parse_version(installed_packages["graphene"])
+        version = package_version("graphene")
 
         if version is None:
-            raise DidNotEnable("Unparsable graphene version: {}".format(version))
+            raise DidNotEnable("Unparsable graphene version.")
 
         if version < (3, 3):
             raise DidNotEnable("graphene 3.3 or newer required.")
@@ -102,7 +101,7 @@ def _patch_graphql():
 
 
 def _event_processor(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+    # type: (Event, Dict[str, Any]) -> Event
     if _should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"

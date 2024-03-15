@@ -1,16 +1,12 @@
+from unittest import mock
+
 import pytest
+import rediscluster
 
 from sentry_sdk import capture_message
 from sentry_sdk.api import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
-
-import rediscluster
 
 
 MOCK_CONNECTION_POOL = mock.MagicMock()

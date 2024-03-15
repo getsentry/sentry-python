@@ -59,6 +59,11 @@ class ClickhouseDriverIntegration(Integration):
         clickhouse_driver.client.Client.receive_end_of_query = _wrap_end(
             clickhouse_driver.client.Client.receive_end_of_query
         )
+        if hasattr(clickhouse_driver.client.Client, "receive_end_of_insert_query"):
+            # In 0.2.7, insert queries are handled separately via `receive_end_of_insert_query`
+            clickhouse_driver.client.Client.receive_end_of_insert_query = _wrap_end(
+                clickhouse_driver.client.Client.receive_end_of_insert_query
+            )
         clickhouse_driver.client.Client.receive_result = _wrap_end(
             clickhouse_driver.client.Client.receive_result
         )
@@ -111,7 +116,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
                 span.set_data("db.result", res)
 
             with capture_internal_exceptions():
-                span.hub.add_breadcrumb(
+                span.scope.add_breadcrumb(
                     message=span._data.pop("query"), category="query", data=span._data
                 )
 

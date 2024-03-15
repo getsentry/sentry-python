@@ -1,33 +1,37 @@
-import re
 import contextlib
+import inspect
+import os
+import re
+import sys
+from collections.abc import Mapping
+from datetime import timedelta
+from functools import wraps
+from urllib.parse import quote, unquote
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    filename_for_module,
     Dsn,
+    logger,
     match_regex_list,
+    qualname_from_function,
     to_string,
     is_sentry_url,
+    _is_external_source,
+    _module_in_list,
 )
-from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
-if PY2:
-    from collections import Mapping
-    from urllib import quote, unquote
-else:
-    from collections.abc import Mapping
-    from urllib.parse import quote, unquote
-
 if TYPE_CHECKING:
-    import typing
-
     from typing import Any
     from typing import Dict
     from typing import Generator
     from typing import Optional
     from typing import Union
+
+    from types import FrameType
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -53,7 +57,7 @@ base64_stripped = (
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: typing.Mapping[str, str]
+        environ,  # type: Mapping[str, str]
         prefix="HTTP_",  # type: str
     ):
         # type: (...) -> None
@@ -145,21 +149,124 @@ def record_sql_queries(
         yield span
 
 
-def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def maybe_create_breadcrumbs_from_span(scope, span):
+    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
+
     if span.op == OP.DB_REDIS:
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
     elif span.op == OP.HTTP_CLIENT:
-        hub.add_breadcrumb(type="http", category="httplib", data=span._data)
+        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             type="subprocess",
             category="subprocess",
             message=span.description,
             data=span._data,
         )
+
+
+def add_query_source(hub, span):
+    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+    """
+    Adds OTel compatible source code information to the span
+    """
+    client = sentry_sdk.Scope.get_client()
+    if not client.is_active():
+        return
+
+    if span.timestamp is None or span.start_timestamp is None:
+        return
+
+    should_add_query_source = client.options.get("enable_db_query_source", True)
+    if not should_add_query_source:
+        return
+
+    duration = span.timestamp - span.start_timestamp
+    threshold = client.options.get("db_query_source_threshold_ms", 0)
+    slow_query = duration / timedelta(milliseconds=1) > threshold
+
+    if not slow_query:
+        return
+
+    project_root = client.options["project_root"]
+    in_app_include = client.options.get("in_app_include")
+    in_app_exclude = client.options.get("in_app_exclude")
+
+    # Find the correct frame
+    frame = sys._getframe()  # type: Union[FrameType, None]
+    while frame is not None:
+        try:
+            abs_path = frame.f_code.co_filename
+        except Exception:
+            abs_path = ""
+
+        try:
+            namespace = frame.f_globals.get("__name__")  # type: Optional[str]
+        except Exception:
+            namespace = None
+
+        is_sentry_sdk_frame = namespace is not None and namespace.startswith(
+            "sentry_sdk."
+        )
+
+        should_be_included = not _is_external_source(abs_path)
+        if namespace is not None:
+            if in_app_exclude and _module_in_list(namespace, in_app_exclude):
+                should_be_included = False
+            if in_app_include and _module_in_list(namespace, in_app_include):
+                # in_app_include takes precedence over in_app_exclude, so doing it
+                # at the end
+                should_be_included = True
+
+        if (
+            abs_path.startswith(project_root)
+            and should_be_included
+            and not is_sentry_sdk_frame
+        ):
+            break
+
+        frame = frame.f_back
+    else:
+        frame = None
+
+    # Set the data
+    if frame is not None:
+        try:
+            lineno = frame.f_lineno
+        except Exception:
+            lineno = None
+        if lineno is not None:
+            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+
+        try:
+            namespace = frame.f_globals.get("__name__")
+        except Exception:
+            namespace = None
+        if namespace is not None:
+            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+
+        try:
+            filepath = frame.f_code.co_filename
+        except Exception:
+            filepath = None
+        if filepath is not None:
+            if namespace is not None:
+                in_app_path = filename_for_module(namespace, filepath)
+            elif project_root is not None and filepath.startswith(project_root):
+                in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
+            else:
+                in_app_path = filepath
+            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+
+        try:
+            code_function = frame.f_code.co_name
+        except Exception:
+            code_function = None
+
+        if code_function is not None:
+            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
 def extract_sentrytrace_data(header):
@@ -214,7 +321,7 @@ def _format_sql(cursor, sql):
     return real_sql or to_string(sql)
 
 
-class Baggage(object):
+class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
     """
@@ -292,10 +399,6 @@ class Baggage(object):
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = options["traces_sample_rate"]
 
-        user = (scope and scope._user) or {}
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
-
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
@@ -305,15 +408,13 @@ class Baggage(object):
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-        hub = transaction.hub or sentry_sdk.Hub.current
-        client = hub.client
+        client = sentry_sdk.Scope.get_client()
         sentry_items = {}  # type: Dict[str, str]
 
-        if not client:
+        if not client.is_active():
             return Baggage(sentry_items)
 
         options = client.options or {}
-        user = (hub.scope and hub.scope._user) or {}
 
         sentry_items["trace_id"] = transaction.trace_id
 
@@ -331,9 +432,6 @@ class Baggage(object):
             and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
         ):
             sentry_items["transaction"] = transaction.name
-
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
 
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
@@ -357,7 +455,7 @@ class Baggage(object):
         # type: () -> Dict[str, str]
         header = {}
 
-        for key, item in iteritems(self.sentry_items):
+        for key, item in self.sentry_items.items():
             header[key] = item
 
         return header
@@ -366,7 +464,7 @@ class Baggage(object):
         # type: (bool) -> str
         items = []
 
-        for key, val in iteritems(self.sentry_items):
+        for key, val in self.sentry_items.items():
             with capture_internal_exceptions():
                 item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
                 items.append(item)
@@ -407,5 +505,74 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
+def start_child_span_decorator(func):
+    # type: (Any) -> Any
+    """
+    Decorator to add child spans for functions.
+
+    See also ``sentry_sdk.tracing.trace()``.
+    """
+    # Asynchronous case
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span()
+
+            if span is None:
+                logger.warning(
+                    "Can not create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return await func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return await func(*args, **kwargs)
+
+    # Synchronous case
+    else:
+
+        @wraps(func)
+        def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span()
+
+            if span is None:
+                logger.warning(
+                    "Can not create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return func(*args, **kwargs)
+
+    return func_with_tracing
+
+
+def get_current_span(scope=None):
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    scope = scope or sentry_sdk.Scope.get_current_scope()
+    current_span = scope.span
+    return current_span
+
+
 # Circular imports
 from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span

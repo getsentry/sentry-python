@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sentry_sdk.hub import Hub
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
@@ -200,7 +198,7 @@ def _make_request_event_processor(app, request, integration):
     # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
 
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         _set_transaction_name_and_source(event, integration.transaction_style, request)
 
         with capture_internal_exceptions():

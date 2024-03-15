@@ -33,10 +33,11 @@ import sys
 import threading
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections import deque
 
 import sentry_sdk
-from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._compat import PY311
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -62,7 +63,7 @@ if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
     import sentry_sdk.tracing
-    from sentry_sdk._types import SamplingContext, ProfilerMode
+    from sentry_sdk._types import Event, SamplingContext, ProfilerMode
 
     ThreadId = str
 
@@ -175,8 +176,14 @@ def has_profiling_enabled(options):
         return True
 
     profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None and profiles_sample_rate > 0:
-        return True
+    if profiles_sample_rate is not None:
+        logger.warning(
+            "_experiments['profiles_sample_rate'] is deprecated. "
+            "Please use the non-experimental profiles_sample_rate option "
+            "directly."
+        )
+        if profiles_sample_rate > 0:
+            return True
 
     return False
 
@@ -187,10 +194,6 @@ def setup_profiler(options):
 
     if _scheduler is not None:
         logger.debug("[Profiling] Profiler is already setup")
-        return False
-
-    if not PY33:
-        logger.warn("[Profiling] Profiler requires Python >= 3.3")
         return False
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
@@ -207,10 +210,13 @@ def setup_profiler(options):
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
     else:
-        profiler_mode = (
-            options.get("_experiments", {}).get("profiler_mode")
-            or default_profiler_mode
-        )
+        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
+        if profiler_mode is not None:
+            logger.warning(
+                "_experiments['profiler_mode'] is deprecated. Please use the "
+                "non-experimental profiler_mode option directly."
+            )
+        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -435,7 +441,7 @@ def get_current_thread_id(thread=None):
     return None
 
 
-class Profile(object):
+class Profile:
     def __init__(
         self,
         transaction,  # type: sentry_sdk.tracing.Transaction
@@ -490,7 +496,7 @@ class Profile(object):
         # type: (SamplingContext) -> None
         """
         Sets the profile's sampling decision according to the following
-        precdence rules:
+        precedence rules:
 
         1. If the transaction to be profiled is not sampled, that decision
         will be used, regardless of anything else.
@@ -515,11 +521,8 @@ class Profile(object):
             self.sampled = False
             return
 
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-
-        # The client is None, so we can't get the sample rate.
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             self.sampled = False
             return
 
@@ -582,18 +585,15 @@ class Profile(object):
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
     def __enter__(self):
         # type: () -> Profile
-        hub = self.hub or sentry_sdk.Hub.current
-
-        _, scope = hub._stack[-1]
+        scope = sentry_sdk.scope.Scope.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
-        self._context_manager_state = (hub, scope, old_profile)
+        self._context_manager_state = (scope, old_profile)
 
         self.start()
 
@@ -603,7 +603,7 @@ class Profile(object):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.stop()
 
-        _, scope, old_profile = self._context_manager_state
+        scope, old_profile = self._context_manager_state
         del self._context_manager_state
 
         scope.profile = old_profile
@@ -673,7 +673,7 @@ class Profile(object):
         }
 
     def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
         set_in_app_in_frames(
@@ -725,9 +725,8 @@ class Profile(object):
 
     def valid(self):
         # type: () -> bool
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             return False
 
         if not has_profiling_enabled(client.options):
@@ -751,7 +750,7 @@ class Profile(object):
         return True
 
 
-class Scheduler(object):
+class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
@@ -773,26 +772,29 @@ class Scheduler(object):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.teardown()
 
+    @abstractmethod
     def setup(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def teardown(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
     def ensure_running(self):
         # type: () -> None
-        raise NotImplementedError
+        """
+        Ensure the scheduler is running. By default, this method is a no-op.
+        The method should be overridden by any implementation for which it is
+        relevant.
+        """
+        return None
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
         self.ensure_running()
         self.new_profiles.append(profile)
-
-    def stop_profiling(self, profile):
-        # type: (Profile) -> None
-        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -877,7 +879,7 @@ class ThreadScheduler(Scheduler):
 
     def __init__(self, frequency):
         # type: (int) -> None
-        super(ThreadScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -898,6 +900,14 @@ class ThreadScheduler(Scheduler):
 
     def ensure_running(self):
         # type: () -> None
+        """
+        Check that the profiler has an active thread to run in, and start one if
+        that's not the case.
+
+        Note that this might fail (e.g. in Python 3.12 it's not possible to
+        spawn new threads at interpreter shutdown). In that case self.running
+        will be False after running this function.
+        """
         pid = os.getpid()
 
         # is running on the right process
@@ -918,7 +928,14 @@ class ThreadScheduler(Scheduler):
             # can keep the application running after other threads
             # have exited
             self.thread = threading.Thread(name=self.name, target=self.run, daemon=True)
-            self.thread.start()
+            try:
+                self.thread.start()
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self.running = False
+                self.thread = None
+                return
 
     def run(self):
         # type: () -> None
@@ -962,7 +979,7 @@ class GeventScheduler(Scheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -1004,7 +1021,14 @@ class GeventScheduler(Scheduler):
             self.running = True
 
             self.thread = ThreadPool(1)
-            self.thread.spawn(self.run)
+            try:
+                self.thread.spawn(self.run)
+            except RuntimeError:
+                # Unfortunately at this point the interpreter is in a state that no
+                # longer allows us to spawn a thread and we have to bail.
+                self.running = False
+                self.thread = None
+                return
 
     def run(self):
         # type: () -> None

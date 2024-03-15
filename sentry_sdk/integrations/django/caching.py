@@ -6,7 +6,6 @@ from django.core.cache import CacheHandler
 
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk._compat import text_type
 
 
 if TYPE_CHECKING:
@@ -25,9 +24,9 @@ def _get_span_description(method_name, args, kwargs):
     description = "{} ".format(method_name)
 
     if args is not None and len(args) >= 1:
-        description += text_type(args[0])
+        description += str(args[0])
     elif kwargs is not None and "key" in kwargs:
-        description += text_type(kwargs["key"])
+        description += str(kwargs["key"])
 
     return description
 
@@ -51,7 +50,7 @@ def _patch_cache_method(cache, method_name):
             if value:
                 span.set_data(SPANDATA.CACHE_HIT, True)
 
-                size = len(text_type(value))
+                size = len(str(value))
                 span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
 
             else:

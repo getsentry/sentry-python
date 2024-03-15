@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import sys
 
 from sentry_sdk import configure_scope
@@ -58,7 +56,7 @@ def _capture_exception(exc_info, hub):
     if rv:
         rv.reverse()
         hint = event_hint_with_exc_info(exc_info)
-        event = {"level": "error", "exception": {"values": rv}}
+        event = {"level": "error", "exception": {"values": rv}}  # type: Event
 
         _tag_task_context()
 

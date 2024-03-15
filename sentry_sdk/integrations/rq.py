@@ -1,13 +1,12 @@
-from __future__ import absolute_import
-
 import weakref
-from sentry_sdk.consts import OP
 
+from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -27,9 +26,9 @@ except ImportError:
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
+    from typing import Any, Callable
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.utils import ExcInfo
 
     from rq.job import Job
@@ -99,7 +98,7 @@ class RqIntegration(Integration):
             # Note, the order of the `or` here is important,
             # because calling `job.is_failed` will change `_status`.
             if job._status == JobStatus.FAILED or job.is_failed:
-                _capture_exception(exc_info)  # type: ignore
+                _capture_exception(exc_info)
 
             return old_handle_exception(self, job, *exc_info, **kwargs)
 
@@ -111,9 +110,10 @@ class RqIntegration(Integration):
             # type: (Queue, Any, **Any) -> Any
             hub = Hub.current
             if hub.get_integration(RqIntegration) is not None:
-                if hub.scope.span is not None:
+                scope = Scope.get_current_scope()
+                if scope.span is not None:
                     job.meta["_sentry_trace_headers"] = dict(
-                        hub.iter_trace_propagation_headers()
+                        scope.iter_trace_propagation_headers()
                     )
 
             return old_enqueue_job(self, job, **kwargs)
@@ -126,12 +126,12 @@ class RqIntegration(Integration):
 def _make_event_processor(weak_job):
     # type: (Callable[[], Job]) -> EventProcessor
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         job = weak_job()
         if job is not None:
             with capture_internal_exceptions():
                 extra = event.setdefault("extra", {})
-                extra["rq-job"] = {
+                rq_job = {
                     "job_id": job.id,
                     "func": job.func_name,
                     "args": job.args,
@@ -140,9 +140,11 @@ def _make_event_processor(weak_job):
                 }
 
                 if job.enqueued_at:
-                    extra["rq-job"]["enqueued_at"] = format_timestamp(job.enqueued_at)
+                    rq_job["enqueued_at"] = format_timestamp(job.enqueued_at)
                 if job.started_at:
-                    extra["rq-job"]["started_at"] = format_timestamp(job.started_at)
+                    rq_job["started_at"] = format_timestamp(job.started_at)
+
+                extra["rq-job"] = rq_job
 
         if "exc_info" in hint:
             with capture_internal_exceptions():

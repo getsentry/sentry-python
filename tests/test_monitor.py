@@ -1,14 +1,12 @@
 import random
+from unittest import mock
 
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.transport import Transport
 
 
 class HealthyTestTransport(Transport):
-    def _send_event(self, event):
-        pass
-
-    def _send_envelope(self, envelope):
+    def capture_envelope(self, _):
         pass
 
     def is_healthy(self):
@@ -82,3 +80,18 @@ def test_transaction_uses_downsampled_rate(
         assert transaction.sample_rate == 0.5
 
     assert reports == [("backpressure", "transaction")]
+
+
+def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):
+    sentry_init(transport=HealthyTestTransport())
+
+    # make it seem like the interpreter is shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        monitor = Hub.current.client.monitor
+        assert monitor is not None
+        assert monitor._thread is None
+        monitor.run()
+        assert monitor._thread is None

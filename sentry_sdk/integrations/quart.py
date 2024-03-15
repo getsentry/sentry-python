@@ -1,7 +1,7 @@
-from __future__ import absolute_import
-
+import asyncio
 import inspect
 import threading
+from functools import wraps
 
 from sentry_sdk.hub import _should_send_default_pii, Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -13,16 +13,13 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-
-from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
     from typing import Union
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 try:
     import quart_auth  # type: ignore
@@ -45,7 +42,6 @@ try:
         request_started,
         websocket_started,
     )
-    from quart.utils import is_coroutine_function  # type: ignore
 except ImportError:
     raise DidNotEnable("Quart is not installed")
 else:
@@ -113,7 +109,9 @@ def patch_scaffold_route():
         def decorator(old_func):
             # type: (Any) -> Any
 
-            if inspect.isfunction(old_func) and not is_coroutine_function(old_func):
+            if inspect.isfunction(old_func) and not asyncio.iscoroutinefunction(
+                old_func
+            ):
 
                 @wraps(old_func)
                 def _sentry_func(*args, **kwargs):
@@ -163,18 +161,18 @@ async def _request_websocket_started(app, **kwargs):
     if integration is None:
         return
 
+    if has_request_context():
+        request_websocket = request._get_current_object()
+    if has_websocket_context():
+        request_websocket = websocket._get_current_object()
+
+    # Set the transaction name here, but rely on ASGI middleware
+    # to actually start the transaction
+    _set_transaction_name_and_source(
+        Scope.get_current_scope(), integration.transaction_style, request_websocket
+    )
+
     with hub.configure_scope() as scope:
-        if has_request_context():
-            request_websocket = request._get_current_object()
-        if has_websocket_context():
-            request_websocket = websocket._get_current_object()
-
-        # Set the transaction name here, but rely on ASGI middleware
-        # to actually start the transaction
-        _set_transaction_name_and_source(
-            scope, integration.transaction_style, request_websocket
-        )
-
         evt_processor = _make_request_event_processor(
             app, request_websocket, integration
         )
@@ -184,7 +182,7 @@ async def _request_websocket_started(app, **kwargs):
 def _make_request_event_processor(app, request, integration):
     # type: (Quart, Request, QuartIntegration) -> EventProcessor
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -229,7 +227,7 @@ async def _capture_exception(sender, exception, **kwargs):
 
 
 def _add_user_to_event(event):
-    # type: (Dict[str, Any]) -> None
+    # type: (Event) -> None
     if quart_auth is None:
         return
 

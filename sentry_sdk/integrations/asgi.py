@@ -7,8 +7,8 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 import asyncio
 import inspect
 from copy import deepcopy
+from functools import partial
 
-from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
@@ -19,7 +19,6 @@ from sentry_sdk.integrations._asgi_common import (
     _get_request_data,
     _get_url,
 )
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.sessions import auto_session_tracking
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -34,6 +33,7 @@ from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     logger,
     transaction_from_function,
+    _get_installed_modules,
 )
 from sentry_sdk.tracing import Transaction
 
@@ -163,8 +163,8 @@ class SentryAsgiMiddleware:
         _asgi_middleware_applied.set(True)
         try:
             hub = Hub(Hub.current)
-            with auto_session_tracking(hub, session_mode="request"):
-                with hub:
+            with hub:
+                with auto_session_tracking(hub, session_mode="request"):
                     with hub.configure_scope() as sentry_scope:
                         sentry_scope.clear_breadcrumbs()
                         sentry_scope._name = "asgi"

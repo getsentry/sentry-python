@@ -20,7 +20,7 @@ help:
 
 dist: .venv
 	rm -rf dist dist-serverless build
-	$(VENV_PATH)/bin/pip install wheel
+	$(VENV_PATH)/bin/pip install wheel setuptools
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
 .PHONY: dist
 
@@ -30,7 +30,7 @@ format: .venv
 .PHONY: format
 
 test: .venv
-	@$(VENV_PATH)/bin/tox -e py3.9
+	@$(VENV_PATH)/bin/tox -e py3.12
 .PHONY: test
 
 test-all: .venv
@@ -60,7 +60,6 @@ apidocs-hotfix: apidocs
 .PHONY: apidocs-hotfix
 
 aws-lambda-layer: dist
-	$(VENV_PATH)/bin/pip install urllib3
-	$(VENV_PATH)/bin/pip install certifi
+	$(VENV_PATH)/bin/pip install -r aws-lambda-layer-requirements.txt
 	$(VENV_PATH)/bin/python -m scripts.build_aws_lambda_layer
 .PHONY: aws-lambda-layer

@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="1.32.0",
+    version="2.0.0rc2",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -37,10 +37,9 @@ setup(
     package_data={"sentry_sdk": ["py.typed"]},
     zip_safe=False,
     license="MIT",
+    python_requires=">=3.6",
     install_requires=[
-        'urllib3>=1.25.7; python_version<="3.4"',
-        'urllib3>=1.26.9; python_version=="3.5"',
-        'urllib3>=1.26.11; python_version>="3.6"',
+        "urllib3>=1.26.11",
         "certifi",
     ],
     extras_require={
@@ -60,6 +59,7 @@ setup(
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "loguru": ["loguru>=0.5"],
+        "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
             "opentelemetry-distro~=0.40b0",
@@ -89,17 +89,14 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.4",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     options={"bdist_wheel": {"universal": "1"}},

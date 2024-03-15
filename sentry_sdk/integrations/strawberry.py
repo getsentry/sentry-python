@@ -1,19 +1,28 @@
 import hashlib
-from functools import cached_property
 from inspect import isawaitable
+
 from sentry_sdk import configure_scope, start_span
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
-    parse_version,
+    package_version,
+    _get_installed_modules,
 )
 from sentry_sdk._types import TYPE_CHECKING
+
+try:
+    from functools import cached_property
+except ImportError:
+    # The strawberry integration requires Python 3.8+. functools.cached_property
+    # was added in 3.8, so this check is technically not needed, but since this
+    # is an auto-enabling integration, we might get to executing this import in
+    # lower Python versions, so we need to deal with it.
+    raise DidNotEnable("strawberry-graphql integration requires Python 3.8 or newer")
 
 try:
     import strawberry.schema.schema as strawberry_schema  # type: ignore
@@ -29,11 +38,11 @@ except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, List, Optional
+    from typing import Any, Callable, Generator, List, Optional
     from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 ignore_logger("strawberry.execution")
@@ -55,8 +64,7 @@ class StrawberryIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        installed_packages = _get_installed_modules()
-        version = parse_version(installed_packages["strawberry-graphql"])
+        version = package_version("strawberry-graphql")
 
         if version is None:
             raise DidNotEnable(
@@ -350,21 +358,21 @@ def _make_request_event_processor(execution_context):
     # type: (ExecutionContext) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    request_data["data"] = {"query": execution_context.query}
+                    data = {"query": execution_context.query}
 
                     if execution_context.variables:
-                        request_data["data"]["variables"] = execution_context.variables
+                        data["variables"] = execution_context.variables
                     if execution_context.operation_name:
-                        request_data["data"][
-                            "operationName"
-                        ] = execution_context.operation_name
+                        data["operationName"] = execution_context.operation_name
+
+                    request_data["data"] = data
 
             else:
                 try:
@@ -381,7 +389,7 @@ def _make_response_event_processor(response_data):
     # type: (GraphQLHTTPResponse) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 contexts = event.setdefault("contexts", {})

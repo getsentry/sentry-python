@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel  # type: ignore
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -15,6 +14,7 @@ try:
     from starlite.plugins.base import get_plugin_for_value  # type: ignore
     from starlite.routes.http import HTTPRoute  # type: ignore
     from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
+    from pydantic import BaseModel  # type: ignore
 
     if TYPE_CHECKING:
         from typing import Any, Dict, List, Optional, Union
@@ -219,7 +219,11 @@ def patch_http_route_handle() -> None:
                     tx_info = {"source": TRANSACTION_SOURCE_ROUTE}
 
                 event.update(
-                    request=request_info, transaction=tx_name, transaction_info=tx_info
+                    {
+                        "request": request_info,
+                        "transaction": tx_name,
+                        "transaction_info": tx_info,
+                    }
                 )
                 return event
 

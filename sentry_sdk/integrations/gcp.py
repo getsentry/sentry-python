@@ -1,19 +1,19 @@
 import sys
 from copy import deepcopy
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from os import environ
 
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
-from sentry_sdk._compat import datetime_utcnow, reraise
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
     logger,
     TimeoutThread,
+    reraise,
 )
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -25,7 +25,6 @@ TIMEOUT_WARNING_BUFFER = 1.5  # Buffer time required to send timeout warning to 
 MILLIS_TO_SECONDS = 1000.0
 
 if TYPE_CHECKING:
-    from datetime import datetime
     from typing import Any
     from typing import TypeVar
     from typing import Callable
@@ -58,7 +57,7 @@ def _wrap_func(func):
 
         configured_time = int(configured_time)
 
-        initial_time = datetime_utcnow()
+        initial_time = datetime.now(timezone.utc)
 
         with hub.push_scope() as scope:
             with capture_internal_exceptions():
@@ -155,10 +154,10 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
 
-        final_time = datetime_utcnow()
+        final_time = datetime.now(timezone.utc)
         time_diff = final_time - initial_time
 
-        execution_duration_in_millis = time_diff.microseconds / MILLIS_TO_SECONDS
+        execution_duration_in_millis = time_diff / timedelta(milliseconds=1)
 
         extra = event.setdefault("extra", {})
         extra["google cloud functions"] = {

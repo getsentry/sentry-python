@@ -105,7 +105,7 @@ def patch_spark_context_init():
     SparkContext._do_init = _sentry_patched_spark_context_init
 
 
-class SparkListener(object):
+class SparkListener:
     def onApplicationEnd(self, applicationEnd):  # noqa: N802,N803
         # type: (Any) -> None
         pass

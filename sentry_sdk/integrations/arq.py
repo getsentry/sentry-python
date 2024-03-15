@@ -1,20 +1,19 @@
-from __future__ import absolute_import
-
 import sys
 
-from sentry_sdk._compat import reraise
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk import Hub
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     SENSITIVE_DATA_SUBSTITUTE,
     parse_version,
+    reraise,
 )
 
 try:
@@ -114,21 +113,21 @@ def patch_run_job():
 
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
-    hub = Hub.current
+    scope = Scope.get_current_scope()
 
-    if hub.scope.transaction is not None:
+    if scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
-            hub.scope.transaction.set_status("aborted")
+            scope.transaction.set_status("aborted")
             return
 
-        hub.scope.transaction.set_status("internal_error")
+        scope.transaction.set_status("internal_error")
 
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options if hub.client else None,
+        client_options=Scope.get_client().options,
         mechanism={"type": ArqIntegration.identifier, "handled": False},
     )
-    hub.capture_event(event, hint=hint)
+    scope.capture_event(event, hint=hint)
 
 
 def _make_event_processor(ctx, *args, **kwargs):
@@ -136,11 +135,10 @@ def _make_event_processor(ctx, *args, **kwargs):
     def event_processor(event, hint):
         # type: (Event, Hint) -> Optional[Event]
 
-        hub = Hub.current
-
         with capture_internal_exceptions():
-            if hub.scope.transaction is not None:
-                hub.scope.transaction.name = ctx["job_name"]
+            scope = Scope.get_current_scope()
+            if scope.transaction is not None:
+                scope.transaction.name = ctx["job_name"]
                 event["transaction"] = ctx["job_name"]
 
             tags = event.setdefault("tags", {})
@@ -149,12 +147,12 @@ def _make_event_processor(ctx, *args, **kwargs):
             extra = event.setdefault("extra", {})
             extra["arq-job"] = {
                 "task": ctx["job_name"],
-                "args": args
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
-                "kwargs": kwargs
-                if _should_send_default_pii()
-                else SENSITIVE_DATA_SUBSTITUTE,
+                "args": (
+                    args if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
+                "kwargs": (
+                    kwargs if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                ),
                 "retry": ctx["job_try"],
             }
 
@@ -169,7 +167,7 @@ def _wrap_coroutine(name, coroutine):
         # type: (Dict[Any, Any], *Any, **Any) -> Any
         hub = Hub.current
         if hub.get_integration(ArqIntegration) is None:
-            return await coroutine(*args, **kwargs)
+            return await coroutine(ctx, *args, **kwargs)
 
         hub.scope.add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)

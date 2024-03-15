@@ -1,8 +1,10 @@
+import functools
+
 from django.template import TemplateSyntaxError
 from django.utils.safestring import mark_safe
 from django import VERSION as DJANGO_VERSION
 
-from sentry_sdk import _functools, Hub
+from sentry_sdk import Hub
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
@@ -82,7 +84,7 @@ def patch_templates():
 
     real_render = django.shortcuts.render
 
-    @_functools.wraps(real_render)
+    @functools.wraps(real_render)
     def render(request, template_name, context=None, *args, **kwargs):
         # type: (django.http.HttpRequest, str, Optional[Dict[str, Any]], *Any, **Any) -> django.http.HttpResponse
         hub = Hub.current

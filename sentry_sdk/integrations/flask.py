@@ -1,23 +1,20 @@
-from __future__ import absolute_import
-
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    parse_version,
+    package_version,
 )
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
@@ -64,13 +61,10 @@ class FlaskIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-
-        installed_packages = _get_installed_modules()
-        flask_version = installed_packages["flask"]
-        version = parse_version(flask_version)
+        version = package_version("flask")
 
         if version is None:
-            raise DidNotEnable("Unparsable Flask version: {}".format(flask_version))
+            raise DidNotEnable("Unparsable Flask version.")
 
         if version < (0, 10):
             raise DidNotEnable("Flask 0.10 or newer is required.")
@@ -126,11 +120,15 @@ def _request_started(app, **kwargs):
     if integration is None:
         return
 
+    request = flask_request._get_current_object()
+
+    # Set the transaction name and source here,
+    # but rely on WSGI middleware to actually start the transaction
+    _set_transaction_name_and_source(
+        Scope.get_current_scope(), integration.transaction_style, request
+    )
+
     with hub.configure_scope() as scope:
-        # Set the transaction name and source here,
-        # but rely on WSGI middleware to actually start the transaction
-        request = flask_request._get_current_object()
-        _set_transaction_name_and_source(scope, integration.transaction_style, request)
         evt_processor = _make_request_event_processor(app, request, integration)
         scope.add_event_processor(evt_processor)
 
@@ -176,7 +174,7 @@ def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -215,7 +213,7 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _add_user_to_event(event):
-    # type: (Dict[str, Any]) -> None
+    # type: (Event) -> None
     if flask_login is None:
         return
 

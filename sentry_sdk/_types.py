@@ -1,5 +1,5 @@
 try:
-    from typing import TYPE_CHECKING as TYPE_CHECKING
+    from typing import TYPE_CHECKING
 except ImportError:
     TYPE_CHECKING = False
 
@@ -9,7 +9,10 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable
+    from collections.abc import Awaitable, MutableMapping
+
+    from datetime import datetime
+
     from types import TracebackType
     from typing import Any
     from typing import Callable
@@ -20,13 +23,69 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import Type
     from typing import Union
-    from typing_extensions import Literal
+    from typing_extensions import Literal, TypedDict
+
+    # "critical" is an alias of "fatal" recognized by Relay
+    LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
+
+    Event = TypedDict(
+        "Event",
+        {
+            "breadcrumbs": dict[
+                Literal["values"], list[dict[str, Any]]
+            ],  # TODO: We can expand on this type
+            "check_in_id": str,
+            "contexts": dict[str, dict[str, object]],
+            "dist": str,
+            "duration": Optional[float],
+            "environment": str,
+            "errors": list[dict[str, Any]],  # TODO: We can expand on this type
+            "event_id": str,
+            "exception": dict[
+                Literal["values"], list[dict[str, Any]]
+            ],  # TODO: We can expand on this type
+            "extra": MutableMapping[str, object],
+            "fingerprint": list[str],
+            "level": LogLevelStr,
+            "logentry": Mapping[str, object],
+            "logger": str,
+            "measurements": dict[str, object],
+            "message": str,
+            "modules": dict[str, str],
+            "monitor_config": Mapping[str, object],
+            "monitor_slug": Optional[str],
+            "platform": Literal["python"],
+            "profile": object,  # Should be sentry_sdk.profiler.Profile, but we can't import that here due to circular imports
+            "release": str,
+            "request": dict[str, object],
+            "sdk": Mapping[str, object],
+            "server_name": str,
+            "spans": list[dict[str, object]],
+            "stacktrace": dict[
+                str, object
+            ],  # We access this key in the code, but I am unsure whether we ever set it
+            "start_timestamp": datetime,
+            "status": Optional[str],
+            "tags": MutableMapping[
+                str, str
+            ],  # Tags must be less than 200 characters each
+            "threads": dict[
+                Literal["values"], list[dict[str, Any]]
+            ],  # TODO: We can expand on this type
+            "timestamp": Optional[datetime],  # Must be set before sending the event
+            "transaction": str,
+            "transaction_info": Mapping[str, Any],  # TODO: We can expand on this type
+            "type": Literal["check_in", "transaction"],
+            "user": dict[str, object],
+            "_metrics_summary": dict[str, object],
+        },
+        total=False,
+    )
 
     ExcInfo = Tuple[
         Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
     ]
 
-    Event = Dict[str, Any]
     Hint = Dict[str, Any]
 
     Breadcrumb = Dict[str, Any]
@@ -55,9 +114,9 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "statsd",
+        "monitor",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
-    EndpointType = Literal["store", "envelope"]
 
     DurationUnit = Literal[
         "nanosecond",
@@ -120,3 +179,5 @@ if TYPE_CHECKING:
 
     GenericCallable = Callable[..., Any]
     GenericAsyncCallable = Callable[..., Awaitable[Any]]
+
+    MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]

@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import os
 import sys
 import weakref
@@ -10,9 +8,8 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    reraise,
 )
-from sentry_sdk._compat import reraise, iteritems
-
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -36,7 +33,7 @@ if TYPE_CHECKING:
     from webob.compat import cgi_FieldStorage  # type: ignore
 
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 if getattr(Request, "authenticated_userid", None):
@@ -80,10 +77,10 @@ class PyramidIntegration(Integration):
             integration = hub.get_integration(PyramidIntegration)
 
             if integration is not None:
+                _set_transaction_name_and_source(
+                    Scope.get_current_scope(), integration.transaction_style, request
+                )
                 with hub.configure_scope() as scope:
-                    _set_transaction_name_and_source(
-                        scope, integration.transaction_style, request
-                    )
                     scope.add_event_processor(
                         _make_event_processor(weakref.ref(request), integration)
                     )
@@ -192,7 +189,7 @@ class PyramidRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, str]
         return {
             key: value
-            for key, value in iteritems(self.request.POST)
+            for key, value in self.request.POST.items()
             if not getattr(value, "filename", None)
         }
 
@@ -200,7 +197,7 @@ class PyramidRequestExtractor(RequestExtractor):
         # type: () -> Dict[str, cgi_FieldStorage]
         return {
             key: value
-            for key, value in iteritems(self.request.POST)
+            for key, value in self.request.POST.items()
             if getattr(value, "filename", None)
         }
 
@@ -215,8 +212,8 @@ class PyramidRequestExtractor(RequestExtractor):
 
 def _make_event_processor(weak_request, integration):
     # type: (Callable[[], Request], PyramidIntegration) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+    def pyramid_event_processor(event, hint):
+        # type: (Event, Dict[str, Any]) -> Event
         request = weak_request()
         if request is None:
             return event
@@ -231,4 +228,4 @@ def _make_event_processor(weak_request, integration):
 
         return event
 
-    return event_processor
+    return pyramid_event_processor

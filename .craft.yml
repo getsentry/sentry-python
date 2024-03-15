@@ -8,20 +8,23 @@ targets:
       pypi:sentry-sdk:
   - name: github
   - name: aws-lambda-layer
-    includeNames: /^sentry-python-serverless-\d+(\.\d+)*\.zip$/
+    # This regex that matches the version is taken from craft:
+    # https://github.com/getsentry/craft/blob/8d77c38ddbe4be59f98f61b6e42952ca087d3acd/src/utils/version.ts#L11
+    includeNames: /^sentry-python-serverless-\bv?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-?([\da-z-]+(?:\.[\da-z-]+)*))?(?:\+([\da-z-]+(?:\.[\da-z-]+)*))?\b.zip$/
     layerName: SentryPythonServerlessSDK
     compatibleRuntimes:
       - name: python
         versions:
           # The number of versions must be, at most, the maximum number of
-          # runtimes AWS Lambda permits for a layer.
+          # runtimes AWS Lambda permits for a layer (currently 15).
           # On the other hand, AWS Lambda does not support every Python runtime.
           # The supported runtimes are available in the following link:
           # https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html
-          - python3.6
           - python3.7
           - python3.8
           - python3.9
+          - python3.10
+          - python3.11
     license: MIT
   - name: sentry-pypi
     internalPypiRepo: getsentry/pypi

@@ -3,12 +3,11 @@ from importlib import import_module
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.integrations.modules import _get_installed_modules
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    parse_version,
+    package_version,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
     from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
     from graphql.language.ast import DocumentNode  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 class AriadneIntegration(Integration):
@@ -33,11 +32,10 @@ class AriadneIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        installed_packages = _get_installed_modules()
-        version = parse_version(installed_packages["ariadne"])
+        version = package_version("ariadne")
 
         if version is None:
-            raise DidNotEnable("Unparsable ariadne version: {}".format(version))
+            raise DidNotEnable("Unparsable ariadne version.")
 
         if version < (0, 20):
             raise DidNotEnable("ariadne 0.20 or newer required.")
@@ -133,7 +131,7 @@ def _make_request_event_processor(data):
     """Add request data and api_target to events."""
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         if not isinstance(data, dict):
             return event
 
@@ -165,7 +163,7 @@ def _make_response_event_processor(response):
     """Add response data to the event's response context."""
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii() and response.get("errors"):
                 contexts = event.setdefault("contexts", {})

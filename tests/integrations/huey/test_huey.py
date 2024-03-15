@@ -3,9 +3,14 @@ from decimal import DivisionByZero
 
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.huey import HueyIntegration
+from sentry_sdk.utils import parse_version
 
+from huey import __version__ as HUEY_VERSION
 from huey.api import MemoryHuey, Result
 from huey.exceptions import RetryTask
+
+
+HUEY_VERSION = parse_version(HUEY_VERSION)
 
 
 @pytest.fixture
@@ -119,6 +124,7 @@ def test_task_retry(capture_events, init_huey):
 
 
 @pytest.mark.parametrize("lock_name", ["lock.a", "lock.b"], ids=["locked", "unlocked"])
+@pytest.mark.skipif(HUEY_VERSION < (2, 5), reason="is_locked was added in 2.5")
 def test_task_lock(capture_events, init_huey, lock_name):
     huey = init_huey()
 
@@ -166,3 +172,21 @@ def test_huey_enqueue(init_huey, capture_events):
     assert len(event["spans"])
     assert event["spans"][0]["op"] == "queue.submit.huey"
     assert event["spans"][0]["description"] == "different_task_name"
+
+
+def test_huey_propagate_trace(init_huey, capture_events):
+    huey = init_huey()
+
+    events = capture_events()
+
+    @huey.task()
+    def propagated_trace_task():
+        pass
+
+    with start_transaction() as outer_transaction:
+        execute_huey_task(huey, propagated_trace_task)
+
+    assert (
+        events[0]["transaction"] == "propagated_trace_task"
+    )  # the "inner" transaction
+    assert events[0]["contexts"]["trace"]["trace_id"] == outer_transaction.trace_id

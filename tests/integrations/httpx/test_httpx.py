@@ -1,17 +1,13 @@
 import asyncio
+from unittest import mock
 
-import pytest
 import httpx
+import pytest
 import responses
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.mark.parametrize(

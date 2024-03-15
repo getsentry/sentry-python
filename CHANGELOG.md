@@ -1,5 +1,405 @@
 # Changelog
 
+## 2.0.0rc2
+
+## New Features
+
+- Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
+
+## Changed
+
+- The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
+- The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
+- The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
+- The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
+- The `_ScopeManager` was moved from `sentry_sdk.hub` to `sentry_sdk.scope`.
+- Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
+- The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
+- `sentry_sdk.tracing_utils.get_current_span()` does now take a `scope` instead of a `hub` as parameter.
+- `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.
+- If you create a transaction manually and later mutate the transaction in a `configure_scope` block this does not work anymore. Here is a recipe on how to change your code to make it work:
+    Your existing implementation:
+    ```python
+    transaction = sentry_sdk.transaction(...)
+
+    # later in the code execution:
+
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_transaction_name("new-transaction-name")
+    ```
+
+    needs to be changed to this:
+    ```python
+    transaction = sentry_sdk.transaction(...)
+
+    # later in the code execution:
+
+    scope = sentry_sdk.Scope.get_current_scope()
+    scope.set_transaction_name("new-transaction-name")
+    ```
+- The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
+  <details>
+    <summary><b>Show table</b></summary>
+
+  | Class                                 | Abstract methods                       |
+  | ------------------------------------- | -------------------------------------- |
+  | `sentry_sdk.integrations.Integration` | `setup_once`                           |
+  | `sentry_sdk.metrics.Metric`           | `add`, `serialize_value`, and `weight` |
+  | `sentry_sdk.profiler.Scheduler`       | `setup` and `teardown`                 |
+  | `sentry_sdk.transport.Transport`      | `capture_envelope`                     |
+
+    </details>
+
+## Removed
+
+- Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
+- Removed support for Celery 3.\*.
+- Removed support for Django 1.8, 1.9, 1.10.
+- Removed support for Flask 0.\*.
+- Removed support for gRPC < 1.39.
+- Removed `last_event_id()` top level API. The last event ID is still returned by `capture_event()`, `capture_exception()` and `capture_message()` but the top level API `sentry_sdk.last_event_id()` has been removed.
+- Removed support for sending events to the `/store` endpoint. Everything is now sent to the `/envelope` endpoint. If you're on SaaS you don't have to worry about this, but if you're running Sentry yourself you'll need version `20.6.0` or higher of self-hosted Sentry.
+- The deprecated `with_locals` configuration option was removed. Use `include_local_variables` instead. See https://docs.sentry.io/platforms/python/configuration/options/#include-local-variables.
+- The deprecated `request_bodies` configuration option was removed. Use `max_request_body_size`. See https://docs.sentry.io/platforms/python/configuration/options/#max-request-body-size.
+- Removed support for `user.segment`. It was also removed from the trace header as well as from the dynamic sampling context.
+- Removed support for the `install` method for custom integrations. Please use `setup_once` instead.
+- Removed `sentry_sdk.tracing.Span.new_span`. Use `sentry_sdk.tracing.Span.start_child` instead.
+- Removed `sentry_sdk.tracing.Transaction.new_span`. Use `sentry_sdk.tracing.Transaction.start_child` instead.
+- Removed `sentry_sdk.utils.Auth.store_api_url`.
+- `sentry_sdk.utils.Auth.get_api_url`'s now accepts a `sentry_sdk.consts.EndpointType` enum instead of a string as its only parameter. We recommend omitting this argument when calling the function, since the parameter's default value is the only possible `sentry_sdk.consts.EndpointType` value. The parameter exists for future compatibility.
+- Removed `tracing_utils_py2.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
+- Removed the `sentry_sdk.profiler.Scheduler.stop_profiling` method. Any calls to this method can simply be removed, since this was a no-op method.
+
+## Deprecated
+
+- `profiler_mode` and `profiles_sample_rate` have been deprecated as `_experiments` options. Use them as top level options instead:
+  ```python
+  sentry_sdk.init(
+      ...,
+      profiler_mode="thread",
+      profiles_sample_rate=1.0,
+  )
+  ```
+- Deprecated `sentry_sdk.transport.Transport.capture_event`. Please use `sentry_sdk.transport.Transport.capture_envelope`, instead.
+- Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
+- The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
+
+## 1.42.0
+
+### Various fixes & improvements
+
+- **New integration:** [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/) (#2791) by @colin-sentry
+
+  We added an integration for OpenAI to capture errors and also performance data when using the OpenAI Python SDK.
+
+  Useage:
+
+  This integrations is auto-enabling, so if you have the `openai` package in your project it will be enabled. Just initialize Sentry before you create your OpenAI client.
+
+  ```python
+  from openai import OpenAI
+
+  import sentry_sdk
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+  )
+
+  client = OpenAI()
+  ```
+
+  For more information, see the documentation for [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/).
+
+- Discard open OpenTelemetry spans after 10 minutes (#2801) by @antonpirker
+- Propagate sentry-trace and baggage headers to Huey tasks (#2792) by @cnschn
+- Added Event type (#2753) by @szokeasaurusrex
+- Improve scrub_dict typing (#2768) by @szokeasaurusrex
+- Dependencies: bump types-protobuf from 4.24.0.20240302 to 4.24.0.20240311 (#2797) by @dependabot
+
+## 1.41.0
+
+### Various fixes & improvements
+
+- Add recursive scrubbing to `EventScrubber` (#2755) by @Cheapshot003
+
+  By default, the `EventScrubber` will not search your events for potential
+  PII recursively. With this release, you can enable this behavior with:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.scrubber import EventScrubber
+
+  sentry_sdk.init(
+      # ...your usual settings...
+      event_scrubber=EventScrubber(recursive=True),
+  )
+  ```
+
+- Expose `socket_options` (#2786) by @sentrivana
+
+  If the SDK is experiencing connection issues (connection resets, server
+  closing connection without response, etc.) while sending events to Sentry,
+  tweaking the default `urllib3` socket options to the following can help:
+
+  ```python
+  import socket
+  from urllib3.connection import HTTPConnection
+  import sentry_sdk
+
+  sentry_sdk.init(
+      # ...your usual settings...
+      socket_options=HTTPConnection.default_socket_options + [
+          (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+          # note: skip the following line if you're on MacOS since TCP_KEEPIDLE doesn't exist there
+          (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+          (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+          (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+      ],
+  )
+  ```
+
+- Allow to configure merge target for releases (#2777) by @sentrivana
+- Allow empty character in metric tags values (#2775) by @viglia
+- Replace invalid tag values with an empty string instead of _ (#2773) by @markushi
+- Add documentation comment to `scrub_list` (#2769) by @szokeasaurusrex
+- Fixed regex to parse version in lambda package file (#2767) by @antonpirker
+- xfail broken AWS Lambda tests for now (#2794) by @sentrivana
+- Removed print statements because it messes with the tests (#2789) by @antonpirker
+- Bump `types-protobuf` from 4.24.0.20240129 to 4.24.0.20240302 (#2782) by @dependabot
+- Bump `checkouts/data-schemas` from `eb941c2` to `ed078ed` (#2781) by @dependabot
+
+## 1.40.6
+
+### Various fixes & improvements
+
+- Fix compatibility with `greenlet`/`gevent` (#2756) by @sentrivana
+- Fix query source relative filepath (#2717) by @gggritso
+- Support `clickhouse-driver==0.2.7` (#2752) by @sentrivana
+- Bump `checkouts/data-schemas` from `6121fd3` to `eb941c2` (#2747) by @dependabot
+
+## 1.40.5
+
+### Various fixes & improvements
+
+- Deprecate `last_event_id()`. (#2749) by @antonpirker
+- Warn if uWSGI is set up without proper thread support (#2738) by @sentrivana
+
+    uWSGI has to be run in threaded mode for the SDK to run properly. If this is
+    not the case, the consequences could range from features not working unexpectedly
+    to uWSGI workers crashing.
+
+    Please make sure to run uWSGI with both `--enable-threads` and `--py-call-uwsgi-fork-hooks`.
+
+- `parsed_url` can be `None` (#2734) by @sentrivana
+- Python 3.7 is not supported anymore by Lambda, so removed it and added 3.12 (#2729) by @antonpirker
+
+## 1.40.4
+
+### Various fixes & improvements
+
+- Only start metrics flusher thread on demand (#2727) by @sentrivana
+- Bump checkouts/data-schemas from `aa7058c` to `6121fd3` (#2724) by @dependabot
+
+## 1.40.3
+
+### Various fixes & improvements
+
+- Turn off metrics for uWSGI (#2720) by @sentrivana
+- Minor improvements (#2714) by @antonpirker
+
+## 1.40.2
+
+### Various fixes & improvements
+
+- test: Fix `pytest` error (#2712) by @szokeasaurusrex
+- build(deps): bump types-protobuf from 4.24.0.4 to 4.24.0.20240129 (#2691) by @dependabot
+
+## 1.40.1
+
+### Various fixes & improvements
+
+- Fix uWSGI workers hanging (#2694) by @sentrivana
+- Make metrics work with `gevent` (#2694) by @sentrivana
+- Guard against `engine.url` being `None` (#2708) by @sentrivana
+- Fix performance regression in `sentry_sdk.utils._generate_installed_modules` (#2703) by @GlenWalker
+- Guard against Sentry initialization mid SQLAlchemy cursor (#2702) by @apmorton
+- Fix yaml generation script (#2695) by @sentrivana
+- Fix AWS Lambda workflow (#2710) by @sentrivana
+- Bump `codecov/codecov-action` from 3 to 4 (#2706) by @dependabot
+- Bump `actions/cache` from 3 to 4 (#2661) by @dependabot
+- Bump `actions/checkout` from 3.1.0 to 4.1.1 (#2561) by @dependabot
+- Bump `github/codeql-action` from 2 to 3 (#2603) by @dependabot
+- Bump `actions/setup-python` from 4 to 5 (#2577) by @dependabot
+
+## 1.40.0
+
+### Various fixes & improvements
+
+- Enable metrics related settings by default (#2685) by @iambriccardo
+- Fix `UnicodeDecodeError` on Python 2 (#2657) by @sentrivana
+- Enable DB query source by default (#2629) by @sentrivana
+- Fix query source duration check (#2675) by @sentrivana
+- Reformat with `black==24.1.0` (#2680) by @sentrivana
+- Cleaning up existing code to prepare for new Scopes API (#2611) by @antonpirker
+- Moved redis related tests to databases (#2674) by @antonpirker
+- Improve `sentry_sdk.trace` type hints (#2633) by @szokeasaurusrex
+- Bump `checkouts/data-schemas` from `e9f7d58` to `aa7058c` (#2639) by @dependabot
+
+## 1.39.2
+
+### Various fixes & improvements
+
+- Fix timestamp in transaction created by OTel (#2627) by @antonpirker
+- Fix relative path in DB query source  (#2624) by @antonpirker
+- Run more CI checks on 2.0 branch (#2625) by @sentrivana
+- Fix tracing `TypeError` for static and class methods (#2559) by @szokeasaurusrex
+- Fix missing `ctx` in Arq integration (#2600) by @ivanovart
+- Change `data_category` from `check_in` to `monitor` (#2598) by @sentrivana
+
+## 1.39.1
+
+### Various fixes & improvements
+
+- Fix psycopg2 detection in the Django integration (#2593) by @sentrivana
+- Filter out empty string releases (#2591) by @sentrivana
+- Fixed local var not present when there is an error in a user's `error_sampler` function (#2511) by @antonpirker
+- Fixed typing in `aiohttp` (#2590) by @antonpirker
+
+## 1.39.0
+
+### Various fixes & improvements
+
+- Add support for cluster clients from Redis SDK (#2394) by @md384
+- Improve location reporting for timer metrics (#2552) by @mitsuhiko
+- Fix Celery `TypeError` with no-argument `apply_async` (#2575) by @szokeasaurusrex
+- Fix Lambda integration with EventBridge source (#2546) by @davidcroda
+- Add max tries to Spotlight (#2571) by @hazAT
+- Handle `os.path.devnull` access issues (#2579) by @sentrivana
+- Change `code.filepath` frame picking logic (#2568) by @sentrivana
+- Trigger AWS Lambda tests on label (#2538) by @sentrivana
+- Run permissions step on pull_request_target but not push (#2548) by @sentrivana
+- Hash AWS Lambda test functions based on current revision (#2557) by @sentrivana
+- Update Django version in tests (#2562) by @sentrivana
+- Make metrics tests non-flaky (#2572) by @antonpirker
+
+## 1.38.0
+
+### Various fixes & improvements
+
+- Only add trace context to checkins and do not run `event_processors` for checkins (#2536) by @antonpirker
+- Metric span summaries (#2522) by @mitsuhiko
+- Add source context to code locations (#2539) by @jan-auer
+- Use in-app filepath instead of absolute path (#2541) by @antonpirker
+- Switch to `jinja2` for generating CI yamls (#2534) by @sentrivana
+
+## 1.37.1
+
+### Various fixes & improvements
+
+- Fix `NameError` on `parse_version` with eventlet (#2532) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `68def1e` to `e9f7d58` (#2501) by @dependabot
+
+## 1.37.0
+
+### Various fixes & improvements
+
+- Move installed modules code to utils (#2429) by @sentrivana
+
+    Note: We moved the internal function `_get_installed_modules` from `sentry_sdk.integrations.modules` to `sentry_sdk.utils`.
+    So if you use this function you have to update your imports
+
+- Add code locations for metrics (#2526) by @jan-auer
+- Add query source to DB spans (#2521) by @antonpirker
+- Send events to Spotlight sidecar (#2524) by @HazAT
+- Run integration tests with newest `pytest` (#2518) by @sentrivana
+- Bring tests up to date (#2512) by @sentrivana
+- Fix: Prevent global var from being discarded at shutdown (#2530) by @antonpirker
+- Fix: Scope transaction source not being updated in scope.span setter (#2519) by @sl0thentr0py
+
+## 1.36.0
+
+### Various fixes & improvements
+
+- Django: Support Django 5.0 (#2490) by @sentrivana
+- Django: Handling ASGI body in the right way. (#2513) by @antonpirker
+- Flask: Test with Flask 3.0 (#2506) by @sentrivana
+- Celery: Do not create a span when task is triggered by Celery Beat (#2510) by @antonpirker
+- Redis: Ensure `RedisIntegration` is disabled, unless `redis` is installed (#2504) by @szokeasaurusrex
+- Quart: Fix Quart integration for Quart 0.19.4  (#2516) by @antonpirker
+- gRPC: Make async gRPC less noisy (#2507) by @jyggen
+
+## 1.35.0
+
+### Various fixes & improvements
+
+- **Updated gRPC integration:** Asyncio interceptors and easier setup (#2369) by @fdellekart
+
+  Our gRPC integration now instruments incoming unary-unary grpc requests and outgoing unary-unary, unary-stream grpc requests using grpcio channels. Everything works now for sync and async code.
+
+  Before this release you had to add Sentry interceptors by hand to your gRPC code, now the only thing you need to do is adding the `GRPCIntegration` to you `sentry_sdk_init()` call. (See [documentation](https://docs.sentry.io/platforms/python/integrations/grpc/) for more information):
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.grpc import GRPCIntegration
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      integrations=[
+          GRPCIntegration(),
+      ],
+  )
+  ```
+  The old way still works, but we strongly encourage you to update your code to the way described above.
+
+- Python 3.12: Replace deprecated datetime functions (#2502) by @sentrivana
+- Metrics: Unify datetime format (#2409) by @mitsuhiko
+- Celery: Set correct data in `check_in`s (#2500) by @antonpirker
+- Celery: Read timezone for Crons monitors from `celery_schedule` if existing (#2497) by @antonpirker
+- Django: Removing redundant code in Django tests (#2491) by @vagi8
+- Django: Make reading the request body work in Django ASGI apps. (#2495) by @antonpirker
+- FastAPI: Use wraps on fastapi request call wrapper (#2476) by @nkaras
+- Fix: Probe for psycopg2 and psycopg3 parameters function. (#2492) by @antonpirker
+- Fix: Remove unnecessary TYPE_CHECKING alias (#2467) by @rafrafek
+
+## 1.34.0
+
+### Various fixes & improvements
+- Added Python 3.12 support (#2471, #2483)
+- Handle missing `connection_kwargs` in `patch_redis_client` (#2482) by @szokeasaurusrex
+- Run common test suite on Python 3.12 (#2479) by @sentrivana
+
+## 1.33.1
+
+### Various fixes & improvements
+
+- Make parse_version work in utils.py itself. (#2474) by @antonpirker
+
+## 1.33.0
+
+### Various fixes & improvements
+
+- New: Added `error_sampler` option (#2456) by @szokeasaurusrex
+- Python 3.12: Detect interpreter in shutdown state on thread spawn (#2468) by @mitsuhiko
+- Patch eventlet under Sentry SDK (#2464) by @szokeasaurusrex
+- Mitigate CPU spikes when sending lots of events with lots of data (#2449) by @antonpirker
+- Make `debug` option also configurable via environment (#2450) by @antonpirker
+- Make sure `get_dsn_parameters` is an actual function (#2441) by @sentrivana
+- Bump pytest-localserver, add compat comment (#2448) by @sentrivana
+- AWS Lambda: Update compatible runtimes for AWS Lambda layer (#2453) by @antonpirker
+- AWS Lambda: Load AWS Lambda secrets in Github CI (#2153) by @antonpirker
+- Redis: Connection attributes in `redis` database spans (#2398) by @antonpirker
+- Falcon: Falcon integration checks response status before reporting error (#2465) by @szokeasaurusrex
+- Quart: Support Quart 0.19 onwards (#2403) by @pgjones
+- Sanic: Sanic integration initial version (#2419) by @szokeasaurusrex
+- Django: Fix parsing of Django `path` patterns (#2452) by @sentrivana
+- Django: Add Django 4.2 to test suite (#2462) by @sentrivana
+- Polish changelog (#2434) by @sentrivana
+- Update CONTRIBUTING.md (#2443) by @krishvsoni
+- Update README.md (#2435) by @sentrivana
+
 ## 1.32.0
 
 ### Various fixes & improvements

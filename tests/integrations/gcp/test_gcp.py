@@ -2,6 +2,7 @@
 # GCP Cloud Functions unit tests
 
 """
+
 import json
 from textwrap import dedent
 import tempfile
@@ -11,10 +12,6 @@ import subprocess
 import pytest
 import os.path
 import os
-
-pytestmark = pytest.mark.skipif(
-    not hasattr(tempfile, "TemporaryDirectory"), reason="need Python 3.2+"
-)
 
 
 FUNCTIONS_PRELUDE = """
@@ -62,17 +59,9 @@ def envelope_processor(envelope):
     return item.get_bytes()
 
 class TestTransport(HttpTransport):
-    def _send_event(self, event):
-        event = event_processor(event)
-        # Writing a single string to stdout holds the GIL (seems like) and
-        # therefore cannot be interleaved with other threads. This is why we
-        # explicitly add a newline at the end even though `print` would provide
-        # us one.
-        print("\\nEVENT: {}\\n".format(json.dumps(event)))
-
-    def _send_envelope(self, envelope):
-        envelope = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(envelope.decode(\"utf-8\")))
+    def capture_envelope(self, envelope):
+        envelope_item = envelope_processor(envelope)
+        print("\\nENVELOPE: {}\\n".format(envelope_item.decode(\"utf-8\")))
 
 
 def init_sdk(timeout_warning=False, **extra_init_args):
@@ -93,8 +82,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 @pytest.fixture
 def run_cloud_function():
     def inner(code, subprocess_kwargs=()):
-        events = []
-        envelopes = []
+        envelope_items = []
         return_value = None
 
         # STEP : Create a zip of cloud function
@@ -130,12 +118,9 @@ def run_cloud_function():
 
             for line in stream_data.splitlines():
                 print("GCP:", line)
-                if line.startswith("EVENT: "):
-                    line = line[len("EVENT: ") :]
-                    events.append(json.loads(line))
-                elif line.startswith("ENVELOPE: "):
+                if line.startswith("ENVELOPE: "):
                     line = line[len("ENVELOPE: ") :]
-                    envelopes.append(json.loads(line))
+                    envelope_items.append(json.loads(line))
                 elif line.startswith("RETURN VALUE: "):
                     line = line[len("RETURN VALUE: ") :]
                     return_value = json.loads(line)
@@ -144,13 +129,13 @@ def run_cloud_function():
 
             stream.close()
 
-        return envelopes, events, return_value
+        return envelope_items, return_value
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    _, events, return_value = run_cloud_function(
+    envelope_items, return_value = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -167,8 +152,8 @@ def test_handled_exception(run_cloud_function):
         """
         )
     )
-    assert events[0]["level"] == "error"
-    (exception,) = events[0]["exception"]["values"]
+    assert envelope_items[0]["level"] == "error"
+    (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
@@ -177,7 +162,7 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    _, events, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -195,8 +180,8 @@ def test_unhandled_exception(run_cloud_function):
         """
         )
     )
-    assert events[0]["level"] == "error"
-    (exception,) = events[0]["exception"]["values"]
+    assert envelope_items[0]["level"] == "error"
+    (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "ZeroDivisionError"
     assert exception["value"] == "division by zero"
@@ -205,7 +190,7 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    _, events, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -223,8 +208,8 @@ def test_timeout_error(run_cloud_function):
         """
         )
     )
-    assert events[0]["level"] == "error"
-    (exception,) = events[0]["exception"]["values"]
+    assert envelope_items[0]["level"] == "error"
+    (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "ServerlessTimeoutWarning"
     assert (
@@ -236,7 +221,7 @@ def test_timeout_error(run_cloud_function):
 
 
 def test_performance_no_error(run_cloud_function):
-    envelopes, _, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -254,15 +239,15 @@ def test_performance_no_error(run_cloud_function):
         )
     )
 
-    assert envelopes[0]["type"] == "transaction"
-    assert envelopes[0]["contexts"]["trace"]["op"] == "function.gcp"
-    assert envelopes[0]["transaction"].startswith("Google Cloud function")
-    assert envelopes[0]["transaction_info"] == {"source": "component"}
-    assert envelopes[0]["transaction"] in envelopes[0]["request"]["url"]
+    assert envelope_items[0]["type"] == "transaction"
+    assert envelope_items[0]["contexts"]["trace"]["op"] == "function.gcp"
+    assert envelope_items[0]["transaction"].startswith("Google Cloud function")
+    assert envelope_items[0]["transaction_info"] == {"source": "component"}
+    assert envelope_items[0]["transaction"] in envelope_items[0]["request"]["url"]
 
 
 def test_performance_error(run_cloud_function):
-    envelopes, events, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -280,18 +265,18 @@ def test_performance_error(run_cloud_function):
         )
     )
 
-    assert envelopes[0]["level"] == "error"
-    (exception,) = envelopes[0]["exception"]["values"]
+    assert envelope_items[0]["level"] == "error"
+    (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "Exception"
     assert exception["value"] == "something went wrong"
     assert exception["mechanism"]["type"] == "gcp"
     assert not exception["mechanism"]["handled"]
 
-    assert envelopes[1]["type"] == "transaction"
-    assert envelopes[1]["contexts"]["trace"]["op"] == "function.gcp"
-    assert envelopes[1]["transaction"].startswith("Google Cloud function")
-    assert envelopes[1]["transaction"] in envelopes[0]["request"]["url"]
+    assert envelope_items[1]["type"] == "transaction"
+    assert envelope_items[1]["contexts"]["trace"]["op"] == "function.gcp"
+    assert envelope_items[1]["transaction"].startswith("Google Cloud function")
+    assert envelope_items[1]["transaction"] in envelope_items[0]["request"]["url"]
 
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
@@ -304,7 +289,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    envelopes, events, return_value = run_cloud_function(
+    _, return_value = run_cloud_function(
         dedent(
             """
             functionhandler = None
@@ -377,7 +362,7 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
     """
     Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
     """
-    envelopes, _, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -396,7 +381,7 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
         """
         )
     )
-    (msg_event, error_event, transaction_event) = envelopes
+    (msg_event, error_event, transaction_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -418,7 +403,7 @@ def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
     """
     Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
     """
-    _, events, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -438,7 +423,7 @@ def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
         )
     )
 
-    (msg_event, error_event) = events
+    (msg_event, error_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -462,7 +447,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_cloud_function
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
-    envelopes, _, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -486,7 +471,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_cloud_function
         """
         )
     )
-    (msg_event, error_event, transaction_event) = envelopes
+    (msg_event, error_event, transaction_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -515,7 +500,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
-    _, events, _ = run_cloud_function(
+    envelope_items, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -539,7 +524,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
         """
         )
     )
-    (msg_event, error_event) = events
+    (msg_event, error_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]

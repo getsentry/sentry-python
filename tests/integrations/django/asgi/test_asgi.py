@@ -1,4 +1,7 @@
+import base64
 import json
+import os
+from unittest import mock
 
 import django
 import pytest
@@ -8,9 +11,10 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from tests.integrations.django.myapp.asgi import channels_application
 
 try:
-    from unittest import mock  # python 3.3 and above
+    from django.urls import reverse
 except ImportError:
-    import mock  # python < 3.3
+    from django.core.urlresolvers import reverse
+
 
 APPS = [channels_application]
 if django.VERSION >= (3, 0):
@@ -21,6 +25,7 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.forked
 async def test_basic(sentry_init, capture_events, application):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
@@ -53,6 +58,7 @@ async def test_basic(sentry_init, capture_events, application):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -80,6 +86,7 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -100,7 +107,6 @@ async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, applic
         await comm.wait()
 
         data = json.loads(response["body"])
-
         envelopes = [envelope for envelope in envelopes]
         assert len(envelopes) == 1
 
@@ -114,6 +120,7 @@ async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, applic
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -147,6 +154,7 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -184,6 +192,7 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -233,6 +242,7 @@ async def test_async_middleware_spans(
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -262,6 +272,7 @@ async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -288,6 +299,7 @@ async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -323,6 +335,7 @@ async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_ev
 
 
 @pytest.mark.asyncio
+@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -353,3 +366,151 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
 
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+
+PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image.png")
+BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="image.png"\r\nContent-Type: image/png\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
+    "{{image_data}}", base64.b64encode(open(PICTURE, "rb").read()).decode("utf-8")
+).encode(
+    "utf-8"
+)
+BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.parametrize(
+    "send_default_pii,method,headers,url_name,body,expected_data",
+    [
+        (
+            True,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            "post_echo_async",
+            b"",
+            None,
+        ),
+        (
+            True,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            "post_echo_async",
+            b"some raw text body",
+            "",
+        ),
+        (
+            True,
+            "POST",
+            [(b"content-type", b"application/json")],
+            "post_echo_async",
+            b'{"username":"xyz","password":"xyz"}',
+            {"username": "xyz", "password": "xyz"},
+        ),
+        (
+            True,
+            "POST",
+            [(b"content-type", b"application/xml")],
+            "post_echo_async",
+            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
+            "",
+        ),
+        (
+            True,
+            "POST",
+            [
+                (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
+                (b"content-length", BODY_FORM_CONTENT_LENGTH),
+            ],
+            "post_echo_async",
+            BODY_FORM,
+            {"password": "hello123", "photo": "", "username": "Jane"},
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            "post_echo_async",
+            b"",
+            None,
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"text/plain")],
+            "post_echo_async",
+            b"some raw text body",
+            "",
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"application/json")],
+            "post_echo_async",
+            b'{"username":"xyz","password":"xyz"}',
+            {"username": "xyz", "password": "[Filtered]"},
+        ),
+        (
+            False,
+            "POST",
+            [(b"content-type", b"application/xml")],
+            "post_echo_async",
+            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
+            "",
+        ),
+        (
+            False,
+            "POST",
+            [
+                (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
+                (b"content-length", BODY_FORM_CONTENT_LENGTH),
+            ],
+            "post_echo_async",
+            BODY_FORM,
+            {"password": "[Filtered]", "photo": "", "username": "Jane"},
+        ),
+    ],
+)
+@pytest.mark.asyncio
+@pytest.mark.forked
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_asgi_request_body(
+    sentry_init,
+    capture_envelopes,
+    application,
+    send_default_pii,
+    method,
+    headers,
+    url_name,
+    body,
+    expected_data,
+):
+    sentry_init(
+        send_default_pii=send_default_pii,
+        integrations=[
+            DjangoIntegration(),
+        ],
+    )
+
+    envelopes = capture_envelopes()
+
+    comm = HttpCommunicator(
+        application,
+        method=method,
+        headers=headers,
+        path=reverse(url_name),
+        body=body,
+    )
+    response = await comm.get_response()
+    assert response["status"] == 200
+
+    await comm.wait()
+    assert response["body"] == body
+
+    (envelope,) = envelopes
+    event = envelope.get_event()
+
+    if expected_data is not None:
+        assert event["request"]["data"] == expected_data
+    else:
+        assert "data" not in event["request"]

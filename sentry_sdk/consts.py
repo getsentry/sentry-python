@@ -1,7 +1,20 @@
+from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
+
+
+# Also needs to be at the top to prevent circular import
+class EndpointType(Enum):
+    """
+    The type of an endpoint. This is an enum, rather than a constant, for historical reasons
+    (the old /store endpoint). The enum also preserve future compatibility, in case we ever
+    have a new endpoint.
+    """
+
+    ENVELOPE = "envelope"
+
 
 if TYPE_CHECKING:
     import sentry_sdk
@@ -14,6 +27,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Any
     from typing import Sequence
+    from typing import Tuple
     from typing_extensions import TypedDict
 
     from sentry_sdk.integrations import Integration
@@ -22,6 +36,7 @@ if TYPE_CHECKING:
         BreadcrumbProcessor,
         Event,
         EventProcessor,
+        Hint,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
@@ -38,14 +53,14 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            # TODO: Remove these 2 profiling related experiments
-            "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
+            "metrics_summary_sample_rate": Optional[float],
+            "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
             "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "metric_code_locations": Optional[bool],
         },
         total=False,
     )
@@ -162,6 +177,30 @@ class SPANDATA:
     Example: 16456
     """
 
+    CODE_FILEPATH = "code.filepath"
+    """
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
+    """
+
+    CODE_LINENO = "code.lineno"
+    """
+    The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_FUNCTION = "code.function"
+    """
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
+    Example: "server_request"
+    """
+
+    CODE_NAMESPACE = "code.namespace"
+    """
+    The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
+    Example: "http.handler"
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
@@ -190,6 +229,8 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
+    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
+    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -210,7 +251,7 @@ class OP:
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
-class ClientConstructor(object):
+class ClientConstructor:
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
@@ -232,6 +273,7 @@ class ClientConstructor(object):
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
+        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -261,6 +303,10 @@ class ClientConstructor(object):
         event_scrubber=None,  # type: Optional[sentry_sdk.scrubber.EventScrubber]
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
         enable_backpressure_handling=True,  # type: bool
+        error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
+        enable_db_query_source=True,  # type: bool
+        db_query_source_threshold_ms=100,  # type: int
+        spotlight=None,  # type: Optional[Union[bool, str]]
     ):
         # type: (...) -> None
         pass
@@ -284,4 +330,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.32.0"
+VERSION = "2.0.0rc2"

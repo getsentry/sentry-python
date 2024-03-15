@@ -1,22 +1,20 @@
-# coding: utf-8
 import logging
 import pickle
 import gzip
 import io
-
-from datetime import datetime, timedelta
+import socket
+from collections import namedtuple
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 import pytest
-from collections import namedtuple
+from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
-from pytest_localserver.http import WSGIServer
-
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
-from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
@@ -119,7 +117,9 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
     capture_message("löl")
 
     getattr(client, client_flush_method)()
@@ -129,7 +129,7 @@ def test_transport_works(
     assert capturing_server.captured
     assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
-    assert any("Sending event" in record.msg for record in caplog.records) == debug
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.parametrize(
@@ -151,6 +151,19 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
+def test_socket_options(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
 def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
@@ -158,11 +171,33 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
     )
 
+    # I am not sure why, but "werkzeug" logger makes an INFO log on sending
+    # the message "hi" and does creates an infinite look.
+    # Ignoring this for breaking the infinite loop and still we can test
+    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
+    # to an infinite loop
+    ignore_logger("werkzeug")
+
     with Hub(client):
         capture_message("hi")
         client.flush()
 
     assert len(capturing_server.captured) == 1
+
+
+def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client):
+    client = make_client()
+
+    # make it seem like the interpreter is shutting down
+    with mock.patch(
+        "threading.Thread.start",
+        side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
+    ):
+        with Hub(client):
+            capture_message("hi")
+
+    # nothing exploded but also no events can be sent anymore
+    assert len(capturing_server.captured) == 0
 
 
 NOW = datetime(2014, 6, 2)
@@ -200,7 +235,7 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
-def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
+def test_simple_rate_limits(capturing_server, make_client):
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
 
@@ -222,7 +257,7 @@ def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits(
-    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=False)
 
@@ -259,7 +294,7 @@ def test_data_category_limits(
     client.flush()
 
     assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/store/"
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
@@ -269,7 +304,7 @@ def test_data_category_limits(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits_reporting(
-    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=True)
 
@@ -338,7 +373,8 @@ def test_data_category_limits_reporting(
 
     assert len(capturing_server.captured) == 2
 
-    event = capturing_server.captured[0].event
+    assert len(capturing_server.captured[0].envelope.items) == 1
+    event = capturing_server.captured[0].envelope.items[0].get_event()
     assert event["type"] == "error"
     assert event["release"] == "foo"
 
@@ -352,7 +388,7 @@ def test_data_category_limits_reporting(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_complex_limits_without_data_category(
-    capturing_server, capsys, caplog, response_code, make_client
+    capturing_server, response_code, make_client
 ):
     client = make_client()
     capturing_server.respond_with(

@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-from sentry_sdk import start_transaction
+from sentry_sdk import start_transaction, Hub
 from sentry_sdk.integrations.arq import ArqIntegration
 
 import arq.worker
@@ -234,3 +234,21 @@ async def test_enqueue_job(capture_events, init_arq, source):
     assert len(event["spans"])
     assert event["spans"][0]["op"] == "queue.submit.arq"
     assert event["spans"][0]["description"] == "dummy_job"
+
+
+@pytest.mark.asyncio
+async def test_execute_job_without_integration(init_arq):
+    async def dummy_job(_ctx):
+        pass
+
+    dummy_job.__qualname__ = dummy_job.__name__
+
+    pool, worker = init_arq([dummy_job])
+    # remove the integration to trigger the edge case
+    Hub.current.client.integrations.pop("arq")
+
+    job = await pool.enqueue_job("dummy_job")
+
+    await worker.run_job(job.job_id, timestamp_ms())
+
+    assert await job.result() is None
