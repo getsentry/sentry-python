@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from typing_extensions import TypedDict
     from sentry_sdk._types import ContinuousProfilerMode
     from sentry_sdk.profiler import (
+        DEFAULT_SAMPLING_FREQUENCY,
         ExtractedSample,
         FrameId,
         StackId,
@@ -49,10 +50,6 @@ except ImportError:
 
 
 _scheduler = None  # type: Optional[ContinuousScheduler]
-
-# The default sampling frequency to use. This is set at 101 in order to
-# mitigate the effects of lockstep sampling.
-DEFAULT_SAMPLING_FREQUENCY = 101
 
 
 def setup_continuous_profiler(options):
@@ -94,6 +91,14 @@ def setup_continuous_profiler(options):
     )
 
     return True
+
+
+def try_ensure_continuous_profiler_running():
+    # type: () -> None
+    if _scheduler is None:
+        return
+
+    _scheduler.ensure_running()
 
 
 def has_continous_profiling_enabled(options):

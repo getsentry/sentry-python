@@ -8,6 +8,7 @@ import uuid
 from sentry_sdk.attachments import Attachment
 from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk.consts import FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.continuous_profiler import try_ensure_continuous_profiler_running
 from sentry_sdk._functools import wraps
 from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
@@ -724,6 +725,8 @@ class Scope(object):
 
         profile = Profile(transaction, hub=hub)
         profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
+        try_ensure_continuous_profiler_running()
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
