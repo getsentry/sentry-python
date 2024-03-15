@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import GenericAsyncCallable
 
 
-def integration_patched_async(original_function, integration=None):
+def ensure_integration_enabled_async(original_function, integration=None):
     # type: (GenericAsyncCallable, Optional[type[Integration]]) -> Callable[[GenericAsyncCallable], GenericAsyncCallable]
     def patcher(sentry_patched_function):
         # type: (GenericAsyncCallable) -> GenericAsyncCallable

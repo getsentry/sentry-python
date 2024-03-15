@@ -1624,7 +1624,7 @@ def reraise(tp, value, tb=None):
     raise value
 
 
-def integration_patched(original_function, integration=None):
+def ensure_integration_enabled(original_function, integration=None):
     # type: (GenericCallable, Optional[type[Integration]]) -> Callable[[GenericCallable], GenericCallable]
     def patcher(sentry_patched_function):
         # type: (GenericCallable) -> GenericCallable

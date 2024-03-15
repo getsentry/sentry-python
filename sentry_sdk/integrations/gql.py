@@ -1,4 +1,8 @@
-from sentry_sdk.utils import event_from_exception, integration_patched, parse_version
+from sentry_sdk.utils import (
+    event_from_exception,
+    ensure_integration_enabled,
+    parse_version,
+)
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 
@@ -85,7 +89,9 @@ def _patch_execute():
     # type: () -> None
     real_execute = gql.Client.execute
 
-    @integration_patched(original_function=real_execute, integration=GQLIntegration)
+    @ensure_integration_enabled(
+        original_function=real_execute, integration=GQLIntegration
+    )
     def sentry_patched_execute(self, document, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
         hub = Hub.current
