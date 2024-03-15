@@ -1635,6 +1635,7 @@ def ensure_integration_enabled(
     integration,  # type: type[Integration]
     original_function,  # type: Callable[P, R]
 ):
+    # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
     """
     Ensures a given integration is enabled prior to calling a Sentry-patched function.
 
@@ -1657,7 +1658,6 @@ def ensure_integration_enabled(
     ```
     """
 
-    # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
     def patcher(sentry_patched_function):
         # type: (Callable[P, R]) -> Callable[P, R]
         @wraps(original_function)
@@ -1677,13 +1677,13 @@ def ensure_integration_enabled_async(
     integration,  # type: type[Integration]
     original_function,  # type: Callable[P, Awaitable[R]]
 ):
+    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
     """
     Version of `ensure_integration_enabled` for decorating async functions.
 
     Please refer to the `ensure_integration_enabled` documentation for more information.
     """
 
-    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
     def patcher(sentry_patched_function):
         # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
         @wraps(original_function)
