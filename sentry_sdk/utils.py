@@ -1641,7 +1641,7 @@ def ensure_integration_enabled(
         @wraps(original_function)
         def runner(*args, **kwargs):
             # type: (*object, **object) -> R
-            if sentry_sdk.hub.Hub.current.get_integration(integration) is None:
+            if sentry_sdk.get_client().get_integration(integration) is None:
                 return original_function(*args, **kwargs)
 
             return sentry_patched_function(*args, **kwargs)
@@ -1661,7 +1661,7 @@ def ensure_integration_enabled_async(
         @wraps(original_function)
         async def runner(*args, **kwargs):
             # type: (*object, **object) -> R
-            if sentry_sdk.hub.Hub.current.get_integration(integration) is None:
+            if sentry_sdk.get_client().get_integration(integration) is None:
                 return await original_function(*args, **kwargs)
 
             return await sentry_patched_function(*args, **kwargs)
