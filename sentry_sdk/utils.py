@@ -32,6 +32,8 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -42,14 +44,19 @@ if TYPE_CHECKING:
         List,
         NoReturn,
         Optional,
+        ParamSpec,
         Set,
         Tuple,
         Type,
+        TypeVar,
         Union,
     )
     from sentry_sdk.integrations import Integration
 
-    from sentry_sdk._types import Event, ExcInfo, GenericCallable
+    from sentry_sdk._types import Event, ExcInfo
+
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
 
 epoch = datetime(1970, 1, 1)
@@ -1625,12 +1632,12 @@ def reraise(tp, value, tb=None):
 
 
 def ensure_integration_enabled(original_function, integration=None):
-    # type: (GenericCallable, Optional[type[Integration]]) -> Callable[[GenericCallable], GenericCallable]
+    # type: (Callable[P, R], Optional[type[Integration]]) -> Callable[[Callable[P, R]], Callable[P, R]]
     def patcher(sentry_patched_function):
-        # type: (GenericCallable) -> GenericCallable
+        # type: (Callable[P, R]) -> Callable[P, R]
         @wraps(original_function)
         def runner(*args, **kwargs):
-            # type: (*object, **object) -> object
+            # type: (*object, **object) -> R
             if (
                 integration is not None
                 and sentry_sdk.hub.Hub.current.get_integration(integration) is None
@@ -1638,6 +1645,29 @@ def ensure_integration_enabled(original_function, integration=None):
                 return original_function(*args, **kwargs)
 
             return sentry_patched_function(*args, **kwargs)
+
+        return runner
+
+    return patcher
+
+
+def ensure_integration_enabled_async(
+    original_function,  # type: Callable[P, Awaitable[R]]
+    integration=None,  # type: Optional[type[Integration]]
+):
+    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
+    def patcher(sentry_patched_function):
+        # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
+        @wraps(original_function)
+        async def runner(*args, **kwargs):
+            # type: (*object, **object) -> R
+            if (
+                integration is not None
+                and sentry_sdk.hub.Hub.current.get_integration(integration) is None
+            ):
+                return await original_function(*args, **kwargs)
+
+            return await sentry_patched_function(*args, **kwargs)
 
         return runner
 

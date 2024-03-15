@@ -9,7 +9,7 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, MutableMapping
+    from collections.abc import MutableMapping
 
     from datetime import datetime
 
@@ -176,8 +176,5 @@ if TYPE_CHECKING:
     FlushedMetricValue = Union[int, float]
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
-
-    GenericCallable = Callable[..., Any]
-    GenericAsyncCallable = Callable[..., Awaitable[Any]]
 
     MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
