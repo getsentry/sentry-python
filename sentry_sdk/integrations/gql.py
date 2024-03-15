@@ -89,9 +89,7 @@ def _patch_execute():
     # type: () -> None
     real_execute = gql.Client.execute
 
-    @ensure_integration_enabled(
-        original_function=real_execute, integration=GQLIntegration
-    )
+    @ensure_integration_enabled(GQLIntegration, real_execute)
     def sentry_patched_execute(self, document, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
         hub = Hub.current

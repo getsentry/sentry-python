@@ -1631,17 +1631,17 @@ def reraise(tp, value, tb=None):
     raise value
 
 
-def ensure_integration_enabled(original_function, integration=None):
-    # type: (Callable[P, R], Optional[type[Integration]]) -> Callable[[Callable[P, R]], Callable[P, R]]
+def ensure_integration_enabled(
+    integration,  # type: type[Integration]
+    original_function,  # type: Callable[P, R]
+):
+    # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
     def patcher(sentry_patched_function):
         # type: (Callable[P, R]) -> Callable[P, R]
         @wraps(original_function)
         def runner(*args, **kwargs):
             # type: (*object, **object) -> R
-            if (
-                integration is not None
-                and sentry_sdk.hub.Hub.current.get_integration(integration) is None
-            ):
+            if sentry_sdk.hub.Hub.current.get_integration(integration) is None:
                 return original_function(*args, **kwargs)
 
             return sentry_patched_function(*args, **kwargs)
@@ -1652,8 +1652,8 @@ def ensure_integration_enabled(original_function, integration=None):
 
 
 def ensure_integration_enabled_async(
+    integration,  # type: type[Integration]
     original_function,  # type: Callable[P, Awaitable[R]]
-    integration=None,  # type: Optional[type[Integration]]
 ):
     # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
     def patcher(sentry_patched_function):
@@ -1661,10 +1661,7 @@ def ensure_integration_enabled_async(
         @wraps(original_function)
         async def runner(*args, **kwargs):
             # type: (*object, **object) -> R
-            if (
-                integration is not None
-                and sentry_sdk.hub.Hub.current.get_integration(integration) is None
-            ):
+            if sentry_sdk.hub.Hub.current.get_integration(integration) is None:
                 return await original_function(*args, **kwargs)
 
             return await sentry_patched_function(*args, **kwargs)
