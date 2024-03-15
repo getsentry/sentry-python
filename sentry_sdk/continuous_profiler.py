@@ -8,7 +8,7 @@ from sentry_sdk._compat import PY33, datetime_utcnow
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.profiler import extract_stack
-from sentry_sdk.utils import capture_internal_exception, is_gevent, logger, nanosecond_time
+from sentry_sdk.utils import capture_internal_exception, is_gevent, logger
 
 
 if TYPE_CHECKING:
@@ -130,7 +130,7 @@ class ContinuousScheduler(object):
             This should be called at a regular interval to collect samples.
             """
 
-            now = nanosecond_time()
+            now = datetime_utcnow().timestamp()
 
             try:
                 sample = [
@@ -293,12 +293,12 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
 
 class ProfileChunkBuffer(object):
-    def __init__(self, buffer_size):
-        # type: () -> None
-        self.current_chunk = ProfileChunk()
+    def __init__(self, buffer_size=10):
+        # type: (int) -> None
+        self.buffer_size = buffer_size
+        self.current_chunk = None  # type: Optional[ProfileChunk]
         self._profiler_id = None  # type: Optional[str]
         self._pid = None  # type: Optional[int]
-        self.start_timestamp = datetime_utcnow()
 
     @property
     def profiler_id(self):
@@ -316,35 +316,41 @@ class ProfileChunkBuffer(object):
         return self._profiler_id
 
     def write(self, ts, sample):
-        # type: (int, ExtractedSample) -> None
-        if self.current_chunk.is_full():
+        # type: (float, ExtractedSample) -> None
+        if self.current_chunk is None:
+            self.current_chunk = ProfileChunk(self.buffer_size)
+
+        if self.current_chunk.is_full(ts):
             self.flush()
-            self.current_chunk = ProfileChunk()
+            self.current_chunk = ProfileChunk(self.buffer_size)
 
         self.current_chunk.write(ts, sample)
 
     def flush(self):
         # type: () -> None
-        pass  # TODO: turn into envelope and write to sentry
+        chunk = self.current_chunk
+        # TODO: flush chunk
+        return
 
 
 class ProfileChunk(object):
-    def __init__(self):
-        # type: () -> None
+    def __init__(self, buffer_size):
+        # type: (int) -> None
+        self.buffer_size = buffer_size
+        self.start_timestamp = datetime_utcnow().timestamp()
+
         self.indexed_frames = {}  # type: Dict[FrameId, int]
         self.indexed_stacks = {}  # type: Dict[StackId, int]
         self.frames = []  # type: List[ProcessedFrame]
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
 
-    def is_full(self):
-        # type: () -> bool
-        return False
+    def is_full(self, ts):
+        # type: (float) -> bool
+        return ts - self.start_timestamp >= self.buffer_size
 
     def write(self, ts, sample):
-        # type: (int, ExtractedSample) -> None
-        print(ts, sample)
-
+        # type: (float, ExtractedSample) -> None
         for tid, (stack_id, frame_ids, frames) in sample:
             try:
                 # Check if the stack is indexed first, this lets us skip
@@ -362,7 +368,7 @@ class ProfileChunk(object):
 
                 self.samples.append(
                     {
-                        "timestamp": 0.0,  # TODO: what should this be?
+                        "timestamp": ts,
                         "thread_id": tid,
                         "stack_id": self.indexed_stacks[stack_id],
                     }
