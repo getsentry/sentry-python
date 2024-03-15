@@ -7,7 +7,7 @@ import uuid
 from sentry_sdk._compat import PY33, datetime_utcnow
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.profiler import extract_stack
+from sentry_sdk.profiler import DEFAULT_SAMPLING_FREQUENCY, extract_stack
 from sentry_sdk.utils import capture_internal_exception, is_gevent, logger
 
 
@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from typing_extensions import TypedDict
     from sentry_sdk._types import ContinuousProfilerMode
     from sentry_sdk.profiler import (
-        DEFAULT_SAMPLING_FREQUENCY,
         ExtractedSample,
         FrameId,
         StackId,
