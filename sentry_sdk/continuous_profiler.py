@@ -2,8 +2,9 @@ import os
 import sys
 import threading
 import time
+import uuid
 
-from sentry_sdk._compat import PY33
+from sentry_sdk._compat import PY33, datetime_utcnow
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.profiler import extract_stack
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
     ProcessedSample = TypedDict(
         "ProcessedSample",
         {
-            "timestamp_ms": float,
+            "timestamp": float,
             "thread_id": ThreadId,
             "stack_id": int,
         },
@@ -292,24 +293,38 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
 
 class ProfileChunkBuffer(object):
-    def __init__(self):
+    def __init__(self, buffer_size):
         # type: () -> None
-        self.current_chunk = None  # type: Optional[ProfileChunk]
+        self.current_chunk = ProfileChunk()
+        self._profiler_id = None  # type: Optional[str]
+        self._pid = None  # type: Optional[int]
+        self.start_timestamp = datetime_utcnow()
+
+    @property
+    def profiler_id(self):
+        # type: () -> str
+        pid = os.getpid()
+
+        # The profiler id should be unique per profiler instance.
+        # In event the process is forked, we should assign a new
+        # profiler id to the instance to indicate it's a separate
+        # instance of the profiler.
+        if pid != self._pid or self._profiler_id is None:
+            self._profiler_id = uuid.uuid4().hex
+            self._pid = pid
+
+        return self._profiler_id
 
     def write(self, ts, sample):
         # type: (int, ExtractedSample) -> None
-        if self.current_chunk is None:
+        if self.current_chunk.is_full():
+            self.flush()
             self.current_chunk = ProfileChunk()
 
         self.current_chunk.write(ts, sample)
 
-        if self.current_chunk.is_full():
-            chunk = self.current_chunk
-            self.current_chunk = None
-            self.flush(chunk)
-
-    def flush(self, chunk):
-        # type: (ProfileChunk) -> None
+    def flush(self):
+        # type: () -> None
         pass  # TODO: turn into envelope and write to sentry
 
 
@@ -347,7 +362,7 @@ class ProfileChunk(object):
 
                 self.samples.append(
                     {
-                        "timestamp_ms": 0.0,  # TODO: what should this be?
+                        "timestamp": 0.0,  # TODO: what should this be?
                         "thread_id": tid,
                         "stack_id": self.indexed_stacks[stack_id],
                     }
