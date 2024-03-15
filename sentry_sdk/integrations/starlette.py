@@ -25,7 +25,6 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
-from sentry_sdk.utils_py3 import integration_patched_async
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
@@ -103,59 +102,60 @@ def _enable_span_for_middleware(middleware_class):
     # type: (Any) -> type
     old_call = middleware_class.__call__
 
-    @integration_patched_async(
-        original_function=old_call, integration=StarletteIntegration
-    )
     async def _create_span_call(app, scope, receive, send, **kwargs):
         # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         hub = Hub.current
         integration = hub.get_integration(StarletteIntegration)
-        middleware_name = app.__class__.__name__
+        if integration is not None:
+            middleware_name = app.__class__.__name__
 
-        # Update transaction name with middleware name
-        name, source = _get_transaction_from_middleware(app, scope, integration)
-        if name is not None:
-            Scope.get_current_scope().set_transaction_name(
-                name,
-                source=source,
-            )
+            # Update transaction name with middleware name
+            name, source = _get_transaction_from_middleware(app, scope, integration)
+            if name is not None:
+                Scope.get_current_scope().set_transaction_name(
+                    name,
+                    source=source,
+                )
 
-        with hub.start_span(
-            op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
-        ) as middleware_span:
-            middleware_span.set_tag("starlette.middleware_name", middleware_name)
+            with hub.start_span(
+                op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
+            ) as middleware_span:
+                middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
-            # Creating spans for the "receive" callback
-            async def _sentry_receive(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
-                hub = Hub.current
-                with hub.start_span(
-                    op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
-                    description=getattr(receive, "__qualname__", str(receive)),
-                ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
-                    return await receive(*args, **kwargs)
+                # Creating spans for the "receive" callback
+                async def _sentry_receive(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    with hub.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
+                        description=getattr(receive, "__qualname__", str(receive)),
+                    ) as span:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+                        return await receive(*args, **kwargs)
 
-            receive_name = getattr(receive, "__name__", str(receive))
-            receive_patched = receive_name == "_sentry_receive"
-            new_receive = _sentry_receive if not receive_patched else receive
+                receive_name = getattr(receive, "__name__", str(receive))
+                receive_patched = receive_name == "_sentry_receive"
+                new_receive = _sentry_receive if not receive_patched else receive
 
-            # Creating spans for the "send" callback
-            async def _sentry_send(*args, **kwargs):
-                # type: (*Any, **Any) -> Any
-                hub = Hub.current
-                with hub.start_span(
-                    op=OP.MIDDLEWARE_STARLETTE_SEND,
-                    description=getattr(send, "__qualname__", str(send)),
-                ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
-                    return await send(*args, **kwargs)
+                # Creating spans for the "send" callback
+                async def _sentry_send(*args, **kwargs):
+                    # type: (*Any, **Any) -> Any
+                    hub = Hub.current
+                    with hub.start_span(
+                        op=OP.MIDDLEWARE_STARLETTE_SEND,
+                        description=getattr(send, "__qualname__", str(send)),
+                    ) as span:
+                        span.set_tag("starlette.middleware_name", middleware_name)
+                        return await send(*args, **kwargs)
 
-            send_name = getattr(send, "__name__", str(send))
-            send_patched = send_name == "_sentry_send"
-            new_send = _sentry_send if not send_patched else send
+                send_name = getattr(send, "__name__", str(send))
+                send_patched = send_name == "_sentry_send"
+                new_send = _sentry_send if not send_patched else send
 
-            return await old_call(app, scope, new_receive, new_send, **kwargs)
+                return await old_call(app, scope, new_receive, new_send, **kwargs)
+
+        else:
+            return await old_call(app, scope, receive, send, **kwargs)
 
     not_yet_patched = old_call.__name__ not in [
         "_create_span_call",
