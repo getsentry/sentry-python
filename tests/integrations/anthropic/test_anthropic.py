@@ -82,17 +82,18 @@ def test_nonstreaming_create_message(
     assert span["data"]["ai.model_id"] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"]["ai.messages"] == messages
+        assert span["data"]["ai.input_messages"] == messages
         assert span["data"]["ai.responses"] == [
             {"type": "text", "text": "Hi, I'm Claude."}
         ]
     else:
-        assert "ai.messages" not in span["data"]
+        assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
 
     assert span["data"][PROMPT_TOKENS_USED] == 10
     assert span["data"][COMPLETION_TOKENS_USED] == 20
     assert span["data"][TOTAL_TOKENS_USED] == 30
+    assert span["data"]["ai.streaming"] is False
 
 
 @pytest.mark.parametrize(
@@ -180,18 +181,19 @@ def test_streaming_create_message(
     assert span["data"]["ai.model_id"] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"]["ai.messages"] == messages
+        assert span["data"]["ai.input_messages"] == messages
         assert span["data"]["ai.responses"] == [
             {"type": "text", "text": "Hi! I'm Claude!"}
         ]
 
     else:
-        assert "ai.messages" not in span["data"]
+        assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
 
     assert span["data"][PROMPT_TOKENS_USED] == 10
     assert span["data"][COMPLETION_TOKENS_USED] == 30
     assert span["data"][TOTAL_TOKENS_USED] == 40
+    assert span["data"]["ai.streaming"] is True
 
 
 def test_exception_message_create(sentry_init, capture_events):

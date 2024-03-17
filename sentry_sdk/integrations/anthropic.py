@@ -117,8 +117,9 @@ def _wrap_message_create(f):
 
         with capture_internal_exceptions():
             span.set_data("ai.model_id", model)
+            span.set_data("ai.streaming", False)
             if _should_send_default_pii() and integration.include_prompts:
-                span.set_data("ai.messages", messages)
+                span.set_data("ai.input_messages", messages)
             if hasattr(result, "content"):
                 if _should_send_default_pii() and integration.include_prompts:
                     span.set_data(
@@ -183,6 +184,7 @@ def _wrap_message_create(f):
                         span.set_data(TOTAL_TOKENS_USED, input_tokens + output_tokens)
                         span.set_data(PROMPT_TOKENS_USED, input_tokens)
                         span.set_data(COMPLETION_TOKENS_USED, output_tokens)
+                        span.set_data("ai.streaming", True)
                     span.finish()
 
                 result._iterator = new_iterator()
