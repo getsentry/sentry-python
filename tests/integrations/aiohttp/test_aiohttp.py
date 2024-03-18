@@ -9,6 +9,7 @@ from aiohttp.web_request import Request
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.aiohttp import AioHttpIntegration
+from tests.conftest import ApproxDict
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -495,7 +496,7 @@ async def test_crumb_capture(
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-        assert crumb["data"] == {
+        assert crumb["data"] == ApproxDict({
             "url": "http://127.0.0.1:{}/".format(raw_server.port),
             "http.fragment": "",
             "http.method": "GET",
@@ -503,7 +504,7 @@ async def test_crumb_capture(
             "http.response.status_code": 200,
             "reason": "OK",
             "extra": "foo",
-        }
+        })
 
 
 @pytest.mark.asyncio
