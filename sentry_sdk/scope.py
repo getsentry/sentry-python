@@ -443,10 +443,17 @@ class Scope(object):
     def level(self, value):
         # type: (LogLevelStr) -> None
         """
-        When set this overrides the level. Deprecated in favor of set_level.
+        When set this overrides the level.
+
+        .. deprecated:: 1.0.0
+            Use :func:`set_level` instead.
 
         :param value: The level to set.
         """
+        logger.warning(
+            "Deprecated: use .set_level() instead. This will be removed in the future."
+        )
+
         self._level = value
 
     def set_level(self, value):
