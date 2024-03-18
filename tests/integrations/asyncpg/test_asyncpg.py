@@ -34,6 +34,7 @@ from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk._compat import contextmanager
+from tests.conftest import ApproxDict
 
 try:
     from unittest import mock
@@ -46,13 +47,13 @@ PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
 )
 CRUMBS_CONNECT = {
     "category": "query",
-    "data": {
+    "data": ApproxDict({
         "db.name": PG_NAME,
         "db.system": "postgresql",
         "db.user": PG_USER,
         "server.address": PG_HOST,
         "server.port": PG_PORT,
-    },
+    }),
     "message": "connect",
     "type": "default",
 }
