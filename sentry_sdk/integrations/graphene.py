@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
     from graphql.type import GraphQLSchema  # type: ignore
+    from sentry_sdk._types import Event
 
 
 class GrapheneIntegration(Integration):
@@ -100,7 +101,7 @@ def _patch_graphql():
 
 
 def _event_processor(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+    # type: (Event, Dict[str, Any]) -> Event
     if _should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
