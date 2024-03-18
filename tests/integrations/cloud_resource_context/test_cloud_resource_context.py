@@ -352,7 +352,6 @@ def test_get_cloud_resource_context_supported_providers(cloud_provider):
     assert CloudResourceContextIntegration._get_cloud_resource_context() != {}
 
 
-@pytest.mark.forked
 @pytest.mark.parametrize(
     "cloud_provider, cloud_resource_context, warning_called, set_context_called",
     [
@@ -368,6 +367,7 @@ def test_get_cloud_resource_context_supported_providers(cloud_provider):
         [CLOUD_PROVIDER.GCP, {"some": "context"}, False, True],
     ],
 )
+@pytest.mark.forked
 def test_setup_once(
     cloud_provider, cloud_resource_context, warning_called, set_context_called
 ):
