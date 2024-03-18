@@ -99,7 +99,7 @@ def test_streaming_chat_completion(
     events = capture_events()
 
     client = OpenAI(api_key="z")
-    returned_stream = Stream(cast_to=None, response=None, client=None)
+    returned_stream = Stream(cast_to=None, response=None, client=client)
     returned_stream._iterator = [
         ChatCompletionChunk(
             id="1",
