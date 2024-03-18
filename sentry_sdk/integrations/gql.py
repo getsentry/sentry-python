@@ -1,8 +1,4 @@
-from sentry_sdk.utils import (
-    event_from_exception,
-    ensure_integration_enabled,
-    parse_version,
-)
+from sentry_sdk.utils import event_from_exception, parse_version
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 
@@ -89,11 +85,13 @@ def _patch_execute():
     # type: () -> None
     real_execute = gql.Client.execute
 
-    @ensure_integration_enabled(GQLIntegration, real_execute)
     def sentry_patched_execute(self, document, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
         hub = Hub.current
-        with hub.configure_scope() as scope:
+        if hub.get_integration(GQLIntegration) is None:
+            return real_execute(self, document, *args, **kwargs)
+
+        with Hub.current.configure_scope() as scope:
             scope.add_event_processor(_make_gql_event_processor(self, document))
 
         try:
