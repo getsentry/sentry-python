@@ -441,13 +441,28 @@ class Scope(object):
 
     @_attr_setter
     def level(self, value):
-        # type: (Optional[LogLevelStr]) -> None
-        """When set this overrides the level. Deprecated in favor of set_level."""
+        # type: (LogLevelStr) -> None
+        """
+        When set this overrides the level.
+
+        .. deprecated:: 1.0.0
+            Use :func:`set_level` instead.
+
+        :param value: The level to set.
+        """
+        logger.warning(
+            "Deprecated: use .set_level() instead. This will be removed in the future."
+        )
+
         self._level = value
 
     def set_level(self, value):
-        # type: (Optional[LogLevelStr]) -> None
-        """Sets the level for the scope."""
+        # type: (LogLevelStr) -> None
+        """
+        Sets the level for the scope.
+
+        :param value: The level to set.
+        """
         self._level = value
 
     @_attr_setter
@@ -555,20 +570,24 @@ class Scope(object):
 
         self._profile = profile
 
-    def set_tag(
-        self,
-        key,  # type: str
-        value,  # type: Any
-    ):
-        # type: (...) -> None
-        """Sets a tag for a key to a specific value."""
+    def set_tag(self, key, value):
+        # type: (str, Any) -> None
+        """
+        Sets a tag for a key to a specific value.
+
+        :param key: Key of the tag to set.
+
+        :param value: Value of the tag to set.
+        """
         self._tags[key] = value
 
-    def remove_tag(
-        self, key  # type: str
-    ):
-        # type: (...) -> None
-        """Removes a specific tag."""
+    def remove_tag(self, key):
+        # type: (str) -> None
+        """
+        Removes a specific tag.
+
+        :param key: Key of the tag to remove.
+        """
         self._tags.pop(key, None)
 
     def set_context(
@@ -577,7 +596,9 @@ class Scope(object):
         value,  # type: Dict[str, Any]
     ):
         # type: (...) -> None
-        """Binds a context at a certain key to a specific value."""
+        """
+        Binds a context at a certain key to a specific value.
+        """
         self._contexts[key] = value
 
     def remove_context(
