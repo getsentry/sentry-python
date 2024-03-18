@@ -84,11 +84,10 @@ def patch_get_request_handler():
             @wraps(old_call)
             def _sentry_call(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
-                hub = Hub.current
-                with hub.configure_scope() as sentry_scope:
-                    if sentry_scope.profile is not None:
-                        sentry_scope.profile.update_active_thread_id()
-                    return old_call(*args, **kwargs)
+                sentry_scope = Scope.get_isolation_scope()
+                if sentry_scope.profile is not None:
+                    sentry_scope.profile.update_active_thread_id()
+                return old_call(*args, **kwargs)
 
             dependant.call = _sentry_call
 
