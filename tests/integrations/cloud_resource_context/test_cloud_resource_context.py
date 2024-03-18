@@ -397,5 +397,6 @@ def test_setup_once(
             if warning_called:
                 print(fake_warning.call_args_list)
                 assert fake_warning.call_count == 1
+                assert False
             else:
                 fake_warning.assert_not_called()
