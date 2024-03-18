@@ -51,8 +51,8 @@ if TYPE_CHECKING:
         TypeVar,
         Union,
     )
-    from sentry_sdk.integrations import Integration
 
+    import sentry_sdk.integrations
     from sentry_sdk._types import Event, ExcInfo
 
     P = ParamSpec("P")
@@ -1632,7 +1632,7 @@ def reraise(tp, value, tb=None):
 
 
 def ensure_integration_enabled(
-    integration,  # type: type[Integration]
+    integration,  # type: type[sentry_sdk.integrations.Integration]
     original_function,  # type: Callable[P, R]
 ):
     # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
@@ -1674,7 +1674,7 @@ def ensure_integration_enabled(
 
 
 def ensure_integration_enabled_async(
-    integration,  # type: type[Integration]
+    integration,  # type: type[sentry_sdk.integrations.Integration]
     original_function,  # type: Callable[P, Awaitable[R]]
 ):
     # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
