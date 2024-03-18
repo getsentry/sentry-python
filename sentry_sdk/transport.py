@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import io
 import gzip
+import socket
 import time
 from datetime import timedelta
 from collections import defaultdict
@@ -38,6 +39,18 @@ try:
     from urllib.request import getproxies
 except ImportError:
     from urllib import getproxies  # type: ignore
+
+
+KEEP_ALIVE_SOCKET_OPTIONS = [
+    (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+    (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+    (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+]
+try:
+    KEEP_ALIVE_SOCKET_OPTIONS.append((socket.SOL_TCP, socket.TCP_KEEPIDLE, 45))
+except AttributeError:
+    # socket.TCP_KEEPIDLE doesn't exist on all systems (e.g. MacOS)
+    pass
 
 
 class Transport(object):
@@ -448,6 +461,8 @@ class HttpTransport(Transport):
 
         if self.options["socket_options"]:
             options["socket_options"] = self.options["socket_options"]
+        elif self.options["keep_alive"]:
+            options["socket_options"] = KEEP_ALIVE_SOCKET_OPTIONS
 
         return options
 

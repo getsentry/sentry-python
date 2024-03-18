@@ -13,7 +13,7 @@ from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.transport import _parse_rate_limits
+from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
@@ -162,6 +162,26 @@ def test_socket_options(make_client):
     ]
 
     client = make_client(socket_options=socket_options)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
+def test_keep_alive(make_client):
+    client = make_client(keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_socket_options_override_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=False)
 
     options = client.transport._get_pool_options([])
     assert options["socket_options"] == socket_options
