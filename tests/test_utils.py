@@ -617,7 +617,7 @@ def test_duration_in_milliseconds(timedelta, expected_milliseconds):
     assert duration_in_milliseconds(timedelta) == expected_milliseconds
 
 
-def test_get_current_thread_id_explicit_thread():
+def test_get_current_thread_meta_explicit_thread():
     results = Queue(maxsize=1)
 
     def target1():
@@ -639,7 +639,7 @@ def test_get_current_thread_id_explicit_thread():
 
 
 @pytest.mark.skipif(gevent is None, reason="gevent not enabled")
-def test_get_current_thread_id_gevent_in_thread():
+def test_get_current_thread_meta_gevent_in_thread():
     results = Queue(maxsize=1)
 
     def target():
@@ -653,7 +653,7 @@ def test_get_current_thread_id_gevent_in_thread():
     assert (thread.ident, thread.name) == results.get(timeout=1)
 
 
-def test_get_current_thread_id_running_thread():
+def test_get_current_thread_meta_running_thread():
     results = Queue(maxsize=1)
 
     def target():
@@ -666,7 +666,7 @@ def test_get_current_thread_id_running_thread():
 
 
 @pytest.mark.skipif(sys.version_info < (3, 4), reason="threading.main_thread() Not available")
-def test_get_current_thread_id_main_thread():
+def test_get_current_thread_meta_main_thread():
     results = Queue(maxsize=1)
 
     def target():

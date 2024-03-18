@@ -4,6 +4,7 @@ import boto3
 
 from sentry_sdk import Hub
 from sentry_sdk.integrations.boto3 import Boto3Integration
+from tests.conftest import ApproxDict
 from tests.integrations.boto3.aws_mock import MockResponse
 from tests.integrations.boto3 import read_fixture
 
@@ -65,12 +66,12 @@ def test_streaming(sentry_init, capture_events):
     span1 = event["spans"][0]
     assert span1["op"] == "http.client"
     assert span1["description"] == "aws.s3.GetObject"
-    assert span1["data"] == {
+    assert span1["data"] == ApproxDict({
         "http.method": "GET",
         "aws.request.url": "https://bucket.s3.amazonaws.com/foo.pdf",
         "http.fragment": "",
         "http.query": "",
-    }
+    })
 
     span2 = event["spans"][1]
     assert span2["op"] == "http.client.stream"
@@ -123,7 +124,11 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
             transaction.finish()
 
     (event,) = events
-    assert event["spans"][0]["data"] == {
+    assert event["spans"][0]["data"] == ApproxDict({
         "http.method": "GET",
         # no url data
-    }
+    })
+
+    assert "aws.request.url" not in event["spans"][0]["data"]
+    assert "http.fragment" not in event["spans"][0]["data"]
+    assert "http.query" not in event["spans"][0]["data"]

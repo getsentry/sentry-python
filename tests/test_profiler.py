@@ -555,52 +555,6 @@ def test_extract_stack_with_cache(frame, depth):
         assert frame1 is frame2, i
 
 
-@requires_python_version(3, 3)
-@requires_gevent
-def test_get_current_thread_id_gevent_in_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        job = gevent.spawn(get_current_thread_id)
-        job.join()
-        results.put(job.value)
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert thread.ident == results.get(timeout=1)
-
-
-@requires_python_version(3, 3)
-def test_get_current_thread_id_running_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        results.put(get_current_thread_id())
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert thread.ident == results.get(timeout=1)
-
-
-@requires_python_version(3, 3)
-def test_get_current_thread_id_main_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        # mock that somehow the current thread doesn't exist
-        with mock.patch("threading.current_thread", side_effect=[None]):
-            results.put(get_current_thread_id())
-
-    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert thread_id == results.get(timeout=1)
-
-
 def get_scheduler_threads(scheduler):
     return [thread for thread in threading.enumerate() if thread.name == scheduler.name]
 
