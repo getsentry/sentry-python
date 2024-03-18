@@ -1,12 +1,15 @@
 import pytest
 import re
 import sys
+import threading
 from datetime import timedelta
 
 from sentry_sdk._compat import duration_in_milliseconds
+from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    get_current_thread_meta,
     get_default_release,
     get_error_message,
     get_git_revision,
@@ -28,6 +31,11 @@ try:
     from unittest import mock  # python 3.3 and above
 except ImportError:
     import mock  # python < 3.3
+
+try:
+    import gevent
+except ImportError:
+    gevent = None
 
 try:
     # Python 3
@@ -607,3 +615,68 @@ def test_default_release_empty_string():
 )
 def test_duration_in_milliseconds(timedelta, expected_milliseconds):
     assert duration_in_milliseconds(timedelta) == expected_milliseconds
+
+
+def test_get_current_thread_id_explicit_thread():
+    results = Queue(maxsize=1)
+
+    def target1():
+        pass
+
+    def target2():
+        results.put(get_current_thread_meta(thread1))
+
+    thread1 = threading.Thread(target=target1)
+    thread1.start()
+
+    thread2 = threading.Thread(target=target2)
+    thread2.start()
+
+    thread2.join()
+    thread1.join()
+
+    assert (thread1.ident, thread1.name) == results.get(timeout=1)
+
+
+@pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+def test_get_current_thread_id_gevent_in_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        job = gevent.spawn(get_current_thread_meta)
+        job.join()
+        results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (thread.ident, thread.name) == results.get(timeout=1)
+
+
+def test_get_current_thread_id_running_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        results.put(get_current_thread_meta())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (thread.ident, thread.name) == results.get(timeout=1)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 4), reason="threading.main_thread() Not available")
+def test_get_current_thread_id_main_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        # mock that somehow the current thread doesn't exist
+        with mock.patch("threading.current_thread", side_effect=[None]):
+            results.put(get_current_thread_meta())
+
+    main_thread = threading.main_thread()
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)

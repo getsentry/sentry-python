@@ -16,7 +16,6 @@ from sentry_sdk.profiler import (
     extract_frame,
     extract_stack,
     frame_id,
-    get_current_thread_id,
     get_frame_name,
     setup_profiler,
 )
@@ -554,28 +553,6 @@ def test_extract_stack_with_cache(frame, depth):
         # equality which would always pass since we're extract
         # the same stack.
         assert frame1 is frame2, i
-
-
-@requires_python_version(3, 3)
-def test_get_current_thread_id_explicit_thread():
-    results = Queue(maxsize=1)
-
-    def target1():
-        pass
-
-    def target2():
-        results.put(get_current_thread_id(thread1))
-
-    thread1 = threading.Thread(target=target1)
-    thread1.start()
-
-    thread2 = threading.Thread(target=target2)
-    thread2.start()
-
-    thread2.join()
-    thread1.join()
-
-    assert thread1.ident == results.get(timeout=1)
 
 
 @requires_python_version(3, 3)

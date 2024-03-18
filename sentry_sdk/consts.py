@@ -191,6 +191,18 @@ class SPANDATA:
     Example: "http.handler"
     """
 
+    THREAD_ID = "thread.id"
+    """
+    The thread id within which the span was started. This should be a string.
+    Example: "7972576320"
+    """
+
+    THREAD_NAME = "thread.name"
+    """
+    The thread name within which the span was started. This should be a string.
+    Example: "MainThread"
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
