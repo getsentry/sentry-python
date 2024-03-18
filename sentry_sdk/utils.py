@@ -1661,8 +1661,8 @@ def ensure_integration_enabled(
     def patcher(sentry_patched_function):
         # type: (Callable[P, R]) -> Callable[P, R]
         @wraps(original_function)
-        def runner(*args, **kwargs):
-            # type: (*object, **object) -> R
+        def runner(*args: "P.args", **kwargs: "P.kwargs"):
+            # type: (...) -> R
             if sentry_sdk.get_client().get_integration(integration) is None:
                 return original_function(*args, **kwargs)
 
@@ -1687,8 +1687,8 @@ def ensure_integration_enabled_async(
     def patcher(sentry_patched_function):
         # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
         @wraps(original_function)
-        async def runner(*args, **kwargs):
-            # type: (*object, **object) -> R
+        async def runner(*args: "P.args", **kwargs: "P.kwargs"):
+            # type: (...) -> R
             if sentry_sdk.get_client().get_integration(integration) is None:
                 return await original_function(*args, **kwargs)
 
