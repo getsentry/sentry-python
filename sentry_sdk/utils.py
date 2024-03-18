@@ -14,7 +14,7 @@ from collections import namedtuple
 from copy import copy
 from datetime import datetime
 from decimal import Decimal
-from functools import partial, partialmethod
+from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
@@ -26,11 +26,14 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
+import sentry_sdk.hub
 from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from types import FrameType, TracebackType
     from typing import (
         Any,
@@ -41,13 +44,19 @@ if TYPE_CHECKING:
         List,
         NoReturn,
         Optional,
+        ParamSpec,
         Set,
         Tuple,
         Type,
+        TypeVar,
         Union,
     )
 
+    import sentry_sdk.integrations
     from sentry_sdk._types import Event, ExcInfo
+
+    P = ParamSpec("P")
+    R = TypeVar("R")
 
 
 epoch = datetime(1970, 1, 1)
@@ -1620,6 +1629,74 @@ def reraise(tp, value, tb=None):
     if value.__traceback__ is not tb:
         raise value.with_traceback(tb)
     raise value
+
+
+def ensure_integration_enabled(
+    integration,  # type: type[sentry_sdk.integrations.Integration]
+    original_function,  # type: Callable[P, R]
+):
+    # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
+    """
+    Ensures a given integration is enabled prior to calling a Sentry-patched function.
+
+    The function takes as its parameters the integration that must be enabled and the original
+    function that the SDK is patching. The function returns a function that takes the
+    decorated (Sentry-patched) function as its parameter, and returns a function that, when
+    called, checks whether the given integration is enabled. If the integration is enabled, the
+    funciton calls the decorated, Sentry-patched funciton. If the integration is not enabled,
+    the original function is called.
+
+    The function also takes care of preserving the original function's signature and docstring.
+
+    Example usage:
+
+    ```python
+    @ensure_integration_enabled(MyIntegration, my_function)
+    def patch_my_function():
+        with sentry_sdk.start_transaction(...):
+            return my_function()
+    ```
+    """
+
+    def patcher(sentry_patched_function):
+        # type: (Callable[P, R]) -> Callable[P, R]
+        @wraps(original_function)
+        def runner(*args: "P.args", **kwargs: "P.kwargs"):
+            # type: (...) -> R
+            if sentry_sdk.get_client().get_integration(integration) is None:
+                return original_function(*args, **kwargs)
+
+            return sentry_patched_function(*args, **kwargs)
+
+        return runner
+
+    return patcher
+
+
+def ensure_integration_enabled_async(
+    integration,  # type: type[sentry_sdk.integrations.Integration]
+    original_function,  # type: Callable[P, Awaitable[R]]
+):
+    # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
+    """
+    Version of `ensure_integration_enabled` for decorating async functions.
+
+    Please refer to the `ensure_integration_enabled` documentation for more information.
+    """
+
+    def patcher(sentry_patched_function):
+        # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
+        @wraps(original_function)
+        async def runner(*args: "P.args", **kwargs: "P.kwargs"):
+            # type: (...) -> R
+            if sentry_sdk.get_client().get_integration(integration) is None:
+                return await original_function(*args, **kwargs)
+
+            return await sentry_patched_function(*args, **kwargs)
+
+        return runner
+
+    return patcher
 
 
 if PY37:
