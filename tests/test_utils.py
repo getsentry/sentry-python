@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     Components,
     Dsn,
@@ -21,7 +22,19 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
 )
+
+
+class TestIntegration(Integration):
+    """
+    Test integration for testing ensure_integration_enabled and
+    ensure_integration_enabled_async decorators.
+    """
+
+    identifier = "test"
+    setup_once = mock.MagicMock()
 
 
 def _normalize_distribution_name(name):
@@ -567,3 +580,75 @@ def test_default_release_empty_string():
         release = get_default_release()
 
     assert release is None
+
+
+def test_ensure_integration_enabled_integration_enabled(sentry_init):
+    def original_function():
+        return "original"
+
+    def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[TestIntegration()])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled(TestIntegration, original_function)(
+        function_to_patch
+    )
+
+    assert patched_function() == "patched"
+
+
+def test_ensure_integration_enabled_integration_disabled(sentry_init):
+    def original_function():
+        return "original"
+
+    def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[])  # TestIntegration is disabled
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled(TestIntegration, original_function)(
+        function_to_patch
+    )
+
+    assert patched_function() == "original"
+
+
+@pytest.mark.asyncio
+async def test_ensure_integration_enabled_async_integration_enabled(sentry_init):
+    # Setup variables and functions for the test
+    async def original_function():
+        return "original"
+
+    async def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[TestIntegration()])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled_async(
+        TestIntegration, original_function
+    )(function_to_patch)
+
+    assert await patched_function() == "patched"
+
+
+@pytest.mark.asyncio
+async def test_ensure_integration_enabled_async_integration_disabled(sentry_init):
+    # Setup variables and functions for the test
+    async def original_function():
+        return "original"
+
+    async def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[])  # TestIntegration is disabled
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled_async(
+        TestIntegration, original_function
+    )(function_to_patch)
+
+    assert await patched_function() == "original"
