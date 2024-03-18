@@ -63,7 +63,7 @@ def _should_send_default_pii():
     client = Hub.current.client
     if not client:
         return False
-    return client.options["send_default_pii"]
+    return client.should_send_default_pii()
 
 
 class _InitGuard:
