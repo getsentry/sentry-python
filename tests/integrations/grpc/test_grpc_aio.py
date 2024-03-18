@@ -11,7 +11,7 @@ import sentry_sdk
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
-from tests.conftests import ApproxDict
+from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
