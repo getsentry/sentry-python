@@ -7,7 +7,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope
-from sentry_sdk.sessions import auto_session_tracking
+from sentry_sdk.sessions import auto_session_tracking_scope
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
@@ -104,7 +104,7 @@ class AioHttpIntegration(Integration):
             weak_request = weakref.ref(request)
 
             with sentry_sdk.isolation_scope() as scope:
-                with auto_session_tracking(scope, session_mode="request"):
+                with auto_session_tracking_scope(scope, session_mode="request"):
                     # Scope data will not leak between requests because aiohttp
                     # create a task to wrap each request.
                     scope.clear_breadcrumbs()
