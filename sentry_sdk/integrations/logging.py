@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -101,7 +101,9 @@ class LoggingIntegration(Integration):
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
                 if ignored_loggers is not None and record.name not in ignored_loggers:
-                    integration = Hub.current.get_integration(LoggingIntegration)
+                    integration = sentry_sdk.get_client().get_integration(
+                        LoggingIntegration
+                    )
                     if integration is not None:
                         integration._handle_record(record)
 
@@ -181,11 +183,11 @@ class EventHandler(_BaseHandler):
         if not self._can_record(record):
             return
 
-        hub = Hub.current
-        if hub.client is None:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
             return
 
-        client_options = hub.client.options
+        client_options = client.options
 
         # exc_info might be None or (None, None, None)
         #
@@ -250,7 +252,7 @@ class EventHandler(_BaseHandler):
 
         event["extra"] = self._extra_from_record(record)
 
-        hub.capture_event(event, hint=hint)
+        sentry_sdk.capture_event(event, hint=hint)
 
 
 # Legacy name
@@ -275,7 +277,7 @@ class BreadcrumbHandler(_BaseHandler):
         if not self._can_record(record):
             return
 
-        Hub.current.add_breadcrumb(
+        sentry_sdk.add_breadcrumb(
             self._breadcrumb_from_record(record), hint={"log_record": record}
         )
 
