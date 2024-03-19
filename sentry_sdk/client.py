@@ -403,6 +403,15 @@ class _Client(BaseClient):
         """
         return True
 
+    def should_send_default_pii(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
+        """
+        return self.options.get("send_default_pii", False)
+
     @property
     def dsn(self):
         # type: () -> Optional[str]
