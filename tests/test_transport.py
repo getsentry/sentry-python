@@ -187,7 +187,7 @@ def test_socket_options_override_keep_alive(make_client):
     assert options["socket_options"] == socket_options
 
 
-def test_socket_options_merge_keep_alive_with_socket_options(make_client):
+def test_socket_options_merge_with_keep_alive(make_client):
     socket_options = [
         (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
         (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
@@ -201,6 +201,18 @@ def test_socket_options_merge_keep_alive_with_socket_options(make_client):
         (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
         (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
     ]
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    socket_options = []
+
+    client = make_client(socket_options=socket_options, keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == []
 
 
 def test_keep_alive_off_by_default(make_client):
