@@ -1,3 +1,4 @@
+import sentry_sdk
 from sentry_sdk.utils import (
     event_from_exception,
     ensure_integration_enabled,
@@ -101,11 +102,11 @@ def _patch_execute():
         except TransportQueryError as e:
             event, hint = event_from_exception(
                 e,
-                client_options=scope.client.options,
+                client_options=sentry_sdk.get_client().options,
                 mechanism={"type": "gql", "handled": False},
             )
 
-            scope.capture_event(event, hint)
+            sentry_sdk.capture_event(event, hint)
             raise e
 
     gql.Client.execute = sentry_patched_execute
