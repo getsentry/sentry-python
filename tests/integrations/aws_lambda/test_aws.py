@@ -489,6 +489,7 @@ def test_performance_error(run_lambda_function):
             True,
             2,
         ),
+        (b"[]", False, 1),
     ],
 )
 def test_non_dict_event(
