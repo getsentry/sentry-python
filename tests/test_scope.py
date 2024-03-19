@@ -10,7 +10,13 @@ from sentry_sdk import (
     new_scope,
 )
 from sentry_sdk.client import Client, NonRecordingClient
-from sentry_sdk.scope import Scope, ScopeType, use_isolation_scope, use_scope
+from sentry_sdk.scope import (
+    Scope,
+    ScopeType,
+    use_isolation_scope,
+    use_scope,
+    should_send_default_pii,
+)
 
 
 def test_copying():
@@ -778,3 +784,15 @@ def test_nested_scopes_with_tags(sentry_init, capture_envelopes):
     assert transaction["tags"] == {"isolation_scope1": 1, "current_scope2": 1, "trx": 1}
     assert transaction["spans"][0]["tags"] == {"a": 1}
     assert transaction["spans"][1]["tags"] == {"b": 1}
+
+
+def test_should_send_default_pii_true(sentry_init):
+    sentry_init(send_default_pii=True)
+
+    assert should_send_default_pii() is True
+
+
+def test_should_send_default_pii_false(sentry_init):
+    sentry_init(send_default_pii=False)
+
+    assert should_send_default_pii() is False
