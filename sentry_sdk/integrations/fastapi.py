@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     transaction_from_function,
@@ -118,10 +118,7 @@ def patch_get_request_handler():
                     # Extract information from request
                     request_info = event.get("request", {})
                     if info:
-                        if (
-                            "cookies" in info
-                            and sentry_sdk.get_client().should_send_default_pii()
-                        ):
+                        if "cookies" in info and should_send_default_pii():
                             request_info["cookies"] = info["cookies"]
                         if "data" in info:
                             request_info["data"] = info["data"]
