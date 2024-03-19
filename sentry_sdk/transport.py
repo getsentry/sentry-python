@@ -467,7 +467,7 @@ class HttpTransport(Transport):
             options["socket_options"] = socket_options
 
         if self.options["keep_alive"]:
-            used_options = {(o[0], o[1]) for o in options["socket_options"] or []}
+            used_options = {(o[0], o[1]) for o in options.get("socket_options") or []}
             for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
                 if (default_option[0], default_option[1]) not in used_options:
                     options["socket_options"].append(default_option)
