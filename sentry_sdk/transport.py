@@ -41,16 +41,19 @@ except ImportError:
     from urllib import getproxies  # type: ignore
 
 
-KEEP_ALIVE_SOCKET_OPTIONS = [
+KEEP_ALIVE_SOCKET_OPTIONS = []
+for option in [
     (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+    (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
     (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
     (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
-]
-try:
-    KEEP_ALIVE_SOCKET_OPTIONS.append((socket.SOL_TCP, socket.TCP_KEEPIDLE, 45))
-except AttributeError:
-    # socket.TCP_KEEPIDLE doesn't exist on all systems (e.g. MacOS)
-    pass
+]:
+    try:
+        KEEP_ALIVE_SOCKET_OPTIONS.append(option)
+    except AttributeError:
+        # a specific option might not be available on specific systems,
+        # e.g. TCP_KEEPIDLE doesn't exist on macOS
+        pass
 
 
 class Transport(object):
