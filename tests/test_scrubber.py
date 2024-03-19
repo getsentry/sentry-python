@@ -122,7 +122,9 @@ def test_span_data_scrubbing(sentry_init, capture_events):
             span.set_data("datafoo", "databar")
 
     (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict({"password": "[Filtered]", "datafoo": "databar"})
+    assert event["spans"][0]["data"] == ApproxDict(
+        {"password": "[Filtered]", "datafoo": "databar"}
+    )
     assert event["_meta"]["spans"] == {
         "0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}
     }

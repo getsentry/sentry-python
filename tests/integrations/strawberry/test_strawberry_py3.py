@@ -352,12 +352,14 @@ def test_capture_transaction_on_error(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Query.error"
-    assert resolve_span["data"] == ApproxDict({
-        "graphql.field_name": "error",
-        "graphql.parent_type": "Query",
-        "graphql.field_path": "Query.error",
-        "graphql.path": "error",
-    })
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "error",
+            "graphql.parent_type": "Query",
+            "graphql.field_path": "Query.error",
+            "graphql.path": "error",
+        }
+    )
 
 
 @parameterize_strawberry_test
@@ -430,12 +432,14 @@ def test_capture_transaction_on_success(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Query.hello"
-    assert resolve_span["data"] == ApproxDict({
-        "graphql.field_name": "hello",
-        "graphql.parent_type": "Query",
-        "graphql.field_path": "Query.hello",
-        "graphql.path": "hello",
-    })
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "hello",
+            "graphql.parent_type": "Query",
+            "graphql.field_path": "Query.hello",
+            "graphql.path": "hello",
+        }
+    )
 
 
 @parameterize_strawberry_test
@@ -508,12 +512,14 @@ def test_transaction_no_operation_name(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Query.hello"
-    assert resolve_span["data"] == ApproxDict({
-        "graphql.field_name": "hello",
-        "graphql.parent_type": "Query",
-        "graphql.field_path": "Query.hello",
-        "graphql.path": "hello",
-    })
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "hello",
+            "graphql.parent_type": "Query",
+            "graphql.field_path": "Query.hello",
+            "graphql.path": "hello",
+        }
+    )
 
 
 @parameterize_strawberry_test
@@ -586,9 +592,11 @@ def test_transaction_mutation(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Mutation.change"
-    assert resolve_span["data"] == ApproxDict({
-        "graphql.field_name": "change",
-        "graphql.parent_type": "Mutation",
-        "graphql.field_path": "Mutation.change",
-        "graphql.path": "change",
-    })
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "change",
+            "graphql.parent_type": "Mutation",
+            "graphql.field_path": "Mutation.change",
+            "graphql.path": "change",
+        }
+    )

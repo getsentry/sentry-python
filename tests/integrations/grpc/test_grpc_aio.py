@@ -162,11 +162,13 @@ async def test_grpc_client_starts_span(
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == ApproxDict({
-        "type": "unary unary",
-        "method": "/grpc_test_server.gRPCTestService/TestServe",
-        "code": "OK",
-    })
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary unary",
+            "method": "/grpc_test_server.gRPCTestService/TestServe",
+            "code": "OK",
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -191,10 +193,12 @@ async def test_grpc_client_unary_stream_starts_span(
         span["description"]
         == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
     )
-    assert span["data"] == ApproxDict({
-        "type": "unary stream",
-        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-    })
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary stream",
+            "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+        }
+    )
 
 
 @pytest.mark.asyncio

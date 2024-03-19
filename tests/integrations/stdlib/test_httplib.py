@@ -46,14 +46,16 @@ def test_crumb_capture(sentry_init, capture_events):
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict({
-        "url": url,
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-        "reason": "OK",
-        SPANDATA.HTTP_FRAGMENT: "",
-        SPANDATA.HTTP_QUERY: "",
-    })
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
 
 
 def test_crumb_capture_hint(sentry_init, capture_events):
@@ -73,15 +75,17 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     (crumb,) = event["breadcrumbs"]["values"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict({
-        "url": url,
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-        "reason": "OK",
-        "extra": "foo",
-        SPANDATA.HTTP_FRAGMENT: "",
-        SPANDATA.HTTP_QUERY: "",
-    })
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            "extra": "foo",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
 
 
 def test_empty_realurl(sentry_init):
@@ -131,14 +135,16 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict({
-        "url": "http://localhost:{}/200".format(PORT),
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-        "reason": "OK",
-        SPANDATA.HTTP_FRAGMENT: "",
-        SPANDATA.HTTP_QUERY: "",
-    })
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": "http://localhost:{}/200".format(PORT),
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+        }
+    )
 
 
 def test_outgoing_trace_headers(sentry_init, monkeypatch):

@@ -496,15 +496,17 @@ async def test_crumb_capture(
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-        assert crumb["data"] == ApproxDict({
-            "url": "http://127.0.0.1:{}/".format(raw_server.port),
-            "http.fragment": "",
-            "http.method": "GET",
-            "http.query": "",
-            "http.response.status_code": 200,
-            "reason": "OK",
-            "extra": "foo",
-        })
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": "http://127.0.0.1:{}/".format(raw_server.port),
+                "http.fragment": "",
+                "http.method": "GET",
+                "http.query": "",
+                "http.response.status_code": 200,
+                "reason": "OK",
+                "extra": "foo",
+            }
+        )
 
 
 @pytest.mark.asyncio

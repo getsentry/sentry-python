@@ -665,7 +665,9 @@ def test_get_current_thread_meta_running_thread():
     assert (thread.ident, thread.name) == results.get(timeout=1)
 
 
-@pytest.mark.skipif(sys.version_info < (3, 4), reason="threading.main_thread() Not available")
+@pytest.mark.skipif(
+    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
+)
 def test_get_current_thread_meta_main_thread():
     results = Queue(maxsize=1)
 

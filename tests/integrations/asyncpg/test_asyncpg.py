@@ -47,13 +47,15 @@ PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
 )
 CRUMBS_CONNECT = {
     "category": "query",
-    "data": ApproxDict({
-        "db.name": PG_NAME,
-        "db.system": "postgresql",
-        "db.user": PG_USER,
-        "server.address": PG_HOST,
-        "server.port": PG_PORT,
-    }),
+    "data": ApproxDict(
+        {
+            "db.name": PG_NAME,
+            "db.system": "postgresql",
+            "db.user": PG_USER,
+            "server.address": PG_HOST,
+            "server.port": PG_PORT,
+        }
+    ),
     "message": "connect",
     "type": "default",
 }

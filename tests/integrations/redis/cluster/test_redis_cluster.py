@@ -83,12 +83,14 @@ def test_rediscluster_basic(sentry_init, capture_events, send_default_pii, descr
     span = spans[-1]
     assert span["op"] == "db.redis"
     assert span["description"] == description
-    assert span["data"] == ApproxDict({
-        SPANDATA.DB_SYSTEM: "redis",
-        # ClusterNode converts localhost to 127.0.0.1
-        SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-        SPANDATA.SERVER_PORT: 6379,
-    })
+    assert span["data"] == ApproxDict(
+        {
+            SPANDATA.DB_SYSTEM: "redis",
+            # ClusterNode converts localhost to 127.0.0.1
+            SPANDATA.SERVER_ADDRESS: "127.0.0.1",
+            SPANDATA.SERVER_PORT: 6379,
+        }
+    )
     assert span["tags"] == {
         "db.operation": "SET",
         "redis.command": "SET",
@@ -126,16 +128,18 @@ def test_rediscluster_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == ApproxDict({
-        "redis.commands": {
-            "count": 3,
-            "first_ten": expected_first_ten,
-        },
-        SPANDATA.DB_SYSTEM: "redis",
-        # ClusterNode converts localhost to 127.0.0.1
-        SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-        SPANDATA.SERVER_PORT: 6379,
-    })
+    assert span["data"] == ApproxDict(
+        {
+            "redis.commands": {
+                "count": 3,
+                "first_ten": expected_first_ten,
+            },
+            SPANDATA.DB_SYSTEM: "redis",
+            # ClusterNode converts localhost to 127.0.0.1
+            SPANDATA.SERVER_ADDRESS: "127.0.0.1",
+            SPANDATA.SERVER_PORT: 6379,
+        }
+    )
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False
         "redis.is_cluster": True,

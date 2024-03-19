@@ -48,12 +48,14 @@ async def test_async_breadcrumb(sentry_init, capture_events):
     assert crumb == {
         "category": "redis",
         "message": "GET 'foobar'",
-        "data": ApproxDict({
-            "db.operation": "GET",
-            "redis.key": "foobar",
-            "redis.command": "GET",
-            "redis.is_cluster": True,
-        }),
+        "data": ApproxDict(
+            {
+                "db.operation": "GET",
+                "redis.key": "foobar",
+                "redis.command": "GET",
+                "redis.is_cluster": True,
+            }
+        ),
         "timestamp": crumb["timestamp"],
         "type": "redis",
     }
@@ -83,12 +85,14 @@ async def test_async_basic(sentry_init, capture_events, send_default_pii, descri
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == description
-    assert span["data"] == ApproxDict({
-        SPANDATA.DB_SYSTEM: "redis",
-        # ClusterNode converts localhost to 127.0.0.1
-        SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-        SPANDATA.SERVER_PORT: 6379,
-    })
+    assert span["data"] == ApproxDict(
+        {
+            SPANDATA.DB_SYSTEM: "redis",
+            # ClusterNode converts localhost to 127.0.0.1
+            SPANDATA.SERVER_ADDRESS: "127.0.0.1",
+            SPANDATA.SERVER_PORT: 6379,
+        }
+    )
     assert span["tags"] == {
         "redis.is_cluster": True,
         "db.operation": "SET",
@@ -127,16 +131,18 @@ async def test_async_redis_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == ApproxDict({
-        "redis.commands": {
-            "count": 3,
-            "first_ten": expected_first_ten,
-        },
-        SPANDATA.DB_SYSTEM: "redis",
-        # ClusterNode converts localhost to 127.0.0.1
-        SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-        SPANDATA.SERVER_PORT: 6379,
-    })
+    assert span["data"] == ApproxDict(
+        {
+            "redis.commands": {
+                "count": 3,
+                "first_ten": expected_first_ten,
+            },
+            SPANDATA.DB_SYSTEM: "redis",
+            # ClusterNode converts localhost to 127.0.0.1
+            SPANDATA.SERVER_ADDRESS: "127.0.0.1",
+            SPANDATA.SERVER_PORT: 6379,
+        }
+    )
     assert span["tags"] == {
         "redis.transaction": False,
         "redis.is_cluster": True,

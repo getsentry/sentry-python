@@ -1749,6 +1749,7 @@ try:
     from gevent import get_hub as get_gevent_hub
     from gevent.monkey import is_module_patched
 except ImportError:
+
     def get_gevent_hub():
         # type: () -> Any
         return None
