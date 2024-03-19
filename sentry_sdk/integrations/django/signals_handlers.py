@@ -2,7 +2,7 @@ from functools import wraps
 
 from django.dispatch import Signal
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DJANGO_VERSION
@@ -52,8 +52,6 @@ def patch_signals():
 
     def _sentry_live_receivers(self, sender):
         # type: (Signal, Any) -> Union[tuple[list[Callable[..., Any]], list[Callable[..., Any]]], list[Callable[..., Any]]]
-        hub = Hub.current
-
         if DJANGO_VERSION >= (5, 0):
             sync_receivers, async_receivers = old_live_receivers(self, sender)
         else:
@@ -66,7 +64,7 @@ def patch_signals():
             def wrapper(*args, **kwargs):
                 # type: (Any, Any) -> Any
                 signal_name = _get_receiver_name(receiver)
-                with hub.start_span(
+                with sentry_sdk.start_span(
                     op=OP.EVENT_DJANGO,
                     description=signal_name,
                 ) as span:
@@ -75,7 +73,7 @@ def patch_signals():
 
             return wrapper
 
-        integration = hub.get_integration(DjangoIntegration)
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration and integration.signals_spans:
             for idx, receiver in enumerate(sync_receivers):
                 sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
