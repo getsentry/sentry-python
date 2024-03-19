@@ -202,11 +202,19 @@ def test_socket_options_merge_with_keep_alive(make_client):
     client = make_client(socket_options=socket_options, keep_alive=True)
 
     options = client.transport._get_pool_options([])
-    assert options["socket_options"] == [
-        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
-        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
-        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
-    ]
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
 
 
 def test_socket_options_override_defaults(make_client):
