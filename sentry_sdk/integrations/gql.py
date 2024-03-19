@@ -3,8 +3,9 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     parse_version,
 )
-from sentry_sdk.hub import Hub, _should_send_default_pii
+
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import Scope, should_send_default_pii
 
 try:
     import gql  # type: ignore[import-not-found]
@@ -92,20 +93,19 @@ def _patch_execute():
     @ensure_integration_enabled(GQLIntegration, real_execute)
     def sentry_patched_execute(self, document, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
-        hub = Hub.current
-        with hub.configure_scope() as scope:
-            scope.add_event_processor(_make_gql_event_processor(self, document))
+        scope = Scope.get_isolation_scope()
+        scope.add_event_processor(_make_gql_event_processor(self, document))
 
         try:
             return real_execute(self, document, *args, **kwargs)
         except TransportQueryError as e:
             event, hint = event_from_exception(
                 e,
-                client_options=hub.client.options if hub.client is not None else None,
+                client_options=scope.client.options,
                 mechanism={"type": "gql", "handled": False},
             )
 
-            hub.capture_event(event, hint)
+            scope.capture_event(event, hint)
             raise e
 
     gql.Client.execute = sentry_patched_execute
@@ -128,7 +128,7 @@ def _make_gql_event_processor(client, document):
             }
         )
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             request["data"] = _data_from_document(document)
             contexts = event.setdefault("contexts", {})
             response = contexts.setdefault("response", {})
