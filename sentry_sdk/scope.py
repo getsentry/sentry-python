@@ -1658,5 +1658,11 @@ def use_isolation_scope(isolation_scope):
         _isolation_scope.reset(isolation_token)
 
 
+def should_send_default_pii():
+    # type: () -> bool
+    """Shortcut for `Scope.get_client().should_send_default_pii()`."""
+    return Scope.get_client().should_send_default_pii()
+
+
 # Circular imports
 from sentry_sdk.client import NonRecordingClient
