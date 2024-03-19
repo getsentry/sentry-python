@@ -1788,7 +1788,7 @@ def get_current_thread_meta(thread=None):
         if gevent_hub is not None:
             try:
                 # this is undocumented, so wrap it in try except to be safe
-                return gevent_hub.thread_ident, gevent_hub.name
+                return gevent_hub.thread_ident, None
             except AttributeError:
                 pass
 
