@@ -522,6 +522,9 @@ def start_child_span_decorator(func):
             span = get_current_span()
 
             if span is None:
+                print("!!!!")
+                import traceback
+                traceback.print_stack()
                 logger.warning(
                     "Can not create a child span for %s. "
                     "Please start a Sentry transaction before calling this function.",
