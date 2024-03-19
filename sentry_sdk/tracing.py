@@ -430,7 +430,7 @@ class Span(object):
         # type: (Optional[int], Optional[str]) -> None
 
         if thread_id is not None:
-            self.set_data(SPANDATA.THREAD_ID, thread_id)
+            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
 
             if thread_name is not None:
                 self.set_data(SPANDATA.THREAD_NAME, thread_name)

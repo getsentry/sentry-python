@@ -193,13 +193,13 @@ class SPANDATA:
 
     THREAD_ID = "thread.id"
     """
-    The thread id within which the span was started. This should be a string.
+    Identifier of a thread from where the span originated. This should be a string.
     Example: "7972576320"
     """
 
     THREAD_NAME = "thread.name"
     """
-    The thread name within which the span was started. This should be a string.
+    Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
     """
 
