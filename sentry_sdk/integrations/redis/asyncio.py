@@ -44,14 +44,14 @@ def patch_redis_async_pipeline(
 
             return await old_execute(self, *args, **kwargs)
 
-    pipeline_cls.execute = _sentry_execute  # type: ignore[method-assign]
+    pipeline_cls.execute = _sentry_execute  # type: ignore
 
 
 def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
     # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
     old_execute_command = cls.execute_command
 
-    @ensure_integration_enabled_async(RedisIntegration, old_execute_command)
+    @ensure_integration_enabled_async(RedisIntegration, old_execute_command)  # type: ignore
     async def _sentry_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
         description = _get_span_description(name, *args)
@@ -62,4 +62,4 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
 
             return await old_execute_command(self, name, *args, **kwargs)
 
-    cls.execute_command = _sentry_execute_command  # type: ignore[method-assign]
+    cls.execute_command = _sentry_execute_command  # type: ignore
