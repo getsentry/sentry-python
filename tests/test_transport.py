@@ -191,7 +191,7 @@ def test_keep_alive_off_by_default(make_client):
     client = make_client()
 
     options = client.transport._get_pool_options([])
-    assert options["socket_options"] != KEEP_ALIVE_SOCKET_OPTIONS
+    assert "socket_options" not in options
 
 
 def test_transport_infinite_loop(capturing_server, request, make_client):
