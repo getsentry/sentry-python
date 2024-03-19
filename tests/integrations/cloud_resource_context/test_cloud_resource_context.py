@@ -397,7 +397,7 @@ def test_setup_once(
             if warning_called:
                 correct_warning_found = False
                 for call in fake_warning.call_args_list:
-                    if call[0][0].startswith('Invalid value for cloud_provider:')
+                    if call[0][0].startswith("Invalid value for cloud_provider:"):
                         correct_warning_found = True
                         break
 
