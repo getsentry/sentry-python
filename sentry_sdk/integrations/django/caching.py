@@ -89,7 +89,7 @@ def patch_caching():
                 cache = original_get_item(self, alias)
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-                if integration and integration.cache_spans:
+                if integration is not None and integration.cache_spans:
                     _patch_cache(cache)
 
                 return cache
@@ -106,7 +106,7 @@ def patch_caching():
                 cache = original_create_connection(self, alias)
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-                if integration and integration.cache_spans:
+                if integration is not None and integration.cache_spans:
                     _patch_cache(cache)
 
                 return cache

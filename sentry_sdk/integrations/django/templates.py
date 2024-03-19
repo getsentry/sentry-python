@@ -85,8 +85,8 @@ def patch_templates():
 
     real_render = django.shortcuts.render
 
-    @ensure_integration_enabled(DjangoIntegration, real_render)
     @functools.wraps(real_render)
+    @ensure_integration_enabled(DjangoIntegration, real_render)
     def render(request, template_name, context=None, *args, **kwargs):
         # type: (django.http.HttpRequest, str, Optional[Dict[str, Any]], *Any, **Any) -> django.http.HttpResponse
 
