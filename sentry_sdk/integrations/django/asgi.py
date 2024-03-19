@@ -17,6 +17,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -55,7 +56,7 @@ def _make_asgi_request_event_processor(request):
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if sentry_sdk.get_client().should_send_default_pii():
+        if should_send_default_pii():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
