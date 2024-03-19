@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Iterable
+    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import Type
@@ -462,17 +463,22 @@ class HttpTransport(Transport):
             "ca_certs": ca_certs or certifi.where(),
         }
 
+        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
+
         if self.options["socket_options"] is not None:
-            options["socket_options"] = self.options["socket_options"]
+            socket_options = self.options["socket_options"]
 
         if self.options["keep_alive"]:
-            if not options.get("socket_options"):
-                options["socket_options"] = []
+            if socket_options is None:
+                socket_options = []
 
-            used_options = {(o[0], o[1]) for o in options["socket_options"]}
+            used_options = {(o[0], o[1]) for o in socket_options}
             for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
                 if (default_option[0], default_option[1]) not in used_options:
-                    options["socket_options"].append(default_option)
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
 
         return options
 
