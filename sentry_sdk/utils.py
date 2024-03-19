@@ -1643,7 +1643,7 @@ def ensure_integration_enabled(
     function that the SDK is patching. The function returns a function that takes the
     decorated (Sentry-patched) function as its parameter, and returns a function that, when
     called, checks whether the given integration is enabled. If the integration is enabled, the
-    funciton calls the decorated, Sentry-patched funciton. If the integration is not enabled,
+    function calls the decorated, Sentry-patched function. If the integration is not enabled,
     the original function is called.
 
     The function also takes care of preserving the original function's signature and docstring.
