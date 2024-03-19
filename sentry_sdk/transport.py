@@ -462,11 +462,13 @@ class HttpTransport(Transport):
             "ca_certs": ca_certs or certifi.where(),
         }
 
-        if self.options["socket_options"]:
-            socket_options = self.options["socket_options"]
-            options["socket_options"] = socket_options
+        if self.options["socket_options"] is not None:
+            options["socket_options"] = self.options["socket_options"]
 
         if self.options["keep_alive"]:
+            if not options.get("socket_options"):
+                options["socket_options"] = []
+
             used_options = {(o[0], o[1]) for o in options.get("socket_options") or []}
             for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
                 if (default_option[0], default_option[1]) not in used_options:

@@ -167,11 +167,17 @@ def test_socket_options(make_client):
     assert options["socket_options"] == socket_options
 
 
-def test_keep_alive(make_client):
+def test_keep_alive_true(make_client):
     client = make_client(keep_alive=True)
 
     options = client.transport._get_pool_options([])
     assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_keep_alive_off_by_default(make_client):
+    client = make_client()
+    options = client.transport._get_pool_options([])
+    assert "socket_options" not in options
 
 
 def test_socket_options_override_keep_alive(make_client):
@@ -207,19 +213,10 @@ def test_socket_options_override_defaults(make_client):
     # If socket_options are set to [], this doesn't mean the user doesn't want
     # any custom socket_options, but rather that they want to disable the urllib3
     # socket option defaults, so we need to set this and not ignore it.
-    socket_options = []
-
-    client = make_client(socket_options=socket_options, keep_alive=True)
+    client = make_client(socket_options=[])
 
     options = client.transport._get_pool_options([])
     assert options["socket_options"] == []
-
-
-def test_keep_alive_off_by_default(make_client):
-    client = make_client()
-
-    options = client.transport._get_pool_options([])
-    assert "socket_options" not in options
 
 
 def test_transport_infinite_loop(capturing_server, request, make_client):
