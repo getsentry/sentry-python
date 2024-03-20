@@ -13,7 +13,7 @@ from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.transport import _parse_rate_limits
+from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
@@ -165,6 +165,66 @@ def test_socket_options(make_client):
 
     options = client.transport._get_pool_options([])
     assert options["socket_options"] == socket_options
+
+
+def test_keep_alive_true(make_client):
+    client = make_client(keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_keep_alive_off_by_default(make_client):
+    client = make_client()
+    options = client.transport._get_pool_options([])
+    assert "socket_options" not in options
+
+
+def test_socket_options_override_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=False)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
+def test_socket_options_merge_with_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    client = make_client(socket_options=[])
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == []
 
 
 def test_transport_infinite_loop(capturing_server, request, make_client):
