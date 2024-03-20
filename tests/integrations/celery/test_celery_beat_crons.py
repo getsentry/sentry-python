@@ -407,6 +407,9 @@ def test_exclude_beat_tasks_option(
     fake_integration = MagicMock()
     fake_integration.exclude_beat_tasks = exclude_beat_tasks
 
+    fake_client = MagicMock()
+    fake_client.get_integration.return_value = fake_integration
+
     fake_schedule_entry = MagicMock()
     fake_schedule_entry.name = task_name
 
@@ -416,8 +419,8 @@ def test_exclude_beat_tasks_option(
         "sentry_sdk.integrations.celery.Scheduler", fake_scheduler
     ) as Scheduler:  # noqa: N806
         with mock.patch(
-            "sentry_sdk.integrations.celery.Hub.current.get_integration",
-            return_value=fake_integration,
+            "sentry_sdk.integrations.celery.sentry_sdk.get_client",
+            return_value=fake_client,
         ):
             with mock.patch(
                 "sentry_sdk.integrations.celery._get_monitor_config",
