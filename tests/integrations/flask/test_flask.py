@@ -20,15 +20,16 @@ try:
 except ImportError:
     UnsupportedMediaType = None
 
+import sentry_sdk
 import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
     set_tag,
     configure_scope,
     capture_message,
     capture_exception,
-    Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
@@ -294,7 +295,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -838,8 +839,10 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
     @app.route("/")
     def index():
-        hub = Hub.current
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        scope = Scope.get_isolation_scope()
+        capture_message(
+            scope.get_traceparent() + "\n" + scope.get_baggage().serialize()
+        )
         return render_template_string(template_string)
 
     with app.test_client() as client:
@@ -916,7 +919,7 @@ def test_response_status_code_ok_in_transaction_context(
     client = app.test_client()
     client.get("/message")
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (_, transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
@@ -943,7 +946,7 @@ def test_response_status_code_not_found_in_transaction_context(
     client = app.test_client()
     client.get("/not-existing-route")
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()

@@ -1,12 +1,13 @@
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     package_version,
 )
@@ -75,11 +76,9 @@ class FlaskIntegration(Integration):
 
         old_app = Flask.__call__
 
+        @ensure_integration_enabled(FlaskIntegration, old_app)
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-            if Hub.current.get_integration(FlaskIntegration) is None:
-                return old_app(self, environ, start_response)
-
             return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
                 environ, start_response
             )
@@ -92,8 +91,8 @@ def _add_sentry_trace(sender, template, context, **extra):
     if "sentry_trace" in context:
         return
 
-    hub = Hub.current
-    trace_meta = Markup(hub.trace_propagation_meta())
+    scope = Scope.get_current_scope()
+    trace_meta = Markup(scope.trace_propagation_meta())
     context["sentry_trace"] = trace_meta  # for backwards compatibility
     context["sentry_trace_meta"] = trace_meta
 
@@ -115,8 +114,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
 
 def _request_started(app, **kwargs):
     # type: (Flask, **Any) -> None
-    hub = Hub.current
-    integration = hub.get_integration(FlaskIntegration)
+    integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
     if integration is None:
         return
 
@@ -128,9 +126,10 @@ def _request_started(app, **kwargs):
         Scope.get_current_scope(), integration.transaction_style, request
     )
 
-    with hub.configure_scope() as scope:
-        evt_processor = _make_request_event_processor(app, request, integration)
-        scope.add_event_processor(evt_processor)
+    scope = Scope.get_isolation_scope()
+    scope.generate_propagation_context()
+    evt_processor = _make_request_event_processor(app, request, integration)
+    scope.add_event_processor(evt_processor)
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -185,7 +184,7 @@ def _make_request_event_processor(app, request, integration):
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             with capture_internal_exceptions():
                 _add_user_to_event(event)
 
@@ -196,12 +195,9 @@ def _make_request_event_processor(app, request, integration):
 
 def _capture_exception(sender, exception, **kwargs):
     # type: (Flask, Union[ValueError, BaseException], **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is None:
+    client = sentry_sdk.get_client()
+    if client.get_integration(FlaskIntegration) is None:
         return
-
-    # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
 
     event, hint = event_from_exception(
         exception,
@@ -209,7 +205,7 @@ def _capture_exception(sender, exception, **kwargs):
         mechanism={"type": "flask", "handled": False},
     )
 
-    hub.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _add_user_to_event(event):
