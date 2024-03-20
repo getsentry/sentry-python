@@ -668,7 +668,9 @@ def test_get_current_thread_meta_gevent_in_thread_failed_to_get_hub():
 
     def target():
         with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
-            with mock.patch("sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]):
+            with mock.patch(
+                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]
+            ):
                 job = gevent.spawn(get_current_thread_meta)
                 job.join()
                 results.put(job.value)
