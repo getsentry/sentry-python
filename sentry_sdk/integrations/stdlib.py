@@ -198,7 +198,9 @@ def _install_subprocess():
         env = None
 
         with sentry_sdk.start_span(op=OP.SUBPROCESS, description=description) as span:
-            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(span=span):
+            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(
+                span=span
+            ):
                 if env is None:
                     env = _init_argument(
                         a, kw, "env", 10, lambda x: dict(x or os.environ)
