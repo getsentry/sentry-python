@@ -1,9 +1,9 @@
 import copy
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 
@@ -116,9 +116,9 @@ class CommandTracer(monitoring.CommandListener):
 
     def started(self, event):
         # type: (CommandStartedEvent) -> None
-        hub = Hub.current
-        if hub.get_integration(PyMongoIntegration) is None:
+        if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
             return
+
         with capture_internal_exceptions():
             command = dict(copy.deepcopy(event.command))
 
@@ -152,11 +152,11 @@ class CommandTracer(monitoring.CommandListener):
             except KeyError:
                 pass
 
-            if not _should_send_default_pii():
+            if not should_send_default_pii():
                 command = _strip_pii(command)
 
             query = "{} {}".format(event.command_name, command)
-            span = hub.start_span(op=op, description=query)
+            span = sentry_sdk.start_span(op=op, description=query)
 
             for tag, value in tags.items():
                 span.set_tag(tag, value)
@@ -165,14 +165,15 @@ class CommandTracer(monitoring.CommandListener):
                 span.set_data(key, value)
 
             with capture_internal_exceptions():
-                hub.add_breadcrumb(message=query, category="query", type=op, data=tags)
+                sentry_sdk.add_breadcrumb(
+                    message=query, category="query", type=op, data=tags
+                )
 
             self._ongoing_operations[self._operation_key(event)] = span.__enter__()
 
     def failed(self, event):
         # type: (CommandFailedEvent) -> None
-        hub = Hub.current
-        if hub.get_integration(PyMongoIntegration) is None:
+        if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
             return
 
         try:
@@ -184,8 +185,7 @@ class CommandTracer(monitoring.CommandListener):
 
     def succeeded(self, event):
         # type: (CommandSucceededEvent) -> None
-        hub = Hub.current
-        if hub.get_integration(PyMongoIntegration) is None:
+        if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
             return
 
         try:
