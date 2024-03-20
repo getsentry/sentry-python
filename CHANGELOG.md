@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.43.0
+
+### Various fixes & improvements
+
+- feat: Add optional `keep_alive` (#2842) by @sentrivana
+- fix(awslambda): aws_event can be an empty list (#2849) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `ed078ed` to `8232f17` (#2832) by @dependabot
+- feat(integrations): Add support for celery-redbeat cron tasks (#2643) by @kwigley
+- Small APIdocs improvement (#2828) by @antonpirker
+- Re-export `Event` in `types.py` (#2829) by @szokeasaurusrex
+- Fixed OpenAI tests (#2834) by @antonpirker
+
 ## 1.42.0
 
 ### Various fixes & improvements
