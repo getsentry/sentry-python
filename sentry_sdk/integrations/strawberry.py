@@ -145,6 +145,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         operation_type = "query"
         op = OP.GRAPHQL_QUERY
 
+        if self.execution_context.query is None:
+            self.execution_context.query = ""
+
         if self.execution_context.query.strip().startswith("mutation"):
             operation_type = "mutation"
             op = OP.GRAPHQL_MUTATION
