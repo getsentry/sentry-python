@@ -107,6 +107,7 @@ class AioHttpIntegration(Integration):
                 with auto_session_tracking_scope(scope, session_mode="request"):
                     # Scope data will not leak between requests because aiohttp
                     # create a task to wrap each request.
+                    scope.generate_propagation_context()
                     scope.clear_breadcrumbs()
                     scope.add_event_processor(_make_request_processor(weak_request))
 
