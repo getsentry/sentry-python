@@ -638,14 +638,42 @@ def test_get_current_thread_meta_explicit_thread():
     assert (thread1.ident, thread1.name) == results.get(timeout=1)
 
 
+def test_get_current_thread_meta_bad_explicit_thread():
+    thread = "fake thread"
+
+    main_thread = threading.main_thread()
+
+    assert (main_thread.ident, main_thread.name) == get_current_thread_meta(thread)
+
+
 @pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 def test_get_current_thread_meta_gevent_in_thread():
     results = Queue(maxsize=1)
 
     def target():
-        job = gevent.spawn(get_current_thread_meta)
-        job.join()
-        results.put(job.value)
+        with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
+            job = gevent.spawn(get_current_thread_meta)
+            job.join()
+            results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (thread.ident, None) == results.get(timeout=1)
+
+
+@pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+def test_get_current_thread_meta_gevent_in_thread_failed_to_get_hub():
+    results = Queue(maxsize=1)
+
+    def target():
+        with (
+            mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]),
+            mock.patch("sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]),
+        ):
+            job = gevent.spawn(get_current_thread_meta)
+            job.join()
+            results.put(job.value)
 
     thread = threading.Thread(target=target)
     thread.start()
@@ -668,12 +696,54 @@ def test_get_current_thread_meta_running_thread():
 @pytest.mark.skipif(
     sys.version_info < (3, 4), reason="threading.main_thread() Not available"
 )
+def test_get_current_thread_meta_bad_running_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        with (
+            mock.patch("threading.current_thread", side_effect=["fake thread"]),
+        ):
+            results.put(get_current_thread_meta())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+
+    main_thread = threading.main_thread()
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
+)
 def test_get_current_thread_meta_main_thread():
     results = Queue(maxsize=1)
 
     def target():
         # mock that somehow the current thread doesn't exist
         with mock.patch("threading.current_thread", side_effect=[None]):
+            results.put(get_current_thread_meta())
+
+    main_thread = threading.main_thread()
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
+)
+def test_get_current_thread_meta_failed_to_get_main_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        # mock that somehow the current thread doesn't exist
+        with (
+            mock.patch("threading.current_thread", side_effect=["fake thread"]),
+            mock.patch("threading.current_thread", side_effect=["fake thread"]),
+        ):
             results.put(get_current_thread_meta())
 
     main_thread = threading.main_thread()
