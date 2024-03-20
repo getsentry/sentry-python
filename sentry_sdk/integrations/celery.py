@@ -57,6 +57,11 @@ try:
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
+try:
+    from redbeat.schedulers import RedBeatScheduler  # type: ignore
+except ImportError:
+    RedBeatScheduler = None
+
 
 CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 
@@ -77,6 +82,7 @@ class CeleryIntegration(Integration):
 
         if monitor_beat_tasks:
             _patch_beat_apply_entry()
+            _patch_redbeat_maybe_due()
             _setup_celery_beat_signals()
 
     @staticmethod
@@ -523,6 +529,61 @@ def _patch_beat_apply_entry():
         return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
+
+
+def _patch_redbeat_maybe_due():
+    # type: () -> None
+
+    if RedBeatScheduler is None:
+        return
+
+    original_maybe_due = RedBeatScheduler.maybe_due
+
+    def sentry_maybe_due(*args, **kwargs):
+        # type: (*Any, **Any) -> None
+        scheduler, schedule_entry = args
+        app = scheduler.app
+
+        celery_schedule = schedule_entry.schedule
+        monitor_name = schedule_entry.name
+
+        integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
+        if integration is None:
+            return original_maybe_due(*args, **kwargs)
+
+        if match_regex_list(monitor_name, integration.exclude_beat_tasks):
+            return original_maybe_due(*args, **kwargs)
+
+        # When tasks are started from Celery Beat, make sure each task has its own trace.
+        scope = Scope.get_isolation_scope()
+        scope.set_new_propagation_context()
+
+        monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
+
+        is_supported_schedule = bool(monitor_config)
+        if is_supported_schedule:
+            headers = schedule_entry.options.pop("headers", {})
+            headers.update(
+                {
+                    "sentry-monitor-slug": monitor_name,
+                    "sentry-monitor-config": monitor_config,
+                }
+            )
+
+            check_in_id = capture_checkin(
+                monitor_slug=monitor_name,
+                monitor_config=monitor_config,
+                status=MonitorStatus.IN_PROGRESS,
+            )
+            headers.update({"sentry-monitor-check-in-id": check_in_id})
+
+            # Set the Sentry configuration in the options of the ScheduleEntry.
+            # Those will be picked up in `apply_async` and added to the headers.
+            schedule_entry.options["headers"] = headers
+
+        return original_maybe_due(*args, **kwargs)
+
+    RedBeatScheduler.maybe_due = sentry_maybe_due
 
 
 def _setup_celery_beat_signals():

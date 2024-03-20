@@ -1,19 +1,20 @@
 from abc import ABC, abstractmethod
 import io
-import warnings
-import urllib3
-import certifi
 import gzip
+import socket
 import time
+import warnings
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from urllib.request import getproxies
+
+import urllib3
+import certifi
 
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Iterable
+    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import Type
@@ -33,6 +35,21 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
     DataCategory = Optional[str]
+
+
+KEEP_ALIVE_SOCKET_OPTIONS = []
+for option in [
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+]:
+    try:
+        KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))
+    except AttributeError:
+        # a specific option might not be available on specific systems,
+        # e.g. TCP_KEEPIDLE doesn't exist on macOS
+        pass
 
 
 class Transport(ABC):
@@ -424,8 +441,22 @@ class HttpTransport(Transport):
             "ca_certs": ca_certs or certifi.where(),
         }
 
-        if self.options["socket_options"]:
-            options["socket_options"] = self.options["socket_options"]
+        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
+
+        if self.options["socket_options"] is not None:
+            socket_options = self.options["socket_options"]
+
+        if self.options["keep_alive"]:
+            if socket_options is None:
+                socket_options = []
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
 
         return options
 
