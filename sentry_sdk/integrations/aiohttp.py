@@ -215,7 +215,7 @@ def create_trace_config():
 
         if should_propagate_trace(client, str(params.url)):
             for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
-                span
+                span=span
             ):
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
