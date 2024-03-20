@@ -49,6 +49,7 @@ setup(
         "beam": ["apache-beam>=2.12"],
         "bottle": ["bottle>=0.12.13"],
         "celery": ["celery>=3"],
+        "celery-redbeat": ["celery-redbeat>=2"],
         "chalice": ["chalice>=1.16.0"],
         "clickhouse-driver": ["clickhouse-driver>=0.2.0"],
         "django": ["django>=1.8"],
