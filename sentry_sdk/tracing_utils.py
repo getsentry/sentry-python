@@ -478,7 +478,7 @@ class Baggage:
 def should_propagate_trace(client, url):
     # type: (sentry_sdk.client.BaseClient, str) -> bool
     """
-    Returns True if url matches trace_propagation_targets configured in the given hub. Otherwise, returns False.
+    Returns True if url matches trace_propagation_targets configured in the given client. Otherwise, returns False.
     """
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
