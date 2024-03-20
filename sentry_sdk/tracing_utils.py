@@ -105,7 +105,6 @@ def has_tracing_enabled(options):
 
 @contextlib.contextmanager
 def record_sql_queries(
-    hub,  # type: sentry_sdk.Hub
     cursor,  # type: Any
     query,  # type: Any
     params_list,  # type:  Any
@@ -116,9 +115,7 @@ def record_sql_queries(
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
     # TODO: Bring back capturing of params by default
-    if hub.client and hub.client.options["_experiments"].get(
-        "record_sql_params", False
-    ):
+    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
         if not params_list or params_list == [None]:
             params_list = None
 
@@ -141,9 +138,9 @@ def record_sql_queries(
         data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
-        hub.add_breadcrumb(message=query, category="query", data=data)
+        sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with hub.start_span(op=OP.DB, description=query) as span:
+    with sentry_sdk.start_span(op=OP.DB, description=query) as span:
         for k, v in data.items():
             span.set_data(k, v)
         yield span
@@ -167,12 +164,12 @@ def maybe_create_breadcrumbs_from_span(scope, span):
         )
 
 
-def add_query_source(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def add_query_source(span):
+    # type: (sentry_sdk.tracing.Span) -> None
     """
     Adds OTel compatible source code information to the span
     """
-    client = sentry_sdk.Scope.get_client()
+    client = sentry_sdk.get_client()
     if not client.is_active():
         return
 
