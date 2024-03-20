@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.43.0
+
+### Various fixes & improvements
+
+- Add optional `keep_alive` (#2842) by @sentrivana
+
+  If you're experiencing frequent network issues between the SDK and Sentry,
+  you can try turning on TCP keep-alive:
+
+  ```python
+  import sentry_sdk
+
+  sentry_sdk.init(
+      # ...your usual settings...
+      keep_alive=True,
+  )
+  ```
+
+- Add support for Celery Redbeat cron tasks (#2643) by @kwigley
+
+  The SDK now supports the Redbeat scheduler in addition to the default
+  Celery Beat scheduler for auto instrumenting crons. See
+  [the docs](https://docs.sentry.io/platforms/python/integrations/celery/crons/)
+  for more information about how to set this up.
+
+- `aws_event` can be an empty list (#2849) by @sentrivana
+- Re-export `Event` in `types.py` (#2829) by @szokeasaurusrex
+- Small API docs improvement (#2828) by @antonpirker
+- Fixed OpenAI tests (#2834) by @antonpirker
+- Bump `checkouts/data-schemas` from `ed078ed` to `8232f17` (#2832) by @dependabot
+
 ## 1.42.0
 
 ### Various fixes & improvements
