@@ -11,6 +11,7 @@ from sentry_sdk.integrations.celery import (
     _get_humanized_interval,
     _get_monitor_config,
     _patch_beat_apply_entry,
+    _patch_redbeat_maybe_due,
     crons_task_success,
     crons_task_failure,
     crons_task_retry,
@@ -439,4 +440,57 @@ def test_exclude_beat_tasks_option(
                 else:
                     # The original Scheduler.apply_entry() is called, AND _get_monitor_config is called.
                     assert fake_apply_entry.call_count == 1
+                    assert _get_monitor_config.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "task_name,exclude_beat_tasks,task_in_excluded_beat_tasks",
+    [
+        ["some_task_name", ["xxx", "some_task.*"], True],
+        ["some_task_name", ["xxx", "some_other_task.*"], False],
+    ],
+)
+def test_exclude_redbeat_tasks_option(
+    task_name, exclude_beat_tasks, task_in_excluded_beat_tasks
+):
+    """
+    Test excluding Celery RedBeat tasks from automatic instrumentation.
+    """
+    fake_maybe_due = MagicMock()
+
+    fake_redbeat_scheduler = MagicMock()
+    fake_redbeat_scheduler.maybe_due = fake_maybe_due
+
+    fake_integration = MagicMock()
+    fake_integration.exclude_beat_tasks = exclude_beat_tasks
+
+    fake_schedule_entry = MagicMock()
+    fake_schedule_entry.name = task_name
+
+    fake_get_monitor_config = MagicMock()
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.RedBeatScheduler", fake_redbeat_scheduler
+    ) as RedBeatScheduler:  # noqa: N806
+        with mock.patch(
+            "sentry_sdk.integrations.celery.Hub.current.get_integration",
+            return_value=fake_integration,
+        ):
+            with mock.patch(
+                "sentry_sdk.integrations.celery._get_monitor_config",
+                fake_get_monitor_config,
+            ) as _get_monitor_config:
+                # Mimic CeleryIntegration patching of RedBeatScheduler.maybe_due()
+                _patch_redbeat_maybe_due()
+                # Mimic Celery RedBeat calling a task from the RedBeat schedule
+                RedBeatScheduler.maybe_due(fake_redbeat_scheduler, fake_schedule_entry)
+
+                if task_in_excluded_beat_tasks:
+                    # Only the original RedBeatScheduler.maybe_due() is called, _get_monitor_config is NOT called.
+                    assert fake_maybe_due.call_count == 1
+                    _get_monitor_config.assert_not_called()
+
+                else:
+                    # The original RedBeatScheduler.maybe_due() is called, AND _get_monitor_config is called.
+                    assert fake_maybe_due.call_count == 1
                     assert _get_monitor_config.call_count == 1
