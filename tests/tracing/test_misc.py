@@ -298,17 +298,16 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
 def test_should_propagate_trace(
     trace_propagation_targets, url, expected_propagation_decision
 ):
-    hub = MagicMock()
-    hub.client = MagicMock()
+    client = MagicMock()
 
     # This test assumes the urls are not Sentry URLs. Use test_should_propagate_trace_to_sentry for sentry URLs.
-    hub.is_sentry_url = lambda _: False
+    client.is_sentry_url = lambda _: False
 
-    hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
-    hub.client.transport = MagicMock()
-    hub.client.transport.parsed_dsn = Dsn("https://bla@xxx.sentry.io/12312012")
+    client.options = {"trace_propagation_targets": trace_propagation_targets}
+    client.transport = MagicMock()
+    client.transport.parsed_dsn = Dsn("https://bla@xxx.sentry.io/12312012")
 
-    assert should_propagate_trace(hub, url) == expected_propagation_decision
+    assert should_propagate_trace(client, url) == expected_propagation_decision
 
 
 @pytest.mark.parametrize(
@@ -349,9 +348,10 @@ def test_should_propagate_trace_to_sentry(
         traces_sample_rate=1.0,
     )
 
-    Hub.current.client.transport.parsed_dsn = Dsn(dsn)
+    client = sentry_sdk.get_client()
+    client.transport.parsed_dsn = Dsn(dsn)
 
-    assert should_propagate_trace(Hub.current, url) == expected_propagation_decision
+    assert should_propagate_trace(client, url) == expected_propagation_decision
 
 
 def test_start_transaction_updates_scope_name_source(sentry_init):

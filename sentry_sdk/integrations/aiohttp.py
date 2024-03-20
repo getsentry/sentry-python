@@ -1,13 +1,13 @@
 import sys
 import weakref
 
+import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope
-from sentry_sdk.sessions import auto_session_tracking
+from sentry_sdk.sessions import auto_session_tracking_scope
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
@@ -20,6 +20,8 @@ from sentry_sdk.tracing import (
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
     logger,
     parse_url,
@@ -96,21 +98,18 @@ class AioHttpIntegration(Integration):
 
         old_handle = Application._handle
 
+        @ensure_integration_enabled_async(AioHttpIntegration, old_handle)
         async def sentry_app_handle(self, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Any
-            hub = Hub.current
-            if hub.get_integration(AioHttpIntegration) is None:
-                return await old_handle(self, request, *args, **kwargs)
-
             weak_request = weakref.ref(request)
 
-            with Hub(hub) as hub:
-                with auto_session_tracking(hub, session_mode="request"):
+            with sentry_sdk.isolation_scope() as scope:
+                with auto_session_tracking_scope(scope, session_mode="request"):
                     # Scope data will not leak between requests because aiohttp
                     # create a task to wrap each request.
-                    with hub.configure_scope() as scope:
-                        scope.clear_breadcrumbs()
-                        scope.add_event_processor(_make_request_processor(weak_request))
+                    scope.generate_propagation_context()
+                    scope.clear_breadcrumbs()
+                    scope.add_event_processor(_make_request_processor(weak_request))
 
                     headers = dict(request.headers)
                     transaction = continue_trace(
@@ -121,7 +120,7 @@ class AioHttpIntegration(Integration):
                         name="generic AIOHTTP request",
                         source=TRANSACTION_SOURCE_ROUTE,
                     )
-                    with hub.start_transaction(
+                    with sentry_sdk.start_transaction(
                         transaction,
                         custom_sampling_context={"aiohttp_request": request},
                     ):
@@ -136,7 +135,7 @@ class AioHttpIntegration(Integration):
                         except Exception:
                             # This will probably map to a 500 but seems like we
                             # have no way to tell. Do not set span status.
-                            reraise(*_capture_exception(hub))
+                            reraise(*_capture_exception())
 
                         transaction.set_http_status(response.status)
                         return response
@@ -149,8 +148,7 @@ class AioHttpIntegration(Integration):
             # type: (UrlDispatcher, Request) -> UrlMappingMatchInfo
             rv = await old_urldispatcher_resolve(self, request)
 
-            hub = Hub.current
-            integration = hub.get_integration(AioHttpIntegration)
+            integration = sentry_sdk.get_client().get_integration(AioHttpIntegration)
 
             name = None
 
@@ -176,12 +174,9 @@ class AioHttpIntegration(Integration):
 
         old_client_session_init = ClientSession.__init__
 
+        @ensure_integration_enabled(AioHttpIntegration, old_client_session_init)
         def init(*args, **kwargs):
             # type: (Any, Any) -> None
-            hub = Hub.current
-            if hub.get_integration(AioHttpIntegration) is None:
-                return old_client_session_init(*args, **kwargs)
-
             client_trace_configs = list(kwargs.get("trace_configs") or ())
             trace_config = create_trace_config()
             client_trace_configs.append(trace_config)
@@ -194,10 +189,11 @@ class AioHttpIntegration(Integration):
 
 def create_trace_config():
     # type: () -> TraceConfig
+
     async def on_request_start(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
-        hub = Hub.current
-        if hub.get_integration(AioHttpIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(AioHttpIntegration) is None:
             return
 
         method = params.method.upper()
@@ -206,7 +202,7 @@ def create_trace_config():
         with capture_internal_exceptions():
             parsed_url = parse_url(str(params.url), sanitize=False)
 
-        span = hub.start_span(
+        span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
@@ -217,8 +213,10 @@ def create_trace_config():
             span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
             span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-        if should_propagate_trace(hub, str(params.url)):
-            for key, value in hub.iter_trace_propagation_headers(span):
+        if should_propagate_trace(client, str(params.url)):
+            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+                span=span
+            ):
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                         key=key, value=value, url=params.url
@@ -275,42 +273,40 @@ def _make_request_processor(weak_request):
             request_info["query_string"] = request.query_string
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote}
-
-            hub = Hub.current
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp
             # without awaiting on some coroutine.
-            request_info["data"] = get_aiohttp_request_data(hub, request)
+            request_info["data"] = get_aiohttp_request_data(request)
 
         return event
 
     return aiohttp_processor
 
 
-def _capture_exception(hub):
-    # type: (Hub) -> ExcInfo
+def _capture_exception():
+    # type: () -> ExcInfo
     exc_info = sys.exc_info()
     event, hint = event_from_exception(
         exc_info,
-        client_options=hub.client.options,  # type: ignore
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "aiohttp", "handled": False},
     )
-    hub.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
     return exc_info
 
 
 BODY_NOT_READ_MESSAGE = "[Can't show request body due to implementation details.]"
 
 
-def get_aiohttp_request_data(hub, request):
-    # type: (Hub, Request) -> Union[Optional[str], AnnotatedValue]
+def get_aiohttp_request_data(request):
+    # type: (Request) -> Union[Optional[str], AnnotatedValue]
     bytes_body = request._read_bytes
 
     if bytes_body is not None:
         # we have body to show
-        if not request_body_within_bounds(hub.client, len(bytes_body)):
+        if not request_body_within_bounds(sentry_sdk.get_client(), len(bytes_body)):
             return AnnotatedValue.removed_because_over_size_limit()
 
         encoding = request.charset or "utf-8"

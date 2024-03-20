@@ -1558,16 +1558,16 @@ def match_regex_list(item, regex_list=None, substring_matching=False):
     return False
 
 
-def is_sentry_url(hub, url):
-    # type: (sentry_sdk.Hub, str) -> bool
+def is_sentry_url(client, url):
+    # type: (sentry_sdk.client.BaseClient, str) -> bool
     """
     Determines whether the given URL matches the Sentry DSN.
     """
     return (
-        hub.client is not None
-        and hub.client.transport is not None
-        and hub.client.transport.parsed_dsn is not None
-        and hub.client.transport.parsed_dsn.netloc in url
+        client is not None
+        and client.transport is not None
+        and client.transport.parsed_dsn is not None
+        and client.transport.parsed_dsn.netloc in url
     )
 
 
