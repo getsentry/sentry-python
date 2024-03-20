@@ -700,9 +700,7 @@ def test_get_current_thread_meta_bad_running_thread():
     results = Queue(maxsize=1)
 
     def target():
-        with (
-            mock.patch("threading.current_thread", side_effect=["fake thread"]),
-        ):
+        with mock.patch("threading.current_thread", side_effect=["fake thread"]):
             results.put(get_current_thread_meta())
 
     thread = threading.Thread(target=target)
@@ -739,12 +737,9 @@ def test_get_current_thread_meta_failed_to_get_main_thread():
     results = Queue(maxsize=1)
 
     def target():
-        # mock that somehow the current thread doesn't exist
-        with (
-            mock.patch("threading.current_thread", side_effect=["fake thread"]),
-            mock.patch("threading.current_thread", side_effect=["fake thread"]),
-        ):
-            results.put(get_current_thread_meta())
+        with mock.patch("threading.current_thread", side_effect=["fake thread"]):
+            with mock.patch("threading.current_thread", side_effect=["fake thread"]):
+                results.put(get_current_thread_meta())
 
     main_thread = threading.main_thread()
 
