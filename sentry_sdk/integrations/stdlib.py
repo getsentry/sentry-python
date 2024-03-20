@@ -103,7 +103,7 @@ def _install_httplib():
 
         if should_propagate_trace(client, real_url):
             for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
-                span
+                span=span
             ):
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
@@ -198,7 +198,7 @@ def _install_subprocess():
         env = None
 
         with sentry_sdk.start_span(op=OP.SUBPROCESS, description=description) as span:
-            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(span):
+            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(span=span):
                 if env is None:
                     env = _init_argument(
                         a, kw, "env", 10, lambda x: dict(x or os.environ)
