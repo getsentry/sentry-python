@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.0.0rc3
+
+### Various fixes & improvements
+
+- Use new scopes default integrations. (#2856) by @antonpirker
+- Updated migration guide (#2859) by @antonpirker
+- Use new scopes api in openai integration (#2853) by @antonpirker
+- Use new scopes API in Celery integration. (#2851) by @antonpirker
+- Use new scopes API in Django, SQLAlchemy, and asyncpg integration. (#2845) by @antonpirker
+- Update CHANGELOG.md (970c5779) by @sentrivana
+- release: 1.43.0 (2020ecac) by @getsentry-bot
+- ref(redis): Use new scopes API (#2854) by @sentrivana
+- feat: Add optional `keep_alive` (#2842) by @sentrivana
+- ref(gql): Use new scopes API in GQL Integration (#2838) by @szokeasaurusrex
+- ref: Ariadne integration new scope API (#2850) by @szokeasaurusrex
+- ref(logging): New scopes API in LoggingIntegration (#2855) by @szokeasaurusrex
+- fix(awslambda): aws_event can be an empty list (#2849) by @sentrivana
+- Revert "ref(logging): New scopes API in LoggingIntegration" (#2861) by @sentrivana
+- ref(logging): New scopes API in LoggingIntegration (#2861) by @sentrivana
+- ref: Use `scope.should_send_default_pii` in FastAPI integration (#2846) by @szokeasaurusrex
+- build(deps): bump checkouts/data-schemas from `ed078ed` to `8232f17` (#2832) by @dependabot
+- ref: `should_send_default_pii` shortcut (#2844) by @szokeasaurusrex
+- ref(fastapi): Use new scopes API in FastAPI integration (#2836) by @szokeasaurusrex
+- ref: Patched functions decorator for integrations (#2454) by @szokeasaurusrex
+- feat(integrations): Add support for celery-redbeat cron tasks (#2643) by @kwigley
+- Moved should_send_default_pii into client (#2840) by @antonpirker
+- Small APIdocs improvement (#2828) by @antonpirker
+- test(gql): Remove problematic tests (#2835) by @szokeasaurusrex
+
+_Plus 2 more_
+
 ## 2.0.0rc2
 
 ## New Features
