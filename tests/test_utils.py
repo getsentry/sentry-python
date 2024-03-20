@@ -638,6 +638,9 @@ def test_get_current_thread_meta_explicit_thread():
     assert (thread1.ident, thread1.name) == results.get(timeout=1)
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
+)
 def test_get_current_thread_meta_bad_explicit_thread():
     thread = "fake thread"
 
