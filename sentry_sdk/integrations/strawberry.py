@@ -176,7 +176,6 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         )
 
         scope = Scope.get_isolation_scope()
-        scope.generate_propagation_context()
         if scope.span:
             self.graphql_span = scope.span.start_child(op=op, description=description)
         else:
@@ -273,7 +272,6 @@ def _patch_execute():
 
         if "execution_context" in kwargs and result.errors:
             scope = Scope.get_isolation_scope()
-            scope.generate_propagation_context()
             event_processor = _make_request_event_processor(kwargs["execution_context"])
             scope.add_event_processor(event_processor)
 
@@ -286,7 +284,6 @@ def _patch_execute():
 
         if "execution_context" in kwargs and result.errors:
             scope = Scope.get_isolation_scope()
-            scope.generate_propagation_context()
             event_processor = _make_request_event_processor(kwargs["execution_context"])
             scope.add_event_processor(event_processor)
 
@@ -322,7 +319,6 @@ def _patch_views():
             return
 
         scope = Scope.get_isolation_scope()
-        scope.generate_propagation_context()
         event_processor = _make_response_event_processor(response_data)
         scope.add_event_processor(event_processor)
 
