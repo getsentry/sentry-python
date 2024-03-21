@@ -160,12 +160,12 @@ class SentryAsgiMiddleware:
 
         _asgi_middleware_applied.set(True)
         try:
-            with sentry_sdk.isolation_scope() as scope:
-                with auto_session_tracking_scope(scope, session_mode="request"):
-                    scope.clear_breadcrumbs()
-                    scope._name = "asgi"
+            with sentry_sdk.isolation_scope() as sentry_scope:
+                with auto_session_tracking_scope(sentry_scope, session_mode="request"):
+                    sentry_scope.clear_breadcrumbs()
+                    sentry_scope._name = "asgi"
                     processor = partial(self.event_processor, asgi_scope=scope)
-                    scope.add_event_processor(processor)
+                    sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
                     (
