@@ -833,10 +833,7 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
     @app.route("/")
     def index():
-        scope = Scope.get_isolation_scope()
-        capture_message(
-            scope.get_traceparent() + "\n" + scope.get_baggage().serialize()
-        )
+        capture_message(sentry_sdk.get_traceparent() + "\n" + sentry_sdk.get_baggage())
         return render_template_string(template_string)
 
     with app.test_client() as client:
