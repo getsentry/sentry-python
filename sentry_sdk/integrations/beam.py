@@ -156,10 +156,9 @@ def _capture_exception(exc_info):
 def raise_exception(client):
     # type: (Optional[BaseClient]) -> None
     """
-    Raise an exception. If the client is not in the hub, rebind it.
+    Raise an exception. If the client is not set, rebind it.
     """
-    set_client = sentry_sdk.get_client()
-    if client != set_client:
+    if not sentry_sdk.get_client().is_active():
         Scope.get_global_scope().set_client(client)
 
     exc_info = sys.exc_info()
