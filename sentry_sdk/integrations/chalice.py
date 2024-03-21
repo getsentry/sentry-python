@@ -1,7 +1,7 @@
 import sys
 from functools import wraps
 
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
@@ -33,10 +33,9 @@ if TYPE_CHECKING:
 class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
     def __call__(self, event, context):
         # type: (Any, Any) -> Any
-        hub = Hub.current
-        client = hub.client  # type: Any
+        client = sentry_sdk.get_client()
 
-        with hub.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = context.get_remaining_time_in_millis()
                 scope.add_event_processor(
@@ -51,8 +50,8 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                     client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
-                hub.capture_event(event, hint=hint)
-                hub.flush()
+                sentry_sdk.capture_event(event, hint=hint)
+                client.flush()
                 reraise(*exc_info)
 
 
@@ -61,9 +60,8 @@ def _get_view_function_response(app, view_function, function_args):
     @wraps(view_function)
     def wrapped_view_function(**function_args):
         # type: (**Any) -> Any
-        hub = Hub.current
-        client = hub.client  # type: Any
-        with hub.push_scope() as scope:
+        client = sentry_sdk.get_client()
+        with sentry_sdk.new_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
                 scope.set_transaction_name(
@@ -89,8 +87,8 @@ def _get_view_function_response(app, view_function, function_args):
                     client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
-                hub.capture_event(event, hint=hint)
-                hub.flush()
+                sentry_sdk.capture_event(event, hint=hint)
+                client.flush()
                 raise
 
     return wrapped_view_function  # type: ignore
