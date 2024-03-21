@@ -1,20 +1,20 @@
 import sys
 from datetime import datetime
 
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk import Hub
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
     TRANSACTION_SOURCE_TASK,
 )
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     SENSITIVE_DATA_SUBSTITUTE,
     reraise,
@@ -52,14 +52,10 @@ def patch_enqueue():
     # type: () -> None
     old_enqueue = Huey.enqueue
 
+    @ensure_integration_enabled(HueyIntegration, old_enqueue)
     def _sentry_enqueue(self, task):
         # type: (Huey, Task) -> Optional[Union[Result, ResultGroup]]
-        hub = Hub.current
-
-        if hub.get_integration(HueyIntegration) is None:
-            return old_enqueue(self, task)
-
-        with hub.start_span(op=OP.QUEUE_SUBMIT_HUEY, description=task.name):
+        with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_HUEY, description=task.name):
             if not isinstance(task, PeriodicTask):
                 # Attach trace propagation data to task kwargs. We do
                 # not do this for periodic tasks, as these don't
@@ -87,12 +83,12 @@ def _make_event_processor(task):
                 "task": task.name,
                 "args": (
                     task.args
-                    if _should_send_default_pii()
+                    if should_send_default_pii()
                     else SENSITIVE_DATA_SUBSTITUTE
                 ),
                 "kwargs": (
                     task.kwargs
-                    if _should_send_default_pii()
+                    if should_send_default_pii()
                     else SENSITIVE_DATA_SUBSTITUTE
                 ),
                 "retry": (task.default_retries or 0) - task.retries,
@@ -124,8 +120,7 @@ def _wrap_task_execute(func):
     # type: (F) -> F
     def _sentry_execute(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        hub = Hub.current
-        if hub.get_integration(HueyIntegration) is None:
+        if sentry_sdk.get_client().get_integration(HueyIntegration) is None:
             return func(*args, **kwargs)
 
         try:
@@ -144,34 +139,31 @@ def patch_execute():
     # type: () -> None
     old_execute = Huey._execute
 
+    @ensure_integration_enabled(HueyIntegration, old_execute)
     def _sentry_execute(self, task, timestamp=None):
         # type: (Huey, Task, Optional[datetime]) -> Any
-        hub = Hub.current
+        scope = Scope.get_isolation_scope()
 
-        if hub.get_integration(HueyIntegration) is None:
+        with capture_internal_exceptions():
+            scope._name = "huey"
+            scope.clear_breadcrumbs()
+            scope.add_event_processor(_make_event_processor(task))
+
+        sentry_headers = task.kwargs.pop("sentry_headers", None)
+
+        transaction = continue_trace(
+            sentry_headers or {},
+            name=task.name,
+            op=OP.QUEUE_TASK_HUEY,
+            source=TRANSACTION_SOURCE_TASK,
+        )
+        transaction.set_status("ok")
+
+        if not getattr(task, "_sentry_is_patched", False):
+            task.execute = _wrap_task_execute(task.execute)
+            task._sentry_is_patched = True
+
+        with sentry_sdk.start_transaction(transaction):
             return old_execute(self, task, timestamp)
-
-        with hub.push_scope() as scope:
-            with capture_internal_exceptions():
-                scope._name = "huey"
-                scope.clear_breadcrumbs()
-                scope.add_event_processor(_make_event_processor(task))
-
-            sentry_headers = task.kwargs.pop("sentry_headers", None)
-
-            transaction = continue_trace(
-                sentry_headers or {},
-                name=task.name,
-                op=OP.QUEUE_TASK_HUEY,
-                source=TRANSACTION_SOURCE_TASK,
-            )
-            transaction.set_status("ok")
-
-            if not getattr(task, "_sentry_is_patched", False):
-                task.execute = _wrap_task_execute(task.execute)
-                task._sentry_is_patched = True
-
-            with hub.start_transaction(transaction):
-                return old_execute(self, task, timestamp)
 
     Huey._execute = _sentry_execute
