@@ -111,6 +111,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
   with sentry_sdk.isolation_scope() as scope:
       # do something with the forked scope
+  ```
 
 - `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
 
