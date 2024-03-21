@@ -7,7 +7,6 @@ import falcon.testing
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import parse_version
 
 
@@ -380,17 +379,20 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
-    Scope.get_isolation_scope().set_tag("request_data", False)
+    with sentry_sdk.configure_scope() as scope:
+        scope.set_tag("request_data", False)
 
     app = falcon.API()
 
     class Resource:
         def on_get(self, req, resp):
-            Scope.get_isolation_scope().set_tag("request_data", True)
+            with sentry_sdk.configure_scope() as scope:
+                scope.set_tag("request_data", True)
 
             def generator():
                 for row in range(1000):
-                    assert Scope.get_isolation_scope()._tags["request_data"]
+                    with sentry_sdk.configure_scope() as scope:
+                        assert scope._tags["request_data"]
 
                     yield (str(row) + "\n").encode()
 
@@ -404,7 +406,9 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     expected_response = "".join(str(row) + "\n" for row in range(1000))
     assert response.text == expected_response
     assert not events
-    assert Scope.get_isolation_scope()._tags["request_data"]
+
+    with sentry_sdk.configure_scope() as scope:
+        assert not scope._tags["request_data"]
 
 
 @pytest.mark.skipif(
