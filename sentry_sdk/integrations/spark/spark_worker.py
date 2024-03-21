@@ -1,8 +1,8 @@
 import sys
 
-from sentry_sdk import configure_scope
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.integrations import Integration
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     exc_info_from_error,
@@ -31,9 +31,9 @@ class SparkWorkerIntegration(Integration):
         original_daemon.worker_main = _sentry_worker_main
 
 
-def _capture_exception(exc_info, hub):
-    # type: (ExcInfo, Hub) -> None
-    client = hub.client
+def _capture_exception(exc_info):
+    # type: (ExcInfo) -> None
+    client = sentry_sdk.get_client()
 
     client_options = client.options  # type: ignore
 
@@ -60,52 +60,50 @@ def _capture_exception(exc_info, hub):
 
         _tag_task_context()
 
-        hub.capture_event(event, hint=hint)
+        sentry_sdk.capture_event(event, hint=hint)
 
 
 def _tag_task_context():
     # type: () -> None
     from pyspark.taskcontext import TaskContext
 
-    with configure_scope() as scope:
+    scope = Scope.get_isolation_scope()
 
-        @scope.add_event_processor
-        def process_event(event, hint):
-            # type: (Event, Hint) -> Optional[Event]
-            with capture_internal_exceptions():
-                integration = Hub.current.get_integration(SparkWorkerIntegration)
-                task_context = TaskContext.get()
+    @scope.add_event_processor
+    def process_event(event, hint):
+        # type: (Event, Hint) -> Optional[Event]
+        with capture_internal_exceptions():
+            integration = sentry_sdk.get_client().get_integration(
+                SparkWorkerIntegration
+            )
+            task_context = TaskContext.get()
 
-                if integration is None or task_context is None:
-                    return event
+            if integration is None or task_context is None:
+                return event
 
-                event.setdefault("tags", {}).setdefault(
-                    "stageId", str(task_context.stageId())
-                )
-                event["tags"].setdefault("partitionId", str(task_context.partitionId()))
-                event["tags"].setdefault(
-                    "attemptNumber", str(task_context.attemptNumber())
-                )
-                event["tags"].setdefault(
-                    "taskAttemptId", str(task_context.taskAttemptId())
-                )
+            event.setdefault("tags", {}).setdefault(
+                "stageId", str(task_context.stageId())
+            )
+            event["tags"].setdefault("partitionId", str(task_context.partitionId()))
+            event["tags"].setdefault("attemptNumber", str(task_context.attemptNumber()))
+            event["tags"].setdefault("taskAttemptId", str(task_context.taskAttemptId()))
 
-                if task_context._localProperties:
-                    if "sentry_app_name" in task_context._localProperties:
-                        event["tags"].setdefault(
-                            "app_name", task_context._localProperties["sentry_app_name"]
-                        )
-                        event["tags"].setdefault(
-                            "application_id",
-                            task_context._localProperties["sentry_application_id"],
-                        )
+            if task_context._localProperties:
+                if "sentry_app_name" in task_context._localProperties:
+                    event["tags"].setdefault(
+                        "app_name", task_context._localProperties["sentry_app_name"]
+                    )
+                    event["tags"].setdefault(
+                        "application_id",
+                        task_context._localProperties["sentry_application_id"],
+                    )
 
-                    if "callSite.short" in task_context._localProperties:
-                        event.setdefault("extra", {}).setdefault(
-                            "callSite", task_context._localProperties["callSite.short"]
-                        )
+                if "callSite.short" in task_context._localProperties:
+                    event.setdefault("extra", {}).setdefault(
+                        "callSite", task_context._localProperties["callSite.short"]
+                    )
 
-            return event
+        return event
 
 
 def _sentry_worker_main(*args, **kwargs):
@@ -115,8 +113,7 @@ def _sentry_worker_main(*args, **kwargs):
     try:
         original_worker.main(*args, **kwargs)
     except SystemExit:
-        if Hub.current.get_integration(SparkWorkerIntegration) is not None:
-            hub = Hub.current
+        if sentry_sdk.get_client().get_integration(SparkWorkerIntegration) is not None:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
-                _capture_exception(exc_info, hub)
+                _capture_exception(exc_info)
