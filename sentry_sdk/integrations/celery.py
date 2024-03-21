@@ -499,6 +499,7 @@ def _patch_beat_apply_entry():
         if match_regex_list(monitor_name, integration.exclude_beat_tasks):
             return original_apply_entry(*args, **kwargs)
 
+        # TODO: xxx we need to check this can be removed and we should for an isolatino scope here!
         # When tasks are started from Celery Beat, make sure each task has its own trace.
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()

@@ -53,7 +53,6 @@ def _patch_graphql():
             return old_graphql_sync(schema, source, *args, **kwargs)
 
         scope = Scope.get_isolation_scope()
-        scope.generate_propagation_context()
         scope.add_event_processor(_event_processor)
 
         result = old_graphql_sync(schema, source, *args, **kwargs)
@@ -80,7 +79,6 @@ def _patch_graphql():
             return await old_graphql_async(schema, source, *args, **kwargs)
 
         scope = Scope.get_isolation_scope()
-        scope.generate_propagation_context()
         scope.add_event_processor(_event_processor)
 
         result = await old_graphql_async(schema, source, *args, **kwargs)
