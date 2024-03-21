@@ -89,7 +89,7 @@ def _patch_graphql():
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=client.options if client else None,
+                    client_options=client.options,
                     mechanism={
                         "type": integration.identifier,
                         "handled": False,
