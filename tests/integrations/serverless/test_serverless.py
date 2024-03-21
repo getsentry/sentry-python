@@ -11,9 +11,7 @@ def test_basic(sentry_init, capture_exceptions, monkeypatch):
 
     @serverless_function
     def foo():
-        monkeypatch.setattr(
-            "sentry_sdk.Hub.current.flush", lambda: flush_calls.append(1)
-        )
+        monkeypatch.setattr("sentry_sdk.Client.flush", lambda: flush_calls.append(1))
         1 / 0
 
     with pytest.raises(ZeroDivisionError):
@@ -31,7 +29,7 @@ def test_flush_disabled(sentry_init, capture_exceptions, monkeypatch):
 
     flush_calls = []
 
-    monkeypatch.setattr("sentry_sdk.Hub.current.flush", lambda: flush_calls.append(1))
+    monkeypatch.setattr("sentry_sdk.Client.flush", lambda: flush_calls.append(1))
 
     @serverless_function(flush=False)
     def foo():
