@@ -5,6 +5,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 ## New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
+- Added new API for custom instrumentation: `new_scope`, `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
 ## Changed
 
@@ -106,7 +107,9 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   After:
 
   ```python
-  with isolation_scope() as scope:
+  import sentry_sdk
+
+  with sentry_sdk.isolation_scope() as scope:
       # do something with the forked scope
 
 - `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
@@ -139,9 +142,9 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  import sentry_sdk
 
-  with new_scope() as scope:
+  with sentry_sdk.new_scope() as scope:
       # do something with `scope`
   ```
 
