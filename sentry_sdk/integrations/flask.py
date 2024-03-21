@@ -127,7 +127,6 @@ def _request_started(app, **kwargs):
     )
 
     scope = Scope.get_isolation_scope()
-    scope.generate_propagation_context()
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
 
