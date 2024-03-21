@@ -12,3 +12,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint  # noqa: F401
+
+    __all__ = [
+        "Event", 
+        "Hint"
+    ]
