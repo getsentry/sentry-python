@@ -5,6 +5,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 ## New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
+- Added new API for custom instrumentation: `new_scope`, `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
 ## Changed
 
@@ -76,6 +77,79 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
 ## Deprecated
 
+- Using the `Hub` directly as well as using hub-based APIs has been deprecated. Where available, use [the top-level API instead](sentry_sdk/api.py); otherwise use the [scope API](sentry_sdk/scope.py) or the [client API](sentry_sdk/client.py).
+
+  Before:
+
+  ```python
+  with hub.start_span(...):
+      # do something
+  ```
+
+  After:
+
+  ```python
+  import sentry_sdk
+
+  with sentry_sdk.start_span(...):
+      # do something
+  ```
+
+- Hub cloning is deprecated.
+
+  Before:
+
+  ```python
+  with Hub(Hub.current) as hub:
+      # do something with the cloned hub
+  ```
+
+  After:
+
+  ```python
+  import sentry_sdk
+
+  with sentry_sdk.isolation_scope() as scope:
+      # do something with the forked scope
+  ```
+
+- `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
+
+  Before:
+
+  ```python
+  with configure_scope() as scope:
+      # do something with `scope`
+  ```
+
+  After:
+
+  ```python
+  from sentry_sdk.scope import Scope
+
+  scope = Scope.get_isolation_scope()
+  # do something with `scope`
+  ```
+
+- `push_scope` is deprecated. Use the new `new_scope` context manager to fork the necessary scopes.
+
+  Before:
+
+  ```python
+  with push_scope() as scope:
+      # do something with `scope`
+  ```
+
+  After:
+
+  ```python
+  import sentry_sdk
+
+  with sentry_sdk.new_scope() as scope:
+      # do something with `scope`
+  ```
+
+- Accessing the client via the hub has been deprecated. Use the top-level `sentry_sdk.get_client()` to get the current client.
 - `profiler_mode` and `profiles_sample_rate` have been deprecated as `_experiments` options. Use them as top level options instead:
   ```python
   sentry_sdk.init(
