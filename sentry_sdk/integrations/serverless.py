@@ -51,7 +51,7 @@ def serverless_function(f=None, flush=True):  # noqa
                     _capture_and_reraise()
                 finally:
                     if flush:
-                        _flush_client()
+                        sentry_sdk.flush()
 
         return inner  # type: ignore
 
@@ -74,8 +74,3 @@ def _capture_and_reraise():
         sentry_sdk.capture_event(event, hint=hint)
 
     reraise(*exc_info)
-
-
-def _flush_client():
-    # type: () -> None
-    return sentry_sdk.get_client().flush()
