@@ -35,8 +35,6 @@ def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
     client = sentry_sdk.get_client()
 
-    client_options = client.options  # type: ignore
-
     mechanism = {"type": "spark", "handled": False}
 
     exc_info = exc_info_from_error(exc_info)
@@ -49,7 +47,7 @@ def _capture_exception(exc_info):
         if exc_type not in (SystemExit, EOFError, ConnectionResetError):
             rv.append(
                 single_exception_from_error_tuple(
-                    exc_type, exc_value, tb, client_options, mechanism
+                    exc_type, exc_value, tb, client.options, mechanism
                 )
             )
 
