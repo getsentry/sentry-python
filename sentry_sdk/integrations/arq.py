@@ -1,12 +1,11 @@
 import sys
 
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk import Hub
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -72,12 +71,10 @@ def patch_enqueue_job():
 
     async def _sentry_enqueue_job(self, function, *args, **kwargs):
         # type: (ArqRedis, str, *Any, **Any) -> Optional[Job]
-        hub = Hub.current
-
-        if hub.get_integration(ArqIntegration) is None:
+        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
-        with hub.start_span(op=OP.QUEUE_SUBMIT_ARQ, description=function):
+        with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_ARQ, description=function):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
     ArqRedis.enqueue_job = _sentry_enqueue_job
@@ -89,12 +86,10 @@ def patch_run_job():
 
     async def _sentry_run_job(self, job_id, score):
         # type: (Worker, str, int) -> None
-        hub = Hub(Hub.current)
-
-        if hub.get_integration(ArqIntegration) is None:
+        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
             return await old_run_job(self, job_id, score)
 
-        with hub.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
 
@@ -105,7 +100,7 @@ def patch_run_job():
                 source=TRANSACTION_SOURCE_TASK,
             )
 
-            with hub.start_transaction(transaction):
+            with sentry_sdk.start_transaction(transaction):
                 return await old_run_job(self, job_id, score)
 
     Worker.run_job = _sentry_run_job
@@ -148,10 +143,10 @@ def _make_event_processor(ctx, *args, **kwargs):
             extra["arq-job"] = {
                 "task": ctx["job_name"],
                 "args": (
-                    args if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
                 ),
                 "kwargs": (
-                    kwargs if _should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
+                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
                 ),
                 "retry": ctx["job_try"],
             }
@@ -165,11 +160,10 @@ def _wrap_coroutine(name, coroutine):
     # type: (str, WorkerCoroutine) -> WorkerCoroutine
     async def _sentry_coroutine(ctx, *args, **kwargs):
         # type: (Dict[Any, Any], *Any, **Any) -> Any
-        hub = Hub.current
-        if hub.get_integration(ArqIntegration) is None:
+        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
             return await coroutine(ctx, *args, **kwargs)
 
-        hub.scope.add_event_processor(
+        Scope.get_current_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
         )
 
@@ -191,9 +185,7 @@ def patch_create_worker():
 
     def _sentry_create_worker(*args, **kwargs):
         # type: (*Any, **Any) -> Worker
-        hub = Hub.current
-
-        if hub.get_integration(ArqIntegration) is None:
+        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
             return old_create_worker(*args, **kwargs)
 
         settings_cls = args[0]
