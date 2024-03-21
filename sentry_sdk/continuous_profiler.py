@@ -8,7 +8,13 @@ from sentry_sdk._compat import PY33, datetime_utcnow
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.profiler import DEFAULT_SAMPLING_FREQUENCY, extract_stack
-from sentry_sdk.utils import capture_internal_exception, is_gevent, logger
+from sentry_sdk.utils import (
+    capture_internal_exception,
+    is_gevent,
+    logger,
+    now,
+    set_in_app_in_frames,
+)
 
 
 if TYPE_CHECKING:
@@ -79,9 +85,9 @@ def setup_continuous_profiler(options):
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
     if profiler_mode == ThreadContinuousScheduler.mode:
-        _scheduler = ThreadContinuousScheduler(frequency=frequency)
+        _scheduler = ThreadContinuousScheduler(frequency, options)
     elif profiler_mode == GeventContinuousScheduler.mode:
-        _scheduler = GeventContinuousScheduler(frequency=frequency)
+        _scheduler = GeventContinuousScheduler(frequency, options)
     else:
         raise ValueError("Unknown continuous profiler mode: {}".format(profiler_mode))
 
@@ -111,15 +117,20 @@ def has_continous_profiling_enabled(options):
 class ContinuousScheduler(object):
     mode = "unknown"  # type: ContinuousProfilerMode
 
-    def __init__(self, frequency):
-        # type: (int) -> None
+    def __init__(self, frequency, options):
+        # type: (int, Dict[str, Any]) -> None
         self.interval = 1.0 / frequency
-        self.buffer = ProfileChunkBuffer()
+        self.options = options
         self.sampler = self.make_sampler()
+        self.buffer = None  # type: Optional[ProfileBuffer]
 
     def ensure_running(self):
         # type: () -> None
         raise NotImplementedError
+
+    def reset_buffer(self):
+        # type: () -> None
+        self.buffer = ProfileBuffer(self.options)
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -134,7 +145,7 @@ class ContinuousScheduler(object):
             This should be called at a regular interval to collect samples.
             """
 
-            now = datetime_utcnow().timestamp()
+            ts = now()
 
             try:
                 sample = [
@@ -147,7 +158,8 @@ class ContinuousScheduler(object):
                 capture_internal_exception(sys.exc_info())
                 return
 
-            self.buffer.write(now, sample)
+            if self.buffer is not None:
+                self.buffer.write(ts, sample)
 
         return _sample_stack
 
@@ -161,9 +173,9 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     mode = "thread"  # type: ContinuousProfilerMode
     name = "sentry.profiler.ThreadContinuousScheduler"
 
-    def __init__(self, frequency):
-        # type: (int) -> None
-        super(ThreadContinuousScheduler, self).__init__(frequency=frequency)
+    def __init__(self, frequency, options):
+        # type: (int, Dict[str, Any]) -> None
+        super(ThreadContinuousScheduler, self).__init__(frequency, options)
 
         self.thread = None  # type: Optional[threading.Thread]
         self.running = False
@@ -187,6 +199,10 @@ class ThreadContinuousScheduler(ContinuousScheduler):
 
             self.pid = pid
             self.running = True
+
+            # if the profiler thread is changing,
+            # we should create a new buffer along with it
+            self.reset_buffer()
 
             # make sure the thread is a daemon here otherwise this
             # can keep the application running after other threads
@@ -236,13 +252,13 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
     mode = "gevent"  # type: ContinuousProfilerMode
 
-    def __init__(self, frequency):
-        # type: (int) -> None
+    def __init__(self, frequency, options):
+        # type: (int, Dict[str, Any]) -> None
 
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventContinuousScheduler, self).__init__(frequency=frequency)
+        super(GeventContinuousScheduler, self).__init__(frequency, options)
 
         self.thread = None  # type: Optional[ThreadPool]
         self.running = False
@@ -266,6 +282,10 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
             self.pid = pid
             self.running = True
+
+            # if the profiler thread is changing,
+            # we should create a new buffer along with it
+            self.reset_buffer()
 
             self.thread = ThreadPool(1)
             try:
@@ -296,43 +316,26 @@ class GeventContinuousScheduler(ContinuousScheduler):
             last = time.perf_counter()
 
 
-class ProfileChunkBuffer(object):
-    def __init__(self, buffer_size=10):
-        # type: (int) -> None
+class ProfileBuffer(object):
+    def __init__(self, options, buffer_size=1):
+        # type: (Dict[str, Any], int) -> None
+        self.profiler_id = uuid.uuid4().hex
+        self.options = options
         self.buffer_size = buffer_size
-        self.current_chunk = None  # type: Optional[ProfileChunk]
-        self._profiler_id = None  # type: Optional[str]
-        self._pid = None  # type: Optional[int]
-
-    @property
-    def profiler_id(self):
-        # type: () -> str
-        pid = os.getpid()
-
-        # The profiler id should be unique per profiler instance.
-        # In event the process is forked, we should assign a new
-        # profiler id to the instance to indicate it's a separate
-        # instance of the profiler.
-        if pid != self._pid or self._profiler_id is None:
-            self._profiler_id = uuid.uuid4().hex
-            self._pid = pid
-
-        return self._profiler_id
+        self.chunk = ProfileChunk(self.buffer_size)
 
     def write(self, ts, sample):
         # type: (float, ExtractedSample) -> None
-        if self.current_chunk is None:
-            self.current_chunk = ProfileChunk(self.buffer_size)
-
-        if self.current_chunk.is_full(ts):
+        if self.chunk.is_full(ts):
             self.flush()
-            self.current_chunk = ProfileChunk(self.buffer_size)
+            self.chunk = ProfileChunk(self.buffer_size)
 
-        self.current_chunk.write(ts, sample)
+        self.chunk.write(ts, sample)
 
     def flush(self):
         # type: () -> None
-        chunk = self.current_chunk
+        chunk = self.chunk
+        chunk.to_json(self.profiler_id, self.options)
         # TODO: flush chunk
         return
 
@@ -340,8 +343,10 @@ class ProfileChunkBuffer(object):
 class ProfileChunk(object):
     def __init__(self, buffer_size):
         # type: (int) -> None
+        self.chunk_id = uuid.uuid4().hex
         self.buffer_size = buffer_size
-        self.start_timestamp = datetime_utcnow().timestamp()
+        self.monotonic_time = now()
+        self.start_timestamp = datetime_utcnow().timestamp() - self.monotonic_time
 
         self.indexed_frames = {}  # type: Dict[FrameId, int]
         self.indexed_stacks = {}  # type: Dict[StackId, int]
@@ -351,9 +356,9 @@ class ProfileChunk(object):
 
     def is_full(self, ts):
         # type: (float) -> bool
-        return ts - self.start_timestamp >= self.buffer_size
+        return ts - self.monotonic_time >= self.buffer_size
 
-    def write(self, ts, sample):
+    def write(self, relative_ts, sample):
         # type: (float, ExtractedSample) -> None
         for tid, (stack_id, frame_ids, frames) in sample:
             try:
@@ -372,7 +377,7 @@ class ProfileChunk(object):
 
                 self.samples.append(
                     {
-                        "timestamp": ts,
+                        "timestamp": self.start_timestamp + relative_ts,
                         "thread_id": tid,
                         "stack_id": self.indexed_stacks[stack_id],
                     }
@@ -381,3 +386,34 @@ class ProfileChunk(object):
                 # For some reason, the frame we get doesn't have certain attributes.
                 # When this happens, we abandon the current sample as it's bad.
                 capture_internal_exception(sys.exc_info())
+
+    def to_json(self, profiler_id, options):
+        # type: (str, Dict[str, Any]) -> Dict[str, Any]
+        profile = {
+            "frames": self.frames,
+            "stacks": self.stacks,
+            "samples": self.samples,
+            "thread_metadata": {
+                str(thread.ident): {
+                    "name": str(thread.name),
+                }
+                for thread in threading.enumerate()
+            },
+        }
+
+        set_in_app_in_frames(
+            profile["frames"],
+            options["in_app_exclude"],
+            options["in_app_include"],
+            options["project_root"],
+        )
+
+        return {
+            "profiler_id": profiler_id,
+            "chunk_id": self.chunk_id,
+            "environment": options["environment"],
+            "release": options["release"],
+            "platform": "python",
+            "version": "2",
+            "profile": profile,
+        }
