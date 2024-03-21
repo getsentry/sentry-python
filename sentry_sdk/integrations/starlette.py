@@ -21,7 +21,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     logger,
     parse_version,
@@ -103,10 +102,12 @@ def _enable_span_for_middleware(middleware_class):
     # type: (Any) -> type
     old_call = middleware_class.__call__
 
-    @ensure_integration_enabled_async(StarletteIntegration, old_call)
     async def _create_span_call(app, scope, receive, send, **kwargs):
         # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
+        if integration is None:
+            return await old_call(app, scope, receive, send, **kwargs)
+
         middleware_name = app.__class__.__name__
 
         # Update transaction name with middleware name
@@ -381,12 +382,14 @@ def patch_request_response():
         is_coroutine = _is_async_callable(old_func)
         if is_coroutine:
 
-            @ensure_integration_enabled_async(StarletteIntegration, old_func)
             async def _sentry_async_func(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
+                if integration is None:
+                    return await old_func(*args, **kwargs)
+
                 request = args[0]
 
                 _set_transaction_name_and_source(
