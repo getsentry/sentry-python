@@ -176,6 +176,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         )
 
         scope = Scope.get_isolation_scope()
+        scope.generate_propagation_context()
         if scope.span:
             self.graphql_span = scope.span.start_child(op=op, description=description)
         else:
