@@ -672,9 +672,10 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
             import sentry_sdk
 
             def test_handler(event, context):
-                current_client = sentry_sdk.Hub.current.client
+                current_client = sentry_sdk.get_client()
 
                 assert current_client is not None
+                assert current_client.is_active()
 
                 assert len(current_client.options['integrations']) == 1
                 assert isinstance(current_client.options['integrations'][0],
