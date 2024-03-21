@@ -3,9 +3,12 @@ import weakref
 from inspect import isawaitable
 from urllib.parse import urlsplit
 
+import sentry_sdk
 from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
@@ -16,10 +19,6 @@ from sentry_sdk.utils import (
     parse_version,
     reraise,
 )
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
-from sentry_sdk.integrations.logging import ignore_logger
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -180,21 +179,18 @@ async def _startup(self):
 
 async def _hub_enter(request):
     # type: (Request) -> None
-    hub = Hub.current
     request.ctx._sentry_do_integration = (
-        hub.get_integration(SanicIntegration) is not None
+        sentry_sdk.get_client().get_integration(SanicIntegration) is not None
     )
 
     if not request.ctx._sentry_do_integration:
         return
 
     weak_request = weakref.ref(request)
-    request.ctx._sentry_hub = Hub(hub)
-    request.ctx._sentry_hub.__enter__()
-
-    with request.ctx._sentry_hub.configure_scope() as scope:
-        scope.clear_breadcrumbs()
-        scope.add_event_processor(_make_request_processor(weak_request))
+    request.ctx._sentry_scope = sentry_sdk.isolation_scope()
+    scope = request.ctx._sentry_scope.__enter__()
+    scope.clear_breadcrumbs()
+    scope.add_event_processor(_make_request_processor(weak_request))
 
     transaction = continue_trace(
         dict(request.headers),
@@ -203,7 +199,7 @@ async def _hub_enter(request):
         name=request.path,
         source=TRANSACTION_SOURCE_URL,
     )
-    request.ctx._sentry_transaction = request.ctx._sentry_hub.start_transaction(
+    request.ctx._sentry_transaction = sentry_sdk.start_transaction(
         transaction
     ).__enter__()
 
@@ -214,7 +210,9 @@ async def _hub_exit(request, response=None):
         if not request.ctx._sentry_do_integration:
             return
 
-        integration = Hub.current.get_integration(SanicIntegration)  # type: Integration
+        integration = sentry_sdk.get_client().get_integration(
+            SanicIntegration
+        )  # type: Integration
 
         response_status = None if response is None else response.status
 
@@ -228,7 +226,7 @@ async def _hub_exit(request, response=None):
             )
             request.ctx._sentry_transaction.__exit__(None, None, None)
 
-        request.ctx._sentry_hub.__exit__(None, None, None)
+        request.ctx._sentry_scope.__exit__(None, None, None)
 
 
 async def _set_transaction(request, route, **_):
@@ -248,7 +246,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     if old_error_handler is None:
         return None
 
-    if Hub.current.get_integration(SanicIntegration) is None:
+    if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
         return old_error_handler
 
     async def sentry_wrapped_error_handler(request, exception):
@@ -276,16 +274,14 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
 
 async def _legacy_handle_request(self, request, *args, **kwargs):
     # type: (Any, Request, *Any, **Any) -> Any
-    hub = Hub.current
-    if hub.get_integration(SanicIntegration) is None:
+    if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
         return old_handle_request(self, request, *args, **kwargs)
 
     weak_request = weakref.ref(request)
 
-    with Hub(hub) as hub:
-        with hub.configure_scope() as scope:
-            scope.clear_breadcrumbs()
-            scope.add_event_processor(_make_request_processor(weak_request))
+    with sentry_sdk.isolation_scope() as scope:
+        scope.clear_breadcrumbs()
+        scope.add_event_processor(_make_request_processor(weak_request))
 
         response = old_handle_request(self, request, *args, **kwargs)
         if isawaitable(response):
@@ -297,43 +293,39 @@ async def _legacy_handle_request(self, request, *args, **kwargs):
 def _legacy_router_get(self, *args):
     # type: (Any, Union[Any, Request]) -> Any
     rv = old_router_get(self, *args)
-    hub = Hub.current
-    if hub.get_integration(SanicIntegration) is not None:
+    if sentry_sdk.get_client().get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
-            with hub.configure_scope() as scope:
-                if SanicIntegration.version and SanicIntegration.version >= (21, 3):
-                    # Sanic versions above and including 21.3 append the app name to the
-                    # route name, and so we need to remove it from Route name so the
-                    # transaction name is consistent across all versions
-                    sanic_app_name = self.ctx.app.name
-                    sanic_route = rv[0].name
+            scope = Scope.get_isolation_scope()
+            if SanicIntegration.version and SanicIntegration.version >= (21, 3):
+                # Sanic versions above and including 21.3 append the app name to the
+                # route name, and so we need to remove it from Route name so the
+                # transaction name is consistent across all versions
+                sanic_app_name = self.ctx.app.name
+                sanic_route = rv[0].name
 
-                    if sanic_route.startswith("%s." % sanic_app_name):
-                        # We add a 1 to the len of the sanic_app_name because there is a dot
-                        # that joins app name and the route name
-                        # Format: app_name.route_name
-                        sanic_route = sanic_route[len(sanic_app_name) + 1 :]
+                if sanic_route.startswith("%s." % sanic_app_name):
+                    # We add a 1 to the len of the sanic_app_name because there is a dot
+                    # that joins app name and the route name
+                    # Format: app_name.route_name
+                    sanic_route = sanic_route[len(sanic_app_name) + 1 :]
 
-                    scope.set_transaction_name(
-                        sanic_route, source=TRANSACTION_SOURCE_COMPONENT
-                    )
-                else:
-                    scope.set_transaction_name(
-                        rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
-                    )
+                scope.set_transaction_name(
+                    sanic_route, source=TRANSACTION_SOURCE_COMPONENT
+                )
+            else:
+                scope.set_transaction_name(
+                    rv[0].__name__, source=TRANSACTION_SOURCE_COMPONENT
+                )
 
     return rv
 
 
 def _capture_exception(exception):
     # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
-    hub = Hub.current
-    integration = hub.get_integration(SanicIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(SanicIntegration)
     if integration is None:
         return
-
-    # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
 
     with capture_internal_exceptions():
         event, hint = event_from_exception(
@@ -341,7 +333,7 @@ def _capture_exception(exception):
             client_options=client.options,
             mechanism={"type": "sanic", "handled": False},
         )
-        hub.capture_event(event, hint=hint)
+        sentry_sdk.capture_event(event, hint=hint)
 
 
 def _make_request_processor(weak_request):
