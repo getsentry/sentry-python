@@ -2,10 +2,11 @@ import sys
 import types
 from functools import wraps
 
-from sentry_sdk.hub import Hub
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
+import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import Scope
+from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -115,7 +116,7 @@ def _wrap_task_call(func):
     Wrap task call with a try catch to get exceptions.
     Pass the client on to raise_exception so it can get rebinded.
     """
-    client = Hub.current.client
+    client = sentry_sdk.get_client()
 
     @wraps(func)
     def _inner(*args, **kwargs):
@@ -133,17 +134,15 @@ def _wrap_task_call(func):
     return _inner  # type: ignore
 
 
-def _capture_exception(exc_info, hub):
-    # type: (ExcInfo, Hub) -> None
+def _capture_exception(exc_info):
+    # type: (ExcInfo) -> None
     """
     Send Beam exception to Sentry.
     """
-    integration = hub.get_integration(BeamIntegration)
-    if integration is None:
-        return
+    client = sentry_sdk.get_client()
 
-    client = hub.client
-    if client is None:
+    integration = client.get_integration(BeamIntegration)
+    if integration is None:
         return
 
     event, hint = event_from_exception(
@@ -151,7 +150,7 @@ def _capture_exception(exc_info, hub):
         client_options=client.options,
         mechanism={"type": "beam", "handled": False},
     )
-    hub.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def raise_exception(client):
@@ -159,12 +158,13 @@ def raise_exception(client):
     """
     Raise an exception. If the client is not in the hub, rebind it.
     """
-    hub = Hub.current
-    if hub.client is None:
-        hub.bind_client(client)
+    set_client = sentry_sdk.get_client()
+    if client != set_client:
+        Scope.get_global_scope().set_client(client)
+
     exc_info = sys.exc_info()
     with capture_internal_exceptions():
-        _capture_exception(exc_info, hub)
+        _capture_exception(exc_info)
     reraise(*exc_info)
 
 
