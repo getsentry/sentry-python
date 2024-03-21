@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>sentry_sdk.transport - sentry-python 1.43.0 documentation</title>
+      <title>sentry_sdk.transport - sentry-python 2.0.0rc3 documentation</title>
     <link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" />
 
   <script>
@@ -132,26 +132,26 @@
       <div class="min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
         <article class="yue" role="main">
           <h1>Source code for sentry_sdk.transport</h1><div class="highlight"><pre>
-<span></span><span id="1-1"><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">print_function</span>
-</span><span id="1-2">
-</span><span id="1-3"><span class="kn">import</span> <span class="nn">io</span>
-</span><span id="1-4"><span class="kn">import</span> <span class="nn">gzip</span>
-</span><span id="1-5"><span class="kn">import</span> <span class="nn">socket</span>
-</span><span id="1-6"><span class="kn">import</span> <span class="nn">time</span>
-</span><span id="1-7"><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">timedelta</span>
+<span></span><span id="1-1"><span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+</span><span id="1-2"><span class="kn">import</span> <span class="nn">io</span>
+</span><span id="1-3"><span class="kn">import</span> <span class="nn">gzip</span>
+</span><span id="1-4"><span class="kn">import</span> <span class="nn">socket</span>
+</span><span id="1-5"><span class="kn">import</span> <span class="nn">time</span>
+</span><span id="1-6"><span class="kn">import</span> <span class="nn">warnings</span>
+</span><span id="1-7"><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span><span class="p">,</span> <span class="n">timezone</span>
 </span><span id="1-8"><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
-</span><span id="1-9">
-</span><span id="1-10"><span class="kn">import</span> <span class="nn">urllib3</span>
-</span><span id="1-11"><span class="kn">import</span> <span class="nn">certifi</span>
-</span><span id="1-12">
-</span><span id="1-13"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span><span class="p">,</span> <span class="n">json_dumps</span>
-</span><span id="1-14"><span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
-</span><span id="1-15"><span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
-</span><span id="1-16"><span class="kn">from</span> <span class="nn">sentry_sdk._compat</span> <span class="kn">import</span> <span class="n">datetime_utcnow</span>
-</span><span id="1-17"><span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
-</span><span id="1-18">
-</span><span id="1-19"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span id="1-20">    <span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+</span><span id="1-9"><span class="kn">from</span> <span class="nn">urllib.request</span> <span class="kn">import</span> <span class="n">getproxies</span>
+</span><span id="1-10">
+</span><span id="1-11"><span class="kn">import</span> <span class="nn">urllib3</span>
+</span><span id="1-12"><span class="kn">import</span> <span class="nn">certifi</span>
+</span><span id="1-13">
+</span><span id="1-14"><span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">EndpointType</span>
+</span><span id="1-15"><span class="kn">from</span> <span class="nn">sentry_sdk.utils</span> <span class="kn">import</span> <span class="n">Dsn</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">capture_internal_exceptions</span>
+</span><span id="1-16"><span class="kn">from</span> <span class="nn">sentry_sdk.worker</span> <span class="kn">import</span> <span class="n">BackgroundWorker</span>
+</span><span id="1-17"><span class="kn">from</span> <span class="nn">sentry_sdk.envelope</span> <span class="kn">import</span> <span class="n">Envelope</span><span class="p">,</span> <span class="n">Item</span><span class="p">,</span> <span class="n">PayloadRef</span>
+</span><span id="1-18"><span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+</span><span id="1-19">
+</span><span id="1-20"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
 </span><span id="1-21">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 </span><span id="1-22">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
 </span><span id="1-23">    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -166,639 +166,616 @@
 </span><span id="1-32">    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">PoolManager</span>
 </span><span id="1-33">    <span class="kn">from</span> <span class="nn">urllib3.poolmanager</span> <span class="kn">import</span> <span class="n">ProxyManager</span>
 </span><span id="1-34">
-</span><span id="1-35">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span><span class="p">,</span> <span class="n">EndpointType</span>
+</span><span id="1-35">    <span class="kn">from</span> <span class="nn">sentry_sdk._types</span> <span class="kn">import</span> <span class="n">Event</span>
 </span><span id="1-36">
 </span><span id="1-37">    <span class="n">DataCategory</span> <span class="o">=</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span><span id="1-38">
-</span><span id="1-39"><span class="k">try</span><span class="p">:</span>
-</span><span id="1-40">    <span class="kn">from</span> <span class="nn">urllib.request</span> <span class="kn">import</span> <span class="n">getproxies</span>
-</span><span id="1-41"><span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-</span><span id="1-42">    <span class="kn">from</span> <span class="nn">urllib</span> <span class="kn">import</span> <span class="n">getproxies</span>  <span class="c1"># type: ignore</span>
-</span><span id="1-43">
-</span><span id="1-44">
-</span><span id="1-45"><span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="1-46"><span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="p">[</span>
-</span><span id="1-47">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_SOCKET</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;SO_KEEPALIVE&quot;</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
-</span><span id="1-48">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_TCP</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;TCP_KEEPIDLE&quot;</span><span class="p">),</span> <span class="mi">45</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
-</span><span id="1-49">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_TCP</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;TCP_KEEPINTVL&quot;</span><span class="p">),</span> <span class="mi">10</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
-</span><span id="1-50">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_TCP</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;TCP_KEEPCNT&quot;</span><span class="p">),</span> <span class="mi">6</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
-</span><span id="1-51"><span class="p">]:</span>
-</span><span id="1-52">    <span class="k">try</span><span class="p">:</span>
-</span><span id="1-53">        <span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">option</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">option</span><span class="p">[</span><span class="mi">1</span><span class="p">](),</span> <span class="n">option</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
-</span><span id="1-54">    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-</span><span id="1-55">        <span class="c1"># a specific option might not be available on specific systems,</span>
-</span><span id="1-56">        <span class="c1"># e.g. TCP_KEEPIDLE doesn&#39;t exist on macOS</span>
-</span><span id="1-57">        <span class="k">pass</span>
-</span><span id="1-58">
-</span><span id="1-59">
+</span><span id="1-39">
+</span><span id="1-40"><span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="1-41"><span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="p">[</span>
+</span><span id="1-42">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_SOCKET</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;SO_KEEPALIVE&quot;</span><span class="p">),</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
+</span><span id="1-43">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_TCP</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;TCP_KEEPIDLE&quot;</span><span class="p">),</span> <span class="mi">45</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
+</span><span id="1-44">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_TCP</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;TCP_KEEPINTVL&quot;</span><span class="p">),</span> <span class="mi">10</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
+</span><span id="1-45">    <span class="p">(</span><span class="n">socket</span><span class="o">.</span><span class="n">SOL_TCP</span><span class="p">,</span> <span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">socket</span><span class="p">,</span> <span class="s2">&quot;TCP_KEEPCNT&quot;</span><span class="p">),</span> <span class="mi">6</span><span class="p">),</span>  <span class="c1"># noqa: B009</span>
+</span><span id="1-46"><span class="p">]:</span>
+</span><span id="1-47">    <span class="k">try</span><span class="p">:</span>
+</span><span id="1-48">        <span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">option</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">option</span><span class="p">[</span><span class="mi">1</span><span class="p">](),</span> <span class="n">option</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+</span><span id="1-49">    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+</span><span id="1-50">        <span class="c1"># a specific option might not be available on specific systems,</span>
+</span><span id="1-51">        <span class="c1"># e.g. TCP_KEEPIDLE doesn&#39;t exist on macOS</span>
+</span><span id="1-52">        <span class="k">pass</span>
+</span><span id="1-53">
+</span><span id="1-54">
 <div class="viewcode-block" id="Transport">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport">[docs]</a>
-</span><span id="1-60"><span class="k">class</span> <span class="nc">Transport</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-</span><span id="1-61"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Baseclass for all transports.</span>
+</span><span id="1-55"><span class="k">class</span> <span class="nc">Transport</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+</span><span id="1-56"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Baseclass for all transports.</span>
+</span><span id="1-57">
+</span><span id="1-58"><span class="sd">    A transport is used to send an event to sentry.</span>
+</span><span id="1-59"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-60">
+</span><span id="1-61">    <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Dsn]</span>
 </span><span id="1-62">
-</span><span id="1-63"><span class="sd">    A transport is used to send an event to sentry.</span>
-</span><span id="1-64"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="1-65">
-</span><span id="1-66">    <span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[Dsn]</span>
-</span><span id="1-67">
-</span><span id="1-68">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-</span><span id="1-69">        <span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
-</span><span id="1-70">    <span class="p">):</span>
-</span><span id="1-71">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-72">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
-</span><span id="1-73">        <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
-</span><span id="1-74">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
-</span><span id="1-75">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-76">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="1-77">
+</span><span id="1-63">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span id="1-64">        <span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span>  <span class="c1"># type: Optional[Dict[str, Any]]</span>
+</span><span id="1-65">    <span class="p">):</span>
+</span><span id="1-66">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-67">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
+</span><span id="1-68">        <span class="k">if</span> <span class="n">options</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
+</span><span id="1-69">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="n">Dsn</span><span class="p">(</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">])</span>
+</span><span id="1-70">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-71">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-72">
 <div class="viewcode-block" id="Transport.capture_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.capture_event">[docs]</a>
-</span><span id="1-78">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
-</span><span id="1-79">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
-</span><span id="1-80">    <span class="p">):</span>
-</span><span id="1-81">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-82"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-83"><span class="sd">        This gets invoked with the event dictionary when an event should</span>
-</span><span id="1-84"><span class="sd">        be sent to sentry.</span>
-</span><span id="1-85"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-86">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+</span><span id="1-73">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+</span><span id="1-74">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
+</span><span id="1-75">    <span class="p">):</span>
+</span><span id="1-76">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-77"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-78"><span class="sd">        DEPRECATED: Please use capture_envelope instead.</span>
+</span><span id="1-79">
+</span><span id="1-80"><span class="sd">        This gets invoked with the event dictionary when an event should</span>
+</span><span id="1-81"><span class="sd">        be sent to sentry.</span>
+</span><span id="1-82"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-83">
+</span><span id="1-84">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span id="1-85">            <span class="s2">&quot;capture_event is deprecated, please use capture_envelope instead!&quot;</span><span class="p">,</span>
+</span><span id="1-86">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span id="1-87">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="1-88">        <span class="p">)</span>
+</span><span id="1-89">
+</span><span id="1-90">        <span class="n">envelope</span> <span class="o">=</span> <span class="n">Envelope</span><span class="p">()</span>
+</span><span id="1-91">        <span class="n">envelope</span><span class="o">.</span><span class="n">add_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span id="1-92">        <span class="bp">self</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span></div>
 
-</span><span id="1-87">
+</span><span id="1-93">
 <div class="viewcode-block" id="Transport.capture_envelope">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.capture_envelope">[docs]</a>
-</span><span id="1-88">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
-</span><span id="1-89">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
-</span><span id="1-90">    <span class="p">):</span>
-</span><span id="1-91">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-92"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="1-93"><span class="sd">        Send an envelope to Sentry.</span>
-</span><span id="1-94">
-</span><span id="1-95"><span class="sd">        Envelopes are a data container format that can hold any type of data</span>
-</span><span id="1-96"><span class="sd">        submitted to Sentry. We use it for transactions and sessions, but</span>
-</span><span id="1-97"><span class="sd">        regular &quot;error&quot; events should go through `capture_event` for backwards</span>
-</span><span id="1-98"><span class="sd">        compat.</span>
-</span><span id="1-99"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-100">        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
-
+</span><span id="1-94">    <span class="nd">@abstractmethod</span>
+</span><span id="1-95">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
+</span><span id="1-96">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
+</span><span id="1-97">    <span class="p">):</span>
+</span><span id="1-98">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-99"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-100"><span class="sd">        Send an envelope to Sentry.</span>
 </span><span id="1-101">
+</span><span id="1-102"><span class="sd">        Envelopes are a data container format that can hold any type of data</span>
+</span><span id="1-103"><span class="sd">        submitted to Sentry. We use it to send all event data (including errors,</span>
+</span><span id="1-104"><span class="sd">        transactions, crons checkins, etc.) to Sentry.</span>
+</span><span id="1-105"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-106">        <span class="k">pass</span></div>
+
+</span><span id="1-107">
 <div class="viewcode-block" id="Transport.flush">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.flush">[docs]</a>
-</span><span id="1-102">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
-</span><span id="1-103">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-104">        <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
-</span><span id="1-105">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-106">    <span class="p">):</span>
-</span><span id="1-107">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-108"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Wait `timeout` seconds for the current events to be sent out.&quot;&quot;&quot;</span>
-</span><span id="1-109">        <span class="k">pass</span></div>
+</span><span id="1-108">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span id="1-109">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-110">        <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
+</span><span id="1-111">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+</span><span id="1-112">    <span class="p">):</span>
+</span><span id="1-113">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-114"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-115"><span class="sd">        Wait `timeout` seconds for the current events to be sent out.</span>
+</span><span id="1-116">
+</span><span id="1-117"><span class="sd">        The default implementation is a no-op, since this method may only be relevant to some transports.</span>
+</span><span id="1-118"><span class="sd">        Subclasses should override this method if necessary.</span>
+</span><span id="1-119"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-120">        <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span id="1-110">
+</span><span id="1-121">
 <div class="viewcode-block" id="Transport.kill">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.kill">[docs]</a>
-</span><span id="1-111">    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-112">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-113"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Forcefully kills the transport.&quot;&quot;&quot;</span>
-</span><span id="1-114">        <span class="k">pass</span></div>
+</span><span id="1-122">    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-123">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-124"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-125"><span class="sd">        Forcefully kills the transport.</span>
+</span><span id="1-126">
+</span><span id="1-127"><span class="sd">        The default implementation is a no-op, since this method may only be relevant to some transports.</span>
+</span><span id="1-128"><span class="sd">        Subclasses should override this method if necessary.</span>
+</span><span id="1-129"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-130">        <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span id="1-115">
+</span><span id="1-131">
 <div class="viewcode-block" id="Transport.record_lost_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.Transport.record_lost_event">[docs]</a>
-</span><span id="1-116">    <span class="k">def</span> <span class="nf">record_lost_event</span><span class="p">(</span>
-</span><span id="1-117">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-118">        <span class="n">reason</span><span class="p">,</span>  <span class="c1"># type: str</span>
-</span><span id="1-119">        <span class="n">data_category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span id="1-120">        <span class="n">item</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Item]</span>
-</span><span id="1-121">    <span class="p">):</span>
-</span><span id="1-122">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-123"><span class="w">        </span><span class="sd">&quot;&quot;&quot;This increments a counter for event loss by reason and</span>
-</span><span id="1-124"><span class="sd">        data category.</span>
-</span><span id="1-125"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span id="1-126">        <span class="k">return</span> <span class="kc">None</span></div>
+</span><span id="1-132">    <span class="k">def</span> <span class="nf">record_lost_event</span><span class="p">(</span>
+</span><span id="1-133">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-134">        <span class="n">reason</span><span class="p">,</span>  <span class="c1"># type: str</span>
+</span><span id="1-135">        <span class="n">data_category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span id="1-136">        <span class="n">item</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Item]</span>
+</span><span id="1-137">    <span class="p">):</span>
+</span><span id="1-138">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-139"><span class="w">        </span><span class="sd">&quot;&quot;&quot;This increments a counter for event loss by reason and</span>
+</span><span id="1-140"><span class="sd">        data category.</span>
+</span><span id="1-141"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="1-142">        <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span id="1-127">
-</span><span id="1-128">    <span class="k">def</span> <span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-129">        <span class="c1"># type: () -&gt; bool</span>
-</span><span id="1-130">        <span class="k">return</span> <span class="kc">True</span>
-</span><span id="1-131">
-</span><span id="1-132">    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-133">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-134">        <span class="k">try</span><span class="p">:</span>
-</span><span id="1-135">            <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
-</span><span id="1-136">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-</span><span id="1-137">            <span class="k">pass</span></div>
+</span><span id="1-143">
+</span><span id="1-144">    <span class="k">def</span> <span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-145">        <span class="c1"># type: () -&gt; bool</span>
+</span><span id="1-146">        <span class="k">return</span> <span class="kc">True</span>
+</span><span id="1-147">
+</span><span id="1-148">    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-149">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-150">        <span class="k">try</span><span class="p">:</span>
+</span><span id="1-151">            <span class="bp">self</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span>
+</span><span id="1-152">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span id="1-153">            <span class="k">pass</span></div>
 
-</span><span id="1-138">
-</span><span id="1-139">
-</span><span id="1-140"><span class="k">def</span> <span class="nf">_parse_rate_limits</span><span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="n">now</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span id="1-141">    <span class="c1"># type: (Any, Optional[datetime]) -&gt; Iterable[Tuple[DataCategory, datetime]]</span>
-</span><span id="1-142">    <span class="k">if</span> <span class="n">now</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-143">        <span class="n">now</span> <span class="o">=</span> <span class="n">datetime_utcnow</span><span class="p">()</span>
-</span><span id="1-144">
-</span><span id="1-145">    <span class="k">for</span> <span class="n">limit</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
-</span><span id="1-146">        <span class="k">try</span><span class="p">:</span>
-</span><span id="1-147">            <span class="n">retry_after</span><span class="p">,</span> <span class="n">categories</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">limit</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-</span><span id="1-148">            <span class="n">retry_after</span> <span class="o">=</span> <span class="n">now</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">retry_after</span><span class="p">))</span>
-</span><span id="1-149">            <span class="k">for</span> <span class="n">category</span> <span class="ow">in</span> <span class="n">categories</span> <span class="ow">and</span> <span class="n">categories</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="kc">None</span><span class="p">,):</span>
-</span><span id="1-150">                <span class="k">yield</span> <span class="n">category</span><span class="p">,</span> <span class="n">retry_after</span>
-</span><span id="1-151">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span id="1-152">            <span class="k">continue</span>
-</span><span id="1-153">
 </span><span id="1-154">
+</span><span id="1-155">
+</span><span id="1-156"><span class="k">def</span> <span class="nf">_parse_rate_limits</span><span class="p">(</span><span class="n">header</span><span class="p">,</span> <span class="n">now</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span id="1-157">    <span class="c1"># type: (Any, Optional[datetime]) -&gt; Iterable[Tuple[DataCategory, datetime]]</span>
+</span><span id="1-158">    <span class="k">if</span> <span class="n">now</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-159">        <span class="n">now</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+</span><span id="1-160">
+</span><span id="1-161">    <span class="k">for</span> <span class="n">limit</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+</span><span id="1-162">        <span class="k">try</span><span class="p">:</span>
+</span><span id="1-163">            <span class="n">retry_after</span><span class="p">,</span> <span class="n">categories</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">limit</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+</span><span id="1-164">            <span class="n">retry_after</span> <span class="o">=</span> <span class="n">now</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">seconds</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">retry_after</span><span class="p">))</span>
+</span><span id="1-165">            <span class="k">for</span> <span class="n">category</span> <span class="ow">in</span> <span class="n">categories</span> <span class="ow">and</span> <span class="n">categories</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="kc">None</span><span class="p">,):</span>
+</span><span id="1-166">                <span class="k">yield</span> <span class="n">category</span><span class="p">,</span> <span class="n">retry_after</span>
+</span><span id="1-167">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span id="1-168">            <span class="k">continue</span>
+</span><span id="1-169">
+</span><span id="1-170">
 <div class="viewcode-block" id="HttpTransport">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport">[docs]</a>
-</span><span id="1-155"><span class="k">class</span> <span class="nc">HttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
-</span><span id="1-156"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The default HTTP transport.&quot;&quot;&quot;</span>
-</span><span id="1-157">
-</span><span id="1-158">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-</span><span id="1-159">        <span class="bp">self</span><span class="p">,</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
-</span><span id="1-160">    <span class="p">):</span>
-</span><span id="1-161">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-162">        <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>
-</span><span id="1-163">
-</span><span id="1-164">        <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span id="1-165">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="1-166">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
-</span><span id="1-167">        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">(</span><span class="n">queue_size</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;transport_queue_size&quot;</span><span class="p">])</span>
-</span><span id="1-168">        <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
-</span><span id="1-169">        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[DataCategory, datetime]</span>
-</span><span id="1-170">        <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
-</span><span id="1-171">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span>
-</span><span id="1-172">            <span class="nb">int</span>
-</span><span id="1-173">        <span class="p">)</span>  <span class="c1"># type: DefaultDict[Tuple[str, str], int]</span>
-</span><span id="1-174">        <span class="bp">self</span><span class="o">.</span><span class="n">_last_client_report_sent</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-</span><span id="1-175">
-</span><span id="1-176">        <span class="n">compresslevel</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_experiments&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-</span><span id="1-177">            <span class="s2">&quot;transport_zlib_compression_level&quot;</span>
-</span><span id="1-178">        <span class="p">)</span>
-</span><span id="1-179">        <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">=</span> <span class="mi">9</span> <span class="k">if</span> <span class="n">compresslevel</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">compresslevel</span><span class="p">)</span>
-</span><span id="1-180">
-</span><span id="1-181">        <span class="n">num_pools</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_experiments&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transport_num_pools&quot;</span><span class="p">)</span>
-</span><span id="1-182">        <span class="bp">self</span><span class="o">.</span><span class="n">_num_pools</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">num_pools</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_pools</span><span class="p">)</span>
-</span><span id="1-183">
-</span><span id="1-184">        <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_pool</span><span class="p">(</span>
-</span><span id="1-185">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="p">,</span>
-</span><span id="1-186">            <span class="n">http_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;http_proxy&quot;</span><span class="p">],</span>
-</span><span id="1-187">            <span class="n">https_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;https_proxy&quot;</span><span class="p">],</span>
-</span><span id="1-188">            <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
-</span><span id="1-189">            <span class="n">proxy_headers</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;proxy_headers&quot;</span><span class="p">],</span>
-</span><span id="1-190">        <span class="p">)</span>
+</span><span id="1-171"><span class="k">class</span> <span class="nc">HttpTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
+</span><span id="1-172"><span class="w">    </span><span class="sd">&quot;&quot;&quot;The default HTTP transport.&quot;&quot;&quot;</span>
+</span><span id="1-173">
+</span><span id="1-174">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span id="1-175">        <span class="bp">self</span><span class="p">,</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
+</span><span id="1-176">    <span class="p">):</span>
+</span><span id="1-177">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-178">        <span class="kn">from</span> <span class="nn">sentry_sdk.consts</span> <span class="kn">import</span> <span class="n">VERSION</span>
+</span><span id="1-179">
+</span><span id="1-180">        <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span id="1-181">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="1-182">        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>  <span class="c1"># type: Dict[str, Any]</span>
+</span><span id="1-183">        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span> <span class="o">=</span> <span class="n">BackgroundWorker</span><span class="p">(</span><span class="n">queue_size</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;transport_queue_size&quot;</span><span class="p">])</span>
+</span><span id="1-184">        <span class="bp">self</span><span class="o">.</span><span class="n">_auth</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">to_auth</span><span class="p">(</span><span class="s2">&quot;sentry.python/</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">VERSION</span><span class="p">)</span>
+</span><span id="1-185">        <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[DataCategory, datetime]</span>
+</span><span id="1-186">        <span class="bp">self</span><span class="o">.</span><span class="n">_retry</span> <span class="o">=</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">Retry</span><span class="p">()</span>
+</span><span id="1-187">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span>
+</span><span id="1-188">            <span class="nb">int</span>
+</span><span id="1-189">        <span class="p">)</span>  <span class="c1"># type: DefaultDict[Tuple[str, str], int]</span>
+</span><span id="1-190">        <span class="bp">self</span><span class="o">.</span><span class="n">_last_client_report_sent</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 </span><span id="1-191">
-</span><span id="1-192">        <span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
-</span><span id="1-193">
-</span><span id="1-194">        <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span> <span class="o">=</span> <span class="n">Hub</span>
-</span><span id="1-195">
+</span><span id="1-192">        <span class="n">compresslevel</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_experiments&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+</span><span id="1-193">            <span class="s2">&quot;transport_zlib_compression_level&quot;</span>
+</span><span id="1-194">        <span class="p">)</span>
+</span><span id="1-195">        <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">=</span> <span class="mi">9</span> <span class="k">if</span> <span class="n">compresslevel</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">compresslevel</span><span class="p">)</span>
+</span><span id="1-196">
+</span><span id="1-197">        <span class="n">num_pools</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;_experiments&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transport_num_pools&quot;</span><span class="p">)</span>
+</span><span id="1-198">        <span class="bp">self</span><span class="o">.</span><span class="n">_num_pools</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">num_pools</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_pools</span><span class="p">)</span>
+</span><span id="1-199">
+</span><span id="1-200">        <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_pool</span><span class="p">(</span>
+</span><span id="1-201">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="p">,</span>
+</span><span id="1-202">            <span class="n">http_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;http_proxy&quot;</span><span class="p">],</span>
+</span><span id="1-203">            <span class="n">https_proxy</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;https_proxy&quot;</span><span class="p">],</span>
+</span><span id="1-204">            <span class="n">ca_certs</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;ca_certs&quot;</span><span class="p">],</span>
+</span><span id="1-205">            <span class="n">proxy_headers</span><span class="o">=</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;proxy_headers&quot;</span><span class="p">],</span>
+</span><span id="1-206">        <span class="p">)</span>
+</span><span id="1-207">
+</span><span id="1-208">        <span class="kn">from</span> <span class="nn">sentry_sdk</span> <span class="kn">import</span> <span class="n">Hub</span>
+</span><span id="1-209">
+</span><span id="1-210">        <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span> <span class="o">=</span> <span class="n">Hub</span>
+</span><span id="1-211">
 <div class="viewcode-block" id="HttpTransport.record_lost_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport.record_lost_event">[docs]</a>
-</span><span id="1-196">    <span class="k">def</span> <span class="nf">record_lost_event</span><span class="p">(</span>
-</span><span id="1-197">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-198">        <span class="n">reason</span><span class="p">,</span>  <span class="c1"># type: str</span>
-</span><span id="1-199">        <span class="n">data_category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span id="1-200">        <span class="n">item</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Item]</span>
-</span><span id="1-201">    <span class="p">):</span>
-</span><span id="1-202">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-203">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;send_client_reports&quot;</span><span class="p">]:</span>
-</span><span id="1-204">            <span class="k">return</span>
-</span><span id="1-205">
-</span><span id="1-206">        <span class="n">quantity</span> <span class="o">=</span> <span class="mi">1</span>
-</span><span id="1-207">        <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-208">            <span class="n">data_category</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">data_category</span>
-</span><span id="1-209">            <span class="k">if</span> <span class="n">data_category</span> <span class="o">==</span> <span class="s2">&quot;attachment&quot;</span><span class="p">:</span>
-</span><span id="1-210">                <span class="c1"># quantity of 0 is actually 1 as we do not want to count</span>
-</span><span id="1-211">                <span class="c1"># empty attachments as actually empty.</span>
-</span><span id="1-212">                <span class="n">quantity</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">())</span> <span class="ow">or</span> <span class="mi">1</span>
-</span><span id="1-213">        <span class="k">elif</span> <span class="n">data_category</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-214">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;data category not provided&quot;</span><span class="p">)</span>
-</span><span id="1-215">
-</span><span id="1-216">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span><span class="p">[</span><span class="n">data_category</span><span class="p">,</span> <span class="n">reason</span><span class="p">]</span> <span class="o">+=</span> <span class="n">quantity</span></div>
+</span><span id="1-212">    <span class="k">def</span> <span class="nf">record_lost_event</span><span class="p">(</span>
+</span><span id="1-213">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-214">        <span class="n">reason</span><span class="p">,</span>  <span class="c1"># type: str</span>
+</span><span id="1-215">        <span class="n">data_category</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span id="1-216">        <span class="n">item</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Item]</span>
+</span><span id="1-217">    <span class="p">):</span>
+</span><span id="1-218">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-219">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;send_client_reports&quot;</span><span class="p">]:</span>
+</span><span id="1-220">            <span class="k">return</span>
+</span><span id="1-221">
+</span><span id="1-222">        <span class="n">quantity</span> <span class="o">=</span> <span class="mi">1</span>
+</span><span id="1-223">        <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-224">            <span class="n">data_category</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">data_category</span>
+</span><span id="1-225">            <span class="k">if</span> <span class="n">data_category</span> <span class="o">==</span> <span class="s2">&quot;attachment&quot;</span><span class="p">:</span>
+</span><span id="1-226">                <span class="c1"># quantity of 0 is actually 1 as we do not want to count</span>
+</span><span id="1-227">                <span class="c1"># empty attachments as actually empty.</span>
+</span><span id="1-228">                <span class="n">quantity</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">get_bytes</span><span class="p">())</span> <span class="ow">or</span> <span class="mi">1</span>
+</span><span id="1-229">        <span class="k">elif</span> <span class="n">data_category</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-230">            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;data category not provided&quot;</span><span class="p">)</span>
+</span><span id="1-231">
+</span><span id="1-232">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span><span class="p">[</span><span class="n">data_category</span><span class="p">,</span> <span class="n">reason</span><span class="p">]</span> <span class="o">+=</span> <span class="n">quantity</span></div>
 
-</span><span id="1-217">
-</span><span id="1-218">    <span class="k">def</span> <span class="nf">_update_rate_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
-</span><span id="1-219">        <span class="c1"># type: (urllib3.BaseHTTPResponse) -&gt; None</span>
-</span><span id="1-220">
-</span><span id="1-221">        <span class="c1"># new sentries with more rate limit insights.  We honor this header</span>
-</span><span id="1-222">        <span class="c1"># no matter of the status code to update our internal rate limits.</span>
-</span><span id="1-223">        <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;x-sentry-rate-limits&quot;</span><span class="p">)</span>
-</span><span id="1-224">        <span class="k">if</span> <span class="n">header</span><span class="p">:</span>
-</span><span id="1-225">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Rate-limited via x-sentry-rate-limits&quot;</span><span class="p">)</span>
-</span><span id="1-226">            <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_parse_rate_limits</span><span class="p">(</span><span class="n">header</span><span class="p">))</span>
-</span><span id="1-227">
-</span><span id="1-228">        <span class="c1"># old sentries only communicate global rate limit hits via the</span>
-</span><span id="1-229">        <span class="c1"># retry-after header on 429.  This header can also be emitted on new</span>
-</span><span id="1-230">        <span class="c1"># sentries if a proxy in front wants to globally slow things down.</span>
-</span><span id="1-231">        <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
-</span><span id="1-232">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Rate-limited via 429&quot;</span><span class="p">)</span>
-</span><span id="1-233">            <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime_utcnow</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
-</span><span id="1-234">                <span class="n">seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_retry</span><span class="o">.</span><span class="n">get_retry_after</span><span class="p">(</span><span class="n">response</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">60</span>
-</span><span id="1-235">            <span class="p">)</span>
+</span><span id="1-233">
+</span><span id="1-234">    <span class="k">def</span> <span class="nf">_update_rate_limits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
+</span><span id="1-235">        <span class="c1"># type: (urllib3.BaseHTTPResponse) -&gt; None</span>
 </span><span id="1-236">
-</span><span id="1-237">    <span class="k">def</span> <span class="nf">_send_request</span><span class="p">(</span>
-</span><span id="1-238">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-239">        <span class="n">body</span><span class="p">,</span>  <span class="c1"># type: bytes</span>
-</span><span id="1-240">        <span class="n">headers</span><span class="p">,</span>  <span class="c1"># type: Dict[str, str]</span>
-</span><span id="1-241">        <span class="n">endpoint_type</span><span class="o">=</span><span class="s2">&quot;store&quot;</span><span class="p">,</span>  <span class="c1"># type: EndpointType</span>
-</span><span id="1-242">        <span class="n">envelope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Envelope]</span>
-</span><span id="1-243">    <span class="p">):</span>
-</span><span id="1-244">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-245">
-</span><span id="1-246">        <span class="k">def</span> <span class="nf">record_loss</span><span class="p">(</span><span class="n">reason</span><span class="p">):</span>
-</span><span id="1-247">            <span class="c1"># type: (str) -&gt; None</span>
-</span><span id="1-248">            <span class="k">if</span> <span class="n">envelope</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-249">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="n">reason</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
-</span><span id="1-250">            <span class="k">else</span><span class="p">:</span>
-</span><span id="1-251">                <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span id="1-252">                    <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="n">reason</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span>
-</span><span id="1-253">
-</span><span id="1-254">        <span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
-</span><span id="1-255">            <span class="p">{</span>
-</span><span id="1-256">                <span class="s2">&quot;User-Agent&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">client</span><span class="p">),</span>
-</span><span id="1-257">                <span class="s2">&quot;X-Sentry-Auth&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">to_header</span><span class="p">()),</span>
-</span><span id="1-258">            <span class="p">}</span>
-</span><span id="1-259">        <span class="p">)</span>
-</span><span id="1-260">        <span class="k">try</span><span class="p">:</span>
-</span><span id="1-261">            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">request</span><span class="p">(</span>
-</span><span id="1-262">                <span class="s2">&quot;POST&quot;</span><span class="p">,</span>
-</span><span id="1-263">                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">get_api_url</span><span class="p">(</span><span class="n">endpoint_type</span><span class="p">)),</span>
-</span><span id="1-264">                <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span>
-</span><span id="1-265">                <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span>
-</span><span id="1-266">            <span class="p">)</span>
-</span><span id="1-267">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-</span><span id="1-268">            <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;network&quot;</span><span class="p">)</span>
-</span><span id="1-269">            <span class="n">record_loss</span><span class="p">(</span><span class="s2">&quot;network_error&quot;</span><span class="p">)</span>
-</span><span id="1-270">            <span class="k">raise</span>
-</span><span id="1-271">
-</span><span id="1-272">        <span class="k">try</span><span class="p">:</span>
-</span><span id="1-273">            <span class="bp">self</span><span class="o">.</span><span class="n">_update_rate_limits</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-</span><span id="1-274">
-</span><span id="1-275">            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
-</span><span id="1-276">                <span class="c1"># if we hit a 429.  Something was rate limited but we already</span>
-</span><span id="1-277">                <span class="c1"># acted on this in `self._update_rate_limits`.  Note that we</span>
-</span><span id="1-278">                <span class="c1"># do not want to record event loss here as we will have recorded</span>
-</span><span id="1-279">                <span class="c1"># an outcome in relay already.</span>
-</span><span id="1-280">                <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;status_429&quot;</span><span class="p">)</span>
-</span><span id="1-281">                <span class="k">pass</span>
-</span><span id="1-282">
-</span><span id="1-283">            <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">300</span> <span class="ow">or</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&lt;</span> <span class="mi">200</span><span class="p">:</span>
-</span><span id="1-284">                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-</span><span id="1-285">                    <span class="s2">&quot;Unexpected status code: </span><span class="si">%s</span><span class="s2"> (body: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
-</span><span id="1-286">                    <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
-</span><span id="1-287">                    <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
-</span><span id="1-288">                <span class="p">)</span>
-</span><span id="1-289">                <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;status_</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">))</span>
-</span><span id="1-290">                <span class="n">record_loss</span><span class="p">(</span><span class="s2">&quot;network_error&quot;</span><span class="p">)</span>
-</span><span id="1-291">        <span class="k">finally</span><span class="p">:</span>
-</span><span id="1-292">            <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
-</span><span id="1-293">
-</span><span id="1-294">    <span class="k">def</span> <span class="nf">on_dropped_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reason</span><span class="p">):</span>
-</span><span id="1-295">        <span class="c1"># type: (str) -&gt; None</span>
-</span><span id="1-296">        <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-297">
-</span><span id="1-298">    <span class="k">def</span> <span class="nf">_fetch_pending_client_report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">):</span>
-</span><span id="1-299">        <span class="c1"># type: (bool, int) -&gt; Optional[Item]</span>
-</span><span id="1-300">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;send_client_reports&quot;</span><span class="p">]:</span>
-</span><span id="1-301">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-302">
-</span><span id="1-303">        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">force</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_client_report_sent</span> <span class="o">&lt;</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">interval</span><span class="p">):</span>
-</span><span id="1-304">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-305">
-</span><span id="1-306">        <span class="n">discarded_events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span>
-</span><span id="1-307">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
-</span><span id="1-308">        <span class="bp">self</span><span class="o">.</span><span class="n">_last_client_report_sent</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+</span><span id="1-237">        <span class="c1"># new sentries with more rate limit insights.  We honor this header</span>
+</span><span id="1-238">        <span class="c1"># no matter of the status code to update our internal rate limits.</span>
+</span><span id="1-239">        <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;x-sentry-rate-limits&quot;</span><span class="p">)</span>
+</span><span id="1-240">        <span class="k">if</span> <span class="n">header</span><span class="p">:</span>
+</span><span id="1-241">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Rate-limited via x-sentry-rate-limits&quot;</span><span class="p">)</span>
+</span><span id="1-242">            <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_parse_rate_limits</span><span class="p">(</span><span class="n">header</span><span class="p">))</span>
+</span><span id="1-243">
+</span><span id="1-244">        <span class="c1"># old sentries only communicate global rate limit hits via the</span>
+</span><span id="1-245">        <span class="c1"># retry-after header on 429.  This header can also be emitted on new</span>
+</span><span id="1-246">        <span class="c1"># sentries if a proxy in front wants to globally slow things down.</span>
+</span><span id="1-247">        <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
+</span><span id="1-248">            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Rate-limited via 429&quot;</span><span class="p">)</span>
+</span><span id="1-249">            <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span>
+</span><span id="1-250">                <span class="n">seconds</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_retry</span><span class="o">.</span><span class="n">get_retry_after</span><span class="p">(</span><span class="n">response</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">60</span>
+</span><span id="1-251">            <span class="p">)</span>
+</span><span id="1-252">
+</span><span id="1-253">    <span class="k">def</span> <span class="nf">_send_request</span><span class="p">(</span>
+</span><span id="1-254">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-255">        <span class="n">body</span><span class="p">,</span>  <span class="c1"># type: bytes</span>
+</span><span id="1-256">        <span class="n">headers</span><span class="p">,</span>  <span class="c1"># type: Dict[str, str]</span>
+</span><span id="1-257">        <span class="n">endpoint_type</span><span class="o">=</span><span class="n">EndpointType</span><span class="o">.</span><span class="n">ENVELOPE</span><span class="p">,</span>  <span class="c1"># type: EndpointType</span>
+</span><span id="1-258">        <span class="n">envelope</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Envelope]</span>
+</span><span id="1-259">    <span class="p">):</span>
+</span><span id="1-260">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-261">
+</span><span id="1-262">        <span class="k">def</span> <span class="nf">record_loss</span><span class="p">(</span><span class="n">reason</span><span class="p">):</span>
+</span><span id="1-263">            <span class="c1"># type: (str) -&gt; None</span>
+</span><span id="1-264">            <span class="k">if</span> <span class="n">envelope</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-265">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="n">reason</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
+</span><span id="1-266">            <span class="k">else</span><span class="p">:</span>
+</span><span id="1-267">                <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+</span><span id="1-268">                    <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="n">reason</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span>
+</span><span id="1-269">
+</span><span id="1-270">        <span class="n">headers</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+</span><span id="1-271">            <span class="p">{</span>
+</span><span id="1-272">                <span class="s2">&quot;User-Agent&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">client</span><span class="p">),</span>
+</span><span id="1-273">                <span class="s2">&quot;X-Sentry-Auth&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">to_header</span><span class="p">()),</span>
+</span><span id="1-274">            <span class="p">}</span>
+</span><span id="1-275">        <span class="p">)</span>
+</span><span id="1-276">        <span class="k">try</span><span class="p">:</span>
+</span><span id="1-277">            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pool</span><span class="o">.</span><span class="n">request</span><span class="p">(</span>
+</span><span id="1-278">                <span class="s2">&quot;POST&quot;</span><span class="p">,</span>
+</span><span id="1-279">                <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_auth</span><span class="o">.</span><span class="n">get_api_url</span><span class="p">(</span><span class="n">endpoint_type</span><span class="p">)),</span>
+</span><span id="1-280">                <span class="n">body</span><span class="o">=</span><span class="n">body</span><span class="p">,</span>
+</span><span id="1-281">                <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span>
+</span><span id="1-282">            <span class="p">)</span>
+</span><span id="1-283">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+</span><span id="1-284">            <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;network&quot;</span><span class="p">)</span>
+</span><span id="1-285">            <span class="n">record_loss</span><span class="p">(</span><span class="s2">&quot;network_error&quot;</span><span class="p">)</span>
+</span><span id="1-286">            <span class="k">raise</span>
+</span><span id="1-287">
+</span><span id="1-288">        <span class="k">try</span><span class="p">:</span>
+</span><span id="1-289">            <span class="bp">self</span><span class="o">.</span><span class="n">_update_rate_limits</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+</span><span id="1-290">
+</span><span id="1-291">            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">429</span><span class="p">:</span>
+</span><span id="1-292">                <span class="c1"># if we hit a 429.  Something was rate limited but we already</span>
+</span><span id="1-293">                <span class="c1"># acted on this in `self._update_rate_limits`.  Note that we</span>
+</span><span id="1-294">                <span class="c1"># do not want to record event loss here as we will have recorded</span>
+</span><span id="1-295">                <span class="c1"># an outcome in relay already.</span>
+</span><span id="1-296">                <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;status_429&quot;</span><span class="p">)</span>
+</span><span id="1-297">                <span class="k">pass</span>
+</span><span id="1-298">
+</span><span id="1-299">            <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&gt;=</span> <span class="mi">300</span> <span class="ow">or</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span> <span class="o">&lt;</span> <span class="mi">200</span><span class="p">:</span>
+</span><span id="1-300">                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+</span><span id="1-301">                    <span class="s2">&quot;Unexpected status code: </span><span class="si">%s</span><span class="s2"> (body: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+</span><span id="1-302">                    <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
+</span><span id="1-303">                    <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+</span><span id="1-304">                <span class="p">)</span>
+</span><span id="1-305">                <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;status_</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">))</span>
+</span><span id="1-306">                <span class="n">record_loss</span><span class="p">(</span><span class="s2">&quot;network_error&quot;</span><span class="p">)</span>
+</span><span id="1-307">        <span class="k">finally</span><span class="p">:</span>
+</span><span id="1-308">            <span class="n">response</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
 </span><span id="1-309">
-</span><span id="1-310">        <span class="k">if</span> <span class="ow">not</span> <span class="n">discarded_events</span><span class="p">:</span>
-</span><span id="1-311">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-312">
-</span><span id="1-313">        <span class="k">return</span> <span class="n">Item</span><span class="p">(</span>
-</span><span id="1-314">            <span class="n">PayloadRef</span><span class="p">(</span>
-</span><span id="1-315">                <span class="n">json</span><span class="o">=</span><span class="p">{</span>
-</span><span id="1-316">                    <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span>
-</span><span id="1-317">                    <span class="s2">&quot;discarded_events&quot;</span><span class="p">:</span> <span class="p">[</span>
-</span><span id="1-318">                        <span class="p">{</span><span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="n">reason</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">category</span><span class="p">,</span> <span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">quantity</span><span class="p">}</span>
-</span><span id="1-319">                        <span class="k">for</span> <span class="p">(</span>
-</span><span id="1-320">                            <span class="p">(</span><span class="n">category</span><span class="p">,</span> <span class="n">reason</span><span class="p">),</span>
-</span><span id="1-321">                            <span class="n">quantity</span><span class="p">,</span>
-</span><span id="1-322">                        <span class="p">)</span> <span class="ow">in</span> <span class="n">discarded_events</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-</span><span id="1-323">                    <span class="p">],</span>
-</span><span id="1-324">                <span class="p">}</span>
-</span><span id="1-325">            <span class="p">),</span>
-</span><span id="1-326">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;client_report&quot;</span><span class="p">,</span>
-</span><span id="1-327">        <span class="p">)</span>
+</span><span id="1-310">    <span class="k">def</span> <span class="nf">on_dropped_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reason</span><span class="p">):</span>
+</span><span id="1-311">        <span class="c1"># type: (str) -&gt; None</span>
+</span><span id="1-312">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-313">
+</span><span id="1-314">    <span class="k">def</span> <span class="nf">_fetch_pending_client_report</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">):</span>
+</span><span id="1-315">        <span class="c1"># type: (bool, int) -&gt; Optional[Item]</span>
+</span><span id="1-316">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;send_client_reports&quot;</span><span class="p">]:</span>
+</span><span id="1-317">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-318">
+</span><span id="1-319">        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">force</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_client_report_sent</span> <span class="o">&lt;</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">interval</span><span class="p">):</span>
+</span><span id="1-320">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-321">
+</span><span id="1-322">        <span class="n">discarded_events</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span>
+</span><span id="1-323">        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_events</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+</span><span id="1-324">        <span class="bp">self</span><span class="o">.</span><span class="n">_last_client_report_sent</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+</span><span id="1-325">
+</span><span id="1-326">        <span class="k">if</span> <span class="ow">not</span> <span class="n">discarded_events</span><span class="p">:</span>
+</span><span id="1-327">            <span class="k">return</span> <span class="kc">None</span>
 </span><span id="1-328">
-</span><span id="1-329">    <span class="k">def</span> <span class="nf">_flush_client_reports</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-</span><span id="1-330">        <span class="c1"># type: (bool) -&gt; None</span>
-</span><span id="1-331">        <span class="n">client_report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_pending_client_report</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
-</span><span id="1-332">        <span class="k">if</span> <span class="n">client_report</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-333">            <span class="bp">self</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">Envelope</span><span class="p">(</span><span class="n">items</span><span class="o">=</span><span class="p">[</span><span class="n">client_report</span><span class="p">]))</span>
-</span><span id="1-334">
-</span><span id="1-335">    <span class="k">def</span> <span class="nf">_check_disabled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span><span class="p">):</span>
-</span><span id="1-336">        <span class="c1"># type: (str) -&gt; bool</span>
-</span><span id="1-337">        <span class="k">def</span> <span class="nf">_disabled</span><span class="p">(</span><span class="n">bucket</span><span class="p">):</span>
-</span><span id="1-338">            <span class="c1"># type: (Any) -&gt; bool</span>
-</span><span id="1-339">            <span class="n">ts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">bucket</span><span class="p">)</span>
-</span><span id="1-340">            <span class="k">return</span> <span class="n">ts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">datetime_utcnow</span><span class="p">()</span>
-</span><span id="1-341">
-</span><span id="1-342">        <span class="k">return</span> <span class="n">_disabled</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="ow">or</span> <span class="n">_disabled</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
-</span><span id="1-343">
-</span><span id="1-344">    <span class="k">def</span> <span class="nf">_is_rate_limited</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-345">        <span class="c1"># type: () -&gt; bool</span>
-</span><span id="1-346">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">ts</span> <span class="o">&gt;</span> <span class="n">datetime_utcnow</span><span class="p">()</span> <span class="k">for</span> <span class="n">ts</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-</span><span id="1-347">
-</span><span id="1-348">    <span class="k">def</span> <span class="nf">_is_worker_full</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-349">        <span class="c1"># type: () -&gt; bool</span>
-</span><span id="1-350">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">full</span><span class="p">()</span>
-</span><span id="1-351">
-</span><span id="1-352">    <span class="k">def</span> <span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-353">        <span class="c1"># type: () -&gt; bool</span>
-</span><span id="1-354">        <span class="k">return</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_is_worker_full</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_rate_limited</span><span class="p">())</span>
-</span><span id="1-355">
-</span><span id="1-356">    <span class="k">def</span> <span class="nf">_send_event</span><span class="p">(</span>
-</span><span id="1-357">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
-</span><span id="1-358">    <span class="p">):</span>
-</span><span id="1-359">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-360">
-</span><span id="1-361">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">):</span>
-</span><span id="1-362">            <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;self_rate_limits&quot;</span><span class="p">)</span>
-</span><span id="1-363">            <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;ratelimit_backoff&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span>
-</span><span id="1-364">            <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-329">        <span class="k">return</span> <span class="n">Item</span><span class="p">(</span>
+</span><span id="1-330">            <span class="n">PayloadRef</span><span class="p">(</span>
+</span><span id="1-331">                <span class="n">json</span><span class="o">=</span><span class="p">{</span>
+</span><span id="1-332">                    <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">(),</span>
+</span><span id="1-333">                    <span class="s2">&quot;discarded_events&quot;</span><span class="p">:</span> <span class="p">[</span>
+</span><span id="1-334">                        <span class="p">{</span><span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="n">reason</span><span class="p">,</span> <span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">category</span><span class="p">,</span> <span class="s2">&quot;quantity&quot;</span><span class="p">:</span> <span class="n">quantity</span><span class="p">}</span>
+</span><span id="1-335">                        <span class="k">for</span> <span class="p">(</span>
+</span><span id="1-336">                            <span class="p">(</span><span class="n">category</span><span class="p">,</span> <span class="n">reason</span><span class="p">),</span>
+</span><span id="1-337">                            <span class="n">quantity</span><span class="p">,</span>
+</span><span id="1-338">                        <span class="p">)</span> <span class="ow">in</span> <span class="n">discarded_events</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+</span><span id="1-339">                    <span class="p">],</span>
+</span><span id="1-340">                <span class="p">}</span>
+</span><span id="1-341">            <span class="p">),</span>
+</span><span id="1-342">            <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;client_report&quot;</span><span class="p">,</span>
+</span><span id="1-343">        <span class="p">)</span>
+</span><span id="1-344">
+</span><span id="1-345">    <span class="k">def</span> <span class="nf">_flush_client_reports</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span id="1-346">        <span class="c1"># type: (bool) -&gt; None</span>
+</span><span id="1-347">        <span class="n">client_report</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_pending_client_report</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
+</span><span id="1-348">        <span class="k">if</span> <span class="n">client_report</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-349">            <span class="bp">self</span><span class="o">.</span><span class="n">capture_envelope</span><span class="p">(</span><span class="n">Envelope</span><span class="p">(</span><span class="n">items</span><span class="o">=</span><span class="p">[</span><span class="n">client_report</span><span class="p">]))</span>
+</span><span id="1-350">
+</span><span id="1-351">    <span class="k">def</span> <span class="nf">_check_disabled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">category</span><span class="p">):</span>
+</span><span id="1-352">        <span class="c1"># type: (str) -&gt; bool</span>
+</span><span id="1-353">        <span class="k">def</span> <span class="nf">_disabled</span><span class="p">(</span><span class="n">bucket</span><span class="p">):</span>
+</span><span id="1-354">            <span class="c1"># type: (Any) -&gt; bool</span>
+</span><span id="1-355">            <span class="n">ts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">bucket</span><span class="p">)</span>
+</span><span id="1-356">            <span class="k">return</span> <span class="n">ts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+</span><span id="1-357">
+</span><span id="1-358">        <span class="k">return</span> <span class="n">_disabled</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="ow">or</span> <span class="n">_disabled</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="1-359">
+</span><span id="1-360">    <span class="k">def</span> <span class="nf">_is_rate_limited</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-361">        <span class="c1"># type: () -&gt; bool</span>
+</span><span id="1-362">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span>
+</span><span id="1-363">            <span class="n">ts</span> <span class="o">&gt;</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span> <span class="k">for</span> <span class="n">ts</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disabled_until</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+</span><span id="1-364">        <span class="p">)</span>
 </span><span id="1-365">
-</span><span id="1-366">        <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
-</span><span id="1-367">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="1-368">            <span class="n">body</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">event</span><span class="p">))</span>
-</span><span id="1-369">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-370">            <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span>
-</span><span id="1-371">                <span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">compresslevel</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span>
-</span><span id="1-372">            <span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-</span><span id="1-373">                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json_dumps</span><span class="p">(</span><span class="n">event</span><span class="p">))</span>
-</span><span id="1-374">
-</span><span id="1-375">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="1-376">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="1-377">            <span class="s2">&quot;Sending event, type:</span><span class="si">%s</span><span class="s2"> level:</span><span class="si">%s</span><span class="s2"> event_id:</span><span class="si">%s</span><span class="s2"> project:</span><span class="si">%s</span><span class="s2"> host:</span><span class="si">%s</span><span class="s2">&quot;</span>
-</span><span id="1-378">            <span class="o">%</span> <span class="p">(</span>
-</span><span id="1-379">                <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;null&quot;</span><span class="p">,</span>
-</span><span id="1-380">                <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;level&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;null&quot;</span><span class="p">,</span>
-</span><span id="1-381">                <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;event_id&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;null&quot;</span><span class="p">,</span>
-</span><span id="1-382">                <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">project_id</span><span class="p">,</span>
-</span><span id="1-383">                <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
-</span><span id="1-384">            <span class="p">)</span>
-</span><span id="1-385">        <span class="p">)</span>
-</span><span id="1-386">
-</span><span id="1-387">        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-388">            <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span>
-</span><span id="1-389">        <span class="p">}</span>
-</span><span id="1-390">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="1-391">            <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Content-Encoding&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span>
+</span><span id="1-366">    <span class="k">def</span> <span class="nf">_is_worker_full</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-367">        <span class="c1"># type: () -&gt; bool</span>
+</span><span id="1-368">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">full</span><span class="p">()</span>
+</span><span id="1-369">
+</span><span id="1-370">    <span class="k">def</span> <span class="nf">is_healthy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-371">        <span class="c1"># type: () -&gt; bool</span>
+</span><span id="1-372">        <span class="k">return</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_is_worker_full</span><span class="p">()</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_rate_limited</span><span class="p">())</span>
+</span><span id="1-373">
+</span><span id="1-374">    <span class="k">def</span> <span class="nf">_send_envelope</span><span class="p">(</span>
+</span><span id="1-375">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
+</span><span id="1-376">    <span class="p">):</span>
+</span><span id="1-377">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-378">
+</span><span id="1-379">        <span class="c1"># remove all items from the envelope which are over quota</span>
+</span><span id="1-380">        <span class="n">new_items</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="1-381">        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+</span><span id="1-382">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">data_category</span><span class="p">):</span>
+</span><span id="1-383">                <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">data_category</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;transaction&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">):</span>
+</span><span id="1-384">                    <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;self_rate_limits&quot;</span><span class="p">)</span>
+</span><span id="1-385">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;ratelimit_backoff&quot;</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span>
+</span><span id="1-386">            <span class="k">else</span><span class="p">:</span>
+</span><span id="1-387">                <span class="n">new_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+</span><span id="1-388">
+</span><span id="1-389">        <span class="c1"># Since we&#39;re modifying the envelope here make a copy so that others</span>
+</span><span id="1-390">        <span class="c1"># that hold references do not see their envelope modified.</span>
+</span><span id="1-391">        <span class="n">envelope</span> <span class="o">=</span> <span class="n">Envelope</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">envelope</span><span class="o">.</span><span class="n">headers</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="n">new_items</span><span class="p">)</span>
 </span><span id="1-392">
-</span><span id="1-393">        <span class="bp">self</span><span class="o">.</span><span class="n">_send_request</span><span class="p">(</span><span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">)</span>
-</span><span id="1-394">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-393">        <span class="k">if</span> <span class="ow">not</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+</span><span id="1-394">            <span class="k">return</span> <span class="kc">None</span>
 </span><span id="1-395">
-</span><span id="1-396">    <span class="k">def</span> <span class="nf">_send_envelope</span><span class="p">(</span>
-</span><span id="1-397">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
-</span><span id="1-398">    <span class="p">):</span>
-</span><span id="1-399">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-400">
-</span><span id="1-401">        <span class="c1"># remove all items from the envelope which are over quota</span>
-</span><span id="1-402">        <span class="n">new_items</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="1-403">        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span id="1-404">            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_disabled</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">data_category</span><span class="p">):</span>
-</span><span id="1-405">                <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">data_category</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;transaction&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">):</span>
-</span><span id="1-406">                    <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;self_rate_limits&quot;</span><span class="p">)</span>
-</span><span id="1-407">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;ratelimit_backoff&quot;</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span>
-</span><span id="1-408">            <span class="k">else</span><span class="p">:</span>
-</span><span id="1-409">                <span class="n">new_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-</span><span id="1-410">
-</span><span id="1-411">        <span class="c1"># Since we&#39;re modifying the envelope here make a copy so that others</span>
-</span><span id="1-412">        <span class="c1"># that hold references do not see their envelope modified.</span>
-</span><span id="1-413">        <span class="n">envelope</span> <span class="o">=</span> <span class="n">Envelope</span><span class="p">(</span><span class="n">headers</span><span class="o">=</span><span class="n">envelope</span><span class="o">.</span><span class="n">headers</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="n">new_items</span><span class="p">)</span>
-</span><span id="1-414">
-</span><span id="1-415">        <span class="k">if</span> <span class="ow">not</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span id="1-416">            <span class="k">return</span> <span class="kc">None</span>
-</span><span id="1-417">
-</span><span id="1-418">        <span class="c1"># since we&#39;re already in the business of sending out an envelope here</span>
-</span><span id="1-419">        <span class="c1"># check if we have one pending for the stats session envelopes so we</span>
-</span><span id="1-420">        <span class="c1"># can attach it to this enveloped scheduled for sending.  This will</span>
-</span><span id="1-421">        <span class="c1"># currently typically attach the client report to the most recent</span>
-</span><span id="1-422">        <span class="c1"># session update.</span>
-</span><span id="1-423">        <span class="n">client_report_item</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_pending_client_report</span><span class="p">(</span><span class="n">interval</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
-</span><span id="1-424">        <span class="k">if</span> <span class="n">client_report_item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-425">            <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">client_report_item</span><span class="p">)</span>
-</span><span id="1-426">
-</span><span id="1-427">        <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
-</span><span id="1-428">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="1-429">            <span class="n">envelope</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
-</span><span id="1-430">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-431">            <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span>
-</span><span id="1-432">                <span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">compresslevel</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span>
-</span><span id="1-433">            <span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-</span><span id="1-434">                <span class="n">envelope</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</span><span id="1-396">        <span class="c1"># since we&#39;re already in the business of sending out an envelope here</span>
+</span><span id="1-397">        <span class="c1"># check if we have one pending for the stats session envelopes so we</span>
+</span><span id="1-398">        <span class="c1"># can attach it to this enveloped scheduled for sending.  This will</span>
+</span><span id="1-399">        <span class="c1"># currently typically attach the client report to the most recent</span>
+</span><span id="1-400">        <span class="c1"># session update.</span>
+</span><span id="1-401">        <span class="n">client_report_item</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_pending_client_report</span><span class="p">(</span><span class="n">interval</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="1-402">        <span class="k">if</span> <span class="n">client_report_item</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-403">            <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">client_report_item</span><span class="p">)</span>
+</span><span id="1-404">
+</span><span id="1-405">        <span class="n">body</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+</span><span id="1-406">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="1-407">            <span class="n">envelope</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+</span><span id="1-408">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-409">            <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">GzipFile</span><span class="p">(</span>
+</span><span id="1-410">                <span class="n">fileobj</span><span class="o">=</span><span class="n">body</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">compresslevel</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span>
+</span><span id="1-411">            <span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+</span><span id="1-412">                <span class="n">envelope</span><span class="o">.</span><span class="n">serialize_into</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+</span><span id="1-413">
+</span><span id="1-414">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="1-415">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+</span><span id="1-416">            <span class="s2">&quot;Sending envelope [</span><span class="si">%s</span><span class="s2">] project:</span><span class="si">%s</span><span class="s2"> host:</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+</span><span id="1-417">            <span class="n">envelope</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+</span><span id="1-418">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">project_id</span><span class="p">,</span>
+</span><span id="1-419">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+</span><span id="1-420">        <span class="p">)</span>
+</span><span id="1-421">
+</span><span id="1-422">        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-423">            <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/x-sentry-envelope&quot;</span><span class="p">,</span>
+</span><span id="1-424">        <span class="p">}</span>
+</span><span id="1-425">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="1-426">            <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Content-Encoding&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span>
+</span><span id="1-427">
+</span><span id="1-428">        <span class="bp">self</span><span class="o">.</span><span class="n">_send_request</span><span class="p">(</span>
+</span><span id="1-429">            <span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
+</span><span id="1-430">            <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span>
+</span><span id="1-431">            <span class="n">endpoint_type</span><span class="o">=</span><span class="n">EndpointType</span><span class="o">.</span><span class="n">ENVELOPE</span><span class="p">,</span>
+</span><span id="1-432">            <span class="n">envelope</span><span class="o">=</span><span class="n">envelope</span><span class="p">,</span>
+</span><span id="1-433">        <span class="p">)</span>
+</span><span id="1-434">        <span class="k">return</span> <span class="kc">None</span>
 </span><span id="1-435">
-</span><span id="1-436">        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="1-437">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-</span><span id="1-438">            <span class="s2">&quot;Sending envelope [</span><span class="si">%s</span><span class="s2">] project:</span><span class="si">%s</span><span class="s2"> host:</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-</span><span id="1-439">            <span class="n">envelope</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
-</span><span id="1-440">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">project_id</span><span class="p">,</span>
-</span><span id="1-441">            <span class="bp">self</span><span class="o">.</span><span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
-</span><span id="1-442">        <span class="p">)</span>
+</span><span id="1-436">    <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
+</span><span id="1-437">        <span class="c1"># type: (Optional[Any]) -&gt; Dict[str, Any]</span>
+</span><span id="1-438">        <span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="1-439">            <span class="s2">&quot;num_pools&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_pools</span><span class="p">,</span>
+</span><span id="1-440">            <span class="s2">&quot;cert_reqs&quot;</span><span class="p">:</span> <span class="s2">&quot;CERT_REQUIRED&quot;</span><span class="p">,</span>
+</span><span id="1-441">            <span class="s2">&quot;ca_certs&quot;</span><span class="p">:</span> <span class="n">ca_certs</span> <span class="ow">or</span> <span class="n">certifi</span><span class="o">.</span><span class="n">where</span><span class="p">(),</span>
+</span><span id="1-442">        <span class="p">}</span>
 </span><span id="1-443">
-</span><span id="1-444">        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-445">            <span class="s2">&quot;Content-Type&quot;</span><span class="p">:</span> <span class="s2">&quot;application/x-sentry-envelope&quot;</span><span class="p">,</span>
-</span><span id="1-446">        <span class="p">}</span>
-</span><span id="1-447">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compresslevel</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="1-448">            <span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Content-Encoding&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;gzip&quot;</span>
-</span><span id="1-449">
-</span><span id="1-450">        <span class="bp">self</span><span class="o">.</span><span class="n">_send_request</span><span class="p">(</span>
-</span><span id="1-451">            <span class="n">body</span><span class="o">.</span><span class="n">getvalue</span><span class="p">(),</span>
-</span><span id="1-452">            <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span>
-</span><span id="1-453">            <span class="n">endpoint_type</span><span class="o">=</span><span class="s2">&quot;envelope&quot;</span><span class="p">,</span>
-</span><span id="1-454">            <span class="n">envelope</span><span class="o">=</span><span class="n">envelope</span><span class="p">,</span>
-</span><span id="1-455">        <span class="p">)</span>
-</span><span id="1-456">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-444">        <span class="n">socket_options</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[List[Tuple[int, int, int | bytes]]]</span>
+</span><span id="1-445">
+</span><span id="1-446">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;socket_options&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-447">            <span class="n">socket_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;socket_options&quot;</span><span class="p">]</span>
+</span><span id="1-448">
+</span><span id="1-449">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;keep_alive&quot;</span><span class="p">]:</span>
+</span><span id="1-450">            <span class="k">if</span> <span class="n">socket_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-451">                <span class="n">socket_options</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="1-452">
+</span><span id="1-453">            <span class="n">used_options</span> <span class="o">=</span> <span class="p">{(</span><span class="n">o</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">o</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">socket_options</span><span class="p">}</span>
+</span><span id="1-454">            <span class="k">for</span> <span class="n">default_option</span> <span class="ow">in</span> <span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span><span class="p">:</span>
+</span><span id="1-455">                <span class="k">if</span> <span class="p">(</span><span class="n">default_option</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">default_option</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">used_options</span><span class="p">:</span>
+</span><span id="1-456">                    <span class="n">socket_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">default_option</span><span class="p">)</span>
 </span><span id="1-457">
-</span><span id="1-458">    <span class="k">def</span> <span class="nf">_get_pool_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ca_certs</span><span class="p">):</span>
-</span><span id="1-459">        <span class="c1"># type: (Optional[Any]) -&gt; Dict[str, Any]</span>
-</span><span id="1-460">        <span class="n">options</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="1-461">            <span class="s2">&quot;num_pools&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_num_pools</span><span class="p">,</span>
-</span><span id="1-462">            <span class="s2">&quot;cert_reqs&quot;</span><span class="p">:</span> <span class="s2">&quot;CERT_REQUIRED&quot;</span><span class="p">,</span>
-</span><span id="1-463">            <span class="s2">&quot;ca_certs&quot;</span><span class="p">:</span> <span class="n">ca_certs</span> <span class="ow">or</span> <span class="n">certifi</span><span class="o">.</span><span class="n">where</span><span class="p">(),</span>
-</span><span id="1-464">        <span class="p">}</span>
-</span><span id="1-465">
-</span><span id="1-466">        <span class="n">socket_options</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># type: Optional[List[Tuple[int, int, int | bytes]]]</span>
-</span><span id="1-467">
-</span><span id="1-468">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;socket_options&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-469">            <span class="n">socket_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;socket_options&quot;</span><span class="p">]</span>
-</span><span id="1-470">
-</span><span id="1-471">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;keep_alive&quot;</span><span class="p">]:</span>
-</span><span id="1-472">            <span class="k">if</span> <span class="n">socket_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-473">                <span class="n">socket_options</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="1-474">
-</span><span id="1-475">            <span class="n">used_options</span> <span class="o">=</span> <span class="p">{(</span><span class="n">o</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">o</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">socket_options</span><span class="p">}</span>
-</span><span id="1-476">            <span class="k">for</span> <span class="n">default_option</span> <span class="ow">in</span> <span class="n">KEEP_ALIVE_SOCKET_OPTIONS</span><span class="p">:</span>
-</span><span id="1-477">                <span class="k">if</span> <span class="p">(</span><span class="n">default_option</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">default_option</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">used_options</span><span class="p">:</span>
-</span><span id="1-478">                    <span class="n">socket_options</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">default_option</span><span class="p">)</span>
-</span><span id="1-479">
-</span><span id="1-480">        <span class="k">if</span> <span class="n">socket_options</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-481">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;socket_options&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">socket_options</span>
-</span><span id="1-482">
-</span><span id="1-483">        <span class="k">return</span> <span class="n">options</span>
-</span><span id="1-484">
-</span><span id="1-485">    <span class="k">def</span> <span class="nf">_in_no_proxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">):</span>
-</span><span id="1-486">        <span class="c1"># type: (Dsn) -&gt; bool</span>
-</span><span id="1-487">        <span class="n">no_proxy</span> <span class="o">=</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;no&quot;</span><span class="p">)</span>
-</span><span id="1-488">        <span class="k">if</span> <span class="ow">not</span> <span class="n">no_proxy</span><span class="p">:</span>
-</span><span id="1-489">            <span class="k">return</span> <span class="kc">False</span>
-</span><span id="1-490">        <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">no_proxy</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
-</span><span id="1-491">            <span class="n">host</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
-</span><span id="1-492">            <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">host</span><span class="p">)</span> <span class="ow">or</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">host</span><span class="p">):</span>
-</span><span id="1-493">                <span class="k">return</span> <span class="kc">True</span>
-</span><span id="1-494">        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="1-458">        <span class="k">if</span> <span class="n">socket_options</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-459">            <span class="n">options</span><span class="p">[</span><span class="s2">&quot;socket_options&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">socket_options</span>
+</span><span id="1-460">
+</span><span id="1-461">        <span class="k">return</span> <span class="n">options</span>
+</span><span id="1-462">
+</span><span id="1-463">    <span class="k">def</span> <span class="nf">_in_no_proxy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parsed_dsn</span><span class="p">):</span>
+</span><span id="1-464">        <span class="c1"># type: (Dsn) -&gt; bool</span>
+</span><span id="1-465">        <span class="n">no_proxy</span> <span class="o">=</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;no&quot;</span><span class="p">)</span>
+</span><span id="1-466">        <span class="k">if</span> <span class="ow">not</span> <span class="n">no_proxy</span><span class="p">:</span>
+</span><span id="1-467">            <span class="k">return</span> <span class="kc">False</span>
+</span><span id="1-468">        <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">no_proxy</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+</span><span id="1-469">            <span class="n">host</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</span><span id="1-470">            <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">host</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">host</span><span class="p">)</span> <span class="ow">or</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">netloc</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">host</span><span class="p">):</span>
+</span><span id="1-471">                <span class="k">return</span> <span class="kc">True</span>
+</span><span id="1-472">        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="1-473">
+</span><span id="1-474">    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span>
+</span><span id="1-475">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-476">        <span class="n">parsed_dsn</span><span class="p">,</span>  <span class="c1"># type: Dsn</span>
+</span><span id="1-477">        <span class="n">http_proxy</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span id="1-478">        <span class="n">https_proxy</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
+</span><span id="1-479">        <span class="n">ca_certs</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+</span><span id="1-480">        <span class="n">proxy_headers</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
+</span><span id="1-481">    <span class="p">):</span>
+</span><span id="1-482">        <span class="c1"># type: (...) -&gt; Union[PoolManager, ProxyManager]</span>
+</span><span id="1-483">        <span class="n">proxy</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="1-484">        <span class="n">no_proxy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_no_proxy</span><span class="p">(</span><span class="n">parsed_dsn</span><span class="p">)</span>
+</span><span id="1-485">
+</span><span id="1-486">        <span class="c1"># try HTTPS first</span>
+</span><span id="1-487">        <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="p">(</span><span class="n">https_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span id="1-488">            <span class="n">proxy</span> <span class="o">=</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">no_proxy</span> <span class="ow">and</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">))</span>
+</span><span id="1-489">
+</span><span id="1-490">        <span class="c1"># maybe fallback to HTTP proxy</span>
+</span><span id="1-491">        <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span> <span class="ow">and</span> <span class="p">(</span><span class="n">http_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span id="1-492">            <span class="n">proxy</span> <span class="o">=</span> <span class="n">http_proxy</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">no_proxy</span> <span class="ow">and</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">))</span>
+</span><span id="1-493">
+</span><span id="1-494">        <span class="n">opts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pool_options</span><span class="p">(</span><span class="n">ca_certs</span><span class="p">)</span>
 </span><span id="1-495">
-</span><span id="1-496">    <span class="k">def</span> <span class="nf">_make_pool</span><span class="p">(</span>
-</span><span id="1-497">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-498">        <span class="n">parsed_dsn</span><span class="p">,</span>  <span class="c1"># type: Dsn</span>
-</span><span id="1-499">        <span class="n">http_proxy</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span id="1-500">        <span class="n">https_proxy</span><span class="p">,</span>  <span class="c1"># type: Optional[str]</span>
-</span><span id="1-501">        <span class="n">ca_certs</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-502">        <span class="n">proxy_headers</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
-</span><span id="1-503">    <span class="p">):</span>
-</span><span id="1-504">        <span class="c1"># type: (...) -&gt; Union[PoolManager, ProxyManager]</span>
-</span><span id="1-505">        <span class="n">proxy</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="1-506">        <span class="n">no_proxy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_no_proxy</span><span class="p">(</span><span class="n">parsed_dsn</span><span class="p">)</span>
-</span><span id="1-507">
-</span><span id="1-508">        <span class="c1"># try HTTPS first</span>
-</span><span id="1-509">        <span class="k">if</span> <span class="n">parsed_dsn</span><span class="o">.</span><span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;https&quot;</span> <span class="ow">and</span> <span class="p">(</span><span class="n">https_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
-</span><span id="1-510">            <span class="n">proxy</span> <span class="o">=</span> <span class="n">https_proxy</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">no_proxy</span> <span class="ow">and</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;https&quot;</span><span class="p">))</span>
+</span><span id="1-496">        <span class="k">if</span> <span class="n">proxy</span><span class="p">:</span>
+</span><span id="1-497">            <span class="k">if</span> <span class="n">proxy_headers</span><span class="p">:</span>
+</span><span id="1-498">                <span class="n">opts</span><span class="p">[</span><span class="s2">&quot;proxy_headers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">proxy_headers</span>
+</span><span id="1-499">
+</span><span id="1-500">            <span class="k">if</span> <span class="n">proxy</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;socks&quot;</span><span class="p">):</span>
+</span><span id="1-501">                <span class="n">use_socks_proxy</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="1-502">                <span class="k">try</span><span class="p">:</span>
+</span><span id="1-503">                    <span class="c1"># Check if PySocks depencency is available</span>
+</span><span id="1-504">                    <span class="kn">from</span> <span class="nn">urllib3.contrib.socks</span> <span class="kn">import</span> <span class="n">SOCKSProxyManager</span>
+</span><span id="1-505">                <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+</span><span id="1-506">                    <span class="n">use_socks_proxy</span> <span class="o">=</span> <span class="kc">False</span>
+</span><span id="1-507">                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+</span><span id="1-508">                        <span class="s2">&quot;You have configured a SOCKS proxy (</span><span class="si">%s</span><span class="s2">) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.&quot;</span><span class="p">,</span>
+</span><span id="1-509">                        <span class="n">proxy</span><span class="p">,</span>
+</span><span id="1-510">                    <span class="p">)</span>
 </span><span id="1-511">
-</span><span id="1-512">        <span class="c1"># maybe fallback to HTTP proxy</span>
-</span><span id="1-513">        <span class="k">if</span> <span class="ow">not</span> <span class="n">proxy</span> <span class="ow">and</span> <span class="p">(</span><span class="n">http_proxy</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">):</span>
-</span><span id="1-514">            <span class="n">proxy</span> <span class="o">=</span> <span class="n">http_proxy</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">no_proxy</span> <span class="ow">and</span> <span class="n">getproxies</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;http&quot;</span><span class="p">))</span>
-</span><span id="1-515">
-</span><span id="1-516">        <span class="n">opts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pool_options</span><span class="p">(</span><span class="n">ca_certs</span><span class="p">)</span>
-</span><span id="1-517">
-</span><span id="1-518">        <span class="k">if</span> <span class="n">proxy</span><span class="p">:</span>
-</span><span id="1-519">            <span class="k">if</span> <span class="n">proxy_headers</span><span class="p">:</span>
-</span><span id="1-520">                <span class="n">opts</span><span class="p">[</span><span class="s2">&quot;proxy_headers&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">proxy_headers</span>
-</span><span id="1-521">
-</span><span id="1-522">            <span class="k">if</span> <span class="n">proxy</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;socks&quot;</span><span class="p">):</span>
-</span><span id="1-523">                <span class="n">use_socks_proxy</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="1-524">                <span class="k">try</span><span class="p">:</span>
-</span><span id="1-525">                    <span class="c1"># Check if PySocks depencency is available</span>
-</span><span id="1-526">                    <span class="kn">from</span> <span class="nn">urllib3.contrib.socks</span> <span class="kn">import</span> <span class="n">SOCKSProxyManager</span>
-</span><span id="1-527">                <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-</span><span id="1-528">                    <span class="n">use_socks_proxy</span> <span class="o">=</span> <span class="kc">False</span>
-</span><span id="1-529">                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-</span><span id="1-530">                        <span class="s2">&quot;You have configured a SOCKS proxy (</span><span class="si">%s</span><span class="s2">) but support for SOCKS proxies is not installed. Disabling proxy support. Please add `PySocks` (or `urllib3` with the `[socks]` extra) to your dependencies.&quot;</span><span class="p">,</span>
-</span><span id="1-531">                        <span class="n">proxy</span><span class="p">,</span>
-</span><span id="1-532">                    <span class="p">)</span>
-</span><span id="1-533">
-</span><span id="1-534">                <span class="k">if</span> <span class="n">use_socks_proxy</span><span class="p">:</span>
-</span><span id="1-535">                    <span class="k">return</span> <span class="n">SOCKSProxyManager</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="o">**</span><span class="n">opts</span><span class="p">)</span>
-</span><span id="1-536">                <span class="k">else</span><span class="p">:</span>
-</span><span id="1-537">                    <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
-</span><span id="1-538">            <span class="k">else</span><span class="p">:</span>
-</span><span id="1-539">                <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">ProxyManager</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="o">**</span><span class="n">opts</span><span class="p">)</span>
-</span><span id="1-540">        <span class="k">else</span><span class="p">:</span>
-</span><span id="1-541">            <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
-</span><span id="1-542">
-<div class="viewcode-block" id="HttpTransport.capture_event">
-<a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport.capture_event">[docs]</a>
-</span><span id="1-543">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
-</span><span id="1-544">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
-</span><span id="1-545">    <span class="p">):</span>
-</span><span id="1-546">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-547">        <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
-</span><span id="1-548">
-</span><span id="1-549">        <span class="k">def</span> <span class="nf">send_event_wrapper</span><span class="p">():</span>
-</span><span id="1-550">            <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-551">            <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
-</span><span id="1-552">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-553">                    <span class="bp">self</span><span class="o">.</span><span class="n">_send_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span id="1-554">                    <span class="bp">self</span><span class="o">.</span><span class="n">_flush_client_reports</span><span class="p">()</span>
-</span><span id="1-555">
-</span><span id="1-556">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_event_wrapper</span><span class="p">):</span>
-</span><span id="1-557">            <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;full_queue&quot;</span><span class="p">)</span>
-</span><span id="1-558">            <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;queue_overflow&quot;</span><span class="p">,</span> <span class="n">data_category</span><span class="o">=</span><span class="s2">&quot;error&quot;</span><span class="p">)</span></div>
-
-</span><span id="1-559">
+</span><span id="1-512">                <span class="k">if</span> <span class="n">use_socks_proxy</span><span class="p">:</span>
+</span><span id="1-513">                    <span class="k">return</span> <span class="n">SOCKSProxyManager</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="o">**</span><span class="n">opts</span><span class="p">)</span>
+</span><span id="1-514">                <span class="k">else</span><span class="p">:</span>
+</span><span id="1-515">                    <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
+</span><span id="1-516">            <span class="k">else</span><span class="p">:</span>
+</span><span id="1-517">                <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">ProxyManager</span><span class="p">(</span><span class="n">proxy</span><span class="p">,</span> <span class="o">**</span><span class="n">opts</span><span class="p">)</span>
+</span><span id="1-518">        <span class="k">else</span><span class="p">:</span>
+</span><span id="1-519">            <span class="k">return</span> <span class="n">urllib3</span><span class="o">.</span><span class="n">PoolManager</span><span class="p">(</span><span class="o">**</span><span class="n">opts</span><span class="p">)</span>
+</span><span id="1-520">
 <div class="viewcode-block" id="HttpTransport.capture_envelope">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport.capture_envelope">[docs]</a>
-</span><span id="1-560">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
-</span><span id="1-561">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
-</span><span id="1-562">    <span class="p">):</span>
-</span><span id="1-563">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-564">        <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
-</span><span id="1-565">
-</span><span id="1-566">        <span class="k">def</span> <span class="nf">send_envelope_wrapper</span><span class="p">():</span>
-</span><span id="1-567">            <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-568">            <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
-</span><span id="1-569">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span id="1-570">                    <span class="bp">self</span><span class="o">.</span><span class="n">_send_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
-</span><span id="1-571">                    <span class="bp">self</span><span class="o">.</span><span class="n">_flush_client_reports</span><span class="p">()</span>
-</span><span id="1-572">
-</span><span id="1-573">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_envelope_wrapper</span><span class="p">):</span>
-</span><span id="1-574">            <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;full_queue&quot;</span><span class="p">)</span>
-</span><span id="1-575">            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
-</span><span id="1-576">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;queue_overflow&quot;</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span></div>
+</span><span id="1-521">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span>
+</span><span id="1-522">        <span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span>  <span class="c1"># type: Envelope</span>
+</span><span id="1-523">    <span class="p">):</span>
+</span><span id="1-524">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-525">        <span class="n">hub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hub_cls</span><span class="o">.</span><span class="n">current</span>
+</span><span id="1-526">
+</span><span id="1-527">        <span class="k">def</span> <span class="nf">send_envelope_wrapper</span><span class="p">():</span>
+</span><span id="1-528">            <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-529">            <span class="k">with</span> <span class="n">hub</span><span class="p">:</span>
+</span><span id="1-530">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span id="1-531">                    <span class="bp">self</span><span class="o">.</span><span class="n">_send_envelope</span><span class="p">(</span><span class="n">envelope</span><span class="p">)</span>
+</span><span id="1-532">                    <span class="bp">self</span><span class="o">.</span><span class="n">_flush_client_reports</span><span class="p">()</span>
+</span><span id="1-533">
+</span><span id="1-534">        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">send_envelope_wrapper</span><span class="p">):</span>
+</span><span id="1-535">            <span class="bp">self</span><span class="o">.</span><span class="n">on_dropped_event</span><span class="p">(</span><span class="s2">&quot;full_queue&quot;</span><span class="p">)</span>
+</span><span id="1-536">            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">envelope</span><span class="o">.</span><span class="n">items</span><span class="p">:</span>
+</span><span id="1-537">                <span class="bp">self</span><span class="o">.</span><span class="n">record_lost_event</span><span class="p">(</span><span class="s2">&quot;queue_overflow&quot;</span><span class="p">,</span> <span class="n">item</span><span class="o">=</span><span class="n">item</span><span class="p">)</span></div>
 
-</span><span id="1-577">
+</span><span id="1-538">
 <div class="viewcode-block" id="HttpTransport.flush">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport.flush">[docs]</a>
-</span><span id="1-578">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
-</span><span id="1-579">        <span class="bp">self</span><span class="p">,</span>
-</span><span id="1-580">        <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
-</span><span id="1-581">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
-</span><span id="1-582">    <span class="p">):</span>
-</span><span id="1-583">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-584">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Flushing HTTP transport&quot;</span><span class="p">)</span>
-</span><span id="1-585">
-</span><span id="1-586">        <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="1-587">            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flush_client_reports</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-</span><span id="1-588">            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span></div>
+</span><span id="1-539">    <span class="k">def</span> <span class="nf">flush</span><span class="p">(</span>
+</span><span id="1-540">        <span class="bp">self</span><span class="p">,</span>
+</span><span id="1-541">        <span class="n">timeout</span><span class="p">,</span>  <span class="c1"># type: float</span>
+</span><span id="1-542">        <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Any]</span>
+</span><span id="1-543">    <span class="p">):</span>
+</span><span id="1-544">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-545">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Flushing HTTP transport&quot;</span><span class="p">)</span>
+</span><span id="1-546">
+</span><span id="1-547">        <span class="k">if</span> <span class="n">timeout</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="1-548">            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flush_client_reports</span><span class="p">(</span><span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</span><span id="1-549">            <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">flush</span><span class="p">(</span><span class="n">timeout</span><span class="p">,</span> <span class="n">callback</span><span class="p">)</span></div>
 
-</span><span id="1-589">
+</span><span id="1-550">
 <div class="viewcode-block" id="HttpTransport.kill">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.HttpTransport.kill">[docs]</a>
-</span><span id="1-590">    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-</span><span id="1-591">        <span class="c1"># type: () -&gt; None</span>
-</span><span id="1-592">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
-</span><span id="1-593">        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span></div>
+</span><span id="1-551">    <span class="k">def</span> <span class="nf">kill</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="1-552">        <span class="c1"># type: () -&gt; None</span>
+</span><span id="1-553">        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Killing HTTP transport&quot;</span><span class="p">)</span>
+</span><span id="1-554">        <span class="bp">self</span><span class="o">.</span><span class="n">_worker</span><span class="o">.</span><span class="n">kill</span><span class="p">()</span></div>
 </div>
 
-</span><span id="1-594">
-</span><span id="1-595">
-</span><span id="1-596"><span class="k">class</span> <span class="nc">_FunctionTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
-</span><span id="1-597">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
-</span><span id="1-598">        <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: Callable[[Event], None]</span>
-</span><span id="1-599">    <span class="p">):</span>
-</span><span id="1-600">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-601">        <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-</span><span id="1-602">        <span class="bp">self</span><span class="o">.</span><span class="n">_func</span> <span class="o">=</span> <span class="n">func</span>
-</span><span id="1-603">
-</span><span id="1-604">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
-</span><span id="1-605">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
-</span><span id="1-606">    <span class="p">):</span>
-</span><span id="1-607">        <span class="c1"># type: (...) -&gt; None</span>
-</span><span id="1-608">        <span class="bp">self</span><span class="o">.</span><span class="n">_func</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
-</span><span id="1-609">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-555">
+</span><span id="1-556">
+</span><span id="1-557"><span class="k">class</span> <span class="nc">_FunctionTransport</span><span class="p">(</span><span class="n">Transport</span><span class="p">):</span>
+</span><span id="1-558"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="1-559"><span class="sd">    DEPRECATED: Users wishing to provide a custom transport should subclass</span>
+</span><span id="1-560"><span class="sd">    the Transport class, rather than providing a function.</span>
+</span><span id="1-561"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="1-562">
+</span><span id="1-563">    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+</span><span id="1-564">        <span class="bp">self</span><span class="p">,</span> <span class="n">func</span>  <span class="c1"># type: Callable[[Event], None]</span>
+</span><span id="1-565">    <span class="p">):</span>
+</span><span id="1-566">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-567">        <span class="n">Transport</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+</span><span id="1-568">        <span class="bp">self</span><span class="o">.</span><span class="n">_func</span> <span class="o">=</span> <span class="n">func</span>
+</span><span id="1-569">
+</span><span id="1-570">    <span class="k">def</span> <span class="nf">capture_event</span><span class="p">(</span>
+</span><span id="1-571">        <span class="bp">self</span><span class="p">,</span> <span class="n">event</span>  <span class="c1"># type: Event</span>
+</span><span id="1-572">    <span class="p">):</span>
+</span><span id="1-573">        <span class="c1"># type: (...) -&gt; None</span>
+</span><span id="1-574">        <span class="bp">self</span><span class="o">.</span><span class="n">_func</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span id="1-575">        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-576">
+</span><span id="1-577">    <span class="k">def</span> <span class="nf">capture_envelope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">envelope</span><span class="p">:</span> <span class="n">Envelope</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-578">        <span class="c1"># Since function transports expect to be called with an event, we need</span>
+</span><span id="1-579">        <span class="c1"># to iterate over the envelope and call the function for each event, via</span>
+</span><span id="1-580">        <span class="c1"># the deprecated capture_event method.</span>
+</span><span id="1-581">        <span class="n">event</span> <span class="o">=</span> <span class="n">envelope</span><span class="o">.</span><span class="n">get_event</span><span class="p">()</span>
+</span><span id="1-582">        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="1-583">            <span class="bp">self</span><span class="o">.</span><span class="n">capture_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+</span><span id="1-584">
+</span><span id="1-585">
+</span><span id="1-586"><span class="k">def</span> <span class="nf">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
+</span><span id="1-587">    <span class="c1"># type: (Dict[str, Any]) -&gt; Optional[Transport]</span>
+</span><span id="1-588">    <span class="n">ref_transport</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;transport&quot;</span><span class="p">]</span>
+</span><span id="1-589">
+</span><span id="1-590">    <span class="c1"># By default, we use the http transport class</span>
+</span><span id="1-591">    <span class="n">transport_cls</span> <span class="o">=</span> <span class="n">HttpTransport</span>  <span class="c1"># type: Type[Transport]</span>
+</span><span id="1-592">
+</span><span id="1-593">    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="n">Transport</span><span class="p">):</span>
+</span><span id="1-594">        <span class="k">return</span> <span class="n">ref_transport</span>
+</span><span id="1-595">    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="n">Transport</span><span class="p">):</span>
+</span><span id="1-596">        <span class="n">transport_cls</span> <span class="o">=</span> <span class="n">ref_transport</span>
+</span><span id="1-597">    <span class="k">elif</span> <span class="nb">callable</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">):</span>
+</span><span id="1-598">        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+</span><span id="1-599">            <span class="s2">&quot;Function transports are deprecated and will be removed in a future release.&quot;</span>
+</span><span id="1-600">            <span class="s2">&quot;Please provide a Transport instance or subclass, instead.&quot;</span><span class="p">,</span>
+</span><span id="1-601">            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+</span><span id="1-602">            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span><span id="1-603">        <span class="p">)</span>
+</span><span id="1-604">        <span class="k">return</span> <span class="n">_FunctionTransport</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">)</span>
+</span><span id="1-605">
+</span><span id="1-606">    <span class="c1"># if a transport class is given only instantiate it if the dsn is not</span>
+</span><span id="1-607">    <span class="c1"># empty or None</span>
+</span><span id="1-608">    <span class="k">if</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
+</span><span id="1-609">        <span class="k">return</span> <span class="n">transport_cls</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
 </span><span id="1-610">
-</span><span id="1-611">
-</span><span id="1-612"><span class="k">def</span> <span class="nf">make_transport</span><span class="p">(</span><span class="n">options</span><span class="p">):</span>
-</span><span id="1-613">    <span class="c1"># type: (Dict[str, Any]) -&gt; Optional[Transport]</span>
-</span><span id="1-614">    <span class="n">ref_transport</span> <span class="o">=</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;transport&quot;</span><span class="p">]</span>
-</span><span id="1-615">
-</span><span id="1-616">    <span class="c1"># If no transport is given, we use the http transport class</span>
-</span><span id="1-617">    <span class="k">if</span> <span class="n">ref_transport</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="1-618">        <span class="n">transport_cls</span> <span class="o">=</span> <span class="n">HttpTransport</span>  <span class="c1"># type: Type[Transport]</span>
-</span><span id="1-619">    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="n">Transport</span><span class="p">):</span>
-</span><span id="1-620">        <span class="k">return</span> <span class="n">ref_transport</span>
-</span><span id="1-621">    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">,</span> <span class="n">Transport</span><span class="p">):</span>
-</span><span id="1-622">        <span class="n">transport_cls</span> <span class="o">=</span> <span class="n">ref_transport</span>
-</span><span id="1-623">    <span class="k">elif</span> <span class="nb">callable</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">):</span>
-</span><span id="1-624">        <span class="k">return</span> <span class="n">_FunctionTransport</span><span class="p">(</span><span class="n">ref_transport</span><span class="p">)</span>
-</span><span id="1-625">
-</span><span id="1-626">    <span class="c1"># if a transport class is given only instantiate it if the dsn is not</span>
-</span><span id="1-627">    <span class="c1"># empty or None</span>
-</span><span id="1-628">    <span class="k">if</span> <span class="n">options</span><span class="p">[</span><span class="s2">&quot;dsn&quot;</span><span class="p">]:</span>
-</span><span id="1-629">        <span class="k">return</span> <span class="n">transport_cls</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
-</span><span id="1-630">
-</span><span id="1-631">    <span class="k">return</span> <span class="kc">None</span>
+</span><span id="1-611">    <span class="k">return</span> <span class="kc">None</span>
 </span></pre></div>
         </article>
         
@@ -831,7 +808,7 @@
     </div>
   </div>
 </footer></div>
-      <script src="../../_static/documentation_options.js?v=d685a340"></script>
+      <script src="../../_static/documentation_options.js?v=6114348e"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=999236dc"></script>
