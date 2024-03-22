@@ -1,5 +1,5 @@
-import sys
 import warnings
+import sys
 
 # This is used in _capture_internal_warnings. We need to run this at import
 # time because that's where many deprecation warnings might get thrown.
