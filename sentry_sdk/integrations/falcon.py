@@ -1,7 +1,8 @@
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -100,14 +101,13 @@ class SentryFalconMiddleware:
 
     def process_request(self, req, resp, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> None
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return
 
-        with hub.configure_scope() as scope:
-            scope._name = "falcon"
-            scope.add_event_processor(_make_request_event_processor(req, integration))
+        scope = Scope.get_isolation_scope()
+        scope._name = "falcon"
+        scope.add_event_processor(_make_request_event_processor(req, integration))
 
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
@@ -150,8 +150,7 @@ def _patch_wsgi_app():
 
     def sentry_patched_wsgi_app(self, env, start_response):
         # type: (falcon.API, Any, Any) -> Any
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return original_wsgi_app(self, env, start_response)
 
@@ -188,19 +187,17 @@ def _patch_handle_exception():
             # capture_internal_exceptions block above.
             return was_handled
 
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(FalconIntegration)
 
         if integration is not None and _exception_leads_to_http_5xx(ex, response):
             # If an integration is there, a client has to be there.
-            client = hub.client  # type: Any
-
             event, hint = event_from_exception(
                 ex,
                 client_options=client.options,
                 mechanism={"type": "falcon", "handled": False},
             )
-            hub.capture_event(event, hint=hint)
+            sentry_sdk.capture_event(event, hint=hint)
 
         return was_handled
 
@@ -219,8 +216,7 @@ def _patch_prepare_middleware():
             # We don't support ASGI Falcon apps, so we don't patch anything here
             return original_prepare_middleware(middleware, independent_middleware, asgi)
 
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is not None:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
 
