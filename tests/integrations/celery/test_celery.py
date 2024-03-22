@@ -354,8 +354,7 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
-# TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
-@pytest.mark.skip
+@pytest.mark.skip(reason="This test is hanging when running test with `tox --parallel auto`. TODO: Figure out why and fix it!")
 @pytest.mark.forked
 def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
