@@ -9,19 +9,20 @@ from grpc.aio import (
 )
 from google.protobuf.message import Message
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.scope import Scope
 
 
 class ClientInterceptor:
     @staticmethod
-    def _update_client_call_details_metadata_from_hub(
-        client_call_details: ClientCallDetails, hub: Hub
+    def _update_client_call_details_metadata_from_scope(
+        client_call_details: ClientCallDetails,
     ) -> ClientCallDetails:
         metadata = (
             list(client_call_details.metadata) if client_call_details.metadata else []
         )
-        for key, value in hub.iter_trace_propagation_headers():
+        for key, value in Scope.get_current_scope().iter_trace_propagation_headers():
             metadata.append((key, value))
 
         client_call_details = ClientCallDetails(
@@ -42,17 +43,16 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
         client_call_details: ClientCallDetails,
         request: Message,
     ) -> Union[UnaryUnaryCall, Message]:
-        hub = Hub.current
         method = client_call_details.method
 
-        with hub.start_span(
+        with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT, description="unary unary call to %s" % method.decode()
         ) as span:
             span.set_data("type", "unary unary")
             span.set_data("method", method)
 
-            client_call_details = self._update_client_call_details_metadata_from_hub(
-                client_call_details, hub
+            client_call_details = self._update_client_call_details_metadata_from_scope(
+                client_call_details
             )
 
             response = await continuation(client_call_details, request)
@@ -71,17 +71,16 @@ class SentryUnaryStreamClientInterceptor(
         client_call_details: ClientCallDetails,
         request: Message,
     ) -> Union[AsyncIterable[Any], UnaryStreamCall]:
-        hub = Hub.current
         method = client_call_details.method
 
-        with hub.start_span(
+        with sentry_sdk.start_span(
             op=OP.GRPC_CLIENT, description="unary stream call to %s" % method.decode()
         ) as span:
             span.set_data("type", "unary stream")
             span.set_data("method", method)
 
-            client_call_details = self._update_client_call_details_metadata_from_hub(
-                client_call_details, hub
+            client_call_details = self._update_client_call_details_metadata_from_scope(
+                client_call_details
             )
 
             response = await continuation(client_call_details, request)

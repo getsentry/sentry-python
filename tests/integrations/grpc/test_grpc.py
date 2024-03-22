@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import grpc
 import pytest
 
-from sentry_sdk import Hub, start_transaction
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
@@ -310,8 +310,7 @@ class TestService(gRPCTestServiceServicer):
 
     @staticmethod
     def TestServe(request, context):  # noqa: N802
-        hub = Hub.current
-        with hub.start_span(op="test", description="test"):
+        with start_span(op="test", description="test"):
             pass
 
         return gRPCTestMessage(text=request.text)
