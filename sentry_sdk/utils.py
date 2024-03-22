@@ -1713,7 +1713,8 @@ def ensure_integration_enabled(
 
 if TYPE_CHECKING:
 
-    @overload
+    # mypy has some trouble with the overloads, hence the ignore[no-overload-impl]
+    @overload  # type: ignore[no-overload-impl]
     def ensure_integration_enabled_async(
         integration,  # type: type[sentry_sdk.integrations.Integration]
         original_function,  # type: Callable[P, Awaitable[R]]
@@ -1729,7 +1730,8 @@ if TYPE_CHECKING:
         ...
 
 
-def ensure_integration_enabled_async(
+# The ignore[no-redef] also needed because mypy is struggling with these overloads.
+def ensure_integration_enabled_async(  # type: ignore[no-redef]
     integration,  # type: type[sentry_sdk.integrations.Integration]
     original_function=_no_op_async,  # type: Union[Callable[P, Awaitable[R]], Callable[P, Awaitable[None]]]
 ):
