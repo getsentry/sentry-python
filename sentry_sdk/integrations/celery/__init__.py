@@ -323,7 +323,9 @@ def _set_status(status):
 
 
 def _patch_build_tracer():
+    # type: () -> None
     import celery.app.trace as trace  # type: ignore
+
     old_build_tracer = trace.build_tracer
 
     def sentry_build_tracer(name, task, *args, **kwargs):
@@ -347,6 +349,7 @@ def _patch_build_tracer():
 
 
 def _patch_task_apply_async():
+    # type: () -> None
     from celery.app.task import Task  # type: ignore
 
     Task.apply_async = _wrap_apply_async(Task.apply_async)
