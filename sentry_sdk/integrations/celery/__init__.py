@@ -11,7 +11,7 @@ from sentry_sdk.integrations.celery.beat import (
     _patch_redbeat_maybe_due,
     _setup_celery_beat_signals,
 )
-from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch, NoOpMgr
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
@@ -93,14 +93,66 @@ class CeleryIntegration(Integration):
         ignore_logger("celery.redirected")
 
 
-class NoOpMgr:
-    def __enter__(self):
-        # type: () -> None
-        return None
+def _set_status(status):
+    # type: (str) -> None
+    with capture_internal_exceptions():
+        scope = Scope.get_current_scope()
+        if scope.span is not None:
+            scope.span.set_status(status)
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        # type: (Any, Any, Any) -> None
-        return None
+
+def _capture_exception(task, exc_info):
+    # type: (Any, ExcInfo) -> None
+    client = sentry_sdk.get_client()
+    if client.get_integration(CeleryIntegration) is None:
+        return
+
+    if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
+        # ??? Doesn't map to anything
+        _set_status("aborted")
+        return
+
+    _set_status("internal_error")
+
+    if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
+        return
+
+    event, hint = event_from_exception(
+        exc_info,
+        client_options=client.options,
+        mechanism={"type": "celery", "handled": False},
+    )
+
+    sentry_sdk.capture_event(event, hint=hint)
+
+
+def _make_event_processor(task, uuid, args, kwargs, request=None):
+    # type: (Any, Any, Any, Any, Optional[Any]) -> EventProcessor
+    def event_processor(event, hint):
+        # type: (Event, Hint) -> Optional[Event]
+
+        with capture_internal_exceptions():
+            tags = event.setdefault("tags", {})
+            tags["celery_task_id"] = uuid
+            extra = event.setdefault("extra", {})
+            extra["celery-job"] = {
+                "task_name": task.name,
+                "args": args,
+                "kwargs": kwargs,
+            }
+
+        if "exc_info" in hint:
+            with capture_internal_exceptions():
+                if issubclass(hint["exc_info"][0], SoftTimeLimitExceeded):
+                    event["fingerprint"] = [
+                        "celery",
+                        "SoftTimeLimitExceeded",
+                        getattr(task, "name", task),
+                    ]
+
+        return event
+
+    return event_processor
 
 
 def _wrap_apply_async(f):
@@ -258,68 +310,6 @@ def _wrap_task_call(task, f):
             reraise(*exc_info)
 
     return _inner  # type: ignore
-
-
-def _make_event_processor(task, uuid, args, kwargs, request=None):
-    # type: (Any, Any, Any, Any, Optional[Any]) -> EventProcessor
-    def event_processor(event, hint):
-        # type: (Event, Hint) -> Optional[Event]
-
-        with capture_internal_exceptions():
-            tags = event.setdefault("tags", {})
-            tags["celery_task_id"] = uuid
-            extra = event.setdefault("extra", {})
-            extra["celery-job"] = {
-                "task_name": task.name,
-                "args": args,
-                "kwargs": kwargs,
-            }
-
-        if "exc_info" in hint:
-            with capture_internal_exceptions():
-                if issubclass(hint["exc_info"][0], SoftTimeLimitExceeded):
-                    event["fingerprint"] = [
-                        "celery",
-                        "SoftTimeLimitExceeded",
-                        getattr(task, "name", task),
-                    ]
-
-        return event
-
-    return event_processor
-
-
-def _capture_exception(task, exc_info):
-    # type: (Any, ExcInfo) -> None
-    client = sentry_sdk.get_client()
-    if client.get_integration(CeleryIntegration) is None:
-        return
-
-    if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
-        # ??? Doesn't map to anything
-        _set_status("aborted")
-        return
-
-    _set_status("internal_error")
-
-    if hasattr(task, "throws") and isinstance(exc_info[1], task.throws):
-        return
-
-    event, hint = event_from_exception(
-        exc_info,
-        client_options=client.options,
-        mechanism={"type": "celery", "handled": False},
-    )
-
-    sentry_sdk.capture_event(event, hint=hint)
-
-
-def _set_status(status):
-    # type: (str) -> None
-    with capture_internal_exceptions():
-        scope = Scope.get_current_scope()
-        if scope.span is not None:
-            scope.span.set_status(status)
 
 
 def _patch_build_tracer():

@@ -1,5 +1,20 @@
 import time
 
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
+
+
+class NoOpMgr:
+    def __enter__(self):
+        # type: () -> None
+        return None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
+        return None
+
 
 def _now_seconds_since_epoch():
     # type: () -> float
