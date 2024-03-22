@@ -209,6 +209,7 @@ def _patch_redbeat_maybe_due():
             return original_maybe_due(*args, **kwargs)
 
         # When tasks are started from Celery Beat, make sure each task has its own trace.
+        # XXX TODO: this does not work right now! Fix it!
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()
 
