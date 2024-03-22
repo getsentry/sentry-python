@@ -57,7 +57,7 @@ def _wrap_func(func):
 
         initial_time = datetime.now(timezone.utc)
 
-        with sentry_sdk.new_scope() as scope:
+        with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(
