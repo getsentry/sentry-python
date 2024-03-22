@@ -38,12 +38,14 @@ if TYPE_CHECKING:
     from typing import (
         Any,
         Callable,
+        cast,
         ContextManager,
         Dict,
         Iterator,
         List,
         NoReturn,
         Optional,
+        overload,
         ParamSpec,
         Set,
         Tuple,
@@ -1631,9 +1633,39 @@ def reraise(tp, value, tb=None):
     raise value
 
 
+def _no_op(*_a, **_k):
+    # type: (*Any, **Any) -> None
+    """No-op function for ensure_integration_enabled."""
+    pass
+
+
+async def _no_op_async(*_a, **_k):
+    # type: (*Any, **Any) -> None
+    """No-op function for ensure_integration_enabled_async."""
+    pass
+
+
+if TYPE_CHECKING:
+
+    @overload
+    def ensure_integration_enabled(
+        integration,  # type: type[sentry_sdk.integrations.Integration]
+        original_function,  # type: Callable[P, R]
+    ):
+        # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
+        ...
+
+    @overload
+    def ensure_integration_enabled(
+        integration,  # type: type[sentry_sdk.integrations.Integration]
+    ):
+        # type: (...) -> Callable[[Callable[P, None]], Callable[P, None]]
+        ...
+
+
 def ensure_integration_enabled(
     integration,  # type: type[sentry_sdk.integrations.Integration]
-    original_function,  # type: Callable[P, R]
+    original_function=_no_op,  # type: Union[Callable[P, R], Callable[P, None]]
 ):
     # type: (...) -> Callable[[Callable[P, R]], Callable[P, R]]
     """
@@ -1657,10 +1689,13 @@ def ensure_integration_enabled(
             return my_function()
     ```
     """
+    if TYPE_CHECKING:
+        # Type hint to ensure the default funciton has the write typing. The overloads
+        # ensure the default _no_op function is only used when R is None.
+        original_function = cast(Callable[P, R], original_function)
 
     def patcher(sentry_patched_function):
         # type: (Callable[P, R]) -> Callable[P, R]
-        @wraps(original_function)
         def runner(*args: "P.args", **kwargs: "P.kwargs"):
             # type: (...) -> R
             if sentry_sdk.get_client().get_integration(integration) is None:
@@ -1668,14 +1703,35 @@ def ensure_integration_enabled(
 
             return sentry_patched_function(*args, **kwargs)
 
-        return runner
+        if original_function is _no_op:
+            return runner
+
+        return wraps(original_function)(runner)
 
     return patcher
 
 
+if TYPE_CHECKING:
+
+    @overload
+    def ensure_integration_enabled_async(
+        integration,  # type: type[sentry_sdk.integrations.Integration]
+        original_function,  # type: Callable[P, Awaitable[R]]
+    ):
+        # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
+        ...
+
+    @overload
+    def ensure_integration_enabled_async(
+        integration,  # type: type[sentry_sdk.integrations.Integration]
+    ):
+        # type: (...) -> Callable[[Callable[P, Awaitable[None]]], Callable[P, Awaitable[None]]]
+        ...
+
+
 def ensure_integration_enabled_async(
     integration,  # type: type[sentry_sdk.integrations.Integration]
-    original_function,  # type: Callable[P, Awaitable[R]]
+    original_function=_no_op_async,  # type: Union[Callable[P, Awaitable[R]], Callable[P, Awaitable[None]]]
 ):
     # type: (...) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]
     """
@@ -1684,9 +1740,13 @@ def ensure_integration_enabled_async(
     Please refer to the `ensure_integration_enabled` documentation for more information.
     """
 
+    if TYPE_CHECKING:
+        # Type hint to ensure the default funciton has the write typing. The overloads
+        # ensure the default _no_op function is only used when R is None.
+        original_function = cast(Callable[P, Awaitable[R]], original_function)
+
     def patcher(sentry_patched_function):
         # type: (Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]
-        @wraps(original_function)
         async def runner(*args: "P.args", **kwargs: "P.kwargs"):
             # type: (...) -> R
             if sentry_sdk.get_client().get_integration(integration) is None:
@@ -1694,7 +1754,10 @@ def ensure_integration_enabled_async(
 
             return await sentry_patched_function(*args, **kwargs)
 
-        return runner
+        if original_function is _no_op_async:
+            return runner
+
+        return wraps(original_function)(runner)
 
     return patcher
 
