@@ -316,7 +316,7 @@ def _patch_build_tracer():
     # type: () -> None
     import celery.app.trace as trace  # type: ignore
 
-    old_build_tracer = trace.build_tracer
+    original_build_tracer = trace.build_tracer
 
     def sentry_build_tracer(name, task, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
@@ -333,7 +333,7 @@ def _patch_build_tracer():
             # or we will get infinitely nested wrapper functions.
             task._sentry_is_patched = True
 
-        return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
+        return _wrap_tracer(task, original_build_tracer(name, task, *args, **kwargs))
 
     trace.build_tracer = sentry_build_tracer
 
@@ -352,12 +352,12 @@ def _patch_worker_exit():
     # call os._exit
     from billiard.pool import Worker  # type: ignore
 
-    old_workloop = Worker.workloop
+    original_workloop = Worker.workloop
 
     def sentry_workloop(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         try:
-            return old_workloop(*args, **kwargs)
+            return original_workloop(*args, **kwargs)
         finally:
             with capture_internal_exceptions():
                 if (
