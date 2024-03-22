@@ -89,7 +89,7 @@ def patch_run_job():
         if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
             return await old_run_job(self, job_id, score)
 
-        with sentry_sdk.new_scope() as scope:
+        with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
 
