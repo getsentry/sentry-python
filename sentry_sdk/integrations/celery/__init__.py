@@ -1,5 +1,4 @@
 import sys
-import time
 from functools import wraps
 
 import sentry_sdk

@@ -267,9 +267,7 @@ def test_get_monitor_config_seconds():
 
     celery_schedule = schedule(run_every=3)  # seconds
 
-    with mock.patch(
-        "sentry_sdk.integrations.logger.warning"
-    ) as mock_logger_warning:
+    with mock.patch("sentry_sdk.integrations.logger.warning") as mock_logger_warning:
         monitor_config = _get_monitor_config(celery_schedule, app, "foo")
         mock_logger_warning.assert_called_with(
             "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
