@@ -21,6 +21,7 @@ try:
         from typing import Any, Dict, List, Optional, Union
         from starlite.types import (  # type: ignore
             ASGIApp,
+            Hint,
             HTTPReceiveMessage,
             HTTPScope,
             Message,
@@ -193,7 +194,7 @@ def patch_http_route_handle() -> None:
 
         request_data = await body
 
-        def event_processor(event: "Event", _: "Dict[str, Any]") -> "Event":
+        def event_processor(event: "Event", _: "Hint") -> "Event":
             route_handler = scope.get("route_handler")
 
             request_info = event.get("request", {})
