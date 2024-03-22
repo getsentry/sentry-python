@@ -35,7 +35,7 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
         # type: (Any, Any) -> Any
         client = sentry_sdk.get_client()
 
-        with sentry_sdk.new_scope() as scope:
+        with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = context.get_remaining_time_in_millis()
                 scope.add_event_processor(
@@ -61,7 +61,7 @@ def _get_view_function_response(app, view_function, function_args):
     def wrapped_view_function(**function_args):
         # type: (**Any) -> Any
         client = sentry_sdk.get_client()
-        with sentry_sdk.new_scope() as scope:
+        with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
                 scope.set_transaction_name(
