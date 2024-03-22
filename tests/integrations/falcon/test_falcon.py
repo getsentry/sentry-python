@@ -380,17 +380,20 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
-    Scope.get_isolation_scope().set_tag("request_data", False)
+    scope = Scope.get_isolation_scope()
+    scope.set_tag("request_data", False)
 
     app = falcon.API()
 
     class Resource:
         def on_get(self, req, resp):
-            Scope.get_isolation_scope().set_tag("request_data", True)
+            scope = Scope.get_isolation_scope()
+            scope.set_tag("request_data", True)
 
             def generator():
                 for row in range(1000):
-                    assert Scope.get_isolation_scope()._tags["request_data"]
+                    scope = Scope.get_isolation_scope()
+                    assert scope._tags["request_data"]
 
                     yield (str(row) + "\n").encode()
 
@@ -405,7 +408,8 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     assert response.text == expected_response
     assert not events
 
-    not Scope.get_isolation_scope()._tags["request_data"]
+    scope = Scope.get_isolation_scope()
+    assert not scope._tags["request_data"]
 
 
 @pytest.mark.skipif(
