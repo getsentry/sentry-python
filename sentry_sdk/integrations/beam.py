@@ -12,10 +12,8 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Iterator
     from typing import TypeVar
-    from typing import Optional
     from typing import Callable
 
-    from sentry_sdk.client import BaseClient
     from sentry_sdk._types import ExcInfo
 
     T = TypeVar("T")
@@ -113,9 +111,7 @@ def _wrap_task_call(func):
     # type: (F) -> F
     """
     Wrap task call with a try catch to get exceptions.
-    Pass the client on to raise_exception so it can get rebinded.
     """
-    client = sentry_sdk.get_client()
 
     @wraps(func)
     def _inner(*args, **kwargs):
@@ -123,11 +119,11 @@ def _wrap_task_call(func):
         try:
             gen = func(*args, **kwargs)
         except Exception:
-            raise_exception(client)
+            raise_exception()
 
         if not isinstance(gen, types.GeneratorType):
             return gen
-        return _wrap_generator_call(gen, client)
+        return _wrap_generator_call(gen)
 
     setattr(_inner, USED_FUNC, True)
     return _inner  # type: ignore
@@ -163,8 +159,8 @@ def raise_exception():
     reraise(*exc_info)
 
 
-def _wrap_generator_call(gen, client):
-    # type: (Iterator[T], Optional[BaseClient]) -> Iterator[T]
+def _wrap_generator_call(gen):
+    # type: (Iterator[T]) -> Iterator[T]
     """
     Wrap the generator to handle any failures.
     """
@@ -174,4 +170,4 @@ def _wrap_generator_call(gen, client):
         except StopIteration:
             break
         except Exception:
-            raise_exception(client)
+            raise_exception()
