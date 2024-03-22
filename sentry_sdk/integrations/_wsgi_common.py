@@ -1,7 +1,8 @@
 import json
 from copy import deepcopy
 
-from sentry_sdk.hub import Hub, _should_send_default_pii
+import sentry_sdk
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -12,8 +13,6 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    import sentry_sdk
-
     from typing import Any
     from typing import Dict
     from typing import Mapping
@@ -67,8 +66,8 @@ class RequestExtractor:
 
     def extract_into_event(self, event):
         # type: (Event) -> None
-        client = Hub.current.client
-        if client is None:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
             return
 
         data = None  # type: Optional[Union[AnnotatedValue, Dict[str, Any]]]
@@ -76,7 +75,7 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
         if not request_body_within_bounds(client, content_length):
@@ -190,7 +189,7 @@ def _is_json_content_type(ct):
 
 def _filter_headers(headers):
     # type: (Mapping[str, str]) -> Mapping[str, Union[AnnotatedValue, str]]
-    if _should_send_default_pii():
+    if should_send_default_pii():
         return headers
 
     return {
