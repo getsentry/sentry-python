@@ -78,12 +78,8 @@ class CeleryIntegration(Integration):
         if CELERY_VERSION < (4, 4, 7):
             raise DidNotEnable("Celery 4.4.7 or newer required.")
 
-        _path_build_tracer()
-
-        from celery.app.task import Task  # type: ignore
-
-        Task.apply_async = _wrap_apply_async(Task.apply_async)
-
+        _patch_build_tracer()
+        _patch_task_apply_async()
         _patch_worker_exit()
 
         # This logger logs every status of every task that ran on the worker.
@@ -326,7 +322,7 @@ def _set_status(status):
             scope.span.set_status(status)
 
 
-def _path_build_tracer():
+def _patch_build_tracer():
     import celery.app.trace as trace  # type: ignore
     old_build_tracer = trace.build_tracer
 
@@ -348,6 +344,12 @@ def _path_build_tracer():
         return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
 
     trace.build_tracer = sentry_build_tracer
+
+
+def _patch_task_apply_async():
+    from celery.app.task import Task  # type: ignore
+
+    Task.apply_async = _wrap_apply_async(Task.apply_async)
 
 
 def _patch_worker_exit():
