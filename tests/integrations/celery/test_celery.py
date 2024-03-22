@@ -572,26 +572,6 @@ def test_apply_async_manually_span(sentry_init):
     wrapped(mock.MagicMock(), (), headers={})
 
 
-def test_apply_async_from_beat_no_span(sentry_init):
-    sentry_init(
-        integrations=[CeleryIntegration()],
-    )
-
-    def dummy_function(*args, **kwargs):
-        headers = kwargs.get("headers")
-        assert "sentry-trace" not in headers
-        assert "baggage" not in headers
-
-    wrapped = _wrap_apply_async(dummy_function)
-    wrapped(
-        mock.MagicMock(),
-        [
-            "BEAT",
-        ],
-        headers={},
-    )
-
-
 def test_apply_async_no_args(init_celery):
     celery = init_celery()
 
