@@ -10,7 +10,7 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message
+from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
@@ -91,7 +91,6 @@ async def _mock_receive(msg):
     return msg
 
 
-from sentry_sdk import Hub
 from starlette.templating import Jinja2Templates
 
 
@@ -133,8 +132,7 @@ def starlette_app_factory(middleware=None, debug=True):
         )
 
     async def _render_template(request):
-        hub = Hub.current
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        capture_message(get_traceparent() + "\n" + get_baggage())
 
         template_context = {
             "request": request,
