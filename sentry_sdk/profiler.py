@@ -42,6 +42,8 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
     filename_for_module,
+    get_current_thread_meta,
+    is_gevent,
     is_valid_sample_rate,
     logger,
     nanosecond_time,
@@ -126,30 +128,14 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent import get_hub as get_gevent_hub  # type: ignore
-    from gevent.monkey import get_original, is_module_patched  # type: ignore
+    from gevent.monkey import get_original  # type: ignore
     from gevent.threadpool import ThreadPool  # type: ignore
 
     thread_sleep = get_original("time", "sleep")
 except ImportError:
-
-    def get_gevent_hub():
-        # type: () -> Any
-        return None
-
     thread_sleep = time.sleep
 
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        # unable to import from gevent means no modules have been patched
-        return False
-
     ThreadPool = None
-
-
-def is_gevent():
-    # type: () -> bool
-    return is_module_patched("threading") or is_module_patched("_thread")
 
 
 _scheduler = None  # type: Optional[Scheduler]
@@ -389,52 +375,6 @@ else:
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
-def get_current_thread_id(thread=None):
-    # type: (Optional[threading.Thread]) -> Optional[int]
-    """
-    Try to get the id of the current thread, with various fall backs.
-    """
-
-    # if a thread is specified, that takes priority
-    if thread is not None:
-        try:
-            thread_id = thread.ident
-            if thread_id is not None:
-                return thread_id
-        except AttributeError:
-            pass
-
-    # if the app is using gevent, we should look at the gevent hub first
-    # as the id there differs from what the threading module reports
-    if is_gevent():
-        gevent_hub = get_gevent_hub()
-        if gevent_hub is not None:
-            try:
-                # this is undocumented, so wrap it in try except to be safe
-                return gevent_hub.thread_ident
-            except AttributeError:
-                pass
-
-    # use the current thread's id if possible
-    try:
-        current_thread_id = threading.current_thread().ident
-        if current_thread_id is not None:
-            return current_thread_id
-    except AttributeError:
-        pass
-
-    # if we can't get the current thread id, fall back to the main thread id
-    try:
-        main_thread_id = threading.main_thread().ident
-        if main_thread_id is not None:
-            return main_thread_id
-    except AttributeError:
-        pass
-
-    # we've tried everything, time to give up
-    return None
-
-
 class Profile(object):
     def __init__(
         self,
@@ -456,7 +396,7 @@ class Profile(object):
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
-        self._default_active_thread_id = get_current_thread_id() or 0  # type: int
+        self._default_active_thread_id = get_current_thread_meta()[0] or 0  # type: int
         self.active_thread_id = None  # type: Optional[int]
 
         try:
@@ -479,7 +419,7 @@ class Profile(object):
 
     def update_active_thread_id(self):
         # type: () -> None
-        self.active_thread_id = get_current_thread_id()
+        self.active_thread_id = get_current_thread_meta()[0]
         logger.debug(
             "[Profiling] updating active thread id to {tid}".format(
                 tid=self.active_thread_id
