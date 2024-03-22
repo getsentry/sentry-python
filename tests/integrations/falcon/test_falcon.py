@@ -404,8 +404,7 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     expected_response = "".join(str(row) + "\n" for row in range(1000))
     assert response.text == expected_response
     assert not events
-
-    not Scope.get_isolation_scope()._tags["request_data"]
+    assert not Scope.get_isolation_scope()._tags["request_data"]
 
 
 @pytest.mark.skipif(
