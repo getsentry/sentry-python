@@ -1,14 +1,15 @@
 import weakref
 
+import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     format_timestamp,
     parse_version,
@@ -51,18 +52,10 @@ class RqIntegration(Integration):
 
         old_perform_job = Worker.perform_job
 
+        @ensure_integration_enabled(RqIntegration, old_perform_job)
         def sentry_patched_perform_job(self, job, *args, **kwargs):
             # type: (Any, Job, *Queue, **Any) -> bool
-            hub = Hub.current
-            integration = hub.get_integration(RqIntegration)
-
-            if integration is None:
-                return old_perform_job(self, job, *args, **kwargs)
-
-            client = hub.client
-            assert client is not None
-
-            with hub.push_scope() as scope:
+            with sentry_sdk.new_scope() as scope:
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
@@ -76,7 +69,7 @@ class RqIntegration(Integration):
                 with capture_internal_exceptions():
                     transaction.name = job.func_name
 
-                with hub.start_transaction(
+                with sentry_sdk.start_transaction(
                     transaction, custom_sampling_context={"rq_job": job}
                 ):
                     rv = old_perform_job(self, job, *args, **kwargs)
@@ -85,7 +78,7 @@ class RqIntegration(Integration):
                 # We're inside of a forked process and RQ is
                 # about to call `os._exit`. Make sure that our
                 # events get sent out.
-                client.flush()
+                sentry_sdk.get_client().flush()
 
             return rv
 
@@ -106,15 +99,14 @@ class RqIntegration(Integration):
 
         old_enqueue_job = Queue.enqueue_job
 
+        @ensure_integration_enabled(RqIntegration, old_enqueue_job)
         def sentry_patched_enqueue_job(self, job, **kwargs):
             # type: (Queue, Any, **Any) -> Any
-            hub = Hub.current
-            if hub.get_integration(RqIntegration) is not None:
-                scope = Scope.get_current_scope()
-                if scope.span is not None:
-                    job.meta["_sentry_trace_headers"] = dict(
-                        scope.iter_trace_propagation_headers()
-                    )
+            scope = Scope.get_current_scope()
+            if scope.span is not None:
+                job.meta["_sentry_trace_headers"] = dict(
+                    scope.iter_trace_propagation_headers()
+                )
 
             return old_enqueue_job(self, job, **kwargs)
 
@@ -158,12 +150,7 @@ def _make_event_processor(weak_job):
 
 def _capture_exception(exc_info, **kwargs):
     # type: (ExcInfo, **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(RqIntegration) is None:
-        return
-
-    # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
+    client = sentry_sdk.get_client()
 
     event, hint = event_from_exception(
         exc_info,
@@ -171,4 +158,4 @@ def _capture_exception(exc_info, **kwargs):
         mechanism={"type": "rq", "handled": False},
     )
 
-    hub.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
