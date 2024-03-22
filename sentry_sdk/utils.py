@@ -1704,7 +1704,7 @@ def ensure_integration_enabled(
             return sentry_patched_function(*args, **kwargs)
 
         if original_function is _no_op:
-            return runner
+            return wraps(sentry_patched_function)(runner)
 
         return wraps(original_function)(runner)
 
@@ -1755,7 +1755,7 @@ def ensure_integration_enabled_async(
             return await sentry_patched_function(*args, **kwargs)
 
         if original_function is _no_op_async:
-            return runner
+            return wraps(sentry_patched_function)(runner)
 
         return wraps(original_function)(runner)
 
