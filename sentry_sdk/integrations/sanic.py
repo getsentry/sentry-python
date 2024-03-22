@@ -161,13 +161,13 @@ async def _startup(self):
     # type: (Sanic) -> None
     # This happens about as early in the lifecycle as possible, just after the
     # Request object is created. The body has not yet been consumed.
-    self.signal("http.lifecycle.request")(_hub_enter)
+    self.signal("http.lifecycle.request")(_context_enter)
 
     # This happens after the handler is complete. In v21.9 this signal is not
     # dispatched when there is an exception. Therefore we need to close out
-    # and call _hub_exit from the custom exception handler as well.
+    # and call _context_exit from the custom exception handler as well.
     # See https://github.com/sanic-org/sanic/issues/2297
-    self.signal("http.lifecycle.response")(_hub_exit)
+    self.signal("http.lifecycle.response")(_context_exit)
 
     # This happens inside of request handling immediately after the route
     # has been identified by the router.
@@ -177,7 +177,7 @@ async def _startup(self):
     await old_startup(self)
 
 
-async def _hub_enter(request):
+async def _context_enter(request):
     # type: (Request) -> None
     request.ctx._sentry_do_integration = (
         sentry_sdk.get_client().get_integration(SanicIntegration) is not None
@@ -204,7 +204,7 @@ async def _hub_enter(request):
     ).__enter__()
 
 
-async def _hub_exit(request, response=None):
+async def _context_exit(request, response=None):
     # type: (Request, Optional[BaseHTTPResponse]) -> None
     with capture_internal_exceptions():
         if not request.ctx._sentry_do_integration:
@@ -267,7 +267,7 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
             # As mentioned in previous comment in _startup, this can be removed
             # after https://github.com/sanic-org/sanic/issues/2297 is resolved
             if SanicIntegration.version and SanicIntegration.version == (21, 9):
-                await _hub_exit(request)
+                await _context_exit(request)
 
     return sentry_wrapped_error_handler
 
