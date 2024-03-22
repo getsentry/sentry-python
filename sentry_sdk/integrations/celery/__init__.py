@@ -6,6 +6,11 @@ from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations.celery.beat import (
+    _patch_beat_apply_entry,
+    _patch_redbeat_maybe_due,
+    _setup_celery_beat_signals,
+)
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
@@ -63,12 +68,6 @@ class CeleryIntegration(Integration):
         self.exclude_beat_tasks = exclude_beat_tasks
 
         if monitor_beat_tasks:
-            from sentry_sdk.integrations.celery.beat import (
-                _patch_beat_apply_entry,
-                _patch_redbeat_maybe_due,
-                _setup_celery_beat_signals,
-            )
-
             _patch_beat_apply_entry()
             _patch_redbeat_maybe_due()
             _setup_celery_beat_signals()
@@ -79,28 +78,7 @@ class CeleryIntegration(Integration):
         if CELERY_VERSION < (4, 4, 7):
             raise DidNotEnable("Celery 4.4.7 or newer required.")
 
-        import celery.app.trace as trace  # type: ignore
-
-        old_build_tracer = trace.build_tracer
-
-        def sentry_build_tracer(name, task, *args, **kwargs):
-            # type: (Any, Any, *Any, **Any) -> Any
-            if not getattr(task, "_sentry_is_patched", False):
-                # determine whether Celery will use __call__ or run and patch
-                # accordingly
-                if task_has_custom(task, "__call__"):
-                    type(task).__call__ = _wrap_task_call(task, type(task).__call__)
-                else:
-                    task.run = _wrap_task_call(task, task.run)
-
-                # `build_tracer` is apparently called for every task
-                # invocation. Can't wrap every celery task for every invocation
-                # or we will get infinitely nested wrapper functions.
-                task._sentry_is_patched = True
-
-            return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
-
-        trace.build_tracer = sentry_build_tracer
+        _path_build_tracer()
 
         from celery.app.task import Task  # type: ignore
 
@@ -346,6 +324,30 @@ def _set_status(status):
         scope = Scope.get_current_scope()
         if scope.span is not None:
             scope.span.set_status(status)
+
+
+def _path_build_tracer():
+    import celery.app.trace as trace  # type: ignore
+    old_build_tracer = trace.build_tracer
+
+    def sentry_build_tracer(name, task, *args, **kwargs):
+        # type: (Any, Any, *Any, **Any) -> Any
+        if not getattr(task, "_sentry_is_patched", False):
+            # determine whether Celery will use __call__ or run and patch
+            # accordingly
+            if task_has_custom(task, "__call__"):
+                type(task).__call__ = _wrap_task_call(task, type(task).__call__)
+            else:
+                task.run = _wrap_task_call(task, task.run)
+
+            # `build_tracer` is apparently called for every task
+            # invocation. Can't wrap every celery task for every invocation
+            # or we will get infinitely nested wrapper functions.
+            task._sentry_is_patched = True
+
+        return _wrap_tracer(task, old_build_tracer(name, task, *args, **kwargs))
+
+    trace.build_tracer = sentry_build_tracer
 
 
 def _patch_worker_exit():
