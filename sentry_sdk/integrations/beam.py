@@ -5,7 +5,6 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -153,14 +152,11 @@ def _capture_exception(exc_info):
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def raise_exception(client):
-    # type: (Optional[BaseClient]) -> None
+def raise_exception():
+    # type: () -> None
     """
-    Raise an exception. If the client is not set, rebind it.
+    Raise an exception.
     """
-    if not sentry_sdk.get_client().is_active():
-        Scope.get_global_scope().set_client(client)
-
     exc_info = sys.exc_info()
     with capture_internal_exceptions():
         _capture_exception(exc_info)
