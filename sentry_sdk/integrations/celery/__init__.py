@@ -3,15 +3,16 @@ import time
 from functools import wraps
 
 import sentry_sdk
+from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk import isolation_scope
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
     _patch_redbeat_maybe_due,
     _setup_celery_beat_signals,
 )
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
@@ -126,16 +127,6 @@ class NoOpMgr:
     def __exit__(self, exc_type, exc_value, traceback):
         # type: (Any, Any, Any) -> None
         return None
-
-
-def _now_seconds_since_epoch():
-    # type: () -> float
-    # We cannot use `time.perf_counter()` when dealing with the duration
-    # of a Celery task, because the start of a Celery task and
-    # the end are recorded in different processes.
-    # Start happens in the Celery Beat process,
-    # the end in a Celery Worker process.
-    return time.time()
 
 
 def _wrap_apply_async(f):

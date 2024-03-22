@@ -1,7 +1,7 @@
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.celery import CeleryIntegration, _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
@@ -130,6 +130,8 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
 
 def _patch_beat_apply_entry():
     # type: () -> None
+    from sentry_sdk.integrations.celery import CeleryIntegration
+
     original_apply_entry = Scheduler.apply_entry
 
     @ensure_integration_enabled(CeleryIntegration, original_apply_entry)
@@ -186,6 +188,8 @@ def _patch_redbeat_maybe_due():
 
     if RedBeatScheduler is None:
         return
+
+    from sentry_sdk.integrations.celery import CeleryIntegration
 
     original_maybe_due = RedBeatScheduler.maybe_due
 

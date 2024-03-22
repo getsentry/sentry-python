@@ -6,15 +6,15 @@ import pytest
 from celery.schedules import crontab, schedule
 
 from sentry_sdk.crons import MonitorStatus
-from sentry_sdk.integrations.celery import (
+from sentry_sdk.integrations.celery.beat import (
     _get_headers,
     _get_humanized_interval,
     _get_monitor_config,
     _patch_beat_apply_entry,
     _patch_redbeat_maybe_due,
-    crons_task_success,
     crons_task_failure,
     crons_task_retry,
+    crons_task_success,
 )
 
 
@@ -91,10 +91,10 @@ def test_crons_task_success():
     }
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
+        "sentry_sdk.integrations.celery.beat.capture_checkin"
     ) as mock_capture_checkin:
         with mock.patch(
-            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            "sentry_sdk.integrations.celery.beat._now_seconds_since_epoch",
             return_value=500.5,
         ):
             crons_task_success(fake_task)
@@ -135,10 +135,10 @@ def test_crons_task_failure():
     }
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
+        "sentry_sdk.integrations.celery.beat.capture_checkin"
     ) as mock_capture_checkin:
         with mock.patch(
-            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            "sentry_sdk.integrations.celery.beat._now_seconds_since_epoch",
             return_value=500.5,
         ):
             crons_task_failure(fake_task)
@@ -179,10 +179,10 @@ def test_crons_task_retry():
     }
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
+        "sentry_sdk.integrations.celery.beat.capture_checkin"
     ) as mock_capture_checkin:
         with mock.patch(
-            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            "sentry_sdk.integrations.celery.beat._now_seconds_since_epoch",
             return_value=500.5,
         ):
             crons_task_retry(fake_task)
@@ -268,7 +268,7 @@ def test_get_monitor_config_seconds():
     celery_schedule = schedule(run_every=3)  # seconds
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.logger.warning"
+        "sentry_sdk.integrations.logger.warning"
     ) as mock_logger_warning:
         monitor_config = _get_monitor_config(celery_schedule, app, "foo")
         mock_logger_warning.assert_called_with(
@@ -417,14 +417,14 @@ def test_exclude_beat_tasks_option(
     fake_get_monitor_config = MagicMock()
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.Scheduler", fake_scheduler
+        "sentry_sdk.integrations.celery.beat.Scheduler", fake_scheduler
     ) as Scheduler:  # noqa: N806
         with mock.patch(
             "sentry_sdk.integrations.celery.sentry_sdk.get_client",
             return_value=fake_client,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.celery._get_monitor_config",
+                "sentry_sdk.integrations.celery.beat._get_monitor_config",
                 fake_get_monitor_config,
             ) as _get_monitor_config:
                 # Mimic CeleryIntegration patching of Scheduler.apply_entry()
@@ -473,14 +473,14 @@ def test_exclude_redbeat_tasks_option(
     fake_get_monitor_config = MagicMock()
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.RedBeatScheduler", fake_redbeat_scheduler
+        "sentry_sdk.integrations.celery.beat.RedBeatScheduler", fake_redbeat_scheduler
     ) as RedBeatScheduler:  # noqa: N806
         with mock.patch(
             "sentry_sdk.integrations.celery.sentry_sdk.get_client",
             return_value=fake_client,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.celery._get_monitor_config",
+                "sentry_sdk.integrations.celery.beat._get_monitor_config",
                 fake_get_monitor_config,
             ) as _get_monitor_config:
                 # Mimic CeleryIntegration patching of RedBeatScheduler.maybe_due()

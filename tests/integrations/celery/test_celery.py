@@ -8,9 +8,9 @@ from celery.bin import worker
 from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
-    _get_headers,
     _wrap_apply_async,
 )
+from sentry_sdk.integrations.celery.beat import _get_headers
 
 
 @pytest.fixture
