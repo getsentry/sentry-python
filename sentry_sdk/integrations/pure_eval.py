@@ -1,6 +1,7 @@
 import ast
 
-from sentry_sdk import Hub, serializer
+import sentry_sdk
+from sentry_sdk import serializer
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.scope import add_global_event_processor
@@ -39,7 +40,7 @@ class PureEvalIntegration(Integration):
         @add_global_event_processor
         def add_executing_info(event, hint):
             # type: (Event, Optional[Hint]) -> Optional[Event]
-            if Hub.current.get_integration(PureEvalIntegration) is None:
+            if sentry_sdk.get_client().get_integration(PureEvalIntegration) is None:
                 return event
 
             if hint is None:
