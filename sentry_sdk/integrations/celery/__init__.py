@@ -6,11 +6,6 @@ from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.integrations.celery.beat import (
-    _patch_beat_apply_entry,
-    _patch_redbeat_maybe_due,
-    _setup_celery_beat_signals,
-)
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
@@ -68,6 +63,12 @@ class CeleryIntegration(Integration):
         self.exclude_beat_tasks = exclude_beat_tasks
 
         if monitor_beat_tasks:
+            from sentry_sdk.integrations.celery.beat import (
+                _patch_beat_apply_entry,
+                _patch_redbeat_maybe_due,
+                _setup_celery_beat_signals,
+            )
+
             _patch_beat_apply_entry()
             _patch_redbeat_maybe_due()
             _setup_celery_beat_signals()
