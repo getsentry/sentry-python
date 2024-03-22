@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import Task, Celery
+    from celery import Task, Celery  # type: ignore
     from celery.beat import Scheduler  # type: ignore
     from celery.schedules import crontab, schedule  # type: ignore
     from celery.signals import (  # type: ignore
