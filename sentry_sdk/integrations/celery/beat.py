@@ -130,6 +130,13 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
 
 def _patch_beat_apply_entry():
     # type: () -> None
+    """
+    Makes sure that the Sentry Crons information is set in the Celery Beat task's
+    headers so that is is monitored with Sentry Crons.
+
+    This is only called by Celery Beat. After apply_entry is called
+    Celery will call apply_async to put the task in the queue.
+    """
     from sentry_sdk.integrations.celery import CeleryIntegration
 
     original_apply_entry = Scheduler.apply_entry
@@ -137,7 +144,6 @@ def _patch_beat_apply_entry():
     @ensure_integration_enabled(CeleryIntegration, original_apply_entry)
     def sentry_apply_entry(*args, **kwargs):
         # type: (*Any, **Any) -> None
-        logger.warn("######  sentry_apply_entry  #######")
         scheduler, schedule_entry = args
         app = scheduler.app
 
@@ -148,37 +154,30 @@ def _patch_beat_apply_entry():
         if match_regex_list(monitor_name, integration.exclude_beat_tasks):
             return original_apply_entry(*args, **kwargs)
 
-        with sentry_sdk.isolation_scope() as scope:
-            # When tasks are started from Celery Beat, make sure each task has its own trace.
-            logger.warn("#############")
-            logger.warn(f"### VORHER {scope}")
-            scope.set_new_propagation_context()
-            logger.warn(f"### NACHHER {scope}")
+        monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
 
-            monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
+        is_supported_schedule = bool(monitor_config)
+        if is_supported_schedule:
+            headers = schedule_entry.options.pop("headers", {})
+            headers.update(
+                {
+                    "sentry-monitor-slug": monitor_name,
+                    "sentry-monitor-config": monitor_config,
+                }
+            )
 
-            is_supported_schedule = bool(monitor_config)
-            if is_supported_schedule:
-                headers = schedule_entry.options.pop("headers", {})
-                headers.update(
-                    {
-                        "sentry-monitor-slug": monitor_name,
-                        "sentry-monitor-config": monitor_config,
-                    }
-                )
+            check_in_id = capture_checkin(
+                monitor_slug=monitor_name,
+                monitor_config=monitor_config,
+                status=MonitorStatus.IN_PROGRESS,
+            )
+            headers.update({"sentry-monitor-check-in-id": check_in_id})
 
-                check_in_id = capture_checkin(
-                    monitor_slug=monitor_name,
-                    monitor_config=monitor_config,
-                    status=MonitorStatus.IN_PROGRESS,
-                )
-                headers.update({"sentry-monitor-check-in-id": check_in_id})
+            # Set the Sentry configuration in the options of the ScheduleEntry.
+            # Those will be picked up in `apply_async` and added to the headers.
+            schedule_entry.options["headers"] = headers
 
-                # Set the Sentry configuration in the options of the ScheduleEntry.
-                # Those will be picked up in `apply_async` and added to the headers.
-                schedule_entry.options["headers"] = headers
-
-            return original_apply_entry(*args, **kwargs)
+        return original_apply_entry(*args, **kwargs)
 
     Scheduler.apply_entry = sentry_apply_entry
 
@@ -205,11 +204,16 @@ def _patch_redbeat_maybe_due():
         if integration is None:
             return original_maybe_due(*args, **kwargs)
 
-        if match_regex_list(monitor_name, integration.exclude_beat_tasks):
+        task_should_be_excluded = match_regex_list(
+            monitor_name, integration.exclude_beat_tasks
+        )
+        if task_should_be_excluded:
             return original_maybe_due(*args, **kwargs)
 
         # When tasks are started from Celery Beat, make sure each task has its own trace.
-        # XXX TODO: this does not work right now! Fix it!
+        # This needs to be called here because RedBeat is a custom scheduler and thus
+        # our implementation sentry_sdk.integrations.celer._patch_scheduler_apply_entry
+        # does not get called.
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()
 
