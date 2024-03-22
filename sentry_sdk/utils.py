@@ -1690,7 +1690,7 @@ def ensure_integration_enabled(
     ```
     """
     if TYPE_CHECKING:
-        # Type hint to ensure the default funciton has the write typing. The overloads
+        # Type hint to ensure the default function has the right typing. The overloads
         # ensure the default _no_op function is only used when R is None.
         original_function = cast(Callable[P, R], original_function)
 
