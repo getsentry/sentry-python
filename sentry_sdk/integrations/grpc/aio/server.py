@@ -1,11 +1,11 @@
-from sentry_sdk import Hub
-from sentry_sdk._types import MYPY
+import sentry_sdk
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_CUSTOM
 from sentry_sdk.utils import event_from_exception
 
-if MYPY:
+if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
     from typing import Any
 
@@ -39,8 +39,6 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                 if not name:
                     return await handler(request, context)
 
-                hub = Hub.current
-
                 # What if the headers are empty?
                 transaction = Transaction.continue_from_headers(
                     dict(context.invocation_metadata()),
@@ -49,7 +47,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     source=TRANSACTION_SOURCE_CUSTOM,
                 )
 
-                with hub.start_transaction(transaction=transaction):
+                with sentry_sdk.start_transaction(transaction=transaction):
                     try:
                         return await handler.unary_unary(request, context)
                     except AbortError:
@@ -59,7 +57,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                             exc,
                             mechanism={"type": "grpc", "handled": False},
                         )
-                        hub.capture_event(event, hint=hint)
+                        sentry_sdk.capture_event(event, hint=hint)
                         raise
 
         elif not handler.request_streaming and handler.response_streaming:

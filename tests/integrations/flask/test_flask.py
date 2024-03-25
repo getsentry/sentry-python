@@ -24,7 +24,6 @@ import sentry_sdk
 import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
     set_tag,
-    configure_scope,
     capture_message,
     capture_exception,
 )
@@ -279,8 +278,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
     @app.route("/")
     def index():
-        with configure_scope() as scope:
-            scope.set_user({"ip_address": "1.2.3.4", "id": "42"})
+        Scope.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:
@@ -668,18 +666,15 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
-    with configure_scope() as scope:
-        scope.set_tag("request_data", False)
+    Scope.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     def index():
-        with configure_scope() as scope:
-            scope.set_tag("request_data", True)
+        Scope.get_isolation_scope().set_tag("request_data", True)
 
         def generate():
             for row in range(1000):
-                with configure_scope() as scope:
-                    assert scope._tags["request_data"]
+                assert Scope.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -690,8 +685,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
     assert not events
 
-    with configure_scope() as scope:
-        assert not scope._tags["request_data"]
+    assert not Scope.get_isolation_scope()._tags["request_data"]
 
 
 def test_scoped_test_client(sentry_init, app):
@@ -839,10 +833,7 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
     @app.route("/")
     def index():
-        scope = Scope.get_isolation_scope()
-        capture_message(
-            scope.get_traceparent() + "\n" + scope.get_baggage().serialize()
-        )
+        capture_message(sentry_sdk.get_traceparent() + "\n" + sentry_sdk.get_baggage())
         return render_template_string(template_string)
 
     with app.test_client() as client:

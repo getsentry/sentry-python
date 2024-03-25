@@ -9,9 +9,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy import text
 
-from sentry_sdk import capture_message, start_transaction, configure_scope
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
@@ -226,12 +227,12 @@ def test_large_event_not_truncated(sentry_init, capture_events):
 
     long_str = "x" * (DEFAULT_MAX_VALUE_LENGTH + 10)
 
-    with configure_scope() as scope:
+    scope = Scope.get_isolation_scope()
 
-        @scope.add_event_processor
-        def processor(event, hint):
-            event["message"] = long_str
-            return event
+    @scope.add_event_processor
+    def processor(event, hint):
+        event["message"] = long_str
+        return event
 
     engine = create_engine("sqlite:///:memory:")
     with start_transaction(name="test"):

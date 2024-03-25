@@ -1,6 +1,6 @@
 from functools import partial
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
@@ -59,13 +59,11 @@ class Boto3Integration(Integration):
 
 def _sentry_request_created(service_id, request, operation_name, **kwargs):
     # type: (str, AWSRequest, str, **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(Boto3Integration) is None:
+    if sentry_sdk.get_client().get_integration(Boto3Integration) is None:
         return
 
     description = "aws.%s.%s" % (service_id, operation_name)
-    span = hub.start_span(
-        hub=hub,
+    span = sentry_sdk.start_span(
         op=OP.HTTP_CLIENT,
         description=description,
     )
