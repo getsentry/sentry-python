@@ -5,7 +5,12 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    event_from_exception,
+    reraise,
+)
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -129,16 +134,13 @@ def _wrap_task_call(func):
     return _inner  # type: ignore
 
 
+@ensure_integration_enabled(BeamIntegration)
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
     """
     Send Beam exception to Sentry.
     """
     client = sentry_sdk.get_client()
-
-    integration = client.get_integration(BeamIntegration)
-    if integration is None:
-        return
 
     event, hint = event_from_exception(
         exc_info,
