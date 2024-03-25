@@ -108,7 +108,7 @@ def patch_run_job():
 
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
-    scope = Scope.get_current_scope()
+    scope = Scope.get_isolation_scope()
 
     if scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
@@ -131,7 +131,7 @@ def _make_event_processor(ctx, *args, **kwargs):
         # type: (Event, Hint) -> Optional[Event]
 
         with capture_internal_exceptions():
-            scope = Scope.get_current_scope()
+            scope = Scope.get_isolation_scope()
             if scope.transaction is not None:
                 scope.transaction.name = ctx["job_name"]
                 event["transaction"] = ctx["job_name"]
