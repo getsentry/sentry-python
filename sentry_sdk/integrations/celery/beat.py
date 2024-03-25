@@ -1,7 +1,10 @@
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import (
+    _get_humanized_interval,
+    _now_seconds_since_epoch,
+)
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
@@ -14,7 +17,6 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Optional
-    from typing import Tuple
     from typing import TypeVar
     from typing import Union
 
@@ -51,23 +53,6 @@ def _get_headers(task):
     headers.update(task.request.get("properties") or {})
 
     return headers
-
-
-def _get_humanized_interval(seconds):
-    # type: (float) -> Tuple[int, str]
-    TIME_UNITS = (  # noqa: N806
-        ("day", 60 * 60 * 24.0),
-        ("hour", 60 * 60.0),
-        ("minute", 60.0),
-    )
-
-    seconds = float(seconds)
-    for unit, divider in TIME_UNITS:
-        if seconds >= divider:
-            interval = int(seconds / divider)
-            return (interval, unit)
-
-    return (int(seconds), "second")
 
 
 def _get_monitor_config(celery_schedule, app, monitor_name):

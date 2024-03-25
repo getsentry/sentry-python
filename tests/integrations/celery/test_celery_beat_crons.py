@@ -8,7 +8,6 @@ from celery.schedules import crontab, schedule
 from sentry_sdk.crons import MonitorStatus
 from sentry_sdk.integrations.celery.beat import (
     _get_headers,
-    _get_humanized_interval,
     _get_monitor_config,
     _patch_beat_apply_entry,
     _patch_redbeat_maybe_due,
@@ -16,6 +15,7 @@ from sentry_sdk.integrations.celery.beat import (
     crons_task_retry,
     crons_task_success,
 )
+from sentry_sdk.integrations.celery.utils import _get_humanized_interval
 
 
 def test_get_headers():

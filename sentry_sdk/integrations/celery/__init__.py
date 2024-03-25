@@ -181,7 +181,9 @@ def _wrap_apply_async(f):
 
             # If Sentry Crons monitoring for Celery Beat tasks is enabled
             # add start timestamp of task,
-            headers = dict(Scope.get_current_scope().iter_trace_propagation_headers(span=span))
+            headers = dict(
+                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
+            )
             if integration.monitor_beat_tasks:
                 headers.update(
                     {
