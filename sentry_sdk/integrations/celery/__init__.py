@@ -179,25 +179,20 @@ def _wrap_apply_async(f):
                 "sentry-propagate-traces", default_propagate_traces
             )
 
+            # If Sentry Crons monitoring for Celery Beat tasks is enabled
+            # add start timestamp of task,
+            headers = dict(Scope.get_current_scope().iter_trace_propagation_headers(span=span))
+            if integration.monitor_beat_tasks:
+                headers.update(
+                    {
+                        "sentry-monitor-start-timestamp-s": "%.9f"
+                        % _now_seconds_since_epoch(),
+                    }
+                )
+
             if propagate_traces:
                 # Set Sentry trace propagation information in the headers of the Celery task
                 with capture_internal_exceptions():
-                    headers = dict(
-                        Scope.get_current_scope().iter_trace_propagation_headers(
-                            span=span
-                        )
-                    )
-
-                    # Add start timestamp of task,
-                    # if Sentry Crons monitoring for Celery Beat tasks is enabled
-                    if integration.monitor_beat_tasks:
-                        headers.update(
-                            {
-                                "sentry-monitor-start-timestamp-s": "%.9f"
-                                % _now_seconds_since_epoch(),
-                            }
-                        )
-
                     if headers:
                         existing_baggage = incoming_headers.get(BAGGAGE_HEADER_NAME)
                         sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
