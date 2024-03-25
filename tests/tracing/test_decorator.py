@@ -15,6 +15,7 @@ async def my_async_example_function():
     return "return_of_async_function"
 
 
+@pytest.mark.forked
 def test_trace_decorator():
     with patch_start_tracing_child() as fake_start_child:
         result = my_example_function()

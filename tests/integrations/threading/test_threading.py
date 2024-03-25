@@ -5,8 +5,9 @@ from threading import Thread
 import pytest
 
 import sentry_sdk
-from sentry_sdk import configure_scope, capture_message
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.threading import ThreadingIntegration
+from sentry_sdk.scope import Scope
 
 original_start = Thread.start
 original_run = Thread.run
@@ -44,8 +45,7 @@ def test_propagates_hub(sentry_init, capture_events, propagate_hub):
     events = capture_events()
 
     def stage1():
-        with configure_scope() as scope:
-            scope.set_tag("stage1", "true")
+        Scope.get_isolation_scope().set_tag("stage1", "true")
 
         t = Thread(target=stage2)
         t.start()
