@@ -37,7 +37,6 @@ if TYPE_CHECKING:
 
 try:
     from celery import VERSION as CELERY_VERSION  # type: ignore
-    from celery.beat import Scheduler  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
         Ignore,
@@ -78,7 +77,6 @@ class CeleryIntegration(Integration):
             raise DidNotEnable("Celery 4.4.7 or newer required.")
 
         _patch_build_tracer()
-        _patch_scheduler_apply_entry()
         _patch_task_apply_async()
         _patch_worker_exit()
 
@@ -341,30 +339,6 @@ def _patch_build_tracer():
         return _wrap_tracer(task, original_build_tracer(name, task, *args, **kwargs))
 
     trace.build_tracer = sentry_build_tracer
-
-
-def _patch_scheduler_apply_entry():
-    # type: () -> None
-    """
-    Makes sure that Celery tasks that are started by Celery Beat
-    start a new Trace.
-
-    This is only called by Celery Beat. After apply_entry is called
-    Celery will call apply_async to put the task in the queue.
-    """
-    from sentry_sdk.integrations.celery import CeleryIntegration
-
-    original_apply_entry = Scheduler.apply_entry
-
-    @ensure_integration_enabled(CeleryIntegration, original_apply_entry)
-    def sentry_apply_entry(*args, **kwargs):
-        # type: (*Any, **Any) -> None
-        # Tasks started by Celery Beat start a new Trace
-        with sentry_sdk.isolation_scope() as scope:
-            scope.set_new_propagation_context()
-            return original_apply_entry(*args, **kwargs)
-
-    Scheduler.apply_entry = sentry_apply_entry
 
 
 def _patch_task_apply_async():

@@ -5,7 +5,6 @@ from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
-    ensure_integration_enabled,
     logger,
     match_regex_list,
 )
@@ -141,7 +140,6 @@ def _patch_beat_apply_entry():
 
     original_apply_entry = Scheduler.apply_entry
 
-    @ensure_integration_enabled(CeleryIntegration, original_apply_entry)
     def sentry_apply_entry(*args, **kwargs):
         # type: (*Any, **Any) -> None
         scheduler, schedule_entry = args
@@ -151,8 +149,15 @@ def _patch_beat_apply_entry():
         monitor_name = schedule_entry.name
 
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
+        if integration is None:
+            return original_apply_entry(*args, **kwargs)
+
         if match_regex_list(monitor_name, integration.exclude_beat_tasks):
             return original_apply_entry(*args, **kwargs)
+
+        # Tasks started by Celery Beat start a new Trace
+        scope = Scope.get_isolation_scope()
+        scope.set_new_propagation_context()
 
         monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
 
@@ -210,10 +215,7 @@ def _patch_redbeat_maybe_due():
         if task_should_be_excluded:
             return original_maybe_due(*args, **kwargs)
 
-        # When tasks are started from Celery Beat, make sure each task has its own trace.
-        # This needs to be called here because RedBeat is a custom scheduler and thus
-        # our implementation sentry_sdk.integrations.celer._patch_scheduler_apply_entry
-        # does not get called.
+        # Tasks started by Celery Beat start a new Trace
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()
 

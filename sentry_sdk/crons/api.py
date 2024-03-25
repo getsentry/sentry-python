@@ -52,9 +52,6 @@ def capture_checkin(
         monitor_config=monitor_config,
     )
 
-    print("### Event ###")
-    print(check_in_event)
-    print("------")
     sentry_sdk.capture_event(check_in_event)
 
     return check_in_event["check_in_id"]
