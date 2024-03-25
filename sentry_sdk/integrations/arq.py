@@ -9,6 +9,8 @@ from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
     SENSITIVE_DATA_SUBSTITUTE,
     parse_version,
@@ -69,11 +71,9 @@ def patch_enqueue_job():
     # type: () -> None
     old_enqueue_job = ArqRedis.enqueue_job
 
+    @ensure_integration_enabled_async(ArqIntegration, old_enqueue_job)
     async def _sentry_enqueue_job(self, function, *args, **kwargs):
         # type: (ArqRedis, str, *Any, **Any) -> Optional[Job]
-        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
-            return await old_enqueue_job(self, function, *args, **kwargs)
-
         with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_ARQ, description=function):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
@@ -84,11 +84,9 @@ def patch_run_job():
     # type: () -> None
     old_run_job = Worker.run_job
 
+    @ensure_integration_enabled_async(ArqIntegration, old_run_job)
     async def _sentry_run_job(self, job_id, score):
         # type: (Worker, str, int) -> None
-        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
-            return await old_run_job(self, job_id, score)
-
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
@@ -108,7 +106,7 @@ def patch_run_job():
 
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
-    scope = Scope.get_isolation_scope()
+    scope = Scope.get_current_scope()
 
     if scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
@@ -122,7 +120,7 @@ def _capture_exception(exc_info):
         client_options=Scope.get_client().options,
         mechanism={"type": ArqIntegration.identifier, "handled": False},
     )
-    scope.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _make_event_processor(ctx, *args, **kwargs):
@@ -131,7 +129,7 @@ def _make_event_processor(ctx, *args, **kwargs):
         # type: (Event, Hint) -> Optional[Event]
 
         with capture_internal_exceptions():
-            scope = Scope.get_isolation_scope()
+            scope = Scope.get_current_scope()
             if scope.transaction is not None:
                 scope.transaction.name = ctx["job_name"]
                 event["transaction"] = ctx["job_name"]
@@ -158,12 +156,11 @@ def _make_event_processor(ctx, *args, **kwargs):
 
 def _wrap_coroutine(name, coroutine):
     # type: (str, WorkerCoroutine) -> WorkerCoroutine
+
+    @ensure_integration_enabled_async(ArqIntegration, coroutine)
     async def _sentry_coroutine(ctx, *args, **kwargs):
         # type: (Dict[Any, Any], *Any, **Any) -> Any
-        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
-            return await coroutine(ctx, *args, **kwargs)
-
-        Scope.get_current_scope().add_event_processor(
+        Scope.get_isolation_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
         )
 
@@ -183,11 +180,9 @@ def patch_create_worker():
     # type: () -> None
     old_create_worker = arq.worker.create_worker
 
+    @ensure_integration_enabled(ArqIntegration, old_create_worker)
     def _sentry_create_worker(*args, **kwargs):
         # type: (*Any, **Any) -> Worker
-        if sentry_sdk.get_client().get_integration(ArqIntegration) is None:
-            return old_create_worker(*args, **kwargs)
-
         settings_cls = args[0]
 
         if hasattr(settings_cls, "functions"):

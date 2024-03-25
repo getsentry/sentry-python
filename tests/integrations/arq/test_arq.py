@@ -60,7 +60,6 @@ def init_arq(sentry_init):
             integrations=[ArqIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            debug=True,
         )
 
         server = FakeRedis()
