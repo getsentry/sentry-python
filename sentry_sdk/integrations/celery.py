@@ -337,11 +337,10 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
+@ensure_integration_enabled(CeleryIntegration)
 def _capture_exception(task, exc_info):
     # type: (Any, ExcInfo) -> None
     client = sentry_sdk.get_client()
-    if client.get_integration(CeleryIntegration) is None:
-        return
 
     if isinstance(exc_info[1], CELERY_CONTROL_FLOW_EXCEPTIONS):
         # ??? Doesn't map to anything
@@ -540,6 +539,7 @@ def _patch_redbeat_maybe_due():
 
     original_maybe_due = RedBeatScheduler.maybe_due
 
+    @ensure_integration_enabled(CeleryIntegration, original_maybe_due)
     def sentry_maybe_due(*args, **kwargs):
         # type: (*Any, **Any) -> None
         scheduler, schedule_entry = args
@@ -549,8 +549,6 @@ def _patch_redbeat_maybe_due():
         monitor_name = schedule_entry.name
 
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-        if integration is None:
-            return original_maybe_due(*args, **kwargs)
 
         if match_regex_list(monitor_name, integration.exclude_beat_tasks):
             return original_maybe_due(*args, **kwargs)

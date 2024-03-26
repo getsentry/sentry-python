@@ -4,7 +4,7 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
 
 from typing import TypeVar
 
@@ -74,9 +74,8 @@ T = TypeVar("T")
 
 
 def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
+    @ensure_integration_enabled(ClickhouseDriverIntegration, f)
     def _inner(*args: P.args, **kwargs: P.kwargs) -> T:
-        if sentry_sdk.get_client().get_integration(ClickhouseDriverIntegration) is None:
-            return f(*args, **kwargs)
         connection = args[0]
         query = args[1]
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
