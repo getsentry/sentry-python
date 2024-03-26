@@ -1,7 +1,7 @@
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import ensure_integration_enabled, event_from_exception
 
 from trytond.exceptions import TrytonException  # type: ignore
 from trytond.wsgi import app  # type: ignore
@@ -20,13 +20,12 @@ class TrytondWSGIIntegration(Integration):
     def setup_once():  # type: () -> None
         app.wsgi_app = SentryWsgiMiddleware(app.wsgi_app)
 
+        @ensure_integration_enabled(TrytondWSGIIntegration)
         def error_handler(e):  # type: (Exception) -> None
-            client = sentry_sdk.get_client()
-            if client.get_integration(TrytondWSGIIntegration) is None:
-                return
-            elif isinstance(e, TrytonException):
+            if isinstance(e, TrytonException):
                 return
             else:
+                client = sentry_sdk.get_client()
                 event, hint = event_from_exception(
                     e,
                     client_options=client.options,
