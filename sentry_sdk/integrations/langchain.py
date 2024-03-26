@@ -1,10 +1,14 @@
+from collections import OrderedDict
 from functools import wraps
 
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import OP
+from sentry_sdk.tracing import Span
 
 if TYPE_CHECKING:
-    from typing import Any, List, Callable, Dict, Union
-from sentry_sdk.hub import Hub
+    from typing import Any, List, Callable, Dict, Union, Optional
+    from uuid import UUID
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import logger, capture_internal_exceptions, event_from_exception
 
@@ -44,9 +48,13 @@ except ImportError:
 class LangchainIntegration(Integration):
     identifier = "langchain"
 
-    def __init__(self, include_prompts=False):
+    # The most number of spans (e.g., LLM calls) that can be processed at the same time.
+    max_spans = 1024
+
+    def __init__(self, include_prompts=False, max_spans=1024):
         # type: (LangchainIntegration, bool) -> None
         self.include_prompts = include_prompts
+        self.max_spans = max_spans
 
     @staticmethod
     def setup_once():
@@ -54,97 +62,168 @@ class LangchainIntegration(Integration):
         manager._configure = _wrap_configure(manager._configure)
 
 
-def _capture_exception(hub, exc, type="langchain"):
-    # type: (Hub, Any, str) -> None
+def _capture_exception(exc, type="langchain"):
+    # type: (Any, str) -> None
 
-    if hub.client is not None:
-        event, hint = event_from_exception(
-            exc,
-            client_options=hub.client.options,
-            mechanism={"type": type, "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": type, "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
-# TODO types
+class WatchedSpan:
+    span = None  # type: Span
+    num_tokens = 0  # type: int
+
+    def __init__(self, span, num_tokens=0):
+        # type: (Span, int) -> None
+        self.span = span
+        self.num_tokens = num_tokens
+
+
 class SentryLangchainCallback(BaseCallbackHandler):
     """Base callback handler that can be used to handle callbacks from langchain."""
 
-    def on_llm_start(self, serialized, prompts, **kwargs):
-        # type: (Dict[str, Any], List[str], **Any) -> Any
+    span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
+
+    max_span_map_size = 0
+
+    def __init__(self, max_span_map_size):
+        self.max_span_map_size = max_span_map_size
+
+    def gc_span_map(self):
+        while len(self.span_map) > self.max_span_map_size:
+            self.span_map.popitem(last=False)
+
+    def on_llm_start(
+        self,
+        serialized,
+        prompts,
+        *,
+        run_id,
+        tags=None,
+        parent_run_id=None,
+        metadata=None,
+        name=None,
+        **kwargs,
+    ):
+        # type: (Dict[str, Any], List[str], *Any, UUID, Optional[List[str]], Optional[UUID], Optional[Dict[str, Any]], Optional[str], **Any) -> Any
         """Run when LLM starts running."""
-        print("on_llm_start")
+        if not run_id:
+            return
+        span = sentry_sdk.start_span(
+            op=OP.LANGCHAIN_INFERENCE, description="Langchain LLM call"
+        )
+        self.span_map[run_id] = WatchedSpan(span)
+        self.gc_span_map()
+        span.__enter__()
 
-    def on_chat_model_start(self, serialized, messages, **kwargs):
-        # type: (Dict[str, Any], List[List[BaseMessage]], **Any) -> Any
+    def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
+        # type: (Dict[str, Any], List[List[BaseMessage]], *Any, UUID, **Any) -> Any
         """Run when Chat Model starts running."""
-        print("on_chat_model_start")
+        if not run_id:
+            return
+        span = sentry_sdk.start_span(
+            op=OP.LANGCHAIN_INFERENCE, description="Langchain LLM call"
+        )
+        self.span_map[run_id] = WatchedSpan(span)
+        self.gc_span_map()
+        span.__enter__()
 
-    def on_llm_new_token(self, token, **kwargs):
-        # type: (str, **Any) -> Any
+    def on_llm_new_token(self, token, *, run_id, **kwargs):
+        # type: (str, *Any, UUID, **Any) -> Any
         """Run on new LLM token. Only available when streaming is enabled."""
-        print("new token")
+        if not run_id or not self.span_map[run_id]:
+            return
+        span_data = self.span_map[run_id]
+        if not span_data:
+            return
+        span_data.num_tokens += count_tokens(token)
 
-    def on_llm_end(self, response, **kwargs):
-        # type: (LLMResult, **Any) -> Any
+    def on_llm_end(self, response, *, run_id, **kwargs):
+        # type: (LLMResult, *Any, UUID, **Any) -> Any
         """Run when LLM ends running."""
+        if not run_id:
+            return
+
+        span_data = self.span_map[run_id]
+        if not span_data:
+            return
+        span_data.span.__exit__(None, None, None)
+
         print("llm end")
 
-    def on_llm_error(self, error, **kwargs):
-        # type: (Union[Exception, KeyboardInterrupt], **Any) -> Any
+    def on_llm_error(self, error, *, run_id, **kwargs):
+        # type: (Union[Exception, KeyboardInterrupt], *Any, UUID, **Any) -> Any
         """Run when LLM errors."""
-        hub = Hub.current
-        if hub:
-            _capture_exception(hub, error, "langchain-llm")
+        _capture_exception(error, "langchain-llm")
 
-    def on_chain_start(self, serialized, inputs, **kwargs):
-        # type: (Dict[str, Any], Dict[str, Any], **kwargs) -> Any
+    def on_chain_start(self, serialized, inputs, *, run_id, **kwargs):
+        # type: (Dict[str, Any], Dict[str, Any], *Any, UUID, **Any) -> Any
         """Run when chain starts running."""
-        print("chain start: ", serialized)
+        if not run_id:
+            return
+        span = sentry_sdk.start_span(
+            op=OP.LANGCHAIN_INFERENCE, description="Langchain chain execution"
+        )
+        self.span_map[run_id] = WatchedSpan(span)
+        self.gc_span_map()
+        span.__enter__()
 
-    def on_chain_end(self, outputs, **kwargs):
-        # type: (Dict[str, Any], **Any) -> Any
+    def on_chain_end(self, outputs, *, run_id, **kwargs):
+        # type: (Dict[str, Any], *Any, UUID, **Any) -> Any
         """Run when chain ends running."""
+        if not run_id or not self.span_map[run_id]:
+            return
+
+        span_data = self.span_map[run_id]
+        if not span_data:
+            return
+        span_data.span.__exit__(None, None, None)
         print("chain end")
 
     def on_chain_error(self, error, **kwargs):
         # type: (Union[Exception, KeyboardInterrupt], **Any) -> Any
         """Run when chain errors."""
-        hub = Hub.current
-        if hub:
-            _capture_exception(hub, error, "langchain-chain")
+        _capture_exception(error, "langchain-chain")
 
-    def on_tool_start(self, serialized, input_str, **kwargs):
-        # type: (Dict[str, Any], str, **Any) -> Any
+    def on_tool_start(self, serialized, input_str, *, run_id, **kwargs):
+        # type: (Dict[str, Any], str, *Any, UUID, **Any) -> Any
         """Run when tool starts running."""
+        if not run_id:
+            return
         print("tool_start")
 
-    def on_tool_end(self, output, **kwargs):
-        # type: (str, **Any) -> Any
+    def on_tool_end(self, output, *, run_id, **kwargs):
+        # type: (str, *Any, UUID, **Any) -> Any
         """Run when tool ends running."""
+        if not run_id or not self.span_map[run_id]:
+            return
+
+        span_data = self.span_map[run_id]
+        if not span_data:
+            return
+        span_data.span.__exit__(None, None, None)
         print("tool_end", output)
 
     def on_tool_error(self, error, **kwargs):
         # type: (Union[Exception, KeyboardInterrupt], **Any) -> Any
         """Run when tool errors."""
-        hub = Hub.current
-        if hub:
-            _capture_exception(hub, error, "langchain-tool")
+        _capture_exception(error, "langchain-tool")
 
-    def on_text(self, text, **kwargs):
-        # type: (str, Any) -> Any
-        """Run on arbitrary text."""
-        print("text: ", text)
-
-    def on_agent_action(self, action, **kwargs):
-        # type: (AgentAction, **Any) -> Any
+    def on_agent_action(self, action, *, run_id, **kwargs):
+        # type: (AgentAction, *Any, UUID, **Any) -> Any
         """Run on agent action."""
-        print("agent_action", action)
+        if not run_id:
+            return
 
-    def on_agent_finish(self, finish, **kwargs):
-        # type: (AgentFinish, **Any) -> Any
+    def on_agent_finish(self, finish, *, run_id, **kwargs):
+        # type: (AgentFinish, *Any, UUID, **Any) -> Any
         """Run on agent end."""
-        print("agent_finish", finish)
+        if not run_id:
+            return
 
 
 def _wrap_configure(f):
@@ -153,6 +232,8 @@ def _wrap_configure(f):
     @wraps(f)
     def new_configure(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+
+        integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
 
         with capture_internal_exceptions():
             new_callbacks = []
@@ -184,7 +265,7 @@ def _wrap_configure(f):
                     already_added = True
 
             if not already_added:
-                new_callbacks.append(SentryLangchainCallback())
+                new_callbacks.append(SentryLangchainCallback(integration.max_spans))
         return f(*args, **kwargs)
 
     return new_configure
