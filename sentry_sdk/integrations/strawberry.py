@@ -85,12 +85,10 @@ def _patch_schema_init():
     # type: () -> None
     old_schema_init = Schema.__init__
 
+    @ensure_integration_enabled(StrawberryIntegration, old_schema_init)
     def _sentry_patched_schema_init(self, *args, **kwargs):
         # type: (Schema, Any, Any) -> None
         integration = sentry_sdk.get_client().get_integration(StrawberryIntegration)
-        if integration is None:
-            return old_schema_init(self, *args, **kwargs)
-
         extensions = kwargs.get("extensions") or []
 
         if integration.async_execution is not None:
@@ -308,19 +306,18 @@ def _patch_views():
         old_sync_view_handle_errors(self, errors, response_data)
         _sentry_patched_handle_errors(self, errors, response_data)
 
+    @ensure_integration_enabled(StrawberryIntegration)
     def _sentry_patched_handle_errors(self, errors, response_data):
         # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(StrawberryIntegration)
-        if integration is None:
-            return
-
         if not errors:
             return
 
         scope = Scope.get_isolation_scope()
         event_processor = _make_response_event_processor(response_data)
         scope.add_event_processor(event_processor)
+
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(StrawberryIntegration)
 
         with capture_internal_exceptions():
             for error in errors:
