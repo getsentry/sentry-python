@@ -2,6 +2,7 @@ from functools import wraps
 
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.consts import SPANDATA
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, Iterator
@@ -46,11 +47,6 @@ except ImportError:
     def count_tokens(s):
         # type: (str) -> int
         return 0
-
-
-COMPLETION_TOKENS_USED = "ai.completion_tоkens.used"
-PROMPT_TOKENS_USED = "ai.prompt_tоkens.used"
-TOTAL_TOKENS_USED = "ai.total_tоkens.used"
 
 
 class OpenAIIntegration(Integration):
@@ -138,11 +134,11 @@ def _calculate_chat_completion_usage(
         total_tokens = prompt_tokens + completion_tokens
 
     if completion_tokens != 0:
-        set_data_normalized(span, COMPLETION_TOKENS_USED, completion_tokens)
+        set_data_normalized(span, SPANDATA.AI_COMPLETION_TOKENS_USED, completion_tokens)
     if prompt_tokens != 0:
-        set_data_normalized(span, PROMPT_TOKENS_USED, prompt_tokens)
+        set_data_normalized(span, SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
     if total_tokens != 0:
-        set_data_normalized(span, TOTAL_TOKENS_USED, total_tokens)
+        set_data_normalized(span, SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)
 
 
 def _wrap_chat_completion_create(f):
@@ -181,10 +177,10 @@ def _wrap_chat_completion_create(f):
 
         with capture_internal_exceptions():
             if should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, "ai.input_messages", messages)
+                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, messages)
 
-            set_data_normalized(span, "ai.model_id", model)
-            set_data_normalized(span, "ai.streaming", streaming)
+            set_data_normalized(span, SPANDATA.AI_MODEL_ID, model)
+            set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
             if hasattr(res, "choices"):
                 if should_send_default_pii() and integration.include_prompts:
@@ -224,7 +220,9 @@ def _wrap_chat_completion_create(f):
                                 should_send_default_pii()
                                 and integration.include_prompts
                             ):
-                                set_data_normalized(span, "ai.responses", all_responses)
+                                set_data_normalized(
+                                    span, SPANDATA.AI_RESPONSES, all_responses
+                                )
                             _calculate_chat_completion_usage(
                                 messages, res, span, all_responses
                             )
@@ -288,8 +286,8 @@ def _wrap_embeddings_create(f):
             if total_tokens == 0:
                 total_tokens = prompt_tokens
 
-            set_data_normalized(span, PROMPT_TOKENS_USED, prompt_tokens)
-            set_data_normalized(span, TOTAL_TOKENS_USED, total_tokens)
+            set_data_normalized(span, SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
+            set_data_normalized(span, SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)
 
             return response
 

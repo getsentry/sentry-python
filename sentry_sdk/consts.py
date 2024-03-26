@@ -91,6 +91,48 @@ class SPANDATA:
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
+    AI_INPUT_MESSAGES = "ai.input_messages"
+    """
+    The input messages to an LLM call.
+    Example: [{"role": "user", "message": "hello"}]
+    """
+
+    AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
+    """
+    The number of tokens used to respond to an AI model request
+    Example: 10
+    """
+
+    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
+    """
+    The number of tokens used to process the input text to an AI model request
+    Example: 20
+    """
+
+    AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
+    """
+    The number of tokens used in total to process an AI model request
+    Example: 30
+    """
+
+    AI_MODEL_ID = "ai.model_id"
+    """
+    The unique descriptor of the model being execugted
+    Example: gpt-4
+    """
+
+    AI_STREAMING = "ai.streaming"
+    """
+    Whether or not the AI model call's repsonse was streamed back asynchronously
+    Example: true
+    """
+
+    AI_RESPONSES = "ai.responses"
+    """
+    The responses to an AI model call. Always as a list.
+    Example: ["hello", "world"]
+    """
+
     DB_NAME = "db.name"
     """
     The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
