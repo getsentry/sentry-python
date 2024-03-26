@@ -80,7 +80,7 @@ def setup_continuous_profiler(options):
 
     experiments = options.get("_experiments", {})
 
-    profiler_mode = experiments.get("profiler_mode") or default_profiler_mode
+    profiler_mode = experiments.get("continuous_profiling_mode") or default_profiler_mode
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
@@ -96,6 +96,17 @@ def setup_continuous_profiler(options):
     )
 
     return True
+
+
+def teardown_continuous_profiler():
+    # type: () -> None
+
+    global _scheduler
+
+    if _scheduler is not None:
+        _scheduler.teardown()
+
+    _scheduler = None
 
 
 def try_ensure_continuous_profiler_running():
@@ -125,6 +136,10 @@ class ContinuousScheduler(object):
         self.buffer = None  # type: Optional[ProfileBuffer]
 
     def ensure_running(self):
+        # type: () -> None
+        raise NotImplementedError
+
+    def teardown(self):
         # type: () -> None
         raise NotImplementedError
 
@@ -235,6 +250,13 @@ class ThreadContinuousScheduler(ContinuousScheduler):
             # timestamp so we can use it next iteration
             last = time.perf_counter()
 
+    def teardown(self):
+        # type: () -> None
+        if self.running:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
+
 
 class GeventContinuousScheduler(ContinuousScheduler):
     """
@@ -314,6 +336,13 @@ class GeventContinuousScheduler(ContinuousScheduler):
             # after sleeping, make sure to take the current
             # timestamp so we can use it next iteration
             last = time.perf_counter()
+
+    def teardown(self):
+        # type: () -> None
+        if self.running:
+            self.running = False
+            if self.thread is not None:
+                self.thread.join()
 
 
 class ProfileBuffer(object):

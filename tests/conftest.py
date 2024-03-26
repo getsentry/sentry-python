@@ -35,6 +35,7 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk._compat import iteritems, reraise, string_types, PY2
+from sentry_sdk.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
@@ -587,6 +588,7 @@ def object_described_by_matcher():
 def teardown_profiling():
     yield
     teardown_profiler()
+    teardown_continuous_profiler()
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):

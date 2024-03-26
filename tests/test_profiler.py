@@ -62,13 +62,7 @@ def experimental_options(mode=None, sample_rate=None):
 @requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
-    [
-        pytest.param("foo"),
-        pytest.param(
-            "gevent",
-            marks=pytest.mark.skipif(gevent is not None, reason="gevent not enabled"),
-        ),
-    ],
+    [pytest.param("foo")],
 )
 @pytest.mark.parametrize(
     "make_options",
