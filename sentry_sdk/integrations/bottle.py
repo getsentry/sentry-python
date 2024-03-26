@@ -99,12 +99,13 @@ class BottleIntegration(Integration):
         def patched_make_callback(self, *args, **kwargs):
             # type: (Route, *object, **object) -> Any
             client = sentry_sdk.get_client()
+            prepared_callback = old_make_callback(self, *args, **kwargs)
 
             def wrapped_callback(*args, **kwargs):
                 # type: (*object, **object) -> Any
 
                 try:
-                    res = old_make_callback(*args, **kwargs)
+                    res = prepared_callback(*args, **kwargs)
                 except HTTPResponse:
                     raise
                 except Exception as exception:
