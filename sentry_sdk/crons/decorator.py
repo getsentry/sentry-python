@@ -1,70 +1,59 @@
-import sys
+import inspect
+from functools import wraps
 
-from sentry_sdk._compat import contextmanager, reraise
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.utils import now
 
+
 if TYPE_CHECKING:
-    from typing import Generator, Optional
+    from typing import Callable, Optional, Type
+    from types import TracebackType
 
 
-@contextmanager
-def monitor(monitor_slug=None):
-    # type: (Optional[str]) -> Generator[None, None, None]
-    """
-    Decorator/context manager to capture checkin events for a monitor.
+class monitor:
+    def __init__(self, monitor_slug=None):
+        # type: (str) -> None
+        self.monitor_slug = monitor_slug
 
-    Usage (as decorator):
-    ```
-    import sentry_sdk
+    def __enter__(self):
+        # type: () -> None
+        self.start_timestamp = now()
+        self.check_in_id = capture_checkin(
+            monitor_slug=self.monitor_slug, status=MonitorStatus.IN_PROGRESS
+        )
 
-    app = Celery()
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]) -> None
+        duration_s = now() - self.start_timestamp
 
-    @app.task
-    @sentry_sdk.monitor(monitor_slug='my-fancy-slug')
-    def test(arg):
-        print(arg)
-    ```
+        if exc_type is None and exc_value is None and traceback is None:
+            status = MonitorStatus.OK
+        else:
+            status = MonitorStatus.ERROR
 
-    This does not have to be used with Celery, but if you do use it with celery,
-    put the `@sentry_sdk.monitor` decorator below Celery's `@app.task` decorator.
-
-    Usage (as context manager):
-    ```
-    import sentry_sdk
-
-    def test(arg):
-        with sentry_sdk.monitor(monitor_slug='my-fancy-slug'):
-            print(arg)
-    ```
-
-
-    """
-
-    start_timestamp = now()
-    check_in_id = capture_checkin(
-        monitor_slug=monitor_slug, status=MonitorStatus.IN_PROGRESS
-    )
-
-    try:
-        yield
-    except Exception:
-        duration_s = now() - start_timestamp
         capture_checkin(
-            monitor_slug=monitor_slug,
-            check_in_id=check_in_id,
-            status=MonitorStatus.ERROR,
+            monitor_slug=self.monitor_slug,
+            check_in_id=self.check_in_id,
+            status=status,
             duration=duration_s,
         )
-        exc_info = sys.exc_info()
-        reraise(*exc_info)
 
-    duration_s = now() - start_timestamp
-    capture_checkin(
-        monitor_slug=monitor_slug,
-        check_in_id=check_in_id,
-        status=MonitorStatus.OK,
-        duration=duration_s,
-    )
+    def __call__(self, fn):
+        # type: (Callable) -> Callable
+        if inspect.iscoroutinefunction(fn):
+
+            @wraps(fn)
+            async def inner(*args, **kwargs):
+                with self:
+                    return await fn(*args, **kwargs)
+
+        else:
+
+            @wraps(fn)
+            def inner(*args, **kwargs):
+                with self:
+                    return fn(*args, **kwargs)
+
+        return inner
