@@ -4,7 +4,6 @@ import sentry_sdk
 from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
-from sentry_sdk.utils import ensure_integration_enabled
 
 if MYPY:
     from socket import AddressFamily, SocketKind
@@ -43,13 +42,15 @@ def _patch_create_connection():
     # type: () -> None
     real_create_connection = socket.create_connection
 
-    @ensure_integration_enabled(SocketIntegration, real_create_connection)
     def create_connection(
         address,
         timeout=socket._GLOBAL_DEFAULT_TIMEOUT,  # type: ignore
         source_address=None,
     ):
         # type: (Tuple[Optional[str], int], Optional[float], Optional[Tuple[Union[bytearray, bytes, str], int]])-> socket.socket
+        integration = sentry_sdk.get_client().get_integration(SocketIntegration)
+        if integration is None:
+            return real_create_connection(address, timeout, source_address)
 
         with sentry_sdk.start_span(
             op=OP.SOCKET_CONNECTION,
