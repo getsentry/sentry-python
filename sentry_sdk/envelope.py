@@ -68,6 +68,12 @@ class Envelope(object):
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
 
+    def add_profile_chunk(
+        self, profile_chunk  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk"))
+
     def add_checkin(
         self, checkin  # type: Any
     ):
@@ -260,6 +266,8 @@ class Item(object):
             return "internal"
         elif ty == "profile":
             return "profile"
+        elif ty == "profile_chunk":
+            return "profile_chunk"
         elif ty == "statsd":
             return "statsd"
         elif ty == "check_in":

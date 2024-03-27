@@ -113,6 +113,7 @@ if TYPE_CHECKING:
         "session",
         "internal",
         "profile",
+        "profile_chunk",
         "statsd",
         "monitor",
     ]

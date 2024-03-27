@@ -4,13 +4,16 @@ import threading
 import time
 import uuid
 
+import sentry_sdk
 from sentry_sdk._compat import PY33, datetime_utcnow
+from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.profiler import DEFAULT_SAMPLING_FREQUENCY, extract_stack
 from sentry_sdk.utils import (
     capture_internal_exception,
     is_gevent,
+    format_timestamp,
     logger,
     now,
     set_in_app_in_frames,
@@ -363,16 +366,30 @@ class ProfileBuffer(object):
 
     def flush(self):
         # type: () -> None
-        chunk = self.chunk
-        chunk.to_json(self.profiler_id, self.options)
-        # TODO: flush chunk
+
+        hub = sentry_sdk.Hub.current
+        client = hub.client
+
+        if client is None or client.transport is None:
+            # We have no client and therefore nowhere to send this profile.
+            return None
+
+        chunk = self.chunk.to_json(self.profiler_id, self.options)
+
+        headers = {
+            "event_id": chunk["event_id"],
+            "sent_at": format_timestamp(datetime_utcnow()),
+        }  # type: dict[str, object]
+        envelope = Envelope(headers=headers)
+        envelope.add_profile_chunk(chunk)
+        client.transport.capture_envelope(envelope)
         return
 
 
 class ProfileChunk(object):
     def __init__(self, buffer_size):
         # type: (int) -> None
-        self.chunk_id = uuid.uuid4().hex
+        self.event_id = uuid.uuid4().hex
         self.buffer_size = buffer_size
         self.monotonic_time = now()
         self.start_timestamp = datetime_utcnow().timestamp() - self.monotonic_time
@@ -439,7 +456,7 @@ class ProfileChunk(object):
 
         return {
             "profiler_id": profiler_id,
-            "chunk_id": self.chunk_id,
+            "event_id": self.event_id,
             "environment": options["environment"],
             "release": options["release"],
             "platform": "python",
