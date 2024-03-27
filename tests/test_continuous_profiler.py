@@ -38,7 +38,7 @@ def test_profiler_invalid_mode(mode, make_options, teardown_profiling):
     [
         pytest.param("thread"),
         pytest.param("gevent", marks=requires_gevent),
-    ]
+    ],
 )
 @pytest.mark.parametrize(
     "make_options",
@@ -55,7 +55,7 @@ def test_profiler_valid_mode(mode, make_options, teardown_profiling):
     [
         pytest.param("thread"),
         pytest.param("gevent", marks=requires_gevent),
-    ]
+    ],
 )
 @pytest.mark.parametrize(
     "make_options",

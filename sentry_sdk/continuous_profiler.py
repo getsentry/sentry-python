@@ -83,7 +83,9 @@ def setup_continuous_profiler(options):
 
     experiments = options.get("_experiments", {})
 
-    profiler_mode = experiments.get("continuous_profiling_mode") or default_profiler_mode
+    profiler_mode = (
+        experiments.get("continuous_profiling_mode") or default_profiler_mode
+    )
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
@@ -95,7 +97,9 @@ def setup_continuous_profiler(options):
         raise ValueError("Unknown continuous profiler mode: {}".format(profiler_mode))
 
     logger.debug(
-        "[Profiling] Setting up continuous profiler in {mode} mode".format(mode=_scheduler.mode)
+        "[Profiling] Setting up continuous profiler in {mode} mode".format(
+            mode=_scheduler.mode
+        )
     )
 
     return True

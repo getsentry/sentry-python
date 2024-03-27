@@ -72,7 +72,9 @@ class Envelope(object):
         self, profile_chunk  # type: Any
     ):
         # type: (...) -> None
-        self.add_item(Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk"))
+        self.add_item(
+            Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk")
+        )
 
     def add_checkin(
         self, checkin  # type: Any

@@ -17,7 +17,10 @@ from sentry_sdk._compat import (
     iteritems,
     check_uwsgi_thread_support,
 )
-from sentry_sdk.continuous_profiler import has_continous_profiling_enabled, setup_continuous_profiler
+from sentry_sdk.continuous_profiler import (
+    has_continous_profiling_enabled,
+    setup_continuous_profiler,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
