@@ -1,3 +1,4 @@
+import atexit
 import os
 import sys
 import threading
@@ -99,6 +100,8 @@ def setup_continuous_profiler(options, capture_func):
             mode=_scheduler.mode
         )
     )
+
+    atexit.register(teardown_continuous_profiler)
 
     return True
 
@@ -260,6 +263,9 @@ class ThreadContinuousScheduler(ContinuousScheduler):
             # timestamp so we can use it next iteration
             last = time.perf_counter()
 
+        if self.buffer is not None:
+            self.buffer.flush()
+
     def teardown(self):
         # type: () -> None
         if self.running:
@@ -349,6 +355,9 @@ class GeventContinuousScheduler(ContinuousScheduler):
             # timestamp so we can use it next iteration
             last = time.perf_counter()
 
+        if self.buffer is not None:
+            self.buffer.flush()
+
     def teardown(self):
         # type: () -> None
         if self.running:
@@ -386,6 +395,7 @@ class ProfileBuffer(object):
         if self.should_flush(monotonic_time):
             self.flush()
             self.chunk = ProfileChunk()
+            self.start_monotonic_time = now()
 
         self.chunk.write(self.start_timestamp + monotonic_time, sample)
 
