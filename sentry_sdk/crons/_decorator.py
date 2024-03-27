@@ -14,14 +14,16 @@ class _MonitorMixin:
 
             @wraps(fn)
             async def inner(*args, **kwargs):
-                with self:
+                # type: (Any, Any) -> Any
+                with self:  # type: ignore[attr-defined]
                     return await fn(*args, **kwargs)
 
         else:
 
             @wraps(fn)
             def inner(*args, **kwargs):
-                with self:
+                # type: (Any, Any) -> Any
+                with self:  # type: ignore[attr-defined]
                     return fn(*args, **kwargs)
 
         return inner

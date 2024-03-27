@@ -11,7 +11,8 @@ class _MonitorMixin:
         # type: (Callable[..., Any]) -> Callable[..., Any]
         @wraps(fn)
         def inner(*args, **kwargs):
-            with self:
+            # type: (Any, Any) -> Any
+            with self:  # type: ignore[attr-defined]
                 return fn(*args, **kwargs)
 
         return inner
