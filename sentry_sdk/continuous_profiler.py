@@ -385,7 +385,7 @@ class ProfileBuffer(object):
         chunk = self.chunk.to_json(self.profiler_id, self.options)
 
         headers = {
-            "event_id": chunk["event_id"],
+            "event_id": chunk["chunk_id"],
             "sent_at": format_timestamp(datetime_utcnow()),
         }  # type: dict[str, object]
         envelope = Envelope(headers=headers)
@@ -397,7 +397,7 @@ class ProfileBuffer(object):
 class ProfileChunk(object):
     def __init__(self, buffer_size):
         # type: (int) -> None
-        self.event_id = uuid.uuid4().hex
+        self.chunk_id = uuid.uuid4().hex
         self.buffer_size = buffer_size
         self.monotonic_time = now()
         self.start_timestamp = datetime_utcnow().timestamp() - self.monotonic_time
@@ -463,11 +463,11 @@ class ProfileChunk(object):
         )
 
         return {
-            "profiler_id": profiler_id,
-            "event_id": self.event_id,
+            "chunk_id": self.chunk_id,
             "environment": options["environment"],
-            "release": options["release"],
             "platform": "python",
-            "version": "2",
             "profile": profile,
+            "profiler_id": profiler_id,
+            "release": options["release"],
+            "version": "2",
         }
