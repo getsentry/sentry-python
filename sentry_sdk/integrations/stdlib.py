@@ -62,6 +62,7 @@ def _install_httplib():
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
 
+    @ensure_integration_enabled(StdlibIntegration)
     def putrequest(self, method, url, *args, **kwargs):
         # type: (HTTPConnection, str, str, *Any, **Any) -> Any
         host = self.host
@@ -69,9 +70,7 @@ def _install_httplib():
         default_port = self.default_port
 
         client = sentry_sdk.get_client()
-        if client.get_integration(StdlibIntegration) is None or is_sentry_url(
-            client, host
-        ):
+        if is_sentry_url(client, host):
             return real_putrequest(self, method, url, *args, **kwargs)
 
         real_url = url
