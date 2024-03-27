@@ -12,7 +12,6 @@ from sentry_sdk.profiler import DEFAULT_SAMPLING_FREQUENCY, extract_stack
 from sentry_sdk.utils import (
     capture_internal_exception,
     is_gevent,
-    format_timestamp,
     logger,
     now,
     set_in_app_in_frames,
