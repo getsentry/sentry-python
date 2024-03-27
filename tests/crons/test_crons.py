@@ -2,9 +2,8 @@ import pytest
 import uuid
 
 import sentry_sdk
-from sentry_sdk.crons import capture_checkin
-
 from sentry_sdk import Hub, configure_scope, set_level
+from sentry_sdk.crons import capture_checkin
 
 try:
     from unittest import mock  # python 3.3 and above
