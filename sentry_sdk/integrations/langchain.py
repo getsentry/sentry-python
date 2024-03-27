@@ -52,7 +52,7 @@ class WatchedSpan:
         self.num_tokens = num_tokens
 
 
-class SentryLangchainCallback(BaseCallbackHandler):
+class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Base callback handler that can be used to handle callbacks from langchain."""
 
     span_map = OrderedDict()  # type: OrderedDict[UUID, WatchedSpan]
@@ -60,15 +60,18 @@ class SentryLangchainCallback(BaseCallbackHandler):
     max_span_map_size = 0
 
     def __init__(self, max_span_map_size, include_prompts):
+        # type: (int, bool) -> None
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
     def gc_span_map(self):
+        # type: () -> None
+
         while len(self.span_map) > self.max_span_map_size:
             self.span_map.popitem(last=False)[1].span.__exit__(None, None, None)
 
     def _handle_error(self, run_id, error):
-        # type: (str, Any) -> None
+        # type: (UUID, Any) -> None
         if not run_id or not self.span_map[run_id]:
             return
 
@@ -80,13 +83,13 @@ class SentryLangchainCallback(BaseCallbackHandler):
         del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message):
-        # type: (BaseMessage) -> dict
+        # type: (BaseMessage) -> Any
         parsed = {"content": message.content, "role": message.type}
         parsed.update(message.additional_kwargs)
         return parsed
 
     def _create_span(self, run_id, parent_id, **kwargs):
-        # type: (UUID, Optional[UUID], Any) -> Span
+        # type: (SentryLangchainCallback, UUID, Optional[Any], Dict[str, Any]) -> Span
 
         span = None  # type: Optional[Span]
         if parent_id:
@@ -113,7 +116,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
         metadata=None,
         **kwargs,
     ):
-        # type: (Dict[str, Any], List[str], Any, UUID, Optional[List[str]], Optional[UUID], Optional[Dict[str, Any]], Any) -> Any
+        # type: (SentryLangchainCallback, Dict[str, Any], List[str], UUID, Optional[List[str]], Optional[UUID], Optional[Dict[str, Any]], Dict[str, Any]) -> Any
         """Run when LLM starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -128,7 +131,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompts)
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
-        # type: (Dict[str, Any], List[List[BaseMessage]], Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Dict[str, Any]) -> Any
         """Run when Chat Model starts running."""
         if not run_id:
             return
@@ -151,7 +154,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 )
 
     def on_llm_new_token(self, token, *, run_id, **kwargs):
-        # type: (str, Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, str, UUID, Dict[str, Any]) -> Any
         """Run on new LLM token. Only available when streaming is enabled."""
         with capture_internal_exceptions():
             if not run_id or not self.span_map[run_id]:
@@ -162,7 +165,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             span_data.num_tokens += 1
 
     def on_llm_end(self, response, *, run_id, **kwargs):
-        # type: (LLMResult, Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, LLMResult, UUID, Dict[str, Any]) -> Any
         """Run when LLM ends running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -206,13 +209,13 @@ class SentryLangchainCallback(BaseCallbackHandler):
             del self.span_map[run_id]
 
     def on_llm_error(self, error, *, run_id, **kwargs):
-        # type: (Union[Exception, KeyboardInterrupt], Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Dict[str, Any]) -> Any
         """Run when LLM errors."""
         with capture_internal_exceptions():
             self._handle_error(run_id, error)
 
     def on_chain_start(self, serialized, inputs, *, run_id, **kwargs):
-        # type: (Dict[str, Any], Dict[str, Any], Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Dict[str, Any], Dict[str, Any], UUID, Dict[str, Any]) -> Any
         """Run when chain starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -225,7 +228,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             )
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
-        # type: (Dict[str, Any], Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Dict[str, Any], UUID, Dict[str, Any]) -> Any
         """Run when chain ends running."""
         with capture_internal_exceptions():
             if not run_id or not self.span_map[run_id]:
@@ -238,12 +241,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
             del self.span_map[run_id]
 
     def on_chain_error(self, error, *, run_id, **kwargs):
-        # type: (Union[Exception, KeyboardInterrupt], Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Dict[str, Any]) -> Any
         """Run when chain errors."""
         self._handle_error(run_id, error)
 
     def on_tool_start(self, serialized, input_str, *, run_id, **kwargs):
-        # type: (Dict[str, Any], str, Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Dict[str, Any], str, UUID, Dict[str, Any]) -> Any
         """Run when tool starts running."""
         with capture_internal_exceptions():
             if not run_id:
@@ -260,7 +263,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
-        # type: (str, Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, str, UUID, Dict[str, Any]) -> Any
         """Run when tool ends running."""
         with capture_internal_exceptions():
             if not run_id or not self.span_map[run_id]:
@@ -275,7 +278,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
             del self.span_map[run_id]
 
     def on_tool_error(self, error, *args, run_id, **kwargs):
-        # type: (Union[Exception, KeyboardInterrupt], Any, UUID, Any) -> Any
+        # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Dict[str, Any]) -> Any
         """Run when tool errors."""
         self._handle_error(run_id, error)
 
@@ -290,7 +293,7 @@ def _wrap_configure(f):
         integration = sentry_sdk.get_client().get_integration(LangchainIntegration)
 
         with capture_internal_exceptions():
-            new_callbacks = []
+            new_callbacks = []  # type: List[BaseCallbackHandler]
             if "local_callbacks" in kwargs:
                 existing_callbacks = kwargs["local_callbacks"]
                 kwargs["local_callbacks"] = new_callbacks
