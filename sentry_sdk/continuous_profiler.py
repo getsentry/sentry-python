@@ -4,7 +4,7 @@ import threading
 import time
 import uuid
 
-from sentry_sdk._compat import PY33, datetime_utcnow
+from sentry_sdk._compat import PY33, datetime_utcnow, text_type
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
@@ -369,38 +369,46 @@ class ProfileBuffer(object):
         self.capture_func = capture_func
 
         self.profiler_id = uuid.uuid4().hex
-        self.chunk = ProfileChunk(self.buffer_size)
+        self.chunk = ProfileChunk()
 
-    def write(self, ts, sample):
+        # Make sure to use the same clock to compute a sample's monotonic timestamp
+        # to ensure the timestamps are correctly aligned.
+        self.start_monotonic_time = now()
+
+        # Make sure the start timestamp is defined only once per profiler id.
+        # This prevents issues with clock drift within a single profiler session.
+        #
+        # Subtracting the start_monotonic_time here to find a fixed starting position
+        # for relative monotonic timestamps for each sample.
+        self.start_timestamp = datetime_utcnow().timestamp() - self.start_monotonic_time
+
+    def write(self, monotonic_time, sample):
         # type: (float, ExtractedSample) -> None
-        if self.chunk.is_full(ts):
+        if self.should_flush(monotonic_time):
             self.flush()
-            self.chunk = ProfileChunk(self.buffer_size)
+            self.chunk = ProfileChunk()
 
-        self.chunk.write(ts, sample)
+        self.chunk.write(self.start_timestamp + monotonic_time, sample)
+
+    def should_flush(self, monotonic_time):
+        # type: (float) -> bool
+
+        # If the delta between the new monotonic time and the start monotonic time
+        # exceeds the buffer size, it means we should flush the chunk
+        return monotonic_time - self.start_monotonic_time >= self.buffer_size
 
     def flush(self):
         # type: () -> None
-
         chunk = self.chunk.to_json(self.profiler_id, self.options)
-
-        headers = {
-            "event_id": chunk["chunk_id"],
-            "sent_at": format_timestamp(datetime_utcnow()),
-        }  # type: dict[str, object]
-        envelope = Envelope(headers=headers)
+        envelope = Envelope()
         envelope.add_profile_chunk(chunk)
         self.capture_func(envelope)
-        return
 
 
 class ProfileChunk(object):
-    def __init__(self, buffer_size):
-        # type: (int) -> None
+    def __init__(self):
+        # type: () -> None
         self.chunk_id = uuid.uuid4().hex
-        self.buffer_size = buffer_size
-        self.monotonic_time = now()
-        self.start_timestamp = datetime_utcnow().timestamp() - self.monotonic_time
 
         self.indexed_frames = {}  # type: Dict[FrameId, int]
         self.indexed_stacks = {}  # type: Dict[StackId, int]
@@ -408,11 +416,7 @@ class ProfileChunk(object):
         self.stacks = []  # type: List[ProcessedStack]
         self.samples = []  # type: List[ProcessedSample]
 
-    def is_full(self, ts):
-        # type: (float) -> bool
-        return ts - self.monotonic_time >= self.buffer_size
-
-    def write(self, relative_ts, sample):
+    def write(self, ts, sample):
         # type: (float, ExtractedSample) -> None
         for tid, (stack_id, frame_ids, frames) in sample:
             try:
@@ -431,7 +435,7 @@ class ProfileChunk(object):
 
                 self.samples.append(
                     {
-                        "timestamp": self.start_timestamp + relative_ts,
+                        "timestamp": ts,
                         "thread_id": tid,
                         "stack_id": self.indexed_stacks[stack_id],
                     }
@@ -462,12 +466,16 @@ class ProfileChunk(object):
             options["project_root"],
         )
 
-        return {
+        payload = {
             "chunk_id": self.chunk_id,
-            "environment": options["environment"],
             "platform": "python",
             "profile": profile,
             "profiler_id": profiler_id,
-            "release": options["release"],
             "version": "2",
         }
+
+        for key in "environment", "release", "dist":
+            if options[key] is not None:
+                payload[key] = text_type(options[key]).strip()
+
+        return payload
