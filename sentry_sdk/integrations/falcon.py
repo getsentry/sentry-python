@@ -149,9 +149,12 @@ def _patch_wsgi_app():
     # type: () -> None
     original_wsgi_app = falcon_app_class.__call__
 
-    @ensure_integration_enabled(FalconIntegration, original_wsgi_app)
     def sentry_patched_wsgi_app(self, env, start_response):
         # type: (falcon.API, Any, Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
+        if integration is None:
+            return original_wsgi_app(self, env, start_response)
+
         sentry_wrapped = SentryWsgiMiddleware(
             lambda envi, start_resp: original_wsgi_app(self, envi, start_resp)
         )
