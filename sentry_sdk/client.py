@@ -337,7 +337,10 @@ class _Client(object):
                     logger.debug("Can not set up profiler. (%s)", e)
             elif continuous_profiling_enabled:
                 try:
-                    setup_continuous_profiler(self.options)
+                    setup_continuous_profiler(
+                        self.options,
+                        capture_func=_capture_envelope,
+                    )
                 except Exception as e:
                     logger.debug("Can not set up continuous profiler. (%s)", e)
 

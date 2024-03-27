@@ -60,8 +60,8 @@ except ImportError:
 _scheduler = None  # type: Optional[ContinuousScheduler]
 
 
-def setup_continuous_profiler(options):
-    # type: (Dict[str, Any]) -> bool
+def setup_continuous_profiler(options, capture_func):
+    # type: (Dict[str, Any], Callable[[Envelope], None]) -> bool
     global _scheduler
 
     if _scheduler is not None:
@@ -90,9 +90,9 @@ def setup_continuous_profiler(options):
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
     if profiler_mode == ThreadContinuousScheduler.mode:
-        _scheduler = ThreadContinuousScheduler(frequency, options)
+        _scheduler = ThreadContinuousScheduler(frequency, options, capture_func)
     elif profiler_mode == GeventContinuousScheduler.mode:
-        _scheduler = GeventContinuousScheduler(frequency, options)
+        _scheduler = GeventContinuousScheduler(frequency, options, capture_func)
     else:
         raise ValueError("Unknown continuous profiler mode: {}".format(profiler_mode))
 
@@ -135,10 +135,11 @@ def has_continous_profiling_enabled(options):
 class ContinuousScheduler(object):
     mode = "unknown"  # type: ContinuousProfilerMode
 
-    def __init__(self, frequency, options):
-        # type: (int, Dict[str, Any]) -> None
+    def __init__(self, frequency, options, capture_func):
+        # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
         self.interval = 1.0 / frequency
         self.options = options
+        self.capture_func = capture_func
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
 
@@ -152,7 +153,7 @@ class ContinuousScheduler(object):
 
     def reset_buffer(self):
         # type: () -> None
-        self.buffer = ProfileBuffer(self.options, PROFILE_BUFFER_SECONDS)
+        self.buffer = ProfileBuffer(self.options, PROFILE_BUFFER_SECONDS, self.capture_func)
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -195,9 +196,9 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     mode = "thread"  # type: ContinuousProfilerMode
     name = "sentry.profiler.ThreadContinuousScheduler"
 
-    def __init__(self, frequency, options):
-        # type: (int, Dict[str, Any]) -> None
-        super(ThreadContinuousScheduler, self).__init__(frequency, options)
+    def __init__(self, frequency, options, capture_func):
+        # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
+        super(ThreadContinuousScheduler, self).__init__(frequency, options, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
         self.running = False
@@ -281,13 +282,13 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
     mode = "gevent"  # type: ContinuousProfilerMode
 
-    def __init__(self, frequency, options):
-        # type: (int, Dict[str, Any]) -> None
+    def __init__(self, frequency, options, capture_func):
+        # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
 
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventContinuousScheduler, self).__init__(frequency, options)
+        super(GeventContinuousScheduler, self).__init__(frequency, options, capture_func)
 
         self.thread = None  # type: Optional[ThreadPool]
         self.running = False
@@ -356,11 +357,13 @@ PROFILE_BUFFER_SECONDS = 10
 
 
 class ProfileBuffer(object):
-    def __init__(self, options, buffer_size):
-        # type: (Dict[str, Any], int) -> None
-        self.profiler_id = uuid.uuid4().hex
+    def __init__(self, options, buffer_size, capture_func):
+        # type: (Dict[str, Any], int, Callable[[Envelope], None]) -> None
         self.options = options
         self.buffer_size = buffer_size
+        self.capture_func = capture_func
+
+        self.profiler_id = uuid.uuid4().hex
         self.chunk = ProfileChunk(self.buffer_size)
 
     def write(self, ts, sample):
@@ -374,12 +377,6 @@ class ProfileBuffer(object):
     def flush(self):
         # type: () -> None
 
-        client = sentry_sdk.Hub.current.client
-
-        if client is None or client.transport is None:
-            # We have no client and therefore nowhere to send this profile.
-            return None
-
         chunk = self.chunk.to_json(self.profiler_id, self.options)
 
         headers = {
@@ -388,7 +385,7 @@ class ProfileBuffer(object):
         }  # type: dict[str, object]
         envelope = Envelope(headers=headers)
         envelope.add_profile_chunk(chunk)
-        client.transport.capture_envelope(envelope)
+        self.capture_func(envelope)
         return
 
 

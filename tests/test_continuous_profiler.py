@@ -1,4 +1,5 @@
 import time
+from collections import defaultdict
 
 import pytest
 
@@ -37,7 +38,7 @@ def experimental_options(enabled, mode=None):
 )
 def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
     with pytest.raises(ValueError):
-        setup_continuous_profiler(make_options(True, mode))
+        setup_continuous_profiler(make_options(True, mode), lambda envelope: None)
 
 
 @requires_python_version(3, 3)
@@ -54,7 +55,7 @@ def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling
 )
 def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     options = make_options(True, mode)
-    setup_continuous_profiler(options)
+    setup_continuous_profiler(options, lambda envelope: None)
 
 
 @requires_python_version(3, 3)
@@ -72,9 +73,9 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
 def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
     options = make_options(True, mode)
     # setting up the first time should return True to indicate success
-    assert setup_continuous_profiler(options)
+    assert setup_continuous_profiler(options, lambda envelope: None)
     # setting up the second time should return False to indicate no-op
-    assert not setup_continuous_profiler(options)
+    assert not setup_continuous_profiler(options, lambda envelope: None)
 
 
 @requires_python_version(3, 3)
@@ -89,7 +90,7 @@ def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling)
     "make_options",
     [pytest.param(experimental_options, id="experiment")],
 )
-@mock.patch("sentry_sdk.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.02)
+@mock.patch("sentry_sdk.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_enable(
     sentry_init,
     capture_envelopes,
@@ -108,6 +109,10 @@ def test_continuous_profiler_enable(
     with start_transaction(name="profiling"):
         time.sleep(0.05)
 
+    items = defaultdict(list)
     for envelope in envelopes:
-        print(envelope)
-    assert 0
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["transaction"]) == 1
+    assert len(items["profile_chunk"]) > 0
