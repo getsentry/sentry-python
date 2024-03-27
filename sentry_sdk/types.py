@@ -18,4 +18,4 @@ else:
     Event = None
     Hint = None
 
-__all__ = ["Event", "Hint"]
+__all__ = ("Event", "Hint")
