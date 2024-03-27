@@ -1,5 +1,9 @@
-import inspect
 from functools import wraps
+
+try:
+    from inspect import iscoroutinefunction
+except ImportError:
+    iscoroutinefunction = lambda f: False
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.crons import capture_checkin
@@ -42,12 +46,18 @@ class monitor:
 
     def __call__(self, fn):
         # type: (Callable) -> Callable
-        if inspect.iscoroutinefunction(fn):
+        if iscoroutinefunction(fn):
 
+            # No async def in Python 2...
+            # XXX get rid of this in SDK 2.0
+            exec(
+                """
             @wraps(fn)
             async def inner(*args, **kwargs):
                 with self:
                     return await fn(*args, **kwargs)
+            """
+            )
 
         else:
 
