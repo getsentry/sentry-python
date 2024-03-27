@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 
-class monitor:
+class monitor:  # noqa: N801
     def __init__(self, monitor_slug=None):
         # type: (str) -> None
         self.monitor_slug = monitor_slug
