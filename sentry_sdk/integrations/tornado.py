@@ -51,8 +51,8 @@ class TornadoIntegration(Integration):
     @staticmethod
     def setup_once():
         # type: () -> None
-        if TORNADO_VERSION < (6, 4):
-            raise DidNotEnable("Tornado 6.4+ required")
+        if TORNADO_VERSION < (6, 0):
+            raise DidNotEnable("Tornado 6.0+ required")
 
         if not HAS_REAL_CONTEXTVARS:
             # Tornado is async. We better have contextvars or we're going to leak
