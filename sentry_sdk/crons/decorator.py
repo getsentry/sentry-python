@@ -11,14 +11,14 @@ if TYPE_CHECKING:
 if PY2:
     from sentry_sdk.crons._decorator_py2 import _MonitorMixin
 else:
-    # This is in its own module so that we don't trigger
-    # `async def` SyntaxErrors on Python 2.
+    # This is in its own module so that we don't make Python 2
+    # angery over `async def` SyntaxErrors.
     # Once we drop Python 2, remove the mixin and merge it
     # into the main monitor class.
     from sentry_sdk.crons._decorator import _MonitorMixin
 
 
-class monitor(_MonitorMixin):
+class monitor(_MonitorMixin):  # noqa: N801
     """
     Decorator/context manager to capture checkin events for a monitor.
 
