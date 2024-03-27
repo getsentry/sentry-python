@@ -48,16 +48,10 @@ class monitor:
         # type: (Callable) -> Callable
         if iscoroutinefunction(fn):
 
-            # No async def in Python 2...
-            # XXX get rid of this in SDK 2.0
-            exec(
-                """
             @wraps(fn)
             async def inner(*args, **kwargs):
                 with self:
                     return await fn(*args, **kwargs)
-            """
-            )
 
         else:
 
