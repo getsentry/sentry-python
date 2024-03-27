@@ -3,6 +3,7 @@ from functools import wraps
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations._ai_common import set_data_normalized
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, Iterator
@@ -71,28 +72,6 @@ def _capture_exception(exc):
         mechanism={"type": "openai", "handled": False},
     )
     sentry_sdk.capture_event(event, hint=hint)
-
-
-def _normalize_data(data):
-    # type: (Any) -> Any
-
-    # convert pydantic data (e.g. OpenAI v1+) to json compatible format
-    if hasattr(data, "model_dump"):
-        try:
-            return data.model_dump()
-        except Exception as e:
-            logger.warning("Could not convert pydantic data to JSON: %s", e)
-            return data
-    if isinstance(data, list):
-        return list(_normalize_data(x) for x in data)
-    if isinstance(data, dict):
-        return {k: _normalize_data(v) for (k, v) in data.items()}
-    return data
-
-
-def set_data_normalized(span, key, value):
-    # type: (Span, str, Any) -> None
-    span.set_data(key, _normalize_data(value))
 
 
 def _calculate_chat_completion_usage(
