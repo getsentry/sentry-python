@@ -9,16 +9,16 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 if PY2:
-    from sentry_sdk.crons._decorator_py2 import _MonitorMixin
+    from sentry_sdk.crons._decorator_py2 import MonitorMixin
 else:
     # This is in its own module so that we don't make Python 2
     # angery over `async def`s.
     # Once we drop Python 2, remove the mixin and merge it
     # into the main monitor class.
-    from sentry_sdk.crons._decorator import _MonitorMixin
+    from sentry_sdk.crons._decorator import MonitorMixin
 
 
-class monitor(_MonitorMixin):  # noqa: N801
+class monitor(MonitorMixin):  # noqa: N801
     """
     Decorator/context manager to capture checkin events for a monitor.
 
