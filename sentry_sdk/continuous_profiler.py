@@ -4,7 +4,6 @@ import threading
 import time
 import uuid
 
-import sentry_sdk
 from sentry_sdk._compat import PY33, datetime_utcnow
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
@@ -153,7 +152,9 @@ class ContinuousScheduler(object):
 
     def reset_buffer(self):
         # type: () -> None
-        self.buffer = ProfileBuffer(self.options, PROFILE_BUFFER_SECONDS, self.capture_func)
+        self.buffer = ProfileBuffer(
+            self.options, PROFILE_BUFFER_SECONDS, self.capture_func
+        )
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -198,7 +199,9 @@ class ThreadContinuousScheduler(ContinuousScheduler):
 
     def __init__(self, frequency, options, capture_func):
         # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
-        super(ThreadContinuousScheduler, self).__init__(frequency, options, capture_func)
+        super(ThreadContinuousScheduler, self).__init__(
+            frequency, options, capture_func
+        )
 
         self.thread = None  # type: Optional[threading.Thread]
         self.running = False
@@ -288,7 +291,9 @@ class GeventContinuousScheduler(ContinuousScheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventContinuousScheduler, self).__init__(frequency, options, capture_func)
+        super(GeventContinuousScheduler, self).__init__(
+            frequency, options, capture_func
+        )
 
         self.thread = None  # type: Optional[ThreadPool]
         self.running = False
