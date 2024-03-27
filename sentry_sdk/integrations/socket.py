@@ -70,7 +70,7 @@ def _patch_getaddrinfo():
     # type: () -> None
     real_getaddrinfo = socket.getaddrinfo
 
-    @ensure_integration_enabled(real_getaddrinfo)
+    @ensure_integration_enabled(SocketIntegration, real_getaddrinfo)
     def getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         # type: (Union[bytes, str, None], Union[str, int, None], int, int, int, int) -> List[Tuple[AddressFamily, SocketKind, int, str, Union[Tuple[str, int], Tuple[str, int, int, int]]]]
         with sentry_sdk.start_span(
