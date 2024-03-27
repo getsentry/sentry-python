@@ -287,7 +287,7 @@ class OP:
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
     OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
     OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
-    LANGCHAIN_INFERENCE = "ai.inference.langchain"
+    LANGCHAIN_RUN = "ai.run.langchain"
     LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
