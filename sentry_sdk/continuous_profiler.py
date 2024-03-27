@@ -152,7 +152,7 @@ class ContinuousScheduler(object):
 
     def reset_buffer(self):
         # type: () -> None
-        self.buffer = ProfileBuffer(self.options)
+        self.buffer = ProfileBuffer(self.options, PROFILE_BUFFER_SECONDS)
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -352,8 +352,11 @@ class GeventContinuousScheduler(ContinuousScheduler):
                 self.thread.join()
 
 
+PROFILE_BUFFER_SECONDS = 10
+
+
 class ProfileBuffer(object):
-    def __init__(self, options, buffer_size=1):
+    def __init__(self, options, buffer_size):
         # type: (Dict[str, Any], int) -> None
         self.profiler_id = uuid.uuid4().hex
         self.options = options
@@ -371,8 +374,7 @@ class ProfileBuffer(object):
     def flush(self):
         # type: () -> None
 
-        hub = sentry_sdk.Hub.current
-        client = hub.client
+        client = sentry_sdk.Hub.current.client
 
         if client is None or client.transport is None:
             # We have no client and therefore nowhere to send this profile.
