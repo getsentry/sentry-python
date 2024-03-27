@@ -6,6 +6,7 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     parse_version,
 )
@@ -148,12 +149,9 @@ def _patch_wsgi_app():
     # type: () -> None
     original_wsgi_app = falcon_app_class.__call__
 
+    @ensure_integration_enabled(FalconIntegration, original_wsgi_app)
     def sentry_patched_wsgi_app(self, env, start_response):
         # type: (falcon.API, Any, Any) -> Any
-        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
-        if integration is None:
-            return original_wsgi_app(self, env, start_response)
-
         sentry_wrapped = SentryWsgiMiddleware(
             lambda envi, start_resp: original_wsgi_app(self, envi, start_resp)
         )
@@ -167,6 +165,7 @@ def _patch_handle_exception():
     # type: () -> None
     original_handle_exception = falcon_app_class._handle_exception
 
+    @ensure_integration_enabled(FalconIntegration, original_handle_exception)
     def sentry_patched_handle_exception(self, *args):
         # type: (falcon.API, *Any) -> Any
         # NOTE(jmagnusson): falcon 2.0 changed falcon.API._handle_exception
@@ -188,9 +187,8 @@ def _patch_handle_exception():
             return was_handled
 
         client = sentry_sdk.get_client()
-        integration = client.get_integration(FalconIntegration)
 
-        if integration is not None and _exception_leads_to_http_5xx(ex, response):
+        if _exception_leads_to_http_5xx(ex, response):
             # If an integration is there, a client has to be there.
             event, hint = event_from_exception(
                 ex,
