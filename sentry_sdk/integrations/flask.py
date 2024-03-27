@@ -112,12 +112,10 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
+@ensure_integration_enabled(FlaskIntegration)
 def _request_started(app, **kwargs):
     # type: (Flask, **Any) -> None
     integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
-    if integration is None:
-        return
-
     request = flask_request._get_current_object()
 
     # Set the transaction name and source here,
@@ -192,15 +190,12 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
+@ensure_integration_enabled(FlaskIntegration)
 def _capture_exception(sender, exception, **kwargs):
     # type: (Flask, Union[ValueError, BaseException], **Any) -> None
-    client = sentry_sdk.get_client()
-    if client.get_integration(FlaskIntegration) is None:
-        return
-
     event, hint = event_from_exception(
         exception,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "flask", "handled": False},
     )
 
