@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import List, Optional, Any, Iterator
 from unittest.mock import Mock
 
@@ -124,7 +123,7 @@ def test_langchain_agent(
     llm = MockOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
-        openai_api_key=open(Path.home() / "open_ai_key").read().strip(),
+        openai_api_key="badkey",
     )
     agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
