@@ -4,6 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations._ai_common import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 
@@ -78,8 +79,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
         span_data.span.__exit__(None, None, None)
         del self.span_map[run_id]
 
+    def _normalize_langchain_message(self, message):
+        # type: (BaseMessage) -> dict
+        parsed = {"content": message.content, "role": message.type}
+        parsed.update(message.additional_kwargs)
+        return parsed
+
     def _create_span(self, run_id, parent_id, **kwargs):
-        # type: (UUID, Optional[UUID], **Any) -> WatchedSpan
+        # type: (UUID, Optional[UUID], **Any) -> Span
 
         span = None  # type: Optional[Span]
         if parent_id:
@@ -93,7 +100,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
         watched_span = WatchedSpan(span)
         self.span_map[run_id] = watched_span
         self.gc_span_map()
-        return watched_span
+        return span
 
     def on_llm_start(
         self,
@@ -108,16 +115,17 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ):
         # type: (Dict[str, Any], List[str], *Any, UUID, Optional[List[str]], Optional[UUID], Optional[Dict[str, Any]], **Any) -> Any
         """Run when LLM starts running."""
-        if not run_id:
-            return
-        watched_span = self._create_span(
-            run_id,
-            kwargs.get("parent_run_id"),
-            op=OP.LANGCHAIN_RUN,
-            description=kwargs.get("name", "Langchain LLM call"),
-        )
-        if should_send_default_pii() and self.include_prompts:
-            watched_span.span.set_data(SPANDATA.AI_INPUT_MESSAGES, prompts)
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+            span = self._create_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.LANGCHAIN_RUN,
+                description=kwargs.get("name") or "Langchain LLM call",
+            )
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompts)
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (Dict[str, Any], List[List[BaseMessage]], *Any, UUID, **Any) -> Any
@@ -125,90 +133,109 @@ class SentryLangchainCallback(BaseCallbackHandler):
         if not run_id:
             return
 
-        watched_span = self._create_span(
-            run_id,
-            kwargs.get("parent_run_id"),
-            op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
-            description=kwargs.get("name", kwargs.get("name", "Langchain Chat Model")),
-        )
-        # TODO model ids
-        if should_send_default_pii() and self.include_prompts:
-            watched_span.span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
+        with capture_internal_exceptions():
+            span = self._create_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
+                description=kwargs.get("name") or "Langchain Chat Model",
+            )
+            # TODO model ids
+            if should_send_default_pii() and self.include_prompts:
+                span.set_data(
+                    SPANDATA.AI_INPUT_MESSAGES,
+                    [
+                        [self._normalize_langchain_message(x) for x in list_]
+                        for list_ in messages
+                    ],
+                )
 
     def on_llm_new_token(self, token, *, run_id, **kwargs):
         # type: (str, *Any, UUID, **Any) -> Any
         """Run on new LLM token. Only available when streaming is enabled."""
-        if not run_id or not self.span_map[run_id]:
-            return
-        span_data = self.span_map[run_id]
-        if not span_data:
-            return
-        span_data.num_tokens += 1
+        with capture_internal_exceptions():
+            if not run_id or not self.span_map[run_id]:
+                return
+            span_data = self.span_map[run_id]
+            if not span_data:
+                return
+            span_data.num_tokens += 1
 
     def on_llm_end(self, response, *, run_id, **kwargs):
         # type: (LLMResult, *Any, UUID, **Any) -> Any
         """Run when LLM ends running."""
-        if not run_id:
-            return
+        with capture_internal_exceptions():
+            if not run_id:
+                return
 
-        token_usage = (
-            response.llm_output.get("token_usage") if response.llm_output else None
-        )
-
-        span_data = self.span_map[run_id]
-        if not span_data:
-            return
-
-        if should_send_default_pii() and self.include_prompts:
-            span_data.span.set_data(SPANDATA.AI_RESPONSES, response.generations)
-
-        if token_usage:
-            span_data.span.set_data(
-                SPANDATA.AI_PROMPT_TOKENS_USED, token_usage.get("prompt_tokens")
+            token_usage = (
+                response.llm_output.get("token_usage") if response.llm_output else None
             )
-            span_data.span.set_data(
-                SPANDATA.AI_COMPLETION_TOKENS_USED, token_usage.get("completion_tokens")
-            )
-            span_data.span.set_data(
-                SPANDATA.AI_TOTAL_TOKENS_USED, token_usage.get("total_tokens")
-            )
-        elif span_data.num_tokens:
-            span_data.span.set_data(
-                SPANDATA.AI_COMPLETION_TOKENS_USED, span_data.num_tokens
-            )
-            span_data.span.set_data(SPANDATA.AI_TOTAL_TOKENS_USED, span_data.num_tokens)
 
-        span_data.span.__exit__(None, None, None)
-        del self.span_map[run_id]
+            span_data = self.span_map[run_id]
+            if not span_data:
+                return
+
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(
+                    span_data.span,
+                    SPANDATA.AI_RESPONSES,
+                    [[x.text for x in list_] for list_ in response.generations],
+                )
+
+            if token_usage:
+                span_data.span.set_data(
+                    SPANDATA.AI_PROMPT_TOKENS_USED, token_usage.get("prompt_tokens")
+                )
+                span_data.span.set_data(
+                    SPANDATA.AI_COMPLETION_TOKENS_USED,
+                    token_usage.get("completion_tokens"),
+                )
+                span_data.span.set_data(
+                    SPANDATA.AI_TOTAL_TOKENS_USED, token_usage.get("total_tokens")
+                )
+            elif span_data.num_tokens:
+                span_data.span.set_data(
+                    SPANDATA.AI_COMPLETION_TOKENS_USED, span_data.num_tokens
+                )
+                span_data.span.set_data(
+                    SPANDATA.AI_TOTAL_TOKENS_USED, span_data.num_tokens
+                )
+
+            span_data.span.__exit__(None, None, None)
+            del self.span_map[run_id]
 
     def on_llm_error(self, error, *, run_id, **kwargs):
         # type: (Union[Exception, KeyboardInterrupt], *Any, UUID, **Any) -> Any
         """Run when LLM errors."""
-        self._handle_error(run_id, error)
+        with capture_internal_exceptions():
+            self._handle_error(run_id, error)
 
     def on_chain_start(self, serialized, inputs, *, run_id, **kwargs):
         # type: (Dict[str, Any], Dict[str, Any], *Any, UUID, **Any) -> Any
         """Run when chain starts running."""
-        if not run_id:
-            return
-        self._create_span(
-            run_id,
-            kwargs.get("parent_run_id"),
-            op=OP.LANGCHAIN_RUN,
-            description=kwargs.get("name", "Chain execution"),
-        )
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+            self._create_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.LANGCHAIN_RUN,
+                description=kwargs.get("name") or "Chain execution",
+            )
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
         # type: (Dict[str, Any], *Any, UUID, **Any) -> Any
         """Run when chain ends running."""
-        if not run_id or not self.span_map[run_id]:
-            return
+        with capture_internal_exceptions():
+            if not run_id or not self.span_map[run_id]:
+                return
 
-        span_data = self.span_map[run_id]
-        if not span_data:
-            return
-        span_data.span.__exit__(None, None, None)
-        del self.span_map[run_id]
+            span_data = self.span_map[run_id]
+            if not span_data:
+                return
+            span_data.span.__exit__(None, None, None)
+            del self.span_map[run_id]
 
     def on_chain_error(self, error, *, run_id, **kwargs):
         # type: (Union[Exception, KeyboardInterrupt], *Any, UUID, **Any) -> Any
@@ -218,32 +245,34 @@ class SentryLangchainCallback(BaseCallbackHandler):
     def on_tool_start(self, serialized, input_str, *, run_id, **kwargs):
         # type: (Dict[str, Any], str, *Any, UUID, **Any) -> Any
         """Run when tool starts running."""
-        if not run_id:
-            return
-        watched_span = self._create_span(
-            run_id,
-            kwargs.get("parent_run_id"),
-            op=OP.LANGCHAIN_RUN,
-            description=kwargs.get("name", "AI tool usage"),
-        )
-        if should_send_default_pii() and self.include_prompts:
-            watched_span.span.set_data(
-                SPANDATA.AI_INPUT_MESSAGES, kwargs.get("inputs", [input_str])
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+            span = self._create_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.LANGCHAIN_TOOL,
+                description=kwargs.get("name") or "AI tool usage",
             )
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(
+                    span, SPANDATA.AI_INPUT_MESSAGES, kwargs.get("inputs", [input_str])
+                )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
         # type: (str, *Any, UUID, **Any) -> Any
         """Run when tool ends running."""
-        if not run_id or not self.span_map[run_id]:
-            return
+        with capture_internal_exceptions():
+            if not run_id or not self.span_map[run_id]:
+                return
 
-        span_data = self.span_map[run_id]
-        if not span_data:
-            return
-        if should_send_default_pii() and self.include_prompts:
-            span_data.span.set_data(SPANDATA.AI_RESPONSES, [output])
-        span_data.span.__exit__(None, None, None)
-        del self.span_map[run_id]
+            span_data = self.span_map[run_id]
+            if not span_data:
+                return
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(span_data.span, SPANDATA.AI_RESPONSES, [output])
+            span_data.span.__exit__(None, None, None)
+            del self.span_map[run_id]
 
     def on_tool_error(self, error, *args, run_id, **kwargs):
         # type: (Union[Exception, KeyboardInterrupt], *Any, UUID, **Any) -> Any
@@ -290,7 +319,11 @@ def _wrap_configure(f):
                     already_added = True
 
             if not already_added:
-                new_callbacks.append(SentryLangchainCallback(integration.max_spans))
+                new_callbacks.append(
+                    SentryLangchainCallback(
+                        integration.max_spans, integration.include_prompts
+                    )
+                )
         return f(*args, **kwargs)
 
     return new_configure
