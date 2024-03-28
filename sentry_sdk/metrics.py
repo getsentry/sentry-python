@@ -557,6 +557,8 @@ class MetricsAggregator(object):
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
 
+        # For sets, we only record that a value has been added to the set but not which one.
+        # See develop docs: https://develop.sentry.dev/sdk/metrics/#sets
         if local_aggregator is not None:
             local_value = float(added if ty == "s" else value)
             local_aggregator.add(ty, key, local_value, unit, serialized_tags)
