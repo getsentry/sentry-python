@@ -6,7 +6,6 @@
 
 - ref: Define types at runtime (#2914) by @szokeasaurusrex
 - Explicit reexport of types (#2866) (#2913) by @szokeasaurusrex
-- build(deps): bump checkouts/data-schemas from `8232f17` to `1e17eb5` (#2901) by @dependabot
 - feat(profiling): Add thread data to spans (#2843) by @Zylphrex
 
 ## 1.43.0
