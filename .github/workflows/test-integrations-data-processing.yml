@@ -58,6 +58,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test langchain latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test openai latest
         run: |
           set -x # print commands that are executed
@@ -114,6 +118,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test langchain pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test openai pinned
         run: |
           set -x # print commands that are executed
