@@ -1,0 +1,5 @@
+-r linter-requirements.txt
+-r test-requirements.txt
+mockupdb # required by `pymongo` tests that are enabled by `pymongo` from linter requirements
+pytest<7.0.0 # https://github.com/pytest-dev/pytest/issues/9621; see tox.ini
+pytest-asyncio<=0.21.1 # https://github.com/pytest-dev/pytest-asyncio/issues/706
