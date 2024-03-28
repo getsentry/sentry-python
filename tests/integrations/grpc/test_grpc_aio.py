@@ -9,6 +9,7 @@ import sentry_sdk
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
+from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
@@ -159,11 +160,13 @@ async def test_grpc_client_starts_span(
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == {
-        "type": "unary unary",
-        "method": "/grpc_test_server.gRPCTestService/TestServe",
-        "code": "OK",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary unary",
+            "method": "/grpc_test_server.gRPCTestService/TestServe",
+            "code": "OK",
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -188,10 +191,12 @@ async def test_grpc_client_unary_stream_starts_span(
         span["description"]
         == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
     )
-    assert span["data"] == {
-        "type": "unary stream",
-        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary stream",
+            "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+        }
+    )
 
 
 @pytest.mark.asyncio

@@ -42,9 +42,10 @@ if TYPE_CHECKING:
         BreadcrumbHint,
         ExcInfo,
         LogLevelStr,
+        SamplingContext,
     )
     from sentry_sdk.consts import ClientConstructor
-    from sentry_sdk.scope import StartTransactionKwargs
+    from sentry_sdk.tracing import TransactionKwargs
 
     T = TypeVar("T")
 
@@ -472,9 +473,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return scope.start_span(instrumenter=instrumenter, **kwargs)
 
     def start_transaction(
-        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
+        self,
+        transaction=None,
+        instrumenter=INSTRUMENTER.SENTRY,
+        custom_sampling_context=None,
+        **kwargs
     ):
-        # type: (Optional[Transaction], str, Unpack[StartTransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -511,7 +516,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         kwargs["hub"] = scope  # type: ignore
 
         return scope.start_transaction(
-            transaction=transaction, instrumenter=instrumenter, **kwargs
+            transaction, instrumenter, custom_sampling_context, **kwargs
         )
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):

@@ -1,14 +1,18 @@
+import threading
 import re
 import sys
+from datetime import timedelta
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
+from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    get_current_thread_meta,
     get_default_release,
     get_error_message,
     get_git_revision,
@@ -35,6 +39,12 @@ class TestIntegration(Integration):
 
     identifier = "test"
     setup_once = mock.MagicMock()
+
+
+try:
+    import gevent
+except ImportError:
+    gevent = None
 
 
 def _normalize_distribution_name(name):
@@ -731,3 +741,139 @@ async def test_ensure_integration_enabled_async_no_original_function_disabled(
 
     assert shared_variable == "original"
     assert patched_function.__name__ == "function_to_patch"
+
+
+@pytest.mark.parametrize(
+    "delta,expected_milliseconds",
+    [
+        [timedelta(milliseconds=132), 132.0],
+        [timedelta(hours=1, milliseconds=132), float(60 * 60 * 1000 + 132)],
+        [timedelta(days=10), float(10 * 24 * 60 * 60 * 1000)],
+        [timedelta(microseconds=100), 0.1],
+    ],
+)
+def test_duration_in_milliseconds(delta, expected_milliseconds):
+    assert delta / timedelta(milliseconds=1) == expected_milliseconds
+
+
+def test_get_current_thread_meta_explicit_thread():
+    results = Queue(maxsize=1)
+
+    def target1():
+        pass
+
+    def target2():
+        results.put(get_current_thread_meta(thread1))
+
+    thread1 = threading.Thread(target=target1)
+    thread1.start()
+
+    thread2 = threading.Thread(target=target2)
+    thread2.start()
+
+    thread2.join()
+    thread1.join()
+
+    assert (thread1.ident, thread1.name) == results.get(timeout=1)
+
+
+def test_get_current_thread_meta_bad_explicit_thread():
+    thread = "fake thread"
+
+    main_thread = threading.main_thread()
+
+    assert (main_thread.ident, main_thread.name) == get_current_thread_meta(thread)
+
+
+@pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+def test_get_current_thread_meta_gevent_in_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
+            job = gevent.spawn(get_current_thread_meta)
+            job.join()
+            results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (thread.ident, None) == results.get(timeout=1)
+
+
+@pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+def test_get_current_thread_meta_gevent_in_thread_failed_to_get_hub():
+    results = Queue(maxsize=1)
+
+    def target():
+        with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
+            with mock.patch(
+                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]
+            ):
+                job = gevent.spawn(get_current_thread_meta)
+                job.join()
+                results.put(job.value)
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (thread.ident, thread.name) == results.get(timeout=1)
+
+
+def test_get_current_thread_meta_running_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        results.put(get_current_thread_meta())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (thread.ident, thread.name) == results.get(timeout=1)
+
+
+def test_get_current_thread_meta_bad_running_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        with mock.patch("threading.current_thread", side_effect=["fake thread"]):
+            results.put(get_current_thread_meta())
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+
+    main_thread = threading.main_thread()
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+
+
+def test_get_current_thread_meta_main_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        # mock that somehow the current thread doesn't exist
+        with mock.patch("threading.current_thread", side_effect=[None]):
+            results.put(get_current_thread_meta())
+
+    main_thread = threading.main_thread()
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
+
+
+def test_get_current_thread_meta_failed_to_get_main_thread():
+    results = Queue(maxsize=1)
+
+    def target():
+        with mock.patch("threading.current_thread", side_effect=["fake thread"]):
+            with mock.patch("threading.current_thread", side_effect=["fake thread"]):
+                results.put(get_current_thread_meta())
+
+    main_thread = threading.main_thread()
+
+    thread = threading.Thread(target=target)
+    thread.start()
+    thread.join()
+    assert (main_thread.ident, main_thread.name) == results.get(timeout=1)

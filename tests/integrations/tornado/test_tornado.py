@@ -112,7 +112,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     ],
 )
 def test_transactions(tornado_testcase, sentry_init, capture_events, handler, code):
-    sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0, debug=True)
+    sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", handler)]))
 
