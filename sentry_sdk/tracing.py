@@ -40,7 +40,6 @@ if TYPE_CHECKING:
         description: str
         # hub: Optional[sentry_sdk.Hub] is deprecated, and therefore omitted here!
         status: str
-        # transaction: str is deprecated, and therefore omitted here!
         containing_transaction: Optional["Transaction"]
         start_timestamp: Optional[Union[datetime, float]]
         scope: "sentry_sdk.Scope"
@@ -108,7 +107,29 @@ class _SpanRecorder:
 
 class Span:
     """A span holds timing information of a block of code.
-    Spans can have multiple child spans thus forming a span tree."""
+    Spans can have multiple child spans thus forming a span tree.
+
+    :param trace_id: The trace ID of the root span. If this new span is to be the root span,
+        omit this parameter, and a new trace ID will be generated.
+    :param span_id: The span ID of this span. If omitted, a new span ID will be generated.
+    :param parent_span_id: The span ID of the parent span, if applicable.
+    :param same_process_as_parent: Whether this span is in the same process as the parent span.
+    :param sampled: Whether the span should be sampled. Overrides the default sampling decision
+        for this span when provided.
+    :param op: The span's operation. A list of recommended values is available here:
+        https://develop.sentry.dev/sdk/performance/span-operations/
+    :param description: A description of what operation is being performed within the span.
+    :param hub: The hub to use for this span.
+
+        .. deprecated:: 2.0.0
+            Please use the `scope` parameter, instead.
+    :param status: The span's status. Possible values are listed at
+        https://develop.sentry.dev/sdk/event-payloads/span/
+    :param containing_transaction: The transaction that this span belongs to.
+    :param start_timestamp: The timestamp when the span started. If omitted, the current time
+        will be used.
+    :param scope: The scope to use for this span. If not provided, we use the current scope.
+    """
 
     __slots__ = (
         "trace_id",
@@ -132,20 +153,6 @@ class Span:
         "scope",
     )
 
-    def __new__(cls, **kwargs):
-        # type: (**Any) -> Any
-        """
-        Backwards-compatible implementation of Span and Transaction
-        creation.
-        """
-
-        # TODO: consider removing this in a future release.
-        # This is for backwards compatibility with releases before Transaction
-        # existed, to allow for a smoother transition.
-        if "transaction" in kwargs:
-            return object.__new__(Transaction)
-        return object.__new__(cls)
-
     def __init__(
         self,
         trace_id=None,  # type: Optional[str]
@@ -157,7 +164,6 @@ class Span:
         description=None,  # type: Optional[str]
         hub=None,  # type: Optional[sentry_sdk.Hub]  # deprecated
         status=None,  # type: Optional[str]
-        transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -562,7 +568,21 @@ class Span:
 
 class Transaction(Span):
     """The Transaction is the root element that holds all the spans
-    for Sentry performance instrumentation."""
+    for Sentry performance instrumentation.
+
+    :param name: Identifier of the transaction.
+        Will show up in the Sentry UI.
+    :param parent_sampled: Whether the parent transaction was sampled.
+        If True this transaction will be kept, if False it will be discarded.
+    :param baggage: The W3C baggage header value.
+        (see https://www.w3.org/TR/baggage/)
+    :param source: A string describing the source of the transaction name.
+        This will be used to determine the transaction's type.
+        See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+        for more information. Default "custom".
+    :param kwargs: Additional arguments to be passed to the Span constructor.
+        See :py:class:`sentry_sdk.tracing.Span` for available arguments.
+    """
 
     __slots__ = (
         "name",
@@ -585,28 +605,6 @@ class Transaction(Span):
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
-        """Constructs a new Transaction.
-
-        :param name: Identifier of the transaction.
-            Will show up in the Sentry UI.
-        :param parent_sampled: Whether the parent transaction was sampled.
-            If True this transaction will be kept, if False it will be discarded.
-        :param baggage: The W3C baggage header value.
-            (see https://www.w3.org/TR/baggage/)
-        :param source: A string describing the source of the transaction name.
-            This will be used to determine the transaction's type.
-            See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-            for more information. Default "custom".
-        """
-        # TODO: consider removing this in a future release.
-        # This is for backwards compatibility with releases before Transaction
-        # existed, to allow for a smoother transition.
-        if not name and "transaction" in kwargs:
-            logger.warning(
-                "Deprecated: use Transaction(name=...) to create transactions "
-                "instead of Span(transaction=...)."
-            )
-            name = kwargs.pop("transaction")  # type: ignore
 
         super().__init__(**kwargs)
 
