@@ -70,10 +70,6 @@ if TYPE_CHECKING:
 
     import sentry_sdk
 
-    class StartTransactionKwargs(TransactionKwargs, total=False):
-        client: Optional["sentry_sdk.Client"]
-        custom_sampling_context: SamplingContext
-
     P = ParamSpec("P")
     R = TypeVar("R")
 
@@ -966,9 +962,13 @@ class Scope(object):
             self._breadcrumbs.popleft()
 
     def start_transaction(
-        self, transaction=None, instrumenter=INSTRUMENTER.SENTRY, **kwargs
+        self,
+        transaction=None,
+        instrumenter=INSTRUMENTER.SENTRY,
+        custom_sampling_context=None,
+        **kwargs
     ):
-        # type: (Optional[Transaction], str, Unpack[StartTransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -991,7 +991,13 @@ class Scope(object):
         When the transaction is finished, it will be sent to Sentry with all its
         finished child spans.
 
-        For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
+        :param transaction: The transaction to start. If omitted, we create and
+            start a new transaction.
+        :param instrumenter: This parameter is meant for internal use only.
+        :param custom_sampling_context: The transaction's custom sampling context.
+        :param kwargs: Optional keyword arguments to be passed to the Transaction
+            constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
+            available arguments.
         """
         kwargs.setdefault("scope", self)
 
@@ -1002,7 +1008,7 @@ class Scope(object):
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
-        custom_sampling_context = kwargs.pop("custom_sampling_context", {})
+        custom_sampling_context = custom_sampling_context or {}
 
         # kwargs at this point has type TransactionKwargs, since we have removed
         # the client and custom_sampling_context from it.
