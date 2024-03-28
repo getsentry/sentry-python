@@ -546,7 +546,21 @@ class Span:
 
 class Transaction(Span):
     """The Transaction is the root element that holds all the spans
-    for Sentry performance instrumentation."""
+    for Sentry performance instrumentation.
+
+    :param name: Identifier of the transaction.
+        Will show up in the Sentry UI.
+    :param parent_sampled: Whether the parent transaction was sampled.
+        If True this transaction will be kept, if False it will be discarded.
+    :param baggage: The W3C baggage header value.
+        (see https://www.w3.org/TR/baggage/)
+    :param source: A string describing the source of the transaction name.
+        This will be used to determine the transaction's type.
+        See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
+        for more information. Default "custom".
+    :param kwargs: Additional arguments to be passed to the Span constructor.
+        See :py:class:`sentry_sdk.tracing.Span` for available arguments.
+    """
 
     __slots__ = (
         "name",
@@ -569,19 +583,6 @@ class Transaction(Span):
         **kwargs,  # type: Unpack[SpanKwargs]
     ):
         # type: (...) -> None
-        """Constructs a new Transaction.
-
-        :param name: Identifier of the transaction.
-            Will show up in the Sentry UI.
-        :param parent_sampled: Whether the parent transaction was sampled.
-            If True this transaction will be kept, if False it will be discarded.
-        :param baggage: The W3C baggage header value.
-            (see https://www.w3.org/TR/baggage/)
-        :param source: A string describing the source of the transaction name.
-            This will be used to determine the transaction's type.
-            See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
-            for more information. Default "custom".
-        """
 
         super().__init__(**kwargs)
 
