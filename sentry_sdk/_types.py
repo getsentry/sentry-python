@@ -113,6 +113,7 @@ if TYPE_CHECKING:
         "session",
         "internal",
         "profile",
+        "profile_chunk",
         "statsd",
         "monitor",
     ]
@@ -150,7 +151,8 @@ if TYPE_CHECKING:
     FractionUnit = Literal["ratio", "percent"]
     MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
 
-    ProfilerMode = Literal["sleep", "thread", "gevent", "unknown"]
+    ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
+    ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
 
     # Type of the metric.
     MetricType = Literal["d", "s", "g", "c"]
