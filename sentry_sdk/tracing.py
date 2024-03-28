@@ -3,9 +3,13 @@ import random
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.utils import (
+    get_current_thread_meta,
+    is_valid_sample_rate,
+    logger,
+    nanosecond_time,
+)
 from sentry_sdk._types import TYPE_CHECKING
 
 
@@ -199,6 +203,9 @@ class Span:
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
         self._local_aggregator = None  # type: Optional[LocalAggregator]
+
+        thread_id, thread_name = get_current_thread_meta()
+        self.set_thread(thread_id, thread_name)
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -434,6 +441,15 @@ class Span:
     def set_status(self, value):
         # type: (str) -> None
         self.status = value
+
+    def set_thread(self, thread_id, thread_name):
+        # type: (Optional[int], Optional[str]) -> None
+
+        if thread_id is not None:
+            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
     def set_http_status(self, http_status):
         # type: (int) -> None

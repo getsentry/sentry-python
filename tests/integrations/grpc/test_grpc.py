@@ -9,6 +9,7 @@ import pytest
 from sentry_sdk import start_span, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
+from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
@@ -149,11 +150,13 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == {
-        "type": "unary unary",
-        "method": "/grpc_test_server.gRPCTestService/TestServe",
-        "code": "OK",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary unary",
+            "method": "/grpc_test_server.gRPCTestService/TestServe",
+            "code": "OK",
+        }
+    )
 
 
 @pytest.mark.forked
@@ -181,10 +184,12 @@ def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksa
         span["description"]
         == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
     )
-    assert span["data"] == {
-        "type": "unary stream",
-        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary stream",
+            "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+        }
+    )
 
 
 # using unittest.mock.Mock not possible because grpc verifies
@@ -227,11 +232,13 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == {
-        "type": "unary unary",
-        "method": "/grpc_test_server.gRPCTestService/TestServe",
-        "code": "OK",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary unary",
+            "method": "/grpc_test_server.gRPCTestService/TestServe",
+            "code": "OK",
+        }
+    )
 
 
 @pytest.mark.forked

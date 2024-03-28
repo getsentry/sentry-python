@@ -36,7 +36,7 @@ def expected_error():
                                     "abs_path": mock.ANY,
                                     "function": "_faulty_function",
                                     "module": "tests.test_new_scopes_compat_event",
-                                    "lineno": 236,
+                                    "lineno": 240,
                                     "pre_context": [
                                         "    return create_expected_transaction_event",
                                         "",
@@ -174,6 +174,10 @@ def expected_transaction():
             "start_timestamp": mock.ANY,
             "spans": [
                 {
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": "MainThread",
+                    },
                     "trace_id": trx.trace_id,
                     "span_id": span.span_id,
                     "parent_span_id": span.parent_span_id,
@@ -313,7 +317,6 @@ def _init_sentry_sdk(sentry_init):
         ),
         send_default_pii=False,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
 

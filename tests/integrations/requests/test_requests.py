@@ -7,6 +7,7 @@ import responses
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+from tests.conftest import ApproxDict
 
 
 def test_crumb_capture(sentry_init, capture_events):
@@ -24,14 +25,16 @@ def test_crumb_capture(sentry_init, capture_events):
     (crumb,) = event["breadcrumbs"]["values"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == {
-        "url": url,
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_FRAGMENT: "",
-        SPANDATA.HTTP_QUERY: "",
-        SPANDATA.HTTP_STATUS_CODE: response.status_code,
-        "reason": response.reason,
-    }
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+            "reason": response.reason,
+        }
+    )
 
 
 @pytest.mark.tests_internal_exceptions
@@ -52,9 +55,15 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == {
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: response.status_code,
-        "reason": response.reason,
-        # no url related data
-    }
+    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: response.status_code,
+            "reason": response.reason,
+            # no url related data
+        }
+    )
+
+    assert "url" not in event["breadcrumbs"]["values"][0]["data"]
+    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
+    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
