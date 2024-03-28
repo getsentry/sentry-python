@@ -39,7 +39,7 @@ _RUNTIME_CONTEXT = {
     "name": platform.python_implementation(),
     "version": "%s.%s.%s" % (sys.version_info[:3]),
     "build": sys.version,
-}
+}  # type: dict[str, object]
 
 
 class StdlibIntegration(Integration):

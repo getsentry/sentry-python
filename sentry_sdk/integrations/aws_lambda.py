@@ -81,7 +81,7 @@ def _wrap_handler(handler):
         # will be the same for all events in the list, since they're all hitting
         # the lambda in the same request.)
 
-        if isinstance(aws_event, list):
+        if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
             batch_size = len(aws_event)
         else:

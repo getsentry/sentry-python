@@ -16,7 +16,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
@@ -172,7 +172,7 @@ def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -211,7 +211,7 @@ def _capture_exception(sender, exception, **kwargs):
 
 
 def _add_user_to_event(event):
-    # type: (Dict[str, Any]) -> None
+    # type: (Event) -> None
     if flask_login is None:
         return
 

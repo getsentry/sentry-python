@@ -70,6 +70,7 @@ GROUPS = {
         "beam",
         "celery",
         "huey",
+        "openai",
         "rq",
     ],
     "Databases": [

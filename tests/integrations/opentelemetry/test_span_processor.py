@@ -531,3 +531,95 @@ def test_link_trace_context_to_error_event():
         assert "contexts" in event
         assert "trace" in event["contexts"]
         assert event["contexts"]["trace"] == fake_trace_context
+
+
+def test_pruning_old_spans_on_start():
+    otel_span = MagicMock()
+    otel_span.name = "Sample OTel Span"
+    otel_span.start_time = time.time_ns()
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
+    otel_span.parent = MagicMock()
+    otel_span.parent.span_id = int("abcdef1234567890", 16)
+
+    parent_context = {}
+    fake_client = MagicMock()
+    fake_client.options = {"instrumenter": "otel"}
+    fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
+
+    current_hub = MagicMock()
+    current_hub.client = fake_client
+
+    fake_hub = MagicMock()
+    fake_hub.current = current_hub
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.span_processor.Hub", fake_hub
+    ):
+        span_processor = SentrySpanProcessor()
+
+        span_processor.otel_span_map = {
+            "111111111abcdef": MagicMock(),  # should stay
+            "2222222222abcdef": MagicMock(),  # should go
+            "3333333333abcdef": MagicMock(),  # should go
+        }
+        current_time_minutes = int(time.time() / 60)
+        span_processor.open_spans = {
+            current_time_minutes - 3: {"111111111abcdef"},  # should stay
+            current_time_minutes
+            - 11: {"2222222222abcdef", "3333333333abcdef"},  # should go
+        }
+
+        span_processor.on_start(otel_span, parent_context)
+        assert sorted(list(span_processor.otel_span_map.keys())) == [
+            "111111111abcdef",
+            "1234567890abcdef",
+        ]
+        assert sorted(list(span_processor.open_spans.values())) == [
+            {"111111111abcdef"},
+            {"1234567890abcdef"},
+        ]
+
+
+def test_pruning_old_spans_on_end():
+    otel_span = MagicMock()
+    otel_span.name = "Sample OTel Span"
+    otel_span.start_time = time.time_ns()
+    span_context = SpanContext(
+        trace_id=int("1234567890abcdef1234567890abcdef", 16),
+        span_id=int("1234567890abcdef", 16),
+        is_remote=True,
+    )
+    otel_span.get_span_context.return_value = span_context
+    otel_span.parent = MagicMock()
+    otel_span.parent.span_id = int("abcdef1234567890", 16)
+
+    fake_sentry_span = MagicMock(spec=Span)
+    fake_sentry_span.set_context = MagicMock()
+    fake_sentry_span.finish = MagicMock()
+
+    span_processor = SentrySpanProcessor()
+    span_processor._get_otel_context = MagicMock()
+    span_processor._update_span_with_otel_data = MagicMock()
+
+    span_processor.otel_span_map = {
+        "111111111abcdef": MagicMock(),  # should stay
+        "2222222222abcdef": MagicMock(),  # should go
+        "3333333333abcdef": MagicMock(),  # should go
+        "1234567890abcdef": fake_sentry_span,  # should go (because it is closed)
+    }
+    current_time_minutes = int(time.time() / 60)
+    span_processor.open_spans = {
+        current_time_minutes: {"1234567890abcdef"},  # should go (because it is closed)
+        current_time_minutes - 3: {"111111111abcdef"},  # should stay
+        current_time_minutes
+        - 11: {"2222222222abcdef", "3333333333abcdef"},  # should go
+    }
+
+    span_processor.on_end(otel_span)
+    assert sorted(list(span_processor.otel_span_map.keys())) == ["111111111abcdef"]
+    assert sorted(list(span_processor.open_spans.values())) == [{"111111111abcdef"}]

@@ -51,6 +51,7 @@ lint: .venv
 apidocs: .venv
 	@$(VENV_PATH)/bin/pip install --editable .
 	@$(VENV_PATH)/bin/pip install -U -r ./docs-requirements.txt
+	rm -rf docs/_build
 	@$(VENV_PATH)/bin/sphinx-build -vv -W -b html docs/ docs/_build
 .PHONY: apidocs
 

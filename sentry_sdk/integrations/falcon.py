@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 # In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
 # and `falcon.API` to `falcon.App`
@@ -258,7 +258,7 @@ def _has_http_5xx_status(response):
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Dict[str, Any], str, falcon.Request) -> None
+    # type: (Event, str, falcon.Request) -> None
     name_for_style = {
         "uri_template": request.uri_template,
         "path": request.path,
@@ -271,7 +271,7 @@ def _make_request_event_processor(req, integration):
     # type: (falcon.Request, FalconIntegration) -> EventProcessor
 
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         _set_transaction_name_and_source(event, integration.transaction_style, req)
 
         with capture_internal_exceptions():

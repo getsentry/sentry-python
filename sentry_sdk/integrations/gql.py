@@ -14,7 +14,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Tuple, Union
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
     EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]
 
@@ -112,7 +112,7 @@ def _patch_execute():
 def _make_gql_event_processor(client, document):
     # type: (gql.Client, DocumentNode) -> EventProcessor
     def processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         try:
             errors = hint["exc_info"][1].errors
         except (AttributeError, KeyError):

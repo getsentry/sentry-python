@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from webob.compat import cgi_FieldStorage  # type: ignore
 
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 if getattr(Request, "authenticated_userid", None):
@@ -216,7 +216,7 @@ class PyramidRequestExtractor(RequestExtractor):
 def _make_event_processor(weak_request, integration):
     # type: (Callable[[], Request], PyramidIntegration) -> EventProcessor
     def pyramid_event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, Dict[str, Any]) -> Event
         request = weak_request()
         if request is None:
             return event

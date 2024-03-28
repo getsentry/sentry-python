@@ -26,13 +26,13 @@ if TYPE_CHECKING:
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 def _make_asgi_request_event_processor(request):
     # type: (ASGIRequest) -> EventProcessor
     def asgi_request_event_processor(event, hint):
-        # type: (dict[str, Any], dict[str, Any]) -> dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.

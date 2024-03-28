@@ -5,7 +5,12 @@ from datetime import datetime, timedelta
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.utils import is_valid_sample_rate, logger, nanosecond_time
+from sentry_sdk.utils import (
+    get_current_thread_meta,
+    is_valid_sample_rate,
+    logger,
+    nanosecond_time,
+)
 from sentry_sdk._compat import datetime_utcnow, utc_from_timestamp, PY2
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk._types import TYPE_CHECKING
@@ -14,7 +19,7 @@ from sentry_sdk._types import TYPE_CHECKING
 if TYPE_CHECKING:
     import typing
 
-    from collections.abc import Callable
+    from collections.abc import Callable, MutableMapping
     from typing import Any
     from typing import Dict
     from typing import Iterator
@@ -151,7 +156,7 @@ class Span(object):
         self.description = description
         self.status = status
         self.hub = hub
-        self._tags = {}  # type: Dict[str, str]
+        self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
         if start_timestamp is None:
@@ -171,6 +176,9 @@ class Span(object):
 
         self._span_recorder = None  # type: Optional[_SpanRecorder]
         self._local_aggregator = None  # type: Optional[LocalAggregator]
+
+        thread_id, thread_name = get_current_thread_meta()
+        self.set_thread(thread_id, thread_name)
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -417,6 +425,15 @@ class Span(object):
     def set_status(self, value):
         # type: (str) -> None
         self.status = value
+
+    def set_thread(self, thread_id, thread_name):
+        # type: (Optional[int], Optional[str]) -> None
+
+        if thread_id is not None:
+            self.set_data(SPANDATA.THREAD_ID, str(thread_id))
+
+            if thread_name is not None:
+                self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
     def set_http_status(self, http_status):
         # type: (int) -> None

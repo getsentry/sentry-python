@@ -200,7 +200,7 @@ def _make_request_event_processor(app, request, integration):
     # type: (Bottle, LocalRequest, BottleIntegration) -> EventProcessor
 
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         _set_transaction_name_and_source(event, integration.transaction_style, request)
 
         with capture_internal_exceptions():

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
     from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
     from graphql.language.ast import DocumentNode  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 class AriadneIntegration(Integration):
@@ -131,7 +131,7 @@ def _make_request_event_processor(data):
     """Add request data and api_target to events."""
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         if not isinstance(data, dict):
             return event
 
@@ -163,7 +163,7 @@ def _make_response_event_processor(response):
     """Add response data to the event's response context."""
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii() and response.get("errors"):
                 contexts = event.setdefault("contexts", {})

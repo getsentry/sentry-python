@@ -20,10 +20,9 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
     from typing import Union
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 try:
     import quart_auth  # type: ignore
@@ -186,7 +185,7 @@ async def _request_websocket_started(app, **kwargs):
 def _make_request_event_processor(app, request, integration):
     # type: (Quart, Request, QuartIntegration) -> EventProcessor
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -231,7 +230,7 @@ async def _capture_exception(sender, exception, **kwargs):
 
 
 def _add_user_to_event(event):
-    # type: (Dict[str, Any]) -> None
+    # type: (Event) -> None
     if quart_auth is None:
         return
 

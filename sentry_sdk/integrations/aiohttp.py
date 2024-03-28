@@ -48,13 +48,12 @@ if TYPE_CHECKING:
     from aiohttp import TraceRequestStartParams, TraceRequestEndParams
     from types import SimpleNamespace
     from typing import Any
-    from typing import Dict
     from typing import Optional
     from typing import Tuple
     from typing import Union
 
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
@@ -256,10 +255,10 @@ def create_trace_config():
 def _make_request_processor(weak_request):
     # type: (weakref.ReferenceType[Request]) -> EventProcessor
     def aiohttp_processor(
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+        event,  # type: Event
+        hint,  # type: dict[str, Tuple[type, BaseException, Any]]
     ):
-        # type: (...) -> Dict[str, Any]
+        # type: (...) -> Event
         request = weak_request()
         if request is None:
             return event

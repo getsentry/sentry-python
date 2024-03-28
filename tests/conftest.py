@@ -652,3 +652,15 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         return_value=fake_transaction,
     ):
         yield fake_start_child
+
+
+class ApproxDict(dict):
+    def __eq__(self, other):
+        # For an ApproxDict to equal another dict, the other dict just needs to contain
+        # all the keys from the ApproxDict with the same values.
+        #
+        # The other dict may contain additional keys with any value.
+        return all(key in other and other[key] == value for key, value in self.items())
+
+    def __ne__(self, other):
+        return not self.__eq__(other)

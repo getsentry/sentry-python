@@ -10,6 +10,7 @@ from sentry_sdk.integrations.celery import (
 )
 
 from sentry_sdk._compat import text_type
+from tests.conftest import ApproxDict
 
 from celery import Celery, VERSION
 from celery.bin import worker
@@ -218,6 +219,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
+            "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],

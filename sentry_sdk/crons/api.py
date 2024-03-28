@@ -6,6 +6,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional
+    from sentry_sdk._types import Event
 
 
 def _create_check_in_event(
@@ -15,7 +16,7 @@ def _create_check_in_event(
     duration_s=None,
     monitor_config=None,
 ):
-    # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> Dict[str, Any]
+    # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> Event
     options = Hub.current.client.options if Hub.current.client else {}
     check_in_id = check_in_id or uuid.uuid4().hex  # type: str
 
@@ -27,7 +28,7 @@ def _create_check_in_event(
         "duration": duration_s,
         "environment": options.get("environment", None),
         "release": options.get("release", None),
-    }
+    }  # type: Event
 
     if monitor_config:
         check_in["monitor_config"] = monitor_config
