@@ -66,6 +66,7 @@ GROUPS = {
         "gcp",
     ],
     "Data Processing": [
+        "anthropic",
         "arq",
         "beam",
         "celery",
