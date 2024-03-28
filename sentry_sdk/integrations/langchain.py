@@ -1,8 +1,6 @@
 from collections import OrderedDict
 from functools import wraps
 
-from langchain_core.agents import AgentAction, AgentFinish
-
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
@@ -23,6 +21,7 @@ try:
         manager,
         BaseCallbackHandler,
     )
+    from langchain_core.agents import AgentAction, AgentFinish
 except ImportError:
     raise DidNotEnable("langchain not installed")
 
