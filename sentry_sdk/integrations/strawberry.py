@@ -316,16 +316,13 @@ def _patch_views():
         event_processor = _make_response_event_processor(response_data)
         scope.add_event_processor(event_processor)
 
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(StrawberryIntegration)
-
         with capture_internal_exceptions():
             for error in errors:
                 event, hint = event_from_exception(
                     error,
-                    client_options=client.options,
+                    client_options=sentry_sdk.get_client().options,
                     mechanism={
-                        "type": integration.identifier,
+                        "type": StrawberryIntegration.identifier,
                         "handled": False,
                     },
                 )
