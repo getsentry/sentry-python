@@ -558,6 +558,8 @@ class Transaction(Span):
         This will be used to determine the transaction's type.
         See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
         for more information. Default "custom".
+    :param kwargs: Additional arguments to be passed to the Span constructor.
+        See :py:class:`sentry_sdk.tracing.Span` for available arguments.
     """
 
     __slots__ = (
