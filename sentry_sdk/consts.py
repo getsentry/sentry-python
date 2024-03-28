@@ -127,6 +127,12 @@ class SPANDATA:
     Example: {"executed_function": "add_integers"}
     """
 
+    AI_TAGS = "ai.tags"
+    """
+    Tags that describe an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
     AI_STREAMING = "ai.streaming"
     """
     Whether or not the AI model call's repsonse was streamed back asynchronously
