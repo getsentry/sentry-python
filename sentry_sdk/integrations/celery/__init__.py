@@ -169,68 +169,80 @@ def _wrap_apply_async(f):
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_CELERY, description=task.name
         ) as span:
-            integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-            default_propagate_traces = (
-                integration.propagate_traces if integration is not None else True
-            )
-
             incoming_headers = kwargs.get("headers") or {}
-            propagate_traces = incoming_headers.pop(
-                "sentry-propagate-traces", default_propagate_traces
-            )
+            integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
 
             # If Sentry Crons monitoring for Celery Beat tasks is enabled
             # add start timestamp of task,
-            headers = dict(
-                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
-            )
-            if integration.monitor_beat_tasks:
-                headers.update(
+            if integration is not None and integration.monitor_beat_tasks:
+                incoming_headers.update(
                     {
                         "sentry-monitor-start-timestamp-s": "%.9f"
                         % _now_seconds_since_epoch(),
                     }
                 )
 
-            if propagate_traces:
-                # Set Sentry trace propagation information in the headers of the Celery task
-                with capture_internal_exceptions():
-                    if headers:
-                        existing_baggage = incoming_headers.get(BAGGAGE_HEADER_NAME)
-                        sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
+            # Propagate Sentry trace information into the Celery task if desired
+            default_propagate_traces = (
+                integration.propagate_traces if integration is not None else True
+            )
+            propagate_traces = incoming_headers.pop(
+                "sentry-propagate-traces", default_propagate_traces
+            )
 
-                        combined_baggage = sentry_baggage or existing_baggage
-                        if sentry_baggage and existing_baggage:
+            if propagate_traces:
+                with capture_internal_exceptions():
+                    sentry_trace_headers = dict(
+                        Scope.get_current_scope().iter_trace_propagation_headers(
+                            span=span
+                        )
+                    )
+                    # Set Sentry trace data in the headers of the Celery task
+                    if sentry_trace_headers:
+                        # Make sure we don't overwrite existing baggage
+                        incoming_baggage = incoming_headers.get(BAGGAGE_HEADER_NAME)
+                        sentry_baggage = sentry_trace_headers.get(BAGGAGE_HEADER_NAME)
+
+                        combined_baggage = sentry_baggage or incoming_baggage
+                        if sentry_baggage and incoming_baggage:
                             combined_baggage = "{},{}".format(
-                                existing_baggage,
+                                incoming_baggage,
                                 sentry_baggage,
                             )
 
-                        incoming_headers.update(headers)
+                        # Set Sentry trace data to the headers of the Celery task
+                        incoming_headers.update(sentry_trace_headers)
 
                         if combined_baggage:
                             incoming_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
+                        # Set sentry trace data also to the inner headers of the Celery task
                         # https://github.com/celery/celery/issues/4875
                         #
                         # Need to setdefault the inner headers too since other
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
-                        incoming_headers.setdefault("headers", {}).update(headers)
+                        incoming_headers.setdefault("headers", {}).update(sentry_trace_headers)
                         if combined_baggage:
                             incoming_headers["headers"][
                                 BAGGAGE_HEADER_NAME
                             ] = combined_baggage
 
-                        # Add the Sentry options potentially added in `sentry_sdk.integrations.beat.sentry_apply_entry`
-                        # to the headers (done when auto-instrumenting Celery Beat tasks)
-                        for key, value in incoming_headers.items():
-                            if key.startswith("sentry-"):
-                                incoming_headers["headers"][key] = value
+            # Add the Sentry options potentially added in `sentry_sdk.integrations.beat.sentry_apply_entry`
+            # to the inner headers (done when auto-instrumenting Celery Beat tasks)
+            # https://github.com/celery/celery/issues/4875
+            #
+            # Need to setdefault the inner headers too since other
+            # tracing tools (dd-trace-py) also employ this exact
+            # workaround and we don't want to break them.
+            incoming_headers.setdefault("headers", {})
+            for key, value in incoming_headers.items():
+                if key.startswith("sentry-"):
+                    incoming_headers["headers"][key] = value
 
-                        kwargs["headers"] = incoming_headers
+            # Run the task (with updated headers in kwargs)
+            kwargs["headers"] = incoming_headers
 
-            # Run the task
             return f(*args, **kwargs)
 
     return apply_async  # type: ignore
