@@ -121,6 +121,12 @@ class SPANDATA:
     Example: gpt-4
     """
 
+    AI_METADATA = "ai.metadata"
+    """
+    Extra metadata passed to an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
     AI_STREAMING = "ai.streaming"
     """
     Whether or not the AI model call's repsonse was streamed back asynchronously
@@ -332,6 +338,7 @@ class OP:
     OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     LANGCHAIN_RUN = "ai.run.langchain"
     LANGCHAIN_TOOL = "ai.tool.langchain"
+    LANGCHAIN_AGENT = "ai.agent.langchain"
     LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
