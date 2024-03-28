@@ -36,23 +36,69 @@ if TYPE_CHECKING:
 
     class SpanKwargs(TypedDict, total=False):
         trace_id: str
+        """
+        The trace ID of the root span. If this new span is to be the root span,
+        omit this parameter, and a new trace ID will be generated.
+        """
+
         span_id: str
+        """The span ID of this span. If omitted, a new span ID will be generated."""
+
         parent_span_id: str
+        """The span ID of the parent span, if applicable."""
+
         same_process_as_parent: bool
+        """Whether this span is in the same process as the parent span."""
+
         sampled: bool
+        """
+        Whether the span should be sampled. Overrides the default sampling decision
+        for this span when provided.
+        """
+
         op: str
+        """
+        The span's operation. A list of recommended values is available here:
+        https://develop.sentry.dev/sdk/performance/span-operations/
+        """
+
         description: str
-        # hub: Optional[sentry_sdk.Hub] is deprecated, and therefore omitted here!
+        """A description of what operation is being performed within the span."""
+
+        hub: Optional["sentry_sdk.Hub"]
+        """The hub to use for this span. This argument is DEPRECATED. Please use the `scope` parameter, instead."""
+
         status: str
+        """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
+
         containing_transaction: Optional["Transaction"]
+        """The transaction that this span belongs to."""
+
         start_timestamp: Optional[Union[datetime, float]]
+        """
+        The timestamp when the span started. If omitted, the current time
+        will be used.
+        """
+
         scope: "sentry_sdk.Scope"
+        """The scope to use for this span. If not provided, we use the current scope."""
 
     class TransactionKwargs(SpanKwargs, total=False):
         name: str
+        """Identifier of the transaction. Will show up in the Sentry UI."""
+
         source: str
+        """
+        A string describing the source of the transaction name. This will be used to determine the transaction's type.
+        See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations for more information.
+        Default "custom".
+        """
+
         parent_sampled: bool
+        """Whether the parent transaction was sampled. If True this transaction will be kept, if False it will be discarded."""
+
         baggage: "Baggage"
+        """The W3C baggage header value. (see https://www.w3.org/TR/baggage/)"""
 
 
 BAGGAGE_HEADER_NAME = "baggage"

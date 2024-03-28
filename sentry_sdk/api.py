@@ -29,9 +29,9 @@ if TYPE_CHECKING:
         ExcInfo,
         MeasurementUnit,
         LogLevelStr,
+        SamplingContext,
     )
-    from sentry_sdk.scope import StartTransactionKwargs
-    from sentry_sdk.tracing import Span
+    from sentry_sdk.tracing import Span, TransactionKwargs
 
     T = TypeVar("T")
     F = TypeVar("F", bound=Callable[..., Any])
@@ -284,11 +284,12 @@ def start_span(
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
     instrumenter=INSTRUMENTER.SENTRY,  # type: str
-    **kwargs,  # type: Unpack[StartTransactionKwargs]
+    custom_sampling_context=None,  # type: Optional[SamplingContext]
+    **kwargs,  # type: Unpack[TransactionKwargs]
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
     return Scope.get_current_scope().start_transaction(
-        transaction, instrumenter, **kwargs
+        transaction, instrumenter, custom_sampling_context, **kwargs
     )
 
 
