@@ -201,3 +201,32 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
     client.post("/graphql", json=query)
 
     assert len(events) == 0
+
+
+def test_transaction_name_sync(sentry_init, capture_events):
+    sentry_init(
+        integrations=[GrapheneIntegration()],
+        enable_tracing=True,
+        auto_enabling_integrations=False,
+    )
+    events = capture_events()
+
+    schema = Schema(query=Query)
+
+    sync_app = Flask(__name__)
+
+    @sync_app.post("/graphql")
+    def graphql_server_sync():
+        data = request.get_json()
+        result = schema.execute(data["query"], operation_name=data.get("operationName"))
+        return result.data
+
+    query = {"query": "query GreetingQuery { hello }", "operationName": "GreetingQuery"}
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (transaction_event,) = events
+    assert transaction_event["transaction"] == "GreetingQuery"
+    assert transaction_event["type"] == "transaction"

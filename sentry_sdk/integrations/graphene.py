@@ -54,7 +54,8 @@ def _patch_graphql():
         with hub.configure_scope() as scope:
             scope.add_event_processor(_event_processor)
 
-        result = old_graphql_sync(schema, source, *args, **kwargs)
+        with hub.start_transaction(op="graphql", name=kwargs.get("operation_name")):
+            result = old_graphql_sync(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
             for error in result.errors or []:
@@ -80,7 +81,8 @@ def _patch_graphql():
         with hub.configure_scope() as scope:
             scope.add_event_processor(_event_processor)
 
-        result = await old_graphql_async(schema, source, *args, **kwargs)
+        with hub.start_transaction(op="graphql", name=kwargs.get("operation_name")):
+            result = await old_graphql_async(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
             for error in result.errors or []:
