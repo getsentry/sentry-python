@@ -193,7 +193,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if model:
                 span.set_data(SPANDATA.AI_MODEL_ID, model)
             if should_send_default_pii() and self.include_prompts:
-                span.set_data(
+                set_data_normalized(
+                    span,
                     SPANDATA.AI_INPUT_MESSAGES,
                     [
                         [self._normalize_langchain_message(x) for x in list_]

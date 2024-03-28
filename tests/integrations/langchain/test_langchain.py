@@ -147,16 +147,16 @@ def test_langchain_agent(
     if send_default_pii and include_prompts:
         assert (
             "You are very powerful"
-            in chat_spans[0]["data"]["ai.input_messages"][0][0]["content"]
+            in chat_spans[0]["data"]["ai.input_messages"][0]["content"]
         )
-        assert "5" in chat_spans[0]["data"]["ai.responses"][0][0]
+        assert "5" in chat_spans[0]["data"]["ai.responses"][0]
         assert "word" in tool_exec_span["data"]["ai.input_messages"]
         assert "5" in tool_exec_span["data"]["ai.responses"][0]
         assert (
             "You are very powerful"
-            in chat_spans[1]["data"]["ai.input_messages"][0][0]["content"]
+            in chat_spans[1]["data"]["ai.input_messages"][0]["content"]
         )
-        assert "5" in chat_spans[1]["data"]["ai.responses"][0][0]
+        assert "5" in chat_spans[1]["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in chat_spans[0].get("data", {})
         assert "ai.responses" not in chat_spans[0].get("data", {})
@@ -198,7 +198,5 @@ def test_langchain_error(sentry_init, capture_events):
     with start_transaction(), pytest.raises(Exception):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
-    for event in events:
-        print(event)
     error = events[0]
     assert error["level"] == "error"
