@@ -40,7 +40,6 @@ if TYPE_CHECKING:
         description: str
         # hub: Optional[sentry_sdk.Hub] is deprecated, and therefore omitted here!
         status: str
-        # transaction: str is deprecated, and therefore omitted here!
         containing_transaction: Optional["Transaction"]
         start_timestamp: Optional[Union[datetime, float]]
         scope: "sentry_sdk.Scope"
@@ -132,20 +131,6 @@ class Span:
         "scope",
     )
 
-    def __new__(cls, **kwargs):
-        # type: (**Any) -> Any
-        """
-        Backwards-compatible implementation of Span and Transaction
-        creation.
-        """
-
-        # TODO: consider removing this in a future release.
-        # This is for backwards compatibility with releases before Transaction
-        # existed, to allow for a smoother transition.
-        if "transaction" in kwargs:
-            return object.__new__(Transaction)
-        return object.__new__(cls)
-
     def __init__(
         self,
         trace_id=None,  # type: Optional[str]
@@ -157,7 +142,6 @@ class Span:
         description=None,  # type: Optional[str]
         hub=None,  # type: Optional[sentry_sdk.Hub]  # deprecated
         status=None,  # type: Optional[str]
-        transaction=None,  # type: Optional[str] # deprecated
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
@@ -598,15 +582,6 @@ class Transaction(Span):
             See https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
             for more information. Default "custom".
         """
-        # TODO: consider removing this in a future release.
-        # This is for backwards compatibility with releases before Transaction
-        # existed, to allow for a smoother transition.
-        if not name and "transaction" in kwargs:
-            logger.warning(
-                "Deprecated: use Transaction(name=...) to create transactions "
-                "instead of Span(transaction=...)."
-            )
-            name = kwargs.pop("transaction")  # type: ignore
 
         super().__init__(**kwargs)
 
