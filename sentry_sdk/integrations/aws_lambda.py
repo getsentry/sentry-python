@@ -11,6 +11,7 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     logger,
     TimeoutThread,
@@ -37,12 +38,10 @@ MILLIS_TO_SECONDS = 1000.0
 
 def _wrap_init_error(init_error):
     # type: (F) -> F
+    @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         client = sentry_sdk.get_client()
-        integration = client.get_integration(AwsLambdaIntegration)
-        if integration is None:
-            return init_error(*args, **kwargs)
 
         with capture_internal_exceptions():
             Scope.get_isolation_scope().clear_breadcrumbs()
@@ -63,6 +62,7 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
+    @ensure_integration_enabled(AwsLambdaIntegration, handler)
     def sentry_handler(aws_event, aws_context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
@@ -91,8 +91,6 @@ def _wrap_handler(handler):
 
         client = sentry_sdk.get_client()
         integration = client.get_integration(AwsLambdaIntegration)
-        if integration is None:
-            return handler(aws_event, aws_context, *args, **kwargs)
 
         configured_time = aws_context.get_remaining_time_in_millis()
 

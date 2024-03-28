@@ -58,14 +58,13 @@ T = TypeVar("T")
 
 
 def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    @ensure_integration_enabled_async(AsyncPGIntegration, f)
     async def _inner(*args: Any, **kwargs: Any) -> T:
-        integration = sentry_sdk.get_client().get_integration(AsyncPGIntegration)
-
         # Avoid recording calls to _execute twice.
         # Calls to Connection.execute with args also call
         # Connection._execute, which is recorded separately
         # args[0] = the connection object, args[1] is the query
-        if integration is None or len(args) > 2:
+        if len(args) > 2:
             return await f(*args, **kwargs)
 
         query = args[1]

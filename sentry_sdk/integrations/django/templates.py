@@ -65,11 +65,9 @@ def patch_templates():
     real_rendered_content = SimpleTemplateResponse.rendered_content
 
     @property  # type: ignore
+    @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
     def rendered_content(self):
         # type: (SimpleTemplateResponse) -> str
-        if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
-            return real_rendered_content.fget(self)
-
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
             description=_get_template_name_description(self.template_name),

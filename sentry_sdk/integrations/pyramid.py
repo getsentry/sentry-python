@@ -72,18 +72,18 @@ class PyramidIntegration(Integration):
 
         old_call_view = router._call_view
 
+        @ensure_integration_enabled(PyramidIntegration, old_call_view)
         def sentry_patched_call_view(registry, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Response
             integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
 
-            if integration is not None:
-                _set_transaction_name_and_source(
-                    Scope.get_current_scope(), integration.transaction_style, request
-                )
-                scope = Scope.get_isolation_scope()
-                scope.add_event_processor(
-                    _make_event_processor(weakref.ref(request), integration)
-                )
+            _set_transaction_name_and_source(
+                Scope.get_current_scope(), integration.transaction_style, request
+            )
+            scope = Scope.get_isolation_scope()
+            scope.add_event_processor(
+                _make_event_processor(weakref.ref(request), integration)
+            )
 
             return old_call_view(registry, request, *args, **kwargs)
 
@@ -130,18 +130,15 @@ class PyramidIntegration(Integration):
         router.Router.__call__ = sentry_patched_wsgi_call
 
 
+@ensure_integration_enabled(PyramidIntegration)
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
     if exc_info[0] is None or issubclass(exc_info[0], HTTPException):
         return
 
-    client = sentry_sdk.get_client()
-    if client.get_integration(PyramidIntegration) is None:
-        return
-
     event, hint = event_from_exception(
         exc_info,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "pyramid", "handled": False},
     )
 

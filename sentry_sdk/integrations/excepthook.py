@@ -1,7 +1,11 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    event_from_exception,
+)
 from sentry_sdk.integrations import Integration
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -43,11 +47,12 @@ class ExcepthookIntegration(Integration):
 
 def _make_excepthook(old_excepthook):
     # type: (Excepthook) -> Excepthook
+    @ensure_integration_enabled(ExcepthookIntegration, old_excepthook)
     def sentry_sdk_excepthook(type_, value, traceback):
         # type: (Type[BaseException], BaseException, Optional[TracebackType]) -> None
         integration = sentry_sdk.get_client().get_integration(ExcepthookIntegration)
 
-        if integration is not None and _should_send(integration.always_run):
+        if _should_send(integration.always_run):
             with capture_internal_exceptions():
                 event, hint = event_from_exception(
                     (type_, value, traceback),

@@ -7,6 +7,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import Scope, use_isolation_scope, use_scope
 from sentry_sdk.utils import (
+    ensure_integration_enabled,
     event_from_exception,
     capture_internal_exceptions,
     logger,
@@ -49,30 +50,30 @@ class ThreadingIntegration(Integration):
         old_start = Thread.start
 
         @wraps(old_start)
+        @ensure_integration_enabled(ThreadingIntegration, old_start)
         def sentry_start(self, *a, **kw):
             # type: (Thread, *Any, **Any) -> Any
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
-            if integration is not None:
-                if integration.propagate_scope:
-                    isolation_scope = sentry_sdk.Scope.get_isolation_scope()
-                    current_scope = sentry_sdk.Scope.get_current_scope()
-                else:
-                    isolation_scope = None
-                    current_scope = None
+            if integration.propagate_scope:
+                isolation_scope = sentry_sdk.Scope.get_isolation_scope()
+                current_scope = sentry_sdk.Scope.get_current_scope()
+            else:
+                isolation_scope = None
+                current_scope = None
 
-                # Patching instance methods in `start()` creates a reference cycle if
-                # done in a naive way. See
-                # https://github.com/getsentry/sentry-python/pull/434
-                #
-                # In threading module, using current_thread API will access current thread instance
-                # without holding it to avoid a reference cycle in an easier way.
-                with capture_internal_exceptions():
-                    new_run = _wrap_run(
-                        isolation_scope,
-                        current_scope,
-                        getattr(self.run, "__func__", self.run),
-                    )
-                    self.run = new_run  # type: ignore
+            # Patching instance methods in `start()` creates a reference cycle if
+            # done in a naive way. See
+            # https://github.com/getsentry/sentry-python/pull/434
+            #
+            # In threading module, using current_thread API will access current thread instance
+            # without holding it to avoid a reference cycle in an easier way.
+            with capture_internal_exceptions():
+                new_run = _wrap_run(
+                    isolation_scope,
+                    current_scope,
+                    getattr(self.run, "__func__", self.run),
+                )
+                self.run = new_run  # type: ignore
 
             return old_start(self, *a, **kw)
 

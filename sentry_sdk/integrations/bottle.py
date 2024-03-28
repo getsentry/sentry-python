@@ -77,11 +77,10 @@ class BottleIntegration(Integration):
 
         old_handle = Bottle._handle
 
+        @ensure_integration_enabled(BottleIntegration, old_handle)
         def _patched_handle(self, environ):
             # type: (Bottle, Dict[str, Any]) -> Any
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
-            if integration is None:
-                return old_handle(self, environ)
 
             scope = Scope.get_isolation_scope()
             scope._name = "bottle"
@@ -96,13 +95,11 @@ class BottleIntegration(Integration):
 
         old_make_callback = Route._make_callback
 
+        @ensure_integration_enabled(BottleIntegration, old_make_callback)
         def patched_make_callback(self, *args, **kwargs):
             # type: (Route, *object, **object) -> Any
             client = sentry_sdk.get_client()
-            integration = client.get_integration(BottleIntegration)
             prepared_callback = old_make_callback(self, *args, **kwargs)
-            if integration is None:
-                return prepared_callback
 
             def wrapped_callback(*args, **kwargs):
                 # type: (*object, **object) -> Any

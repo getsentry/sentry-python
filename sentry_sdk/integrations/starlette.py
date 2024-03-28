@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
     logger,
     parse_version,
@@ -165,15 +166,12 @@ def _enable_span_for_middleware(middleware_class):
     return middleware_class
 
 
+@ensure_integration_enabled(StarletteIntegration)
 def _capture_exception(exception, handled=False):
     # type: (BaseException, **Any) -> None
-    client = sentry_sdk.get_client()
-    if client.get_integration(StarletteIntegration) is None:
-        return
-
     event, hint = event_from_exception(
         exception,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": StarletteIntegration.identifier, "handled": handled},
     )
 
@@ -252,6 +250,7 @@ def patch_exception_middleware(middleware_class):
         middleware_class.__call__ = _sentry_exceptionmiddleware_call
 
 
+@ensure_integration_enabled(StarletteIntegration)
 def _add_user_to_sentry_scope(scope):
     # type: (Dict[str, Any]) -> None
     """
@@ -262,9 +261,6 @@ def _add_user_to_sentry_scope(scope):
         return
 
     if not should_send_default_pii():
-        return
-
-    if sentry_sdk.get_client().get_integration(StarletteIntegration) is None:
         return
 
     user_info = {}  # type: Dict[str, Any]
@@ -341,11 +337,10 @@ def patch_asgi_app():
     """
     old_app = Starlette.__call__
 
+    @ensure_integration_enabled_async(StarletteIntegration, old_app)
     async def _sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Starlette, StarletteScope, Receive, Send) -> None
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
-        if integration is None:
-            return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
@@ -382,13 +377,12 @@ def patch_request_response():
         is_coroutine = _is_async_callable(old_func)
         if is_coroutine:
 
+            @ensure_integration_enabled_async(StarletteIntegration, old_func)
             async def _sentry_async_func(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
-                if integration is None:
-                    return await old_func(*args, **kwargs)
 
                 request = args[0]
 

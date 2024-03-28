@@ -6,7 +6,12 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import Scope as SentryScope, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
-from sentry_sdk.utils import event_from_exception, transaction_from_function
+from sentry_sdk.utils import (
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
+    event_from_exception,
+    transaction_from_function,
+)
 
 try:
     from starlite import Request, Starlite, State  # type: ignore
@@ -174,14 +179,10 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 def patch_http_route_handle() -> None:
     old_handle = HTTPRoute.handle
 
+    @ensure_integration_enabled_async(StarliteIntegration, old_handle)
     async def handle_wrapper(
         self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send"
     ) -> None:
-        integration: StarliteIntegration = sentry_sdk.get_client().get_integration(
-            StarliteIntegration
-        )
-        if integration is None:
-            return await old_handle(self, scope, receive, send)
 
         sentry_scope = SentryScope.get_isolation_scope()
         request: "Request[Any, Any]" = scope["app"].request_class(
@@ -255,11 +256,8 @@ def retrieve_user_from_scope(scope: "StarliteScope") -> "Optional[Dict[str, Any]
     return None
 
 
+@ensure_integration_enabled(StarliteIntegration)
 def exception_handler(exc: Exception, scope: "StarliteScope", _: "State") -> None:
-    client = sentry_sdk.get_client()
-    if client.get_integration(StarliteIntegration) is None:
-        return
-
     user_info: "Optional[Dict[str, Any]]" = None
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
@@ -269,7 +267,7 @@ def exception_handler(exc: Exception, scope: "StarliteScope", _: "State") -> Non
 
     event, hint = event_from_exception(
         exc,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": StarliteIntegration.identifier, "handled": False},
     )
 

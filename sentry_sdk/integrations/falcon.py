@@ -6,6 +6,7 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     parse_version,
 )
@@ -167,6 +168,7 @@ def _patch_handle_exception():
     # type: () -> None
     original_handle_exception = falcon_app_class._handle_exception
 
+    @ensure_integration_enabled(FalconIntegration, original_handle_exception)
     def sentry_patched_handle_exception(self, *args):
         # type: (falcon.API, *Any) -> Any
         # NOTE(jmagnusson): falcon 2.0 changed falcon.API._handle_exception
@@ -187,14 +189,10 @@ def _patch_handle_exception():
             # capture_internal_exceptions block above.
             return was_handled
 
-        client = sentry_sdk.get_client()
-        integration = client.get_integration(FalconIntegration)
-
-        if integration is not None and _exception_leads_to_http_5xx(ex, response):
-            # If an integration is there, a client has to be there.
+        if _exception_leads_to_http_5xx(ex, response):
             event, hint = event_from_exception(
                 ex,
-                client_options=client.options,
+                client_options=sentry_sdk.get_client().options,
                 mechanism={"type": "falcon", "handled": False},
             )
             sentry_sdk.capture_event(event, hint=hint)

@@ -6,7 +6,7 @@ import sentry_sdk
 from sentry_sdk import Scope
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
-
+from sentry_sdk.utils import ensure_integration_enabled
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -44,13 +44,13 @@ class AtexitIntegration(Integration):
     def setup_once():
         # type: () -> None
         @atexit.register
+        @ensure_integration_enabled(AtexitIntegration)
         def _shutdown():
             # type: () -> None
             logger.debug("atexit: got shutdown signal")
             client = sentry_sdk.get_client()
             integration = client.get_integration(AtexitIntegration)
-            if integration is not None:
-                logger.debug("atexit: shutting down client")
 
-                Scope.get_isolation_scope().end_session()
-                client.close(callback=integration.callback)
+            logger.debug("atexit: shutting down client")
+            Scope.get_isolation_scope().end_session()
+            client.close(callback=integration.callback)

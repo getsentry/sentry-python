@@ -190,12 +190,9 @@ class AioHttpIntegration(Integration):
 def create_trace_config():
     # type: () -> TraceConfig
 
+    @ensure_integration_enabled_async(AioHttpIntegration)
     async def on_request_start(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
-        client = sentry_sdk.get_client()
-        if client.get_integration(AioHttpIntegration) is None:
-            return
-
         method = params.method.upper()
 
         parsed_url = None
@@ -212,6 +209,8 @@ def create_trace_config():
             span.set_data("url", parsed_url.url)
             span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
             span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+
+        client = sentry_sdk.get_client()
 
         if should_propagate_trace(client, str(params.url)):
             for key, value in Scope.get_current_scope().iter_trace_propagation_headers(

@@ -13,6 +13,8 @@ from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_
 from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -272,11 +274,9 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     return sentry_wrapped_error_handler
 
 
+@ensure_integration_enabled_async(SanicIntegration, old_handle_request)
 async def _legacy_handle_request(self, request, *args, **kwargs):
     # type: (Any, Request, *Any, **Any) -> Any
-    if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
-        return old_handle_request(self, request, *args, **kwargs)
-
     weak_request = weakref.ref(request)
 
     with sentry_sdk.isolation_scope() as scope:
@@ -320,17 +320,13 @@ def _legacy_router_get(self, *args):
     return rv
 
 
+@ensure_integration_enabled(SanicIntegration)
 def _capture_exception(exception):
     # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
-    client = sentry_sdk.get_client()
-    integration = client.get_integration(SanicIntegration)
-    if integration is None:
-        return
-
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,
-            client_options=client.options,
+            client_options=sentry_sdk.get_client().options,
             mechanism={"type": "sanic", "handled": False},
         )
         sentry_sdk.capture_event(event, hint=hint)

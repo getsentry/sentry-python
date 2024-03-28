@@ -12,6 +12,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
 )
 from sentry_sdk._types import TYPE_CHECKING
@@ -113,14 +114,9 @@ def patch_scaffold_route():
             ):
 
                 @wraps(old_func)
+                @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
-                    integration = sentry_sdk.get_client().get_integration(
-                        QuartIntegration
-                    )
-                    if integration is None:
-                        return old_func(*args, **kwargs)
-
                     scope = Scope.get_isolation_scope()
                     if scope.profile is not None:
                         scope.profile.active_thread_id = (
@@ -154,11 +150,10 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
+@ensure_integration_enabled_async(QuartIntegration)
 async def _request_websocket_started(app, **kwargs):
     # type: (Quart, **Any) -> None
     integration = sentry_sdk.get_client().get_integration(QuartIntegration)
-    if integration is None:
-        return
 
     if has_request_context():
         request_websocket = request._get_current_object()
@@ -205,15 +200,12 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
+@ensure_integration_enabled_async(QuartIntegration)
 async def _capture_exception(sender, exception, **kwargs):
     # type: (Quart, Union[ValueError, BaseException], **Any) -> None
-    client = sentry_sdk.get_client()
-    if client.get_integration(QuartIntegration) is None:
-        return
-
     event, hint = event_from_exception(
         exception,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "quart", "handled": False},
     )
 
