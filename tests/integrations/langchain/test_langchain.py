@@ -164,3 +164,41 @@ def test_langchain_agent(
         assert "ai.responses" not in chat_spans[1].get("data", {})
         assert "ai.input_messages" not in tool_exec_span.get("data", {})
         assert "ai.responses" not in tool_exec_span.get("data", {})
+
+
+def test_langchain_error(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LangchainIntegration(include_prompts=True)],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are very powerful assistant, but don't know current events",
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+    global stream_result_mock
+    stream_result_mock = Mock(side_effect=Exception("API rate limit error"))
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with start_transaction(), pytest.raises(Exception):
+        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    for event in events:
+        print(event)
+    error = events[0]
+    assert error["level"] == "error"
