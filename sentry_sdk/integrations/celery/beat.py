@@ -143,6 +143,7 @@ def _patch_beat_apply_entry():
         # Tasks started by Celery Beat start a new Trace
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()
+        scope._name = "celery-beat"
 
         monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
 
@@ -203,6 +204,7 @@ def _patch_redbeat_maybe_due():
         # Tasks started by Celery Beat start a new Trace
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()
+        scope._name = "celery-beat"
 
         monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
 

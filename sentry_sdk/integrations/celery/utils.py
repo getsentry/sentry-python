@@ -3,6 +3,7 @@ import time
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any
     from typing import Tuple
 
 
@@ -31,3 +32,13 @@ def _get_humanized_interval(seconds):
             return (interval, unit)
 
     return (int(seconds), "second")
+
+
+class NoOpMgr:
+    def __enter__(self):
+        # type: () -> None
+        return None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
+        return None
