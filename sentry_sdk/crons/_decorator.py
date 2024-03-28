@@ -22,14 +22,16 @@ class MonitorMixin:
         if iscoroutinefunction(fn):
 
             @wraps(fn)
-            async def inner(*args: "P.args", **kwargs: "P.kwargs") -> R:
+            async def inner(*args: "P.args", **kwargs: "P.kwargs"):
+                # type: (...) -> R
                 with self:  # type: ignore[attr-defined]
                     return await fn(*args, **kwargs)
 
         else:
 
             @wraps(fn)
-            def inner(*args: "P.args", **kwargs: "P.kwargs") -> R:
+            def inner(*args: "P.args", **kwargs: "P.kwargs"):
+                # type: (...) -> R
                 with self:  # type: ignore[attr-defined]
                     return fn(*args, **kwargs)
 
