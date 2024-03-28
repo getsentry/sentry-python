@@ -58,6 +58,7 @@ DATA_FIELDS = {
     "tools": SPANDATA.AI_TOOLS,
     "response_format": SPANDATA.AI_RESPONSE_FORMAT,
     "logit_bias": SPANDATA.AI_LOGIT_BIAS,
+    "tags": SPANDATA.AI_TAGS,
 }
 
 
@@ -346,12 +347,18 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_TOOL,
-                description=kwargs.get("name") or "AI tool usage",
+                description=serialized.get("name")
+                or kwargs.get("name")
+                or "AI tool usage",
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span, SPANDATA.AI_INPUT_MESSAGES, kwargs.get("inputs", [input_str])
                 )
+                if kwargs.get("metadata"):
+                    set_data_normalized(
+                        span, SPANDATA.AI_METADATA, kwargs.get("metadata")
+                    )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
