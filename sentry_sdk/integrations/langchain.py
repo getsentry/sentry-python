@@ -25,13 +25,47 @@ except ImportError:
     raise DidNotEnable("langchain not installed")
 
 
+try:
+    import tiktoken  # type: ignore
+
+    enc = tiktoken.get_encoding("cl100k_base")
+
+    def count_tokens(s):
+        # type: (str) -> int
+        return len(enc.encode_ordinary(s))
+
+    logger.debug("[langchain] using tiktoken to count tokens")
+except ImportError:
+    logger.info(
+        "The Sentry Python SDK requires 'tiktoken' in order to measure token usage from streaming langchain calls."
+        "Please install 'tiktoken' if you aren't receiving accurate token usage in Sentry."
+        "See https://docs.sentry.io/platforms/python/integrations/langchain/ for more information."
+    )
+
+    def count_tokens(s):
+        # type: (str) -> int
+        return 1
+
+
+DATA_FIELDS = [
+    "temperature",
+    "top_p",
+    "top_k",
+    "function_call",
+    "functions",
+    "tools",
+    "response_format",
+    "logit_bias",
+]
+
+
 class LangchainIntegration(Integration):
     identifier = "langchain"
 
     # The most number of spans (e.g., LLM calls) that can be processed at the same time.
     max_spans = 1024
 
-    def __init__(self, include_prompts=False, max_spans=1024):
+    def __init__(self, include_prompts=True, max_spans=1024):
         # type: (LangchainIntegration, bool, int) -> None
         self.include_prompts = include_prompts
         self.max_spans = max_spans
@@ -44,12 +78,12 @@ class LangchainIntegration(Integration):
 
 class WatchedSpan:
     span = None  # type: Span
-    num_tokens = 0  # type: int
+    num_completion_tokens = 0  # type: int
+    num_prompt_tokens = 0  # type: int
 
-    def __init__(self, span, num_tokens=0):
-        # type: (Span, int) -> None
+    def __init__(self, span):
+        # type: (Span) -> None
         self.span = span
-        self.num_tokens = num_tokens
 
 
 class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
@@ -121,6 +155,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
+            params = kwargs.get("invocation_params", {})
+            params.update(serialized.get("kwargs", {}))
             span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
@@ -152,6 +188,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         for list_ in messages
                     ],
                 )
+            for list_ in messages:
+                for message in list_:
+                    self.span_map[run_id].num_prompt_tokens += count_tokens(
+                        message.content
+                    ) + count_tokens(message.type)
 
     def on_llm_new_token(self, token, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
@@ -162,7 +203,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span_data = self.span_map[run_id]
             if not span_data:
                 return
-            span_data.num_tokens += 1
+            span_data.num_completion_tokens += count_tokens(token)
 
     def on_llm_end(self, response, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, LLMResult, UUID, Any) -> Any
@@ -197,13 +238,21 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 span_data.span.set_data(
                     SPANDATA.AI_TOTAL_TOKENS_USED, token_usage.get("total_tokens")
                 )
-            elif span_data.num_tokens:
-                span_data.span.set_data(
-                    SPANDATA.AI_COMPLETION_TOKENS_USED, span_data.num_tokens
-                )
-                span_data.span.set_data(
-                    SPANDATA.AI_TOTAL_TOKENS_USED, span_data.num_tokens
-                )
+            else:
+                if span_data.num_completion_tokens:
+                    span_data.span.set_data(
+                        SPANDATA.AI_COMPLETION_TOKENS_USED,
+                        span_data.num_completion_tokens,
+                    )
+                if span_data.num_prompt_tokens:
+                    span_data.span.set_data(
+                        SPANDATA.AI_PROMPT_TOKENS_USED, span_data.num_prompt_tokens
+                    )
+                if span_data.num_prompt_tokens and span_data.num_completion_tokens:
+                    span_data.span.set_data(
+                        SPANDATA.AI_TOTAL_TOKENS_USED,
+                        span_data.num_prompt_tokens + span_data.num_completion_tokens,
+                    )
 
             span_data.span.__exit__(None, None, None)
             del self.span_map[run_id]
