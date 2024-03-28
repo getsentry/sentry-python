@@ -1,6 +1,8 @@
 from collections import OrderedDict
 from functools import wraps
 
+from langchain_core.agents import AgentAction, AgentFinish
+
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
@@ -106,7 +108,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def _handle_error(self, run_id, error):
         # type: (UUID, Any) -> None
-        if not run_id or not self.span_map[run_id]:
+        if not run_id or not run_id not in self.span_map:
             return
 
         span_data = self.span_map[run_id]
@@ -155,8 +157,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-            params = kwargs.get("invocation_params", {})
-            params.update(serialized.get("kwargs", {}))
+            all_params = kwargs.get("invocation_params", {})
+            all_params.update(serialized.get("kwargs", {}))
             span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
@@ -166,16 +168,17 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompts)
             for k, v in DATA_FIELDS.items():
-                if k in params:
-                    span.set_data(v, params[k])
+                if k in all_params:
+                    set_data_normalized(span, v, all_params[k])
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any
         """Run when Chat Model starts running."""
-        if not run_id:
-            return
-
         with capture_internal_exceptions():
+            if not run_id:
+                return
+            all_params = kwargs.get("invocation_params", {})
+            all_params.update(serialized.get("kwargs", {}))
             span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
@@ -191,6 +194,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                         for list_ in messages
                     ],
                 )
+            for k, v in DATA_FIELDS.items():
+                if k in all_params:
+                    set_data_normalized(span, v, all_params[k])
             for list_ in messages:
                 for message in list_:
                     self.span_map[run_id].num_prompt_tokens += count_tokens(
@@ -201,7 +207,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
         """Run on new LLM token. Only available when streaming is enabled."""
         with capture_internal_exceptions():
-            if not run_id or not self.span_map[run_id]:
+            if not run_id or run_id not in self.span_map:
                 return
             span_data = self.span_map[run_id]
             if not span_data:
@@ -272,18 +278,21 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-            self._create_span(
+            span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_RUN,
                 description=kwargs.get("name") or "Chain execution",
             )
+            metadata = kwargs.get("metadata")
+            if metadata:
+                set_data_normalized(span, SPANDATA.AI_METADATA, metadata)
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], UUID, Any) -> Any
         """Run when chain ends running."""
         with capture_internal_exceptions():
-            if not run_id or not self.span_map[run_id]:
+            if not run_id or run_id not in self.span_map:
                 return
 
             span_data = self.span_map[run_id]
@@ -296,6 +305,36 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
         """Run when chain errors."""
         self._handle_error(run_id, error)
+
+    def on_agent_action(self, action, *, run_id, **kwargs):
+        # type: (SentryLangchainCallback, AgentAction, UUID, Any) -> Any
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+            span = self._create_span(
+                run_id,
+                kwargs.get("parent_run_id"),
+                op=OP.LANGCHAIN_AGENT,
+                description=action.tool or "AI tool usage",
+            )
+            if action.tool_input and should_send_default_pii() and self.include_prompts:
+                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, action.tool_input)
+
+    def on_agent_finish(self, finish, *, run_id, **kwargs):
+        # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
+        with capture_internal_exceptions():
+            if not run_id:
+                return
+
+            span_data = self.span_map[run_id]
+            if not span_data:
+                return
+            if should_send_default_pii() and self.include_prompts:
+                set_data_normalized(
+                    span_data.span, SPANDATA.AI_RESPONSES, finish.return_values.items()
+                )
+            span_data.span.__exit__(None, None, None)
+            del self.span_map[run_id]
 
     def on_tool_start(self, serialized, input_str, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], str, UUID, Any) -> Any
@@ -318,7 +357,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
         """Run when tool ends running."""
         with capture_internal_exceptions():
-            if not run_id or not self.span_map[run_id]:
+            if not run_id or run_id not in self.span_map:
                 return
 
             span_data = self.span_map[run_id]
