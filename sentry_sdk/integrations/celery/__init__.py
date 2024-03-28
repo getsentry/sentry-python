@@ -222,7 +222,9 @@ def _wrap_apply_async(f):
                         # Need to setdefault the inner headers too since other
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
-                        incoming_headers.setdefault("headers", {}).update(sentry_trace_headers)
+                        incoming_headers.setdefault("headers", {}).update(
+                            sentry_trace_headers
+                        )
                         if combined_baggage:
                             incoming_headers["headers"][
                                 BAGGAGE_HEADER_NAME
