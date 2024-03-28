@@ -47,16 +47,16 @@ except ImportError:
         return 1
 
 
-DATA_FIELDS = [
-    "temperature",
-    "top_p",
-    "top_k",
-    "function_call",
-    "functions",
-    "tools",
-    "response_format",
-    "logit_bias",
-]
+DATA_FIELDS = {
+    "temperature": SPANDATA.AI_TEMPERATURE,
+    "top_p": SPANDATA.AI_TOP_P,
+    "top_k": SPANDATA.AI_TOP_K,
+    "function_call": SPANDATA.AI_FUNCTION_CALL,
+    "tool_calls": SPANDATA.AI_TOOL_CALLS,
+    "tools": SPANDATA.AI_TOOLS,
+    "response_format": SPANDATA.AI_RESPONSE_FORMAT,
+    "logit_bias": SPANDATA.AI_LOGIT_BIAS,
+}
 
 
 class LangchainIntegration(Integration):
@@ -165,6 +165,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompts)
+            for k, v in DATA_FIELDS.items():
+                if k in params:
+                    span.set_data(v, params[k])
 
     def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], List[List[BaseMessage]], UUID, Any) -> Any

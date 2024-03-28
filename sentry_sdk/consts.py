@@ -127,6 +127,49 @@ class SPANDATA:
     Example: true
     """
 
+    AI_TEMPERATURE = "ai.temperature"
+    """
+    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TOP_P = "ai.top_p"
+    """
+    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TOP_K = "ai.top_k"
+    """
+    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
+    Example: 35
+    """
+
+    AI_FUNCTION_CALL = "ai.function_call"
+    """
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_TOOL_CALLS = "ai.tool_calls"
+    """
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_TOOLS = "ai.tools"
+    """
+    For an AI model call, the functions that are available
+    """
+
+    AI_RESPONSE_FORMAT = "ai.response_format"
+    """
+    For an AI model call, the format of the response
+    """
+
+    AI_LOGIT_BIAS = "ai.response_format"
+    """
+    For an AI model call, the logit bias
+    """
+
     AI_RESPONSES = "ai.responses"
     """
     The responses to an AI model call. Always as a list.
