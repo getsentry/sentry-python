@@ -120,7 +120,9 @@ class Span:
         https://develop.sentry.dev/sdk/performance/span-operations/
     :param description: A description of what operation is being performed within the span.
     :param hub: The hub to use for this span.
+
         .. deprecated:: 2.0.0
+            Please use the `scope` parameter, instead.
     :param status: The span's status. Possible values are listed at
         https://develop.sentry.dev/sdk/event-payloads/span/
     :param containing_transaction: The transaction that this span belongs to.
