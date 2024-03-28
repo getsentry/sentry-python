@@ -108,7 +108,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def _handle_error(self, run_id, error):
         # type: (UUID, Any) -> None
-        if not run_id or not run_id not in self.span_map:
+        if not run_id or run_id not in self.span_map:
             return
 
         span_data = self.span_map[run_id]
