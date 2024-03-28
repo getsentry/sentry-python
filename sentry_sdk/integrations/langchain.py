@@ -186,7 +186,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
                 description=kwargs.get("name") or "Langchain Chat Model",
             )
-            # TODO model ids
+            model = all_params.get(
+                "model", all_params.get("model_name", all_params.get("model_id"))
+            )
+            if not model and "anthropic" in all_params.get("_type"):
+                model = "claude-2"
+            if model:
+                span.set_data(SPANDATA.AI_MODEL_ID, model)
             if should_send_default_pii() and self.include_prompts:
                 span.set_data(
                     SPANDATA.AI_INPUT_MESSAGES,
