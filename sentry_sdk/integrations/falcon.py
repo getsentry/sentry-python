@@ -192,7 +192,6 @@ def _patch_handle_exception():
         client = sentry_sdk.get_client()
 
         if _exception_leads_to_http_5xx(ex, response):
-            # If an integration is there, a client has to be there.
             event, hint = event_from_exception(
                 ex,
                 client_options=client.options,
