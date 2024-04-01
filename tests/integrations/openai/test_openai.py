@@ -68,8 +68,8 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"][0]["content"]
-        assert "the model response" in span["data"]["ai.responses"][0]["content"]
+        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert "the model response" in span["data"]["ai.responses"]["content"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -147,8 +147,8 @@ def test_streaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"][0]["content"]
-        assert "hello world" in span["data"]["ai.responses"][0]
+        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert "hello world" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -219,7 +219,7 @@ def test_embeddings_create(
     span = tx["spans"][0]
     assert span["op"] == "ai.embeddings.create.openai"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"][0]
+        assert "hello" in span["data"]["ai.input_messages"]
     else:
         assert "ai.input_messages" not in span["data"]
 
