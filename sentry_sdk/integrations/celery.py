@@ -3,6 +3,11 @@ from __future__ import absolute_import
 import sys
 import time
 
+try:
+    from typing import cast
+except ImportError:
+    cast = lambda _, obj: obj
+
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -29,7 +34,6 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import TypeVar
     from typing import Union
-    from typing import cast
 
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import (
