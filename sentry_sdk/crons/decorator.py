@@ -5,7 +5,7 @@ from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.utils import now
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Type
+    from typing import Any, Optional, Type
     from types import TracebackType
 
 if PY2:
@@ -48,7 +48,7 @@ class monitor(MonitorMixin):  # noqa: N801
     """
 
     def __init__(self, monitor_slug=None, monitor_config=None):
-        # type: (Optional[str], Optional[Dict[str, Any]]) -> None
+        # type: (Optional[str], Optional[dict[str, Any]]) -> None
         self.monitor_slug = monitor_slug
         self.monitor_config = monitor_config
 
