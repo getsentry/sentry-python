@@ -184,7 +184,7 @@ if TYPE_CHECKING:
         {
             "type": Literal["crontab", "interval"],
             "value": Union[int, str],
-            "unit": str,
+            "unit": Literal["year", "month", "week", "day", "hour", "minute"],
         },
         total=False,
     )
