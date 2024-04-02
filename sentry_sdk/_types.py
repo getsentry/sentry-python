@@ -187,8 +187,7 @@ if TYPE_CHECKING:
         "day",
         "hour",
         "minute",
-        "second",
-        # "second" is not supported in Sentry and will result in a warning
+        "second",  # not supported in Sentry and will result in a warning
     ]
 
     MonitorConfigSchedule = TypedDict(
