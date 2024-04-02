@@ -181,7 +181,14 @@ if TYPE_CHECKING:
 
     MonitorConfigScheduleType = Literal["crontab", "interval"]
     MonitorConfigScheduleUnit = Literal[
-        "year", "month", "week", "day", "hour", "minute"
+        "year",
+        "month",
+        "week",
+        "day",
+        "hour",
+        "minute",
+        "second",
+        # "second" is not supported in Sentry and will result in a warning
     ]
 
     MonitorConfigSchedule = TypedDict(

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing import TypeVar
     from typing import Union
+    from typing import cast
 
     from sentry_sdk.tracing import Span
     from sentry_sdk._types import (
@@ -424,7 +425,7 @@ def _get_headers(task):
 
 
 def _get_humanized_interval(seconds):
-    # type: (float) -> Tuple[int, str]
+    # type: (float) -> Tuple[int, MonitorConfigScheduleUnit]
     TIME_UNITS = (  # noqa: N806
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
@@ -435,7 +436,7 @@ def _get_humanized_interval(seconds):
     for unit, divider in TIME_UNITS:
         if seconds >= divider:
             interval = int(seconds / divider)
-            return (interval, unit)
+            return (interval, cast(MonitorConfigScheduleUnit, unit))
 
     return (int(seconds), "second")
 
