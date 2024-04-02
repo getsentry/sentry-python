@@ -5,7 +5,7 @@ from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.utils import now
 
 if TYPE_CHECKING:
-    from typing import Optional, Type
+    from typing import Any, Dict, Optional, Type
     from types import TracebackType
 
 if PY2:
@@ -47,15 +47,18 @@ class monitor(MonitorMixin):  # noqa: N801
     ```
     """
 
-    def __init__(self, monitor_slug=None):
-        # type: (Optional[str]) -> None
+    def __init__(self, monitor_slug=None, monitor_config=None):
+        # type: (Optional[str], Optional[Dict[str, Any]]) -> None
         self.monitor_slug = monitor_slug
+        self.monitor_config = monitor_config
 
     def __enter__(self):
         # type: () -> None
         self.start_timestamp = now()
         self.check_in_id = capture_checkin(
-            monitor_slug=self.monitor_slug, status=MonitorStatus.IN_PROGRESS
+            monitor_slug=self.monitor_slug,
+            status=MonitorStatus.IN_PROGRESS,
+            monitor_config=self.monitor_config,
         )
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -72,4 +75,5 @@ class monitor(MonitorMixin):  # noqa: N801
             check_in_id=self.check_in_id,
             status=status,
             duration=duration_s,
+            monitor_config=self.monitor_config,
         )

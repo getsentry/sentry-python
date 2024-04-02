@@ -49,7 +49,9 @@ async def test_decorator(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="abc123", status="in_progress"),
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -75,7 +77,9 @@ async def test_decorator_error(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="def456", status="in_progress"),
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -99,7 +103,9 @@ async def test_contextmanager(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="abc123", status="in_progress"),
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -125,7 +131,9 @@ async def test_contextmanager_error(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="def456", status="in_progress"),
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
