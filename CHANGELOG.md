@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.44.1
+
+### Better async support (ongoing)
+
+By: @sentrivana (#2912)
+
+### Various fixes & improvements
+
+- fix(types): Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
+
 ## 1.44.0
 
 ### Various fixes & improvements
