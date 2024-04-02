@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from typing import Union
 
     from sentry_sdk.tracing import Span
-    from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
+    from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo, MonitorConfig
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -433,8 +433,8 @@ def _get_humanized_interval(seconds):
 
 
 def _get_monitor_config(celery_schedule, app, monitor_name):
-    # type: (Any, Celery, str) -> Dict[str, Any]
-    monitor_config = {}  # type: Dict[str, Any]
+    # type: (Any, Celery, str) -> MonitorConfig
+    monitor_config = {}  # type: MonitorConfig
     schedule_type = None  # type: Optional[str]
     schedule_value = None  # type: Optional[Union[str, int]]
     schedule_unit = None  # type: Optional[str]
