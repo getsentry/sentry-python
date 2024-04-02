@@ -179,12 +179,17 @@ if TYPE_CHECKING:
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
     MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
 
+    MonitorConfigScheduleType = Literal["crontab", "interval"]
+    MonitorConfigScheduleUnit = Literal[
+        "year", "month", "week", "day", "hour", "minute"
+    ]
+
     MonitorConfigSchedule = TypedDict(
         "MonitorConfigSchedule",
         {
-            "type": Literal["crontab", "interval"],
+            "type": MonitorConfigScheduleType,
             "value": Union[int, str],
-            "unit": Literal["year", "month", "week", "day", "hour", "minute"],
+            "unit": MonitorConfigScheduleUnit,
         },
         total=False,
     )
