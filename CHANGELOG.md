@@ -113,6 +113,13 @@ _Plus 2 more_
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
 
 
+## 1.44.0
+
+### Various fixes & improvements
+
+- ref: Define types at runtime (#2914) by @szokeasaurusrex
+- Explicit reexport of types (#2866) (#2913) by @szokeasaurusrex
+- feat(profiling): Add thread data to spans (#2843) by @Zylphrex
 
 ## 1.43.0
 
