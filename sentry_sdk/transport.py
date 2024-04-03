@@ -222,6 +222,12 @@ class HttpTransport(Transport):
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
                 quantity = len(item.get_bytes()) or 1
+            if data_category == "statsd":
+                # The envelope item type used for metrics is statsd
+                # whereas the client report category for discarded events 
+                # is metric_bucket
+                data_category = "metric_bucket"
+
         elif data_category is None:
             raise TypeError("data category not provided")
 

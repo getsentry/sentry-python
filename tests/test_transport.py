@@ -501,8 +501,7 @@ def test_metric_bucket_limits(capturing_server, response_code, make_client):
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
     assert report["discarded_events"] == [
-        # Clarify category statsd or metric_bucket
-        {"category": "statsd", "reason": "ratelimit_backoff", "quantity": 1},
+        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
     ]
 
 
@@ -576,6 +575,5 @@ def test_metric_bucket_limits_with_all_namespaces(
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
     assert report["discarded_events"] == [
-        # Clarify category statsd or metric_bucket
-        {"category": "statsd", "reason": "ratelimit_backoff", "quantity": 1},
+        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
     ]
