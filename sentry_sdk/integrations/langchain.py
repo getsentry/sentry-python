@@ -364,7 +364,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not span_data:
                 return
             if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span_data.span, SPANDATA.AI_RESPONSES, [output])
+                set_data_normalized(span_data.span, SPANDATA.AI_RESPONSES, output)
             span_data.span.__exit__(None, None, None)
             del self.span_map[run_id]
 

@@ -78,9 +78,9 @@ def _calculate_chat_completion_usage(
     messages, response, span, streaming_message_responses=None
 ):
     # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]]) -> None
-    completion_tokens = 0
-    prompt_tokens = 0
-    total_tokens = 0
+    completion_tokens = 0  # type: Optional[int]
+    prompt_tokens = 0  # type: Optional[int]
+    total_tokens = 0  # type: Optional[int]
     if hasattr(response, "usage"):
         if hasattr(response.usage, "completion_tokens") and isinstance(
             response.usage.completion_tokens, int
