@@ -17,16 +17,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 
 sentry_sdk.init(integrations=[DjangoIntegration()])
 
-
 import os
 
-try:
-    # Django >= 1.10
-    from django.utils.deprecation import MiddlewareMixin
-except ImportError:
-    # Not required for Django <= 1.9, see:
-    # https://docs.djangoproject.com/en/1.10/topics/http/middleware/#upgrading-pre-django-1-10-style-middleware
-    MiddlewareMixin = object
+from django.utils.deprecation import MiddlewareMixin
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
