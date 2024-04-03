@@ -113,6 +113,8 @@ def _calculate_chat_completion_usage(
         prompt_tokens = None
     if completion_tokens == 0:
         completion_tokens = None
+    if total_tokens == 0:
+        total_tokens = None
     record_token_usage(span, prompt_tokens, completion_tokens, total_tokens)
 
 
