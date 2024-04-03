@@ -4,7 +4,8 @@ pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
-tox==4.0.19
+tox; python_version < '3.12'
+tox<4; python_version >= '3.12'
 jsonschema
 pyrsistent
 executing
