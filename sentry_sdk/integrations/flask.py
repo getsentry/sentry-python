@@ -1,12 +1,13 @@
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     package_version,
 )
@@ -14,7 +15,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
@@ -77,7 +78,7 @@ class FlaskIntegration(Integration):
 
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-            if Hub.current.get_integration(FlaskIntegration) is None:
+            if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
             return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
@@ -92,8 +93,8 @@ def _add_sentry_trace(sender, template, context, **extra):
     if "sentry_trace" in context:
         return
 
-    hub = Hub.current
-    trace_meta = Markup(hub.trace_propagation_meta())
+    scope = Scope.get_current_scope()
+    trace_meta = Markup(scope.trace_propagation_meta())
     context["sentry_trace"] = trace_meta  # for backwards compatibility
     context["sentry_trace_meta"] = trace_meta
 
@@ -113,20 +114,21 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
+@ensure_integration_enabled(FlaskIntegration)
 def _request_started(app, **kwargs):
     # type: (Flask, **Any) -> None
-    hub = Hub.current
-    integration = hub.get_integration(FlaskIntegration)
-    if integration is None:
-        return
+    integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+    request = flask_request._get_current_object()
 
-    with hub.configure_scope() as scope:
-        # Set the transaction name and source here,
-        # but rely on WSGI middleware to actually start the transaction
-        request = flask_request._get_current_object()
-        _set_transaction_name_and_source(scope, integration.transaction_style, request)
-        evt_processor = _make_request_event_processor(app, request, integration)
-        scope.add_event_processor(evt_processor)
+    # Set the transaction name and source here,
+    # but rely on WSGI middleware to actually start the transaction
+    _set_transaction_name_and_source(
+        Scope.get_current_scope(), integration.transaction_style, request
+    )
+
+    scope = Scope.get_isolation_scope()
+    evt_processor = _make_request_event_processor(app, request, integration)
+    scope.add_event_processor(evt_processor)
 
 
 class FlaskRequestExtractor(RequestExtractor):
@@ -170,7 +172,7 @@ def _make_request_event_processor(app, request, integration):
     # type: (Flask, Callable[[], Request], FlaskIntegration) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
 
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
@@ -181,7 +183,7 @@ def _make_request_event_processor(app, request, integration):
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             with capture_internal_exceptions():
                 _add_user_to_event(event)
 
@@ -190,26 +192,20 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
+@ensure_integration_enabled(FlaskIntegration)
 def _capture_exception(sender, exception, **kwargs):
     # type: (Flask, Union[ValueError, BaseException], **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(FlaskIntegration) is None:
-        return
-
-    # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
-
     event, hint = event_from_exception(
         exception,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "flask", "handled": False},
     )
 
-    hub.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _add_user_to_event(event):
-    # type: (Dict[str, Any]) -> None
+    # type: (Event) -> None
     if flask_login is None:
         return
 

@@ -55,7 +55,7 @@ class B(A, object):
 
     def __init__(self):
         self.r = "We are in B"
-        super(B, self).__init__(self.fa)
+        super().__init__(self.fa)
 
 
 class SimpleFunc(DoFn):

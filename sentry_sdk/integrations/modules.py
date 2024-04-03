@@ -1,4 +1,4 @@
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import _get_installed_modules
@@ -7,8 +7,6 @@ from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from typing import Dict
-
     from sentry_sdk._types import Event
 
 
@@ -20,11 +18,11 @@ class ModulesIntegration(Integration):
         # type: () -> None
         @add_global_event_processor
         def processor(event, hint):
-            # type: (Event, Any) -> Dict[str, Any]
+            # type: (Event, Any) -> Event
             if event.get("type") == "transaction":
                 return event
 
-            if Hub.current.get_integration(ModulesIntegration) is None:
+            if sentry_sdk.get_client().get_integration(ModulesIntegration) is None:
                 return event
 
             event["modules"] = _get_installed_modules()

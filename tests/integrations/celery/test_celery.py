@@ -8,9 +8,10 @@ from celery.bin import worker
 from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
-    _get_headers,
     _wrap_apply_async,
 )
+from sentry_sdk.integrations.celery.beat import _get_headers
+from tests.conftest import ApproxDict
 
 
 @pytest.fixture
@@ -211,6 +212,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
+            "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
@@ -278,6 +280,9 @@ def test_ignore_expected(capture_events, celery):
     assert not events
 
 
+@pytest.mark.skip(
+    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
+)
 def test_broken_prerun(init_celery, connect_signal):
     from celery.signals import task_prerun
 
@@ -351,8 +356,9 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
-# TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
-@pytest.mark.skip
+@pytest.mark.skip(
+    reason="This test is hanging when running test with `tox --parallel auto`. TODO: Figure out why and fix it!"
+)
 @pytest.mark.forked
 def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
@@ -566,26 +572,6 @@ def test_apply_async_manually_span(sentry_init):
 
     wrapped = _wrap_apply_async(dummy_function)
     wrapped(mock.MagicMock(), (), headers={})
-
-
-def test_apply_async_from_beat_no_span(sentry_init):
-    sentry_init(
-        integrations=[CeleryIntegration()],
-    )
-
-    def dummy_function(*args, **kwargs):
-        headers = kwargs.get("headers")
-        assert "sentry-trace" not in headers
-        assert "baggage" not in headers
-
-    wrapped = _wrap_apply_async(dummy_function)
-    wrapped(
-        mock.MagicMock(),
-        [
-            "BEAT",
-        ],
-        headers={},
-    )
 
 
 def test_apply_async_no_args(init_celery):

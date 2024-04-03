@@ -7,6 +7,7 @@ import falcon.testing
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import parse_version
 
 
@@ -303,7 +304,7 @@ def test_logging(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
-def test_500(sentry_init, capture_events):
+def test_500(sentry_init):
     sentry_init(integrations=[FalconIntegration()])
 
     app = falcon.API()
@@ -316,17 +317,14 @@ def test_500(sentry_init, capture_events):
 
     def http500_handler(ex, req, resp, params):
         sentry_sdk.capture_exception(ex)
-        resp.media = {"message": "Sentry error: %s" % sentry_sdk.last_event_id()}
+        resp.media = {"message": "Sentry error."}
 
     app.add_error_handler(Exception, http500_handler)
-
-    events = capture_events()
 
     client = falcon.testing.TestClient(app)
     response = client.simulate_get("/")
 
-    (event,) = events
-    assert response.json == {"message": "Sentry error: %s" % event["event_id"]}
+    assert response.json == {"message": "Sentry error."}
 
 
 def test_error_in_errorhandler(sentry_init, capture_events):
@@ -382,20 +380,17 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
-    with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("request_data", False)
+    Scope.get_isolation_scope().set_tag("request_data", False)
 
     app = falcon.API()
 
     class Resource:
         def on_get(self, req, resp):
-            with sentry_sdk.configure_scope() as scope:
-                scope.set_tag("request_data", True)
+            Scope.get_isolation_scope().set_tag("request_data", True)
 
             def generator():
                 for row in range(1000):
-                    with sentry_sdk.configure_scope() as scope:
-                        assert scope._tags["request_data"]
+                    assert Scope.get_isolation_scope()._tags["request_data"]
 
                     yield (str(row) + "\n").encode()
 
@@ -409,9 +404,7 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     expected_response = "".join(str(row) + "\n" for row in range(1000))
     assert response.text == expected_response
     assert not events
-
-    with sentry_sdk.configure_scope() as scope:
-        assert not scope._tags["request_data"]
+    assert not Scope.get_isolation_scope()._tags["request_data"]
 
 
 @pytest.mark.skipif(

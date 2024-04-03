@@ -4,14 +4,15 @@ import sys
 import platform
 from http.client import HTTPConnection
 
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import Scope, add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
+    ensure_integration_enabled,
     is_sentry_url,
     logger,
     safe_repr,
@@ -33,7 +34,7 @@ _RUNTIME_CONTEXT = {
     "name": platform.python_implementation(),
     "version": "%s.%s.%s" % (sys.version_info[:3]),
     "build": sys.version,
-}
+}  # type: dict[str, object]
 
 
 class StdlibIntegration(Integration):
@@ -48,7 +49,7 @@ class StdlibIntegration(Integration):
         @add_global_event_processor
         def add_python_runtime_context(event, hint):
             # type: (Event, Hint) -> Optional[Event]
-            if Hub.current.get_integration(StdlibIntegration) is not None:
+            if sentry_sdk.get_client().get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
                     contexts["runtime"] = _RUNTIME_CONTEXT
@@ -63,13 +64,14 @@ def _install_httplib():
 
     def putrequest(self, method, url, *args, **kwargs):
         # type: (HTTPConnection, str, str, *Any, **Any) -> Any
-        hub = Hub.current
-
         host = self.host
         port = self.port
         default_port = self.default_port
 
-        if hub.get_integration(StdlibIntegration) is None or is_sentry_url(hub, host):
+        client = sentry_sdk.get_client()
+        if client.get_integration(StdlibIntegration) is None or is_sentry_url(
+            client, host
+        ):
             return real_putrequest(self, method, url, *args, **kwargs)
 
         real_url = url
@@ -85,7 +87,7 @@ def _install_httplib():
         with capture_internal_exceptions():
             parsed_url = parse_url(real_url, sanitize=False)
 
-        span = hub.start_span(
+        span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
@@ -99,8 +101,10 @@ def _install_httplib():
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        if should_propagate_trace(hub, real_url):
-            for key, value in hub.iter_trace_propagation_headers(span):
+        if should_propagate_trace(client, real_url):
+            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+                span=span
+            ):
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
                         key=key, value=value, real_url=real_url
@@ -166,13 +170,9 @@ def _install_subprocess():
     # type: () -> None
     old_popen_init = subprocess.Popen.__init__
 
+    @ensure_integration_enabled(StdlibIntegration, old_popen_init)
     def sentry_patched_popen_init(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> None
-
-        hub = Hub.current
-        if hub.get_integration(StdlibIntegration) is None:
-            return old_popen_init(self, *a, **kw)
-
         # Convert from tuple to list to be able to set values.
         a = list(a)
 
@@ -197,8 +197,10 @@ def _install_subprocess():
 
         env = None
 
-        with hub.start_span(op=OP.SUBPROCESS, description=description) as span:
-            for k, v in hub.iter_trace_propagation_headers(span):
+        with sentry_sdk.start_span(op=OP.SUBPROCESS, description=description) as span:
+            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(
+                span=span
+            ):
                 if env is None:
                     env = _init_argument(
                         a, kw, "env", 10, lambda x: dict(x or os.environ)
@@ -217,14 +219,10 @@ def _install_subprocess():
 
     old_popen_wait = subprocess.Popen.wait
 
+    @ensure_integration_enabled(StdlibIntegration, old_popen_wait)
     def sentry_patched_popen_wait(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> Any
-        hub = Hub.current
-
-        if hub.get_integration(StdlibIntegration) is None:
-            return old_popen_wait(self, *a, **kw)
-
-        with hub.start_span(op=OP.SUBPROCESS_WAIT) as span:
+        with sentry_sdk.start_span(op=OP.SUBPROCESS_WAIT) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
 
@@ -232,14 +230,10 @@ def _install_subprocess():
 
     old_popen_communicate = subprocess.Popen.communicate
 
+    @ensure_integration_enabled(StdlibIntegration, old_popen_communicate)
     def sentry_patched_popen_communicate(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> Any
-        hub = Hub.current
-
-        if hub.get_integration(StdlibIntegration) is None:
-            return old_popen_communicate(self, *a, **kw)
-
-        with hub.start_span(op=OP.SUBPROCESS_COMMUNICATE) as span:
+        with sentry_sdk.start_span(op=OP.SUBPROCESS_COMMUNICATE) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_communicate(self, *a, **kw)
 

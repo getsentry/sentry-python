@@ -8,6 +8,7 @@ import pytest
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+from tests.conftest import ApproxDict
 
 
 class ImmutableDict(Mapping):
@@ -119,7 +120,7 @@ def test_subprocess_basic(
 
     assert message_event["message"] == "hi"
 
-    data = {"subprocess.cwd": os.getcwd()} if with_cwd else {}
+    data = ApproxDict({"subprocess.cwd": os.getcwd()} if with_cwd else {})
 
     (crumb,) = message_event["breadcrumbs"]["values"]
     assert crumb == {

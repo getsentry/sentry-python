@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections import deque
 
 import sentry_sdk
@@ -42,6 +43,8 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     capture_internal_exception,
     filename_for_module,
+    get_current_thread_meta,
+    is_gevent,
     is_valid_sample_rate,
     logger,
     nanosecond_time,
@@ -62,7 +65,7 @@ if TYPE_CHECKING:
     from typing_extensions import TypedDict
 
     import sentry_sdk.tracing
-    from sentry_sdk._types import SamplingContext, ProfilerMode
+    from sentry_sdk._types import Event, SamplingContext, ProfilerMode
 
     ThreadId = str
 
@@ -126,30 +129,14 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent import get_hub as get_gevent_hub  # type: ignore
-    from gevent.monkey import get_original, is_module_patched  # type: ignore
+    from gevent.monkey import get_original  # type: ignore
     from gevent.threadpool import ThreadPool  # type: ignore
 
     thread_sleep = get_original("time", "sleep")
 except ImportError:
-
-    def get_gevent_hub():
-        # type: () -> Any
-        return None
-
     thread_sleep = time.sleep
 
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
-        # unable to import from gevent means no modules have been patched
-        return False
-
     ThreadPool = None
-
-
-def is_gevent():
-    # type: () -> bool
-    return is_module_patched("threading") or is_module_patched("_thread")
 
 
 _scheduler = None  # type: Optional[Scheduler]
@@ -175,8 +162,14 @@ def has_profiling_enabled(options):
         return True
 
     profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None and profiles_sample_rate > 0:
-        return True
+    if profiles_sample_rate is not None:
+        logger.warning(
+            "_experiments['profiles_sample_rate'] is deprecated. "
+            "Please use the non-experimental profiles_sample_rate option "
+            "directly."
+        )
+        if profiles_sample_rate > 0:
+            return True
 
     return False
 
@@ -203,10 +196,13 @@ def setup_profiler(options):
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
     else:
-        profiler_mode = (
-            options.get("_experiments", {}).get("profiler_mode")
-            or default_profiler_mode
-        )
+        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
+        if profiler_mode is not None:
+            logger.warning(
+                "_experiments['profiler_mode'] is deprecated. Please use the "
+                "non-experimental profiler_mode option directly."
+            )
+        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -385,52 +381,6 @@ else:
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
-def get_current_thread_id(thread=None):
-    # type: (Optional[threading.Thread]) -> Optional[int]
-    """
-    Try to get the id of the current thread, with various fall backs.
-    """
-
-    # if a thread is specified, that takes priority
-    if thread is not None:
-        try:
-            thread_id = thread.ident
-            if thread_id is not None:
-                return thread_id
-        except AttributeError:
-            pass
-
-    # if the app is using gevent, we should look at the gevent hub first
-    # as the id there differs from what the threading module reports
-    if is_gevent():
-        gevent_hub = get_gevent_hub()
-        if gevent_hub is not None:
-            try:
-                # this is undocumented, so wrap it in try except to be safe
-                return gevent_hub.thread_ident
-            except AttributeError:
-                pass
-
-    # use the current thread's id if possible
-    try:
-        current_thread_id = threading.current_thread().ident
-        if current_thread_id is not None:
-            return current_thread_id
-    except AttributeError:
-        pass
-
-    # if we can't get the current thread id, fall back to the main thread id
-    try:
-        main_thread_id = threading.main_thread().ident
-        if main_thread_id is not None:
-            return main_thread_id
-    except AttributeError:
-        pass
-
-    # we've tried everything, time to give up
-    return None
-
-
 class Profile:
     def __init__(
         self,
@@ -452,7 +402,7 @@ class Profile:
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
-        self._default_active_thread_id = get_current_thread_id() or 0  # type: int
+        self._default_active_thread_id = get_current_thread_meta()[0] or 0  # type: int
         self.active_thread_id = None  # type: Optional[int]
 
         try:
@@ -475,7 +425,7 @@ class Profile:
 
     def update_active_thread_id(self):
         # type: () -> None
-        self.active_thread_id = get_current_thread_id()
+        self.active_thread_id = get_current_thread_meta()[0]
         logger.debug(
             "[Profiling] updating active thread id to {tid}".format(
                 tid=self.active_thread_id
@@ -511,11 +461,8 @@ class Profile:
             self.sampled = False
             return
 
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-
-        # The client is None, so we can't get the sample rate.
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             self.sampled = False
             return
 
@@ -578,18 +525,15 @@ class Profile:
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
     def __enter__(self):
         # type: () -> Profile
-        hub = self.hub or sentry_sdk.Hub.current
-
-        _, scope = hub._stack[-1]
+        scope = sentry_sdk.scope.Scope.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
-        self._context_manager_state = (hub, scope, old_profile)
+        self._context_manager_state = (scope, old_profile)
 
         self.start()
 
@@ -599,7 +543,7 @@ class Profile:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.stop()
 
-        _, scope, old_profile = self._context_manager_state
+        scope, old_profile = self._context_manager_state
         del self._context_manager_state
 
         scope.profile = old_profile
@@ -669,7 +613,7 @@ class Profile:
         }
 
     def to_json(self, event_opt, options):
-        # type: (Any, Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, Dict[str, Any]) -> Dict[str, Any]
         profile = self.process()
 
         set_in_app_in_frames(
@@ -721,9 +665,8 @@ class Profile:
 
     def valid(self):
         # type: () -> bool
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             return False
 
         if not has_profiling_enabled(client.options):
@@ -747,7 +690,7 @@ class Profile:
         return True
 
 
-class Scheduler:
+class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
@@ -769,26 +712,29 @@ class Scheduler:
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.teardown()
 
+    @abstractmethod
     def setup(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def teardown(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
     def ensure_running(self):
         # type: () -> None
-        raise NotImplementedError
+        """
+        Ensure the scheduler is running. By default, this method is a no-op.
+        The method should be overridden by any implementation for which it is
+        relevant.
+        """
+        return None
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
         self.ensure_running()
         self.new_profiles.append(profile)
-
-    def stop_profiling(self, profile):
-        # type: (Profile) -> None
-        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -873,7 +819,7 @@ class ThreadScheduler(Scheduler):
 
     def __init__(self, frequency):
         # type: (int) -> None
-        super(ThreadScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -973,7 +919,7 @@ class GeventScheduler(Scheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False

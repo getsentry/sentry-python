@@ -11,6 +11,12 @@ API Docs
 .. autoclass:: sentry_sdk.Client
     :members:
 
+.. autoclass:: sentry_sdk.client.BaseClient
+    :members:
+
+.. autoclass:: sentry_sdk.client.NonRecordingClient
+    :members:
+
 .. autoclass:: sentry_sdk.client._Client
     :members:
 

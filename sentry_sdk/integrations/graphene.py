@@ -1,7 +1,10 @@
-from sentry_sdk.hub import Hub, _should_send_default_pii
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
     package_version,
 )
@@ -19,6 +22,7 @@ if TYPE_CHECKING:
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
     from graphql.type import GraphQLSchema  # type: ignore
+    from sentry_sdk._types import Event
 
 
 class GrapheneIntegration(Integration):
@@ -43,15 +47,11 @@ def _patch_graphql():
     old_graphql_sync = graphene_schema.graphql_sync
     old_graphql_async = graphene_schema.graphql
 
+    @ensure_integration_enabled(GrapheneIntegration, old_graphql_sync)
     def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
-        hub = Hub.current
-        integration = hub.get_integration(GrapheneIntegration)
-        if integration is None:
-            return old_graphql_sync(schema, source, *args, **kwargs)
-
-        with hub.configure_scope() as scope:
-            scope.add_event_processor(_event_processor)
+        scope = Scope.get_isolation_scope()
+        scope.add_event_processor(_event_processor)
 
         result = old_graphql_sync(schema, source, *args, **kwargs)
 
@@ -59,25 +59,21 @@ def _patch_graphql():
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=hub.client.options if hub.client else None,
+                    client_options=sentry_sdk.get_client().options,
                     mechanism={
-                        "type": integration.identifier,
+                        "type": GrapheneIntegration.identifier,
                         "handled": False,
                     },
                 )
-                hub.capture_event(event, hint=hint)
+                sentry_sdk.capture_event(event, hint=hint)
 
         return result
 
+    @ensure_integration_enabled_async(GrapheneIntegration, old_graphql_async)
     async def _sentry_patched_graphql_async(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
-        hub = Hub.current
-        integration = hub.get_integration(GrapheneIntegration)
-        if integration is None:
-            return await old_graphql_async(schema, source, *args, **kwargs)
-
-        with hub.configure_scope() as scope:
-            scope.add_event_processor(_event_processor)
+        scope = Scope.get_isolation_scope()
+        scope.add_event_processor(_event_processor)
 
         result = await old_graphql_async(schema, source, *args, **kwargs)
 
@@ -85,13 +81,13 @@ def _patch_graphql():
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=hub.client.options if hub.client else None,
+                    client_options=sentry_sdk.get_client().options,
                     mechanism={
-                        "type": integration.identifier,
+                        "type": GrapheneIntegration.identifier,
                         "handled": False,
                     },
                 )
-                hub.capture_event(event, hint=hint)
+                sentry_sdk.capture_event(event, hint=hint)
 
         return result
 
@@ -100,8 +96,8 @@ def _patch_graphql():
 
 
 def _event_processor(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
-    if _should_send_default_pii():
+    # type: (Event, Dict[str, Any]) -> Event
+    if should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
 

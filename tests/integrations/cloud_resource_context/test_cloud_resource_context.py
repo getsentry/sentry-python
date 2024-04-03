@@ -395,6 +395,12 @@ def test_setup_once(
                 fake_set_context.assert_not_called()
 
             if warning_called:
-                assert fake_warning.call_count == 1
+                correct_warning_found = False
+                for call in fake_warning.call_args_list:
+                    if call[0][0].startswith("Invalid value for cloud_provider:"):
+                        correct_warning_found = True
+                        break
+
+                assert correct_warning_found
             else:
                 fake_warning.assert_not_called()

@@ -70,6 +70,7 @@ GROUPS = {
         "beam",
         "celery",
         "huey",
+        "openai",
         "rq",
     ],
     "Databases": [
@@ -94,9 +95,9 @@ GROUPS = {
     ],
     "Web Frameworks 1": [
         "django",
-        "fastapi",
         "flask",
         "starlette",
+        "fastapi",
     ],
     "Web Frameworks 2": [
         "aiohttp",

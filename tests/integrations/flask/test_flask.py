@@ -20,16 +20,15 @@ try:
 except ImportError:
     UnsupportedMediaType = None
 
+import sentry_sdk
 import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
     set_tag,
-    configure_scope,
     capture_message,
     capture_exception,
-    last_event_id,
-    Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
@@ -279,8 +278,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
     @app.route("/")
     def index():
-        with configure_scope() as scope:
-            scope.set_user({"ip_address": "1.2.3.4", "id": "42"})
+        Scope.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:
@@ -295,7 +293,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -599,7 +597,7 @@ def test_wsgi_level_error_is_caught(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
 
 
-def test_500(sentry_init, capture_events, app):
+def test_500(sentry_init, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
@@ -611,15 +609,12 @@ def test_500(sentry_init, capture_events, app):
 
     @app.errorhandler(500)
     def error_handler(err):
-        return "Sentry error: %s" % last_event_id()
-
-    events = capture_events()
+        return "Sentry error."
 
     client = app.test_client()
     response = client.get("/")
 
-    (event,) = events
-    assert response.data.decode("utf-8") == "Sentry error: %s" % event["event_id"]
+    assert response.data.decode("utf-8") == "Sentry error."
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app):
@@ -671,18 +666,15 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
-    with configure_scope() as scope:
-        scope.set_tag("request_data", False)
+    Scope.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     def index():
-        with configure_scope() as scope:
-            scope.set_tag("request_data", True)
+        Scope.get_isolation_scope().set_tag("request_data", True)
 
         def generate():
             for row in range(1000):
-                with configure_scope() as scope:
-                    assert scope._tags["request_data"]
+                assert Scope.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -693,8 +685,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
     assert not events
 
-    with configure_scope() as scope:
-        assert not scope._tags["request_data"]
+    assert not Scope.get_isolation_scope()._tags["request_data"]
 
 
 def test_scoped_test_client(sentry_init, app):
@@ -842,8 +833,7 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
     @app.route("/")
     def index():
-        hub = Hub.current
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        capture_message(sentry_sdk.get_traceparent() + "\n" + sentry_sdk.get_baggage())
         return render_template_string(template_string)
 
     with app.test_client() as client:
@@ -920,7 +910,7 @@ def test_response_status_code_ok_in_transaction_context(
     client = app.test_client()
     client.get("/message")
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (_, transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
@@ -947,7 +937,7 @@ def test_response_status_code_not_found_in_transaction_context(
     client = app.test_client()
     client.get("/not-existing-route")
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()

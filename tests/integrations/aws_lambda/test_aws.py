@@ -139,11 +139,11 @@ def lambda_client():
 
 @pytest.fixture(
     params=[
-        "python3.7",
         "python3.8",
         "python3.9",
         "python3.10",
         "python3.11",
+        "python3.12",
     ]
 )
 def lambda_runtime(request):
@@ -454,23 +454,23 @@ def test_performance_error(run_lambda_function):
             [
                 {
                     "headers": {
-                        "Host": "x.io",
-                        "X-Forwarded-Proto": "http"
+                        "Host": "x1.io",
+                        "X-Forwarded-Proto": "https"
                     },
                     "httpMethod": "GET",
-                    "path": "/somepath",
+                    "path": "/path1",
                     "queryStringParameters": {
-                        "done": "true"
+                        "done": "false"
                     },
                     "dog": "Maisey"
                 },
                 {
                     "headers": {
-                        "Host": "x.io",
+                        "Host": "x2.io",
                         "X-Forwarded-Proto": "http"
                     },
-                    "httpMethod": "GET",
-                    "path": "/somepath",
+                    "httpMethod": "POST",
+                    "path": "/path2",
                     "queryStringParameters": {
                         "done": "true"
                     },
@@ -481,6 +481,7 @@ def test_performance_error(run_lambda_function):
             True,
             2,
         ),
+        (b"[]", False, 1),
     ],
 )
 def test_non_dict_event(
@@ -531,11 +532,11 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
-            "url": "http://x.io/somepath",
+            "url": "https://x1.io/path1",
             "query_string": {
-                "done": "true",
+                "done": "false",
             },
         }
     else:
@@ -650,6 +651,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     assert response["Payload"]["AssertionError raised"] is False
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_serverless_no_code_instrumentation(run_lambda_function):
     """
     Test that ensures that just by adding a lambda layer containing the
@@ -668,9 +672,9 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
             import sentry_sdk
 
             def test_handler(event, context):
-                current_client = sentry_sdk.Hub.current.client
+                current_client = sentry_sdk.get_client()
 
-                assert current_client is not None
+                assert current_client.is_active()
 
                 assert len(current_client.options['integrations']) == 1
                 assert isinstance(current_client.options['integrations'][0],
@@ -694,6 +698,9 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
     envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
@@ -756,6 +763,9 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
     )
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_error_has_existing_trace_context_performance_enabled(run_lambda_function):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"

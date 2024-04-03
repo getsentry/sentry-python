@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from fnmatch import fnmatch
 
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -13,6 +13,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import MutableMapping
     from logging import LogRecord
     from typing import Any
     from typing import Dict
@@ -100,7 +101,9 @@ class LoggingIntegration(Integration):
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
                 if ignored_loggers is not None and record.name not in ignored_loggers:
-                    integration = Hub.current.get_integration(LoggingIntegration)
+                    integration = sentry_sdk.get_client().get_integration(
+                        LoggingIntegration
+                    )
                     if integration is not None:
                         integration._handle_record(record)
 
@@ -153,7 +156,7 @@ class _BaseHandler(logging.Handler, object):
         )
 
     def _extra_from_record(self, record):
-        # type: (LogRecord) -> Dict[str, None]
+        # type: (LogRecord) -> MutableMapping[str, object]
         return {
             k: v
             for k, v in vars(record).items()
@@ -180,11 +183,11 @@ class EventHandler(_BaseHandler):
         if not self._can_record(record):
             return
 
-        hub = Hub.current
-        if hub.client is None:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
             return
 
-        client_options = hub.client.options
+        client_options = client.options
 
         # exc_info might be None or (None, None, None)
         #
@@ -222,7 +225,9 @@ class EventHandler(_BaseHandler):
 
         hint["log_record"] = record
 
-        event["level"] = self._logging_to_event_level(record)
+        level = self._logging_to_event_level(record)
+        if level in {"debug", "info", "warning", "error", "critical", "fatal"}:
+            event["level"] = level  # type: ignore[typeddict-item]
         event["logger"] = record.name
 
         # Log records from `warnings` module as separate issues
@@ -247,7 +252,7 @@ class EventHandler(_BaseHandler):
 
         event["extra"] = self._extra_from_record(record)
 
-        hub.capture_event(event, hint=hint)
+        sentry_sdk.capture_event(event, hint=hint)
 
 
 # Legacy name
@@ -272,7 +277,7 @@ class BreadcrumbHandler(_BaseHandler):
         if not self._can_record(record):
             return
 
-        Hub.current.add_breadcrumb(
+        sentry_sdk.add_breadcrumb(
             self._breadcrumb_from_record(record), hint={"log_record": record}
         )
 

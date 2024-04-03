@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Any
     from typing import Sequence
+    from typing import Tuple
     from typing_extensions import TypedDict
 
     from sentry_sdk.integrations import Integration
@@ -52,9 +53,6 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            # TODO: Remove these 2 profiling related experiments
-            "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
@@ -203,6 +201,18 @@ class SPANDATA:
     Example: "http.handler"
     """
 
+    THREAD_ID = "thread.id"
+    """
+    Identifier of a thread from where the span originated. This should be a string.
+    Example: "7972576320"
+    """
+
+    THREAD_NAME = "thread.name"
+    """
+    Label identifying a thread from where the span originated. This should be a string.
+    Example: "MainThread"
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
@@ -231,6 +241,8 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
+    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
+    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -273,6 +285,8 @@ class ClientConstructor:
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
+        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
+        keep_alive=False,  # type: bool
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -329,4 +343,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.40.1"
+VERSION = "2.0.0rc3"

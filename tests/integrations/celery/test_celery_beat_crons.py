@@ -6,15 +6,16 @@ import pytest
 from celery.schedules import crontab, schedule
 
 from sentry_sdk.crons import MonitorStatus
-from sentry_sdk.integrations.celery import (
+from sentry_sdk.integrations.celery.beat import (
     _get_headers,
-    _get_humanized_interval,
     _get_monitor_config,
     _patch_beat_apply_entry,
-    crons_task_success,
+    _patch_redbeat_maybe_due,
     crons_task_failure,
     crons_task_retry,
+    crons_task_success,
 )
+from sentry_sdk.integrations.celery.utils import _get_humanized_interval
 
 
 def test_get_headers():
@@ -90,10 +91,10 @@ def test_crons_task_success():
     }
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
+        "sentry_sdk.integrations.celery.beat.capture_checkin"
     ) as mock_capture_checkin:
         with mock.patch(
-            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            "sentry_sdk.integrations.celery.beat._now_seconds_since_epoch",
             return_value=500.5,
         ):
             crons_task_success(fake_task)
@@ -134,10 +135,10 @@ def test_crons_task_failure():
     }
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
+        "sentry_sdk.integrations.celery.beat.capture_checkin"
     ) as mock_capture_checkin:
         with mock.patch(
-            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            "sentry_sdk.integrations.celery.beat._now_seconds_since_epoch",
             return_value=500.5,
         ):
             crons_task_failure(fake_task)
@@ -178,10 +179,10 @@ def test_crons_task_retry():
     }
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.capture_checkin"
+        "sentry_sdk.integrations.celery.beat.capture_checkin"
     ) as mock_capture_checkin:
         with mock.patch(
-            "sentry_sdk.integrations.celery._now_seconds_since_epoch",
+            "sentry_sdk.integrations.celery.beat._now_seconds_since_epoch",
             return_value=500.5,
         ):
             crons_task_retry(fake_task)
@@ -266,9 +267,7 @@ def test_get_monitor_config_seconds():
 
     celery_schedule = schedule(run_every=3)  # seconds
 
-    with mock.patch(
-        "sentry_sdk.integrations.celery.logger.warning"
-    ) as mock_logger_warning:
+    with mock.patch("sentry_sdk.integrations.logger.warning") as mock_logger_warning:
         monitor_config = _get_monitor_config(celery_schedule, app, "foo")
         mock_logger_warning.assert_called_with(
             "Intervals shorter than one minute are not supported by Sentry Crons. Monitor '%s' has an interval of %s seconds. Use the `exclude_beat_tasks` option in the celery integration to exclude it.",
@@ -407,20 +406,23 @@ def test_exclude_beat_tasks_option(
     fake_integration = MagicMock()
     fake_integration.exclude_beat_tasks = exclude_beat_tasks
 
+    fake_client = MagicMock()
+    fake_client.get_integration.return_value = fake_integration
+
     fake_schedule_entry = MagicMock()
     fake_schedule_entry.name = task_name
 
     fake_get_monitor_config = MagicMock()
 
     with mock.patch(
-        "sentry_sdk.integrations.celery.Scheduler", fake_scheduler
+        "sentry_sdk.integrations.celery.beat.Scheduler", fake_scheduler
     ) as Scheduler:  # noqa: N806
         with mock.patch(
-            "sentry_sdk.integrations.celery.Hub.current.get_integration",
-            return_value=fake_integration,
+            "sentry_sdk.integrations.celery.sentry_sdk.get_client",
+            return_value=fake_client,
         ):
             with mock.patch(
-                "sentry_sdk.integrations.celery._get_monitor_config",
+                "sentry_sdk.integrations.celery.beat._get_monitor_config",
                 fake_get_monitor_config,
             ) as _get_monitor_config:
                 # Mimic CeleryIntegration patching of Scheduler.apply_entry()
@@ -436,4 +438,60 @@ def test_exclude_beat_tasks_option(
                 else:
                     # The original Scheduler.apply_entry() is called, AND _get_monitor_config is called.
                     assert fake_apply_entry.call_count == 1
+                    assert _get_monitor_config.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "task_name,exclude_beat_tasks,task_in_excluded_beat_tasks",
+    [
+        ["some_task_name", ["xxx", "some_task.*"], True],
+        ["some_task_name", ["xxx", "some_other_task.*"], False],
+    ],
+)
+def test_exclude_redbeat_tasks_option(
+    task_name, exclude_beat_tasks, task_in_excluded_beat_tasks
+):
+    """
+    Test excluding Celery RedBeat tasks from automatic instrumentation.
+    """
+    fake_maybe_due = MagicMock()
+
+    fake_redbeat_scheduler = MagicMock()
+    fake_redbeat_scheduler.maybe_due = fake_maybe_due
+
+    fake_integration = MagicMock()
+    fake_integration.exclude_beat_tasks = exclude_beat_tasks
+
+    fake_client = MagicMock()
+    fake_client.get_integration.return_value = fake_integration
+
+    fake_schedule_entry = MagicMock()
+    fake_schedule_entry.name = task_name
+
+    fake_get_monitor_config = MagicMock()
+
+    with mock.patch(
+        "sentry_sdk.integrations.celery.beat.RedBeatScheduler", fake_redbeat_scheduler
+    ) as RedBeatScheduler:  # noqa: N806
+        with mock.patch(
+            "sentry_sdk.integrations.celery.sentry_sdk.get_client",
+            return_value=fake_client,
+        ):
+            with mock.patch(
+                "sentry_sdk.integrations.celery.beat._get_monitor_config",
+                fake_get_monitor_config,
+            ) as _get_monitor_config:
+                # Mimic CeleryIntegration patching of RedBeatScheduler.maybe_due()
+                _patch_redbeat_maybe_due()
+                # Mimic Celery RedBeat calling a task from the RedBeat schedule
+                RedBeatScheduler.maybe_due(fake_redbeat_scheduler, fake_schedule_entry)
+
+                if task_in_excluded_beat_tasks:
+                    # Only the original RedBeatScheduler.maybe_due() is called, _get_monitor_config is NOT called.
+                    assert fake_maybe_due.call_count == 1
+                    _get_monitor_config.assert_not_called()
+
+                else:
+                    # The original RedBeatScheduler.maybe_due() is called, AND _get_monitor_config is called.
+                    assert fake_maybe_due.call_count == 1
                     assert _get_monitor_config.call_count == 1

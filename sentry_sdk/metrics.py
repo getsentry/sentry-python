@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 import zlib
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps, partial
@@ -18,7 +19,6 @@ from sentry_sdk.utils import (
     to_timestamp,
     serialize_frame,
     json_dumps,
-    is_gevent,
 )
 from sentry_sdk.envelope import Envelope, Item
 from sentry_sdk.tracing import (
@@ -53,20 +53,9 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-try:
-    from gevent.monkey import get_original  # type: ignore
-    from gevent.threadpool import ThreadPool  # type: ignore
-except ImportError:
-    import importlib
-
-    def get_original(module, name):
-        # type: (str, str) -> Any
-        return getattr(importlib.import_module(module), name)
-
-
-_in_metrics = ContextVar("in_metrics")
+_in_metrics = ContextVar("in_metrics", default=False)
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
-_sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
+_sanitize_value = partial(re.compile(r"[^\w\d\s_:/@\.{}\[\]$-]+", re.UNICODE).sub, "")
 _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
@@ -95,7 +84,7 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
-    old_in_metrics = _in_metrics.get(False)
+    old_in_metrics = _in_metrics.get()
     _in_metrics.set(True)
     try:
         yield old_in_metrics
@@ -119,23 +108,29 @@ def metrics_noop(func):
     return new_func
 
 
-class Metric:
+class Metric(ABC):
     __slots__ = ()
 
+    @abstractmethod
+    def __init__(self, first):
+        # type: (MetricValue) -> None
+        pass
+
     @property
+    @abstractmethod
     def weight(self):
-        # type: (...) -> int
-        raise NotImplementedError()
+        # type: () -> int
+        pass
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
-        raise NotImplementedError()
+    @abstractmethod
+    def add(self, value):
+        # type: (MetricValue) -> None
+        pass
 
+    @abstractmethod
     def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
-        raise NotImplementedError()
+        # type: () -> Iterable[FlushedMetricValue]
+        pass
 
 
 class CounterMetric(Metric):
@@ -333,7 +328,7 @@ METRIC_TYPES = {
     "g": GaugeMetric,
     "d": DistributionMetric,
     "s": SetMetric,
-}
+}  # type: dict[MetricType, type[Metric]]
 
 # some of these are dumb
 TIMING_FUNCTIONS = {
@@ -422,9 +417,7 @@ class MetricsAggregator:
         self._running = True
         self._lock = threading.Lock()
 
-        event_cls = get_original("threading", "Event")
-        self._flush_event = event_cls()  # type: threading.Event
-
+        self._flush_event = threading.Event()  # type: threading.Event
         self._force_flush = False
 
         # The aggregator shifts its flushing by up to an entire rollup window to
@@ -435,9 +428,8 @@ class MetricsAggregator:
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Union[threading.Thread, ThreadPool]]
+        self._flusher = None  # type: Optional[threading.Thread]
         self._flusher_pid = None  # type: Optional[int]
-        self._ensure_thread()
 
     def _ensure_thread(self):
         # type: (...) -> bool
@@ -452,18 +444,18 @@ class MetricsAggregator:
             return True
 
         with self._lock:
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
+            if self._flusher_pid == pid:
+                return True
+
             self._flusher_pid = pid
 
-            if not is_gevent():
-                self._flusher = threading.Thread(target=self._flush_loop)
-                self._flusher.daemon = True
-                start_flusher = self._flusher.start
-            else:
-                self._flusher = ThreadPool(1)
-                start_flusher = partial(self._flusher.spawn, func=self._flush_loop)
+            self._flusher = threading.Thread(target=self._flush_loop)
+            self._flusher.daemon = True
 
             try:
-                start_flusher()
+                self._flusher.start()
             except RuntimeError:
                 # Unfortunately at this point the interpreter is in a state that no
                 # longer allows us to spawn a thread and we have to bail.
@@ -476,9 +468,9 @@ class MetricsAggregator:
         # type: (...) -> None
         _in_metrics.set(True)
         while self._running or self._force_flush:
-            self._flush()
             if self._running:
                 self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
+            self._flush()
 
     def _flush(self):
         # type: (...) -> None
@@ -605,7 +597,7 @@ class MetricsAggregator:
                 )
 
     @metrics_noop
-    def need_code_loation(
+    def need_code_location(
         self,
         ty,  # type: MetricType
         key,  # type: str
@@ -728,7 +720,7 @@ def _get_aggregator_and_update_tags(key, tags):
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
-    scope = hub.scope
+    scope = sentry_sdk.Scope.get_current_scope()
     local_aggregator = None
 
     # We go with the low-level API here to access transaction information as

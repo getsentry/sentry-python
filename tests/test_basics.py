@@ -4,11 +4,11 @@ import sys
 import time
 
 import pytest
+from sentry_sdk.client import Client
 
 from tests.conftest import patch_start_tracing_child
 
 from sentry_sdk import (
-    Client,
     push_scope,
     configure_scope,
     capture_event,
@@ -16,8 +16,8 @@ from sentry_sdk import (
     capture_message,
     start_transaction,
     add_breadcrumb,
-    last_event_id,
     Hub,
+    Scope,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -106,28 +106,6 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
             )
             for record in caplog.records
         ), "Problem with checking auto enabling {}".format(import_string)
-
-
-def test_event_id(sentry_init, capture_events):
-    sentry_init()
-    events = capture_events()
-
-    try:
-        raise ValueError("aha!")
-    except Exception:
-        event_id = capture_exception()
-        int(event_id, 16)
-        assert len(event_id) == 32
-
-    (event,) = events
-    assert event["event_id"] == event_id
-    assert last_event_id() == event_id
-    assert Hub.current.last_event_id() == event_id
-
-    new_event_id = Hub.current.capture_event({"type": "transaction"})
-    assert new_event_id is not None
-    assert new_event_id != event_id
-    assert Hub.current.last_event_id() == event_id
 
 
 def test_generic_mechanism(sentry_init, capture_events):
@@ -346,6 +324,9 @@ def test_push_scope_null_client(sentry_init, capture_events):
     assert len(events) == 0
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
+)
 @pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
     sentry_init()
@@ -395,8 +376,7 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    with configure_scope() as scope:
-        scope.clear()
+    Scope.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
@@ -453,6 +433,9 @@ def test_integration_scoping(sentry_init, capture_events):
     assert not events
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
+)
 def test_client_initialized_within_scope(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
@@ -466,6 +449,9 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     assert record.msg.startswith("init() called inside of pushed scope.")
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
+)
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
@@ -483,6 +469,9 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
     assert record.message.startswith("Leaked 1 scopes:")
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
+)
 def test_scope_popped_too_soon(sentry_init, caplog):
     caplog.set_level(logging.ERROR)
 

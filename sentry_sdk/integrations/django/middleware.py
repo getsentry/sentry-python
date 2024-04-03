@@ -6,7 +6,7 @@ from functools import wraps
 
 from django import VERSION as DJANGO_VERSION
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
@@ -71,8 +71,7 @@ def _wrap_middleware(middleware, middleware_name):
 
     def _check_middleware_span(old_method):
         # type: (Callable[..., Any]) -> Optional[Span]
-        hub = Hub.current
-        integration = hub.get_integration(DjangoIntegration)
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None
 
@@ -83,7 +82,7 @@ def _wrap_middleware(middleware, middleware_name):
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        middleware_span = hub.start_span(
+        middleware_span = sentry_sdk.start_span(
             op=OP.MIDDLEWARE_DJANGO, description=description
         )
         middleware_span.set_tag("django.function_name", function_name)
@@ -132,7 +131,7 @@ def _wrap_middleware(middleware, middleware_name):
             self.get_response = get_response
             self._call_method = None
             if self.async_capable:
-                super(SentryWrappingMiddleware, self).__init__(get_response)
+                super().__init__(get_response)
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.

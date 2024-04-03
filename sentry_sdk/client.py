@@ -2,9 +2,11 @@ import os
 import uuid
 import random
 import socket
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
 
+from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -14,11 +16,12 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
+    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
-from sentry_sdk.transport import make_transport
+from sentry_sdk.transport import HttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
@@ -30,7 +33,7 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.profiler import has_profiling_enabled, Profile, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
@@ -46,10 +49,12 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk.integrations import Integration
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.integrations import Integration
+    from sentry_sdk.metrics import MetricsAggregator
+    from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
+    from sentry_sdk.transport import Transport
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -120,6 +125,12 @@ def _get_options(*args, **kwargs):
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber()
 
+    if rv["socket_options"] and not isinstance(rv["socket_options"], list):
+        logger.warning(
+            "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
+        )
+        rv["socket_options"] = None
+
     return rv
 
 
@@ -131,19 +142,101 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class _Client:
-    """The client is internally responsible for capturing the events and
+class BaseClient:
+    """
+    .. versionadded:: 2.0.0
+
+    The basic definition of a client that is used for sending data to Sentry.
+    """
+
+    def __init__(self, options=None):
+        # type: (Optional[Dict[str, Any]]) -> None
+        self.options = (
+            options if options is not None else DEFAULT_OPTIONS
+        )  # type: Dict[str, Any]
+
+        self.transport = None  # type: Optional[Transport]
+        self.monitor = None  # type: Optional[Monitor]
+        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+
+    def __getstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return {"options": {}}
+
+    def __setstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        pass
+
+    @property
+    def dsn(self):
+        # type: () -> Optional[str]
+        return None
+
+    def should_send_default_pii(self):
+        # type: () -> bool
+        return False
+
+    def is_active(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
+        """
+        return False
+
+    def capture_event(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Optional[str]
+        return None
+
+    def capture_session(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def get_integration(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return None
+
+    def close(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def flush(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def __enter__(self):
+        # type: () -> BaseClient
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
+        return None
+
+
+class NonRecordingClient(BaseClient):
+    """
+    .. versionadded:: 2.0.0
+
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+    """
+
+    pass
+
+
+class _Client(BaseClient):
+    """
+    The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
-
+        super(_Client, self).__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self):
@@ -230,14 +323,22 @@ class _Client:
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
+                # Context vars are not working correctly on Python <=3.6
+                # with gevent.
+                metrics_supported = not is_gevent() or PY37
+                if metrics_supported:
+                    from sentry_sdk.metrics import MetricsAggregator
 
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
+                    self.metrics_aggregator = MetricsAggregator(
+                        capture_func=_capture_envelope,
+                        enable_code_locations=bool(
+                            experiments.get("metric_code_locations", True)
+                        ),
+                    )
+                else:
+                    logger.info(
+                        "Metrics not supported on Python 3.6 and lower with gevent."
+                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -282,6 +383,34 @@ class _Client:
             _client_init_debug.set(old_debug)
 
         self._setup_instrumentation(self.options.get("functions_to_trace", []))
+
+        if (
+            self.monitor
+            or self.metrics_aggregator
+            or has_profiling_enabled(self.options)
+            or isinstance(self.transport, HttpTransport)
+        ):
+            # If we have anything on that could spawn a background thread, we
+            # need to check if it's safe to use them.
+            check_uwsgi_thread_support()
+
+    def is_active(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
+        """
+        return True
+
+    def should_send_default_pii(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
+        """
+        return self.options.get("send_default_pii", False)
 
     @property
     def dsn(self):
@@ -341,7 +470,7 @@ class _Client:
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = str(self.options[key]).strip()
+                event[key] = str(self.options[key]).strip()  # type: ignore[literal-required]
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -515,7 +644,7 @@ class _Client:
             errored = True
             for error in exceptions:
                 mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("handled") is False:
+                if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
                     break
 
@@ -523,7 +652,8 @@ class _Client:
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for k, v in (headers or {}).items():
+            headers_dict = headers if isinstance(headers, dict) else {}
+            for k, v in headers_dict.items():
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
@@ -549,7 +679,6 @@ class _Client:
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
-            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
@@ -596,7 +725,7 @@ class _Client:
         headers = {
             "event_id": event_opt["event_id"],
             "sent_at": format_timestamp(datetime.now(timezone.utc)),
-        }
+        }  # type: dict[str, object]
 
         if dynamic_sampling_context:
             headers["trace"] = dynamic_sampling_context
@@ -604,7 +733,7 @@ class _Client:
         envelope = Envelope(headers=headers)
 
         if is_transaction:
-            if profile is not None:
+            if isinstance(profile, Profile):
                 envelope.add_profile(profile.to_json(event_opt, self.options))
             envelope.add_transaction(event_opt)
         elif is_checkin:

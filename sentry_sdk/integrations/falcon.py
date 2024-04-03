@@ -1,10 +1,12 @@
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     parse_version,
 )
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Optional
 
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 # In Falcon 3.0 `falcon.api_helpers` is renamed to `falcon.app_helpers`
 # and `falcon.API` to `falcon.App`
@@ -100,14 +102,13 @@ class SentryFalconMiddleware:
 
     def process_request(self, req, resp, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> None
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return
 
-        with hub.configure_scope() as scope:
-            scope._name = "falcon"
-            scope.add_event_processor(_make_request_event_processor(req, integration))
+        scope = Scope.get_isolation_scope()
+        scope._name = "falcon"
+        scope.add_event_processor(_make_request_event_processor(req, integration))
 
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
@@ -150,8 +151,7 @@ def _patch_wsgi_app():
 
     def sentry_patched_wsgi_app(self, env, start_response):
         # type: (falcon.API, Any, Any) -> Any
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is None:
             return original_wsgi_app(self, env, start_response)
 
@@ -168,6 +168,7 @@ def _patch_handle_exception():
     # type: () -> None
     original_handle_exception = falcon_app_class._handle_exception
 
+    @ensure_integration_enabled(FalconIntegration, original_handle_exception)
     def sentry_patched_handle_exception(self, *args):
         # type: (falcon.API, *Any) -> Any
         # NOTE(jmagnusson): falcon 2.0 changed falcon.API._handle_exception
@@ -188,19 +189,13 @@ def _patch_handle_exception():
             # capture_internal_exceptions block above.
             return was_handled
 
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
-
-        if integration is not None and _exception_leads_to_http_5xx(ex, response):
-            # If an integration is there, a client has to be there.
-            client = hub.client  # type: Any
-
+        if _exception_leads_to_http_5xx(ex, response):
             event, hint = event_from_exception(
                 ex,
-                client_options=client.options,
+                client_options=sentry_sdk.get_client().options,
                 mechanism={"type": "falcon", "handled": False},
             )
-            hub.capture_event(event, hint=hint)
+            sentry_sdk.capture_event(event, hint=hint)
 
         return was_handled
 
@@ -219,8 +214,7 @@ def _patch_prepare_middleware():
             # We don't support ASGI Falcon apps, so we don't patch anything here
             return original_prepare_middleware(middleware, independent_middleware, asgi)
 
-        hub = Hub.current
-        integration = hub.get_integration(FalconIntegration)
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
         if integration is not None:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
 
@@ -256,7 +250,7 @@ def _has_http_5xx_status(response):
 
 
 def _set_transaction_name_and_source(event, transaction_style, request):
-    # type: (Dict[str, Any], str, falcon.Request) -> None
+    # type: (Event, str, falcon.Request) -> None
     name_for_style = {
         "uri_template": request.uri_template,
         "path": request.path,
@@ -269,7 +263,7 @@ def _make_request_event_processor(req, integration):
     # type: (falcon.Request, FalconIntegration) -> EventProcessor
 
     def event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         _set_transaction_name_and_source(event, integration.transaction_style, req)
 
         with capture_internal_exceptions():

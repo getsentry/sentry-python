@@ -18,14 +18,15 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 from sentry_sdk._compat import PY310
-from sentry_sdk import capture_message, capture_exception, configure_scope
+from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span
-from tests.conftest import unpack_werkzeug_response
+from tests.conftest import ApproxDict, unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
@@ -337,17 +338,14 @@ def test_custom_error_handler_request_context(sentry_init, client, capture_event
     }
 
 
-def test_500(sentry_init, client, capture_events):
+def test_500(sentry_init, client):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    events = capture_events()
 
     content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
     content = content.decode("utf-8")
 
-    (event,) = events
-    event_id = event["event_id"]
-    assert content == "Sentry error: %s" % event_id
+    assert content == "Sentry error."
 
 
 @pytest.mark.forked
@@ -375,8 +373,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     sql = connection.cursor()
 
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(OperationalError):
         # table doesn't even exist
@@ -410,8 +407,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(ProgrammingError):
         sql.execute(
@@ -476,8 +472,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     sql = connections["postgres"].cursor()
 
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     events = capture_events()
 
@@ -510,8 +505,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(DataError):
         names = ["foo", "bar"]
@@ -1231,14 +1225,14 @@ def test_cache_spans_middleware(
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert first_event["spans"][0]["data"] == {"cache.hit": False}
+    assert first_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert len(second_event["spans"]) == 2
     assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert second_event["spans"][0]["data"] == {"cache.hit": False}
+    assert second_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
@@ -1273,14 +1267,14 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert first_event["spans"][0]["data"] == {"cache.hit": False}
+    assert first_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert len(second_event["spans"]) == 2
     assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert second_event["spans"][0]["data"] == {"cache.hit": False}
+    assert second_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
@@ -1317,7 +1311,7 @@ def test_cache_spans_templatetag(
     assert first_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
-    assert first_event["spans"][0]["data"] == {"cache.hit": False}
+    assert first_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert len(second_event["spans"]) == 1
     assert second_event["spans"][0]["op"] == "cache.get_item"

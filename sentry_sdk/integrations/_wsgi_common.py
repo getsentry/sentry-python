@@ -1,7 +1,8 @@
 import json
 from copy import deepcopy
 
-from sentry_sdk.hub import Hub, _should_send_default_pii
+import sentry_sdk
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -12,13 +13,12 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    import sentry_sdk
-
     from typing import Any
     from typing import Dict
     from typing import Mapping
     from typing import Optional
     from typing import Union
+    from sentry_sdk._types import Event
 
 
 SENSITIVE_ENV_KEYS = (
@@ -38,7 +38,7 @@ SENSITIVE_HEADERS = tuple(
 
 
 def request_body_within_bounds(client, content_length):
-    # type: (Optional[sentry_sdk.Client], int) -> bool
+    # type: (Optional[sentry_sdk.client.BaseClient], int) -> bool
     if client is None:
         return False
 
@@ -51,14 +51,23 @@ def request_body_within_bounds(client, content_length):
 
 
 class RequestExtractor:
+    """
+    Base class for request extraction.
+    """
+
+    # It does not make sense to make this class an ABC because it is not used
+    # for typing, only so that child classes can inherit common methods from
+    # it. Only some child classes implement all methods that raise
+    # NotImplementedError in this class.
+
     def __init__(self, request):
         # type: (Any) -> None
         self.request = request
 
     def extract_into_event(self, event):
-        # type: (Dict[str, Any]) -> None
-        client = Hub.current.client
-        if client is None:
+        # type: (Event) -> None
+        client = sentry_sdk.get_client()
+        if not client.is_active():
             return
 
         data = None  # type: Optional[Union[AnnotatedValue, Dict[str, Any]]]
@@ -66,7 +75,7 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
         if not request_body_within_bounds(client, content_length):
@@ -180,7 +189,7 @@ def _is_json_content_type(ct):
 
 def _filter_headers(headers):
     # type: (Mapping[str, str]) -> Mapping[str, Union[AnnotatedValue, str]]
-    if _should_send_default_pii():
+    if should_send_default_pii():
         return headers
 
     return {

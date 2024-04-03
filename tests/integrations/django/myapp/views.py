@@ -118,7 +118,7 @@ def mylogin(request):
 
 @csrf_exempt
 def handler500(request):
-    return HttpResponseServerError("Sentry error: %s" % sentry_sdk.last_event_id())
+    return HttpResponseServerError("Sentry error.")
 
 
 class ClassBasedView(ListView):
@@ -126,7 +126,7 @@ class ClassBasedView(ListView):
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
-        return super(ClassBasedView, self).dispatch(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
     def head(self, *args, **kwargs):
         sentry_sdk.capture_message("hi")
@@ -177,10 +177,17 @@ def template_test2(request, *args, **kwargs):
 
 @csrf_exempt
 def template_test3(request, *args, **kwargs):
-    from sentry_sdk import Hub
+    from sentry_sdk import Scope
 
-    hub = Hub.current
-    capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+    traceparent = Scope.get_current_scope().get_traceparent()
+    if traceparent is None:
+        traceparent = Scope.get_isolation_scope().get_traceparent()
+
+    baggage = Scope.get_current_scope().get_baggage()
+    if baggage is None:
+        baggage = Scope.get_isolation_scope().get_baggage()
+
+    capture_message(traceparent + "\n" + baggage.serialize())
     return render(request, "trace_meta.html", {})
 
 

@@ -2,6 +2,7 @@ import logging
 import pickle
 import gzip
 import io
+import socket
 from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -11,9 +12,9 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
-from sentry_sdk.transport import _parse_rate_limits
 from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
@@ -150,12 +151,92 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
+def test_socket_options(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
+def test_keep_alive_true(make_client):
+    client = make_client(keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_keep_alive_off_by_default(make_client):
+    client = make_client()
+    options = client.transport._get_pool_options([])
+    assert "socket_options" not in options
+
+
+def test_socket_options_override_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=False)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
+def test_socket_options_merge_with_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    client = make_client(socket_options=[])
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == []
+
+
 def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
         # Make sure we cannot create events from our own logging
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
     )
+
+    # I am not sure why, but "werkzeug" logger makes an INFO log on sending
+    # the message "hi" and does creates an infinite look.
+    # Ignoring this for breaking the infinite loop and still we can test
+    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
+    # to an infinite loop
+    ignore_logger("werkzeug")
 
     with Hub(client):
         capture_message("hi")
@@ -214,7 +295,7 @@ def test_parse_rate_limits(input, expected):
     assert dict(_parse_rate_limits(input, now=NOW)) == expected
 
 
-def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
+def test_simple_rate_limits(capturing_server, make_client):
     client = make_client()
     capturing_server.respond_with(code=429, headers={"Retry-After": "4"})
 
@@ -236,7 +317,7 @@ def test_simple_rate_limits(capturing_server, capsys, caplog, make_client):
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits(
-    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=False)
 
@@ -283,7 +364,7 @@ def test_data_category_limits(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_data_category_limits_reporting(
-    capturing_server, capsys, caplog, response_code, make_client, monkeypatch
+    capturing_server, response_code, make_client, monkeypatch
 ):
     client = make_client(send_client_reports=True)
 
@@ -367,7 +448,7 @@ def test_data_category_limits_reporting(
 
 @pytest.mark.parametrize("response_code", [200, 429])
 def test_complex_limits_without_data_category(
-    capturing_server, capsys, caplog, response_code, make_client
+    capturing_server, response_code, make_client
 ):
     client = make_client()
     capturing_server.respond_with(

@@ -55,6 +55,19 @@ else:
     del pytest_benchmark
 
 
+from sentry_sdk import scope
+
+
+@pytest.fixture(autouse=True)
+def clean_scopes():
+    """
+    Resets the scopes for every test to avoid leaking data between tests.
+    """
+    scope._global_scope = None
+    scope._isolation_scope.set(None)
+    scope._current_scope.set(None)
+
+
 @pytest.fixture(autouse=True)
 def internal_exceptions(request, monkeypatch):
     errors = []
@@ -589,3 +602,15 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
     ):
         yield fake_start_child
+
+
+class ApproxDict(dict):
+    def __eq__(self, other):
+        # For an ApproxDict to equal another dict, the other dict just needs to contain
+        # all the keys from the ApproxDict with the same values.
+        #
+        # The other dict may contain additional keys with any value.
+        return all(key in other and other[key] == value for key, value in self.items())
+
+    def __ne__(self, other):
+        return not self.__eq__(other)

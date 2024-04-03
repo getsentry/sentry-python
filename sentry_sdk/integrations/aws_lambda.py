@@ -3,13 +3,15 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from os import environ
 
+import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     logger,
     TimeoutThread,
@@ -36,20 +38,13 @@ MILLIS_TO_SECONDS = 1000.0
 
 def _wrap_init_error(init_error):
     # type: (F) -> F
+    @ensure_integration_enabled(AwsLambdaIntegration, init_error)
     def sentry_init_error(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-
-        hub = Hub.current
-        integration = hub.get_integration(AwsLambdaIntegration)
-        if integration is None:
-            return init_error(*args, **kwargs)
-
-        # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+        client = sentry_sdk.get_client()
 
         with capture_internal_exceptions():
-            with hub.configure_scope() as scope:
-                scope.clear_breadcrumbs()
+            Scope.get_isolation_scope().clear_breadcrumbs()
 
             exc_info = sys.exc_info()
             if exc_info and all(exc_info):
@@ -58,7 +53,7 @@ def _wrap_init_error(init_error):
                     client_options=client.options,
                     mechanism={"type": "aws_lambda", "handled": False},
                 )
-                hub.capture_event(sentry_event, hint=hint)
+                sentry_sdk.capture_event(sentry_event, hint=hint)
 
         return init_error(*args, **kwargs)
 
@@ -67,6 +62,7 @@ def _wrap_init_error(init_error):
 
 def _wrap_handler(handler):
     # type: (F) -> F
+    @ensure_integration_enabled(AwsLambdaIntegration, handler)
     def sentry_handler(aws_event, aws_context, *args, **kwargs):
         # type: (Any, Any, *Any, **Any) -> Any
 
@@ -80,7 +76,7 @@ def _wrap_handler(handler):
         # will be the same for all events in the list, since they're all hitting
         # the lambda in the same request.)
 
-        if isinstance(aws_event, list):
+        if isinstance(aws_event, list) and len(aws_event) >= 1:
             request_data = aws_event[0]
             batch_size = len(aws_event)
         else:
@@ -93,16 +89,12 @@ def _wrap_handler(handler):
             # this is empty
             request_data = {}
 
-        hub = Hub.current
-        integration = hub.get_integration(AwsLambdaIntegration)
-        if integration is None:
-            return handler(aws_event, aws_context, *args, **kwargs)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(AwsLambdaIntegration)
 
-        # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
         configured_time = aws_context.get_remaining_time_in_millis()
 
-        with hub.push_scope() as scope:
+        with sentry_sdk.isolation_scope() as scope:
             timeout_thread = None
             with capture_internal_exceptions():
                 scope.clear_breadcrumbs()
@@ -148,7 +140,7 @@ def _wrap_handler(handler):
                 name=aws_context.function_name,
                 source=TRANSACTION_SOURCE_COMPONENT,
             )
-            with hub.start_transaction(
+            with sentry_sdk.start_transaction(
                 transaction,
                 custom_sampling_context={
                     "aws_event": aws_event,
@@ -164,7 +156,7 @@ def _wrap_handler(handler):
                         client_options=client.options,
                         mechanism={"type": "aws_lambda", "handled": False},
                     )
-                    hub.capture_event(sentry_event, hint=hint)
+                    sentry_sdk.capture_event(sentry_event, hint=hint)
                     reraise(*exc_info)
                 finally:
                     if timeout_thread:
@@ -176,12 +168,12 @@ def _wrap_handler(handler):
 def _drain_queue():
     # type: () -> None
     with capture_internal_exceptions():
-        hub = Hub.current
-        integration = hub.get_integration(AwsLambdaIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(AwsLambdaIntegration)
         if integration is not None:
             # Flush out the event queue before AWS kills the
             # process.
-            hub.flush()
+            client.flush()
 
 
 class AwsLambdaIntegration(Integration):
@@ -358,7 +350,7 @@ def _make_request_event_processor(aws_event, aws_context, configured_timeout):
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 
             identity = aws_event.get("identity")
