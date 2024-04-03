@@ -59,7 +59,6 @@ async def test_response(sentry_init, capture_events):
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -196,7 +195,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = FastAPI()
@@ -354,7 +352,6 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -384,7 +381,6 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
             FastApiIntegration(),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -438,7 +434,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -482,7 +477,6 @@ def test_transaction_name_in_middleware(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()

@@ -322,7 +322,7 @@ async def test_trace_from_headers_if_performance_disabled(
 
 @pytest.mark.asyncio
 async def test_websocket(sentry_init, asgi3_ws_app, capture_events, request):
-    sentry_init(debug=True, send_default_pii=True)
+    sentry_init(send_default_pii=True)
 
     events = capture_events()
 
@@ -612,7 +612,6 @@ async def test_transaction_name(
     """
     sentry_init(
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -674,7 +673,6 @@ async def test_transaction_name_in_traces_sampler(
     sentry_init(
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)

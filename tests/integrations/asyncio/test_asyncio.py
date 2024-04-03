@@ -67,7 +67,6 @@ async def test_create_task(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
         integrations=[
             AsyncioIntegration(),
         ],
@@ -111,7 +110,6 @@ async def test_gather(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
         integrations=[
             AsyncioIntegration(),
         ],
@@ -155,7 +153,6 @@ async def test_exception(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
         integrations=[
             AsyncioIntegration(),
         ],

@@ -129,7 +129,7 @@ async def test_errors(
     app,
     integration_enabled_params,
 ):
-    sentry_init(debug=True, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
 
     @app.route("/")
     async def index():
