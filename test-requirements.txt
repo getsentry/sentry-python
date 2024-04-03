@@ -4,7 +4,7 @@ pytest-cov
 pytest-forked
 pytest-localserver
 pytest-watch
-tox==4.0.0
+tox==4.0.19
 jsonschema
 pyrsistent
 executing
