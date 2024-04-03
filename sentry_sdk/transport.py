@@ -224,7 +224,7 @@ class HttpTransport(Transport):
                 quantity = len(item.get_bytes()) or 1
             if data_category == "statsd":
                 # The envelope item type used for metrics is statsd
-                # whereas the client report category for discarded events 
+                # whereas the client report category for discarded events
                 # is metric_bucket
                 data_category = "metric_bucket"
 
