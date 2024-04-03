@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Top Level API - sentry-python 1.44.1 documentation</title>
+      <title>Top Level API - sentry-python 2.0.0rc4 documentation</title>
     <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" />
 
   <script>
@@ -117,9 +117,15 @@
 <li><a class="reference internal" href="#sentry_sdk.api.get_traceparent"><code class="docutils literal notranslate"><span class="pre">get_traceparent()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#client-management">Client Management</a><ul>
+<li><a class="reference internal" href="#sentry_sdk.api.is_initialized"><code class="docutils literal notranslate"><span class="pre">is_initialized()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.api.get_client"><code class="docutils literal notranslate"><span class="pre">get_client()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#managing-scope-advanced">Managing Scope (advanced)</a><ul>
 <li><a class="reference internal" href="#sentry_sdk.api.configure_scope"><code class="docutils literal notranslate"><span class="pre">configure_scope()</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.api.push_scope"><code class="docutils literal notranslate"><span class="pre">push_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.api.new_scope"><code class="docutils literal notranslate"><span class="pre">new_scope()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -172,9 +178,9 @@ With this API you can implement a custom performance monitoring or error reporti
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.capture_event">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">capture_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_event"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.capture_event" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.capture_event" title="sentry_sdk.Hub.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_event()</span></code></a></p>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.capture_event" title="sentry_sdk.Scope.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.capture_event()</span></code></a></p>
 <p>Captures an event.</p>
-<p>Alias of <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.capture_event" title="sentry_sdk.Scope.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.capture_event()</span></code></a>.</p>
+<p>Merges given scope data and calls <a class="reference internal" href="apidocs.html#sentry_sdk.client._Client.capture_event" title="sentry_sdk.client._Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.capture_event()</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -190,15 +196,17 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
 </dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="apidocs.html#sentry_sdk.client._Client.capture_event" title="sentry_sdk.client._Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.capture_event()</span></code></a>).</p>
+</dd>
 </dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.capture_exception">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">capture_exception</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_exception"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.capture_exception" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.capture_exception" title="sentry_sdk.Hub.capture_exception"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_exception()</span></code></a></p>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.capture_exception" title="sentry_sdk.Scope.capture_exception"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.capture_exception()</span></code></a></p>
 <p>Captures an exception.</p>
-<p>Alias of <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.capture_exception" title="sentry_sdk.Scope.capture_exception"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.capture_exception()</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -214,7 +222,7 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code>).</p>
+<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="apidocs.html#sentry_sdk.client._Client.capture_event" title="sentry_sdk.client._Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.capture_event()</span></code></a>).</p>
 </dd>
 </dl>
 </dd></dl>
@@ -222,13 +230,12 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.capture_message">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">capture_message</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">scope_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#capture_message"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.capture_message" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.capture_message" title="sentry_sdk.Hub.capture_message"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.capture_message()</span></code></a></p>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.capture_message" title="sentry_sdk.Scope.capture_message"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.capture_message()</span></code></a></p>
 <p>Captures a message.</p>
-<p>Alias of <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.capture_message" title="sentry_sdk.Scope.capture_message"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.capture_message()</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>message</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – The string to send as the message to Sentry.</p></li>
+<li><p><strong>message</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – The string to send as the message.</p></li>
 <li><p><strong>level</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Literal" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code></a>[<code class="docutils literal notranslate"><span class="pre">'fatal'</span></code>, <code class="docutils literal notranslate"><span class="pre">'critical'</span></code>, <code class="docutils literal notranslate"><span class="pre">'error'</span></code>, <code class="docutils literal notranslate"><span class="pre">'warning'</span></code>, <code class="docutils literal notranslate"><span class="pre">'info'</span></code>, <code class="docutils literal notranslate"><span class="pre">'debug'</span></code>]]</span>) – If no level is provided, the default level is <cite>info</cite>.</p></li>
 <li><p><strong>scope</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span>) – An optional <a class="reference internal" href="apidocs.html#sentry_sdk.Scope" title="sentry_sdk.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.Scope</span></code></a> to apply to events.
 The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exclusive.</p></li>
@@ -241,7 +248,7 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Client.capture_event()</span></code>).</p>
+<dd class="field-odd"><p>An <cite>event_id</cite> if the SDK decided to send the event (see <a class="reference internal" href="apidocs.html#sentry_sdk.client._Client.capture_event" title="sentry_sdk.client._Client.capture_event"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.client._Client.capture_event()</span></code></a>).</p>
 </dd>
 </dl>
 </dd></dl>
@@ -252,7 +259,7 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.add_breadcrumb">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">add_breadcrumb</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">crumb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hint</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#add_breadcrumb"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.add_breadcrumb" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.add_breadcrumb" title="sentry_sdk.Hub.add_breadcrumb"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.add_breadcrumb()</span></code></a></p>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.add_breadcrumb" title="sentry_sdk.Scope.add_breadcrumb"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.add_breadcrumb()</span></code></a></p>
 <p>Adds a breadcrumb.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -353,7 +360,7 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.get_current_span">
-<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">get_current_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#get_current_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.get_current_span" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">get_current_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#get_current_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.get_current_span" title="Link to this definition">¶</a></dt>
 <dd><p>Returns the currently active span if there is one running, otherwise <cite>None</cite></p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -364,8 +371,8 @@ to customize the breadcrumbs that are emitted.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.start_span">
-<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">start_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">span</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.start_span" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.start_span" title="sentry_sdk.Hub.start_span"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.start_span()</span></code></a></p>
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">start_span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.start_span" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.start_span" title="sentry_sdk.Scope.start_span"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.start_span()</span></code></a></p>
 <p>Start a span whose parent is the currently active span or transaction, if any.</p>
 <p>The return value is a <a class="reference internal" href="apidocs.html#sentry_sdk.tracing.Span" title="sentry_sdk.tracing.Span"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Span</span></code></a> instance,
 typically used as a context manager to start and stop timing in a <cite>with</cite>
@@ -385,8 +392,8 @@ one is not already in progress.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.start_transaction">
-<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">start_transaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.start_transaction" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.start_transaction" title="sentry_sdk.Hub.start_transaction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.start_transaction()</span></code></a></p>
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">start_transaction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">instrumenter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'sentry'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">custom_sampling_context</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#start_transaction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.start_transaction" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.start_transaction" title="sentry_sdk.Scope.start_transaction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.start_transaction()</span></code></a></p>
 <p>Start and return a transaction.</p>
 <p>Start an existing transaction if given, otherwise create and start a new
 transaction with kwargs.</p>
@@ -401,10 +408,20 @@ finished at the end of the <cite>with</cite> block. If not using context manager
 call the <cite>.finish()</cite> method.</p>
 <p>When the transaction is finished, it will be sent to Sentry with all its
 finished child spans.</p>
-<p>For supported <cite>**kwargs</cite> see <a class="reference internal" href="apidocs.html#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction</span></code></a>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference internal" href="apidocs.html#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</span></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>transaction</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference internal" href="apidocs.html#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>]</span>) – The transaction to start. If omitted, we create and
+start a new transaction.</p></li>
+<li><p><strong>instrumenter</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – This parameter is meant for internal use only.</p></li>
+<li><p><strong>custom_sampling_context</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]]</span>) – The transaction’s custom sampling context.</p></li>
+<li><p><strong>kwargs</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Unpack</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">TransactionKwargs</span></code>]</span>) – Optional keyword arguments to be passed to the Transaction
+constructor. See <a class="reference internal" href="apidocs.html#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.tracing.Transaction</span></code></a> for
+available arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Union" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Union</span></code></a>[<a class="reference internal" href="apidocs.html#sentry_sdk.tracing.Transaction" title="sentry_sdk.tracing.Transaction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Transaction</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">NoOpSpan</span></code>]</span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -435,13 +452,41 @@ finished child spans.</p>
 </dd></dl>
 
 </section>
+<section id="client-management">
+<h2>Client Management<a class="headerlink" href="#client-management" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="sentry_sdk.api.is_initialized">
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">is_initialized</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#is_initialized"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.is_initialized" title="Link to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+</div>
+<p>Returns whether Sentry has been initialized or not.</p>
+<p>If a client is available and the client is active
+(meaning it is configured to send data) then
+Sentry is initialized.
+:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="sentry_sdk.api.get_client">
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">get_client</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#get_client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.get_client" title="Link to this definition">¶</a></dt>
+<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Scope.get_client" title="sentry_sdk.Scope.get_client"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Scope.get_client()</span></code></a>
+:rtype: <span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="apidocs.html#sentry_sdk.client.BaseClient" title="sentry_sdk.client.BaseClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseClient</span></code></a></span></p>
+<div class="versionadded">
+<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+</div>
+<p>Returns the currently used <a class="reference internal" href="apidocs.html#sentry_sdk.Client" title="sentry_sdk.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.Client</span></code></a>.
+This checks the current scope, the isolation scope and the global scope for a client.
+If no client is available a <a class="reference internal" href="apidocs.html#sentry_sdk.client.NonRecordingClient" title="sentry_sdk.client.NonRecordingClient"><code class="xref py py-class docutils literal notranslate"><span class="pre">sentry_sdk.client.NonRecordingClient</span></code></a> is returned.</p>
+</dd></dl>
+
+</section>
 <section id="managing-scope-advanced">
 <h2>Managing Scope (advanced)<a class="headerlink" href="#managing-scope-advanced" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.configure_scope">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">configure_scope</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#configure_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.configure_scope" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.configure_scope" title="sentry_sdk.Hub.configure_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.configure_scope()</span></code></a></p>
-<p>Reconfigures the scope.</p>
+<dd><p>Reconfigures the scope.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>callback</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a>[[<a class="reference internal" href="apidocs.html#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]]</span>) – If provided, call the callback with the current scope.</p>
@@ -458,8 +503,7 @@ finished child spans.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.api.push_scope">
 <span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">push_scope</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/api.html#push_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.push_scope" title="Link to this definition">¶</a></dt>
-<dd><p>Alias for <a class="reference internal" href="apidocs.html#sentry_sdk.Hub.push_scope" title="sentry_sdk.Hub.push_scope"><code class="xref py py-meth docutils literal notranslate"><span class="pre">sentry_sdk.Hub.push_scope()</span></code></a></p>
-<p>Pushes a new layer on the scope stack.</p>
+<dd><p>Pushes a new layer on the scope stack.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>callback</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Optional" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Optional</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Callable" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Callable</span></code></a>[[<a class="reference internal" href="apidocs.html#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]]</span>) – If provided, this method pushes a scope, calls
@@ -471,6 +515,31 @@ finished child spans.</p>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>If no <cite>callback</cite> is provided, a context manager that should
 be used to pop the scope again.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="sentry_sdk.api.new_scope">
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.api.</span></span><span class="sig-name descname"><span class="pre">new_scope</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#new_scope"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.api.new_scope" title="Link to this definition">¶</a></dt>
+<dd><div class="versionadded">
+<p><span class="versionmodified added">New in version 2.0.0.</span></p>
+</div>
+<p>Context manager that forks the current scope and runs the wrapped code in it.
+After the wrapped code is executed, the original scope is restored.</p>
+<p>Example Usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="kn">import</span> <span class="nn">sentry_sdk</span>
+</span><span id="1-2">
+</span><span id="1-3"><span class="k">with</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">new_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+</span><span id="1-4">    <span class="n">scope</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="s2">&quot;color&quot;</span><span class="p">,</span> <span class="s2">&quot;green&quot;</span><span class="p">)</span>
+</span><span id="1-5">    <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span> <span class="c1"># will include `color` tag.</span>
+</span><span id="1-6">
+</span><span id="1-7"><span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello, again&quot;</span><span class="p">)</span> <span class="c1"># will NOT include `color` tag.</span>
+</span></pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference internal" href="apidocs.html#sentry_sdk.Scope" title="sentry_sdk.scope.Scope"><code class="xref py py-class docutils literal notranslate"><span class="pre">Scope</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -527,7 +596,7 @@ be used to pop the scope again.</p>
     </div>
   </div>
 </footer></div>
-      <script src="_static/documentation_options.js?v=fca6d697"></script>
+      <script src="_static/documentation_options.js?v=aa9da443"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=999236dc"></script>
