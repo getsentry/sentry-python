@@ -4,7 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations._ai_common import set_data_normalized
+from sentry_sdk.integrations._ai_common import set_data_normalized, record_token_usage
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 
@@ -244,31 +244,18 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 )
 
             if token_usage:
-                span_data.span.set_data(
-                    SPANDATA.AI_PROMPT_TOKENS_USED, token_usage.get("prompt_tokens")
-                )
-                span_data.span.set_data(
-                    SPANDATA.AI_COMPLETION_TOKENS_USED,
+                record_token_usage(
+                    span_data.span,
+                    token_usage.get("prompt_tokens"),
                     token_usage.get("completion_tokens"),
-                )
-                span_data.span.set_data(
-                    SPANDATA.AI_TOTAL_TOKENS_USED, token_usage.get("total_tokens")
+                    token_usage.get("total_tokens"),
                 )
             else:
-                if span_data.num_completion_tokens:
-                    span_data.span.set_data(
-                        SPANDATA.AI_COMPLETION_TOKENS_USED,
-                        span_data.num_completion_tokens,
-                    )
-                if span_data.num_prompt_tokens:
-                    span_data.span.set_data(
-                        SPANDATA.AI_PROMPT_TOKENS_USED, span_data.num_prompt_tokens
-                    )
-                if span_data.num_prompt_tokens and span_data.num_completion_tokens:
-                    span_data.span.set_data(
-                        SPANDATA.AI_TOTAL_TOKENS_USED,
-                        span_data.num_prompt_tokens + span_data.num_completion_tokens,
-                    )
+                record_token_usage(
+                    span_data.span,
+                    span_data.num_prompt_tokens,
+                    span_data.num_completion_tokens,
+                )
 
             span_data.span.__exit__(None, None, None)
             del self.span_map[run_id]

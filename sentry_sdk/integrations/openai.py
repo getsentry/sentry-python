@@ -3,7 +3,7 @@ from functools import wraps
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations._ai_common import set_data_normalized
+from sentry_sdk.integrations._ai_common import set_data_normalized, record_token_usage
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, Iterator
@@ -109,15 +109,11 @@ def _calculate_chat_completion_usage(
                 if hasattr(choice, "message"):
                     completion_tokens += count_tokens(choice.message)
 
-    if total_tokens == 0:
-        total_tokens = prompt_tokens + completion_tokens
-
-    if completion_tokens != 0:
-        set_data_normalized(span, SPANDATA.AI_COMPLETION_TOKENS_USED, completion_tokens)
-    if prompt_tokens != 0:
-        set_data_normalized(span, SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
-    if total_tokens != 0:
-        set_data_normalized(span, SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)
+    if prompt_tokens == 0:
+        prompt_tokens = None
+    if completion_tokens == 0:
+        completion_tokens = None
+    record_token_usage(span, prompt_tokens, completion_tokens, total_tokens)
 
 
 def _wrap_chat_completion_create(f):
@@ -262,11 +258,7 @@ def _wrap_embeddings_create(f):
             if prompt_tokens == 0:
                 prompt_tokens = count_tokens(kwargs["input"] or "")
 
-            if total_tokens == 0:
-                total_tokens = prompt_tokens
-
-            set_data_normalized(span, SPANDATA.AI_PROMPT_TOKENS_USED, prompt_tokens)
-            set_data_normalized(span, SPANDATA.AI_TOTAL_TOKENS_USED, total_tokens)
+            record_token_usage(span, prompt_tokens, None, total_tokens or prompt_tokens)
 
             return response
 
