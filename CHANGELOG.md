@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.0.0rc4
+
+### Better async support (ongoing)
+
+By: @sentrivana (#2912)
+
+### Various fixes & improvements
+
+- feat(crons): Allow to upsert monitors (#2929) by @sentrivana
+- fix(types): Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
+- docs: Document top-level `start_transaction` function (#2924) by @colin-sentry
+- ref(integrations): Use `ensure_integration_enabled` decorator (#2906) by @sentrivana
+- docs: Document Transaction and Span kwargs typed dicts (#2923) by @colin-sentry
+- ref(otel): Use new scopes API (#2865) by @sentrivana
+- docs: Document arguments for `Span` (#2919) by @colin-sentry
+- docs: Move transaction __init__ doc comment content (#2918) by @colin-sentry
+- Update and cleanup Celery integration (#2891) by @antonpirker
+- ref: Remove deprecated `Transaction` creation method (#2917) by @colin-sentry
+- Revert "ref: Remove deprecated `Transaction` creation method" (#2911) by @colin-sentry
+- ref: Remove deprecated `Transaction` creation method (#2911) by @colin-sentry
+- ref: Correct `api.start_transaction` method signature (#2905) by @szokeasaurusrex
+- Update CHANGELOG.md (4d8db718) by @szokeasaurusrex
+- release: 1.44.0 (a4e44fa6) by @getsentry-bot
+- ref(tornado): Use new scopes API (#2907) by @sentrivana
+- ref(socket): Use new scopes API (#2915) by @colin-sentry
+- ref: Define types at runtime (#2914) by @szokeasaurusrex
+- Explicit reexport of types (#2866) (#2913) by @szokeasaurusrex
+- ref(beam): Use new scopes API (#2879) by @sentrivana
+- ref(starlite): Use new scopes API (#2876) by @sentrivana
+- ref(sanic): Use new scopes API (#2875) by @sentrivana
+- ref: `ensure_integration_enabled` without original function (#2893) by @szokeasaurusrex
+- ref(arq): Use new scopes API (#2878) by @sentrivana
+
+_Plus 30 more_
+
 ## 2.0.0rc3
 
 ### Various fixes & improvements
