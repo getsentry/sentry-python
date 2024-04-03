@@ -92,7 +92,7 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
         "sentry_sdk.integrations.redis.RedisIntegration"
     )  # noqa: N806
 
-    sentry_init(auto_enabling_integrations=True)
+    sentry_init(auto_enabling_integrations=True, debug=True)
 
     for import_string in _AUTO_ENABLING_INTEGRATIONS:
         # Ignore redis in the test case, because it does not raise a DidNotEnable
