@@ -2,13 +2,15 @@
 
 ## 1.44.1
 
-### Better async support (ongoing)
-
-By: @sentrivana (#2912)
-
 ### Various fixes & improvements
 
-- fix(types): Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
+- Make `monitor` async friendly (#2912) by @sentrivana
+
+  You can now decorate your async functions with the `monitor`
+  decorator and they will correctly report their duration
+  and completion status.
+
+- Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
 
 ## 1.44.0
 
