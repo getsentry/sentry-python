@@ -5,7 +5,7 @@ pytest-forked
 pytest-localserver
 pytest-watch
 tox; python_version < '3.12'
-tox<4; python_version >= '3.12'
+tox<4; python_version >= '3.12'  # TODO: >=4 makes async django tests hang in CI
 jsonschema
 pyrsistent
 executing
