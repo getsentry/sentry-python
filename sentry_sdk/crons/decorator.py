@@ -9,6 +9,7 @@ from sentry_sdk.utils import now
 if TYPE_CHECKING:
     from types import TracebackType
     from typing import (
+        Any,
         Awaitable,
         Callable,
         Optional,
@@ -51,15 +52,18 @@ class monitor:  # noqa: N801
     ```
     """
 
-    def __init__(self, monitor_slug=None):
-        # type: (Optional[str]) -> None
+    def __init__(self, monitor_slug=None, monitor_config=None):
+        # type: (Optional[str], Optional[dict[str, Any]]) -> None
         self.monitor_slug = monitor_slug
+        self.monitor_config = monitor_config
 
     def __enter__(self):
         # type: () -> None
         self.start_timestamp = now()
         self.check_in_id = capture_checkin(
-            monitor_slug=self.monitor_slug, status=MonitorStatus.IN_PROGRESS
+            monitor_slug=self.monitor_slug,
+            status=MonitorStatus.IN_PROGRESS,
+            monitor_config=self.monitor_config,
         )
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -76,6 +80,7 @@ class monitor:  # noqa: N801
             check_in_id=self.check_in_id,
             status=status,
             duration=duration_s,
+            monitor_config=self.monitor_config,
         )
 
     def __call__(self, fn):
