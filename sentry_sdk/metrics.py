@@ -1,19 +1,19 @@
-import os
 import io
+import os
+import random
 import re
 import sys
 import threading
-import random
 import time
 import zlib
+from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps, partial
-from threading import Event, Lock, Thread
-from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
+    ContextVar,
     now,
     nanosecond_time,
     to_timestamp,
@@ -53,9 +53,9 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-_thread_local = threading.local()
+_in_metrics = ContextVar("in_metrics", default=False)
 _sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
-_sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
+_sanitize_value = partial(re.compile(r"[^\w\d\s_:/@\.{}\[\]$-]+", re.UNICODE).sub, "")
 _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
@@ -84,15 +84,12 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
+    old_in_metrics = _in_metrics.get()
+    _in_metrics.set(True)
     try:
-        in_metrics = _thread_local.in_metrics
-    except AttributeError:
-        in_metrics = False
-    _thread_local.in_metrics = True
-    try:
-        yield in_metrics
+        yield old_in_metrics
     finally:
-        _thread_local.in_metrics = in_metrics
+        _in_metrics.set(old_in_metrics)
 
 
 def metrics_noop(func):
@@ -411,12 +408,13 @@ class MetricsAggregator(object):
         self._pending_locations = {}  # type: Dict[int, List[Tuple[MetricMetaKey, Any]]]
         self._buckets_total_weight = 0
         self._capture_func = capture_func
-        self._lock = Lock()
         self._running = True
-        self._flush_event = Event()
+        self._lock = threading.Lock()
+
+        self._flush_event = threading.Event()  # type: threading.Event
         self._force_flush = False
 
-        # The aggregator shifts it's flushing by up to an entire rollup window to
+        # The aggregator shifts its flushing by up to an entire rollup window to
         # avoid multiple clients trampling on end of a 10 second window as all the
         # buckets are anchored to multiples of ROLLUP seconds.  We randomize this
         # number once per aggregator boot to achieve some level of offsetting
@@ -424,9 +422,8 @@ class MetricsAggregator(object):
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Thread]
+        self._flusher = None  # type: Optional[threading.Thread]
         self._flusher_pid = None  # type: Optional[int]
-        self._ensure_thread()
 
     def _ensure_thread(self):
         # type: (...) -> bool
@@ -435,13 +432,22 @@ class MetricsAggregator(object):
         """
         if not self._running:
             return False
+
         pid = os.getpid()
         if self._flusher_pid == pid:
             return True
+
         with self._lock:
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
+            if self._flusher_pid == pid:
+                return True
+
             self._flusher_pid = pid
-            self._flusher = Thread(target=self._flush_loop)
+
+            self._flusher = threading.Thread(target=self._flush_loop)
             self._flusher.daemon = True
+
             try:
                 self._flusher.start()
             except RuntimeError:
@@ -449,15 +455,16 @@ class MetricsAggregator(object):
                 # longer allows us to spawn a thread and we have to bail.
                 self._running = False
                 return False
+
         return True
 
     def _flush_loop(self):
         # type: (...) -> None
-        _thread_local.in_metrics = True
+        _in_metrics.set(True)
         while self._running or self._force_flush:
-            self._flush()
             if self._running:
                 self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
+            self._flush()
 
     def _flush(self):
         # type: (...) -> None
@@ -608,7 +615,6 @@ class MetricsAggregator(object):
 
         self._running = False
         self._flush_event.set()
-        self._flusher.join()
         self._flusher = None
 
     @metrics_noop
@@ -719,7 +725,11 @@ def _get_aggregator_and_update_tags(key, tags):
         if transaction_name:
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
-            sample_rate = experiments.get("metrics_summary_sample_rate") or 0.0
+            sample_rate = experiments.get("metrics_summary_sample_rate")
+            # We default the sample rate of metrics summaries to 1.0 only when the sample rate is `None` since we
+            # want to honor the user's decision if they pass a valid float.
+            if sample_rate is None:
+                sample_rate = 1.0
             should_summarize_metric_callback = experiments.get(
                 "should_summarize_metric"
             )

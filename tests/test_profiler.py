@@ -16,13 +16,11 @@ from sentry_sdk.profiler import (
     extract_frame,
     extract_stack,
     frame_id,
-    get_current_thread_id,
     get_frame_name,
     setup_profiler,
 )
 from sentry_sdk.tracing import Transaction
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk._queue import Queue
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -282,6 +280,7 @@ def test_minimum_unique_samples_required(
     assert reports == [("insufficient_data", "profile")]
 
 
+@pytest.mark.forked
 @requires_python_version(3, 3)
 def test_profile_captured(
     sentry_init,
@@ -393,9 +392,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().instance_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrame.instance_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrame.instance_method_wrapped.<locals>.wrapped"
+            ),
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -405,9 +406,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().class_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrame.class_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrame.class_method_wrapped.<locals>.wrapped"
+            ),
             id="class_method_wrapped",
         ),
         pytest.param(
@@ -422,9 +425,11 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_instance_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_instance_method_wrapped.<locals>.wrapped"
+            ),
             id="instance_method_wrapped",
         ),
         pytest.param(
@@ -434,16 +439,20 @@ class GetFrame(GetFrameBase):
         ),
         pytest.param(
             GetFrame().inherited_class_method_wrapped()(),
-            "wrapped"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped",
+            (
+                "wrapped"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_class_method_wrapped.<locals>.wrapped"
+            ),
             id="inherited_class_method_wrapped",
         ),
         pytest.param(
             GetFrame().inherited_static_method(),
-            "inherited_static_method"
-            if sys.version_info < (3, 11)
-            else "GetFrameBase.inherited_static_method",
+            (
+                "inherited_static_method"
+                if sys.version_info < (3, 11)
+                else "GetFrameBase.inherited_static_method"
+            ),
             id="inherited_static_method",
         ),
     ],
@@ -543,74 +552,6 @@ def test_extract_stack_with_cache(frame, depth):
         # equality which would always pass since we're extract
         # the same stack.
         assert frame1 is frame2, i
-
-
-@requires_python_version(3, 3)
-def test_get_current_thread_id_explicit_thread():
-    results = Queue(maxsize=1)
-
-    def target1():
-        pass
-
-    def target2():
-        results.put(get_current_thread_id(thread1))
-
-    thread1 = threading.Thread(target=target1)
-    thread1.start()
-
-    thread2 = threading.Thread(target=target2)
-    thread2.start()
-
-    thread2.join()
-    thread1.join()
-
-    assert thread1.ident == results.get(timeout=1)
-
-
-@requires_python_version(3, 3)
-@requires_gevent
-def test_get_current_thread_id_gevent_in_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        job = gevent.spawn(get_current_thread_id)
-        job.join()
-        results.put(job.value)
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert thread.ident == results.get(timeout=1)
-
-
-@requires_python_version(3, 3)
-def test_get_current_thread_id_running_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        results.put(get_current_thread_id())
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert thread.ident == results.get(timeout=1)
-
-
-@requires_python_version(3, 3)
-def test_get_current_thread_id_main_thread():
-    results = Queue(maxsize=1)
-
-    def target():
-        # mock that somehow the current thread doesn't exist
-        with mock.patch("threading.current_thread", side_effect=[None]):
-            results.put(get_current_thread_id())
-
-    thread_id = threading.main_thread().ident if sys.version_info >= (3, 4) else None
-
-    thread = threading.Thread(target=target)
-    thread.start()
-    thread.join()
-    assert thread_id == results.get(timeout=1)
 
 
 def get_scheduler_threads(scheduler):

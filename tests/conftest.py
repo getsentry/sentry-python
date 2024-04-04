@@ -2,6 +2,7 @@ import json
 import os
 import socket
 from threading import Thread
+from contextlib import contextmanager
 
 import pytest
 import jsonschema
@@ -27,8 +28,13 @@ except Exception:
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+
 import sentry_sdk
-from sentry_sdk._compat import iteritems, reraise, string_types
+from sentry_sdk._compat import iteritems, reraise, string_types, PY2
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
@@ -36,6 +42,12 @@ from sentry_sdk.transport import Transport
 from sentry_sdk.utils import capture_internal_exceptions
 
 from tests import _warning_recorder, _warning_recorder_mgr
+
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+    from collections.abc import Iterator
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -620,3 +632,35 @@ def werkzeug_set_cookie(client, servername, key, value):
         client.set_cookie(servername, key, value)
     except TypeError:
         client.set_cookie(key, value)
+
+
+@contextmanager
+def patch_start_tracing_child(fake_transaction_is_none=False):
+    # type: (bool) -> Iterator[Optional[mock.MagicMock]]
+    if not fake_transaction_is_none:
+        fake_transaction = mock.MagicMock()
+        fake_start_child = mock.MagicMock()
+        fake_transaction.start_child = fake_start_child
+    else:
+        fake_transaction = None
+        fake_start_child = None
+
+    version = "2" if PY2 else "3"
+
+    with mock.patch(
+        "sentry_sdk.tracing_utils_py%s.get_current_span" % version,
+        return_value=fake_transaction,
+    ):
+        yield fake_start_child
+
+
+class ApproxDict(dict):
+    def __eq__(self, other):
+        # For an ApproxDict to equal another dict, the other dict just needs to contain
+        # all the keys from the ApproxDict with the same values.
+        #
+        # The other dict may contain additional keys with any value.
+        return all(key in other and other[key] == value for key, value in self.items())
+
+    def __ne__(self, other):
+        return not self.__eq__(other)

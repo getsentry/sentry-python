@@ -4,6 +4,7 @@ on:
     branches:
       - master
       - release/**
+      - sentry-sdk-2.0
   # XXX: We are using `pull_request_target` instead of `pull_request` because we want
   # this to run on forks with access to the secrets necessary to run the test suite.
   # Prefer to use `pull_request` when possible.
@@ -29,7 +30,7 @@ jobs:
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - uses: actions/checkout@v4.1.1
         with:
           persist-credentials: false
       - name: Check permissions on PR
@@ -64,10 +65,10 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.1
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
@@ -84,7 +85,7 @@ jobs:
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml

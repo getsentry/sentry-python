@@ -1,6 +1,6 @@
 import sys
 import contextlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -34,10 +34,18 @@ if PY2:
     binary_sequence_types = (bytearray, memoryview)
 
     def datetime_utcnow():
+        # type: () -> datetime
         return datetime.utcnow()
 
     def utc_from_timestamp(timestamp):
+        # type: (float) -> datetime
         return datetime.utcfromtimestamp(timestamp)
+
+    def duration_in_milliseconds(delta):
+        # type: (timedelta) -> float
+        seconds = delta.days * 24 * 60 * 60 + delta.seconds
+        milliseconds = seconds * 1000 + float(delta.microseconds) / 1000
+        return milliseconds
 
     def implements_str(cls):
         # type: (T) -> T
@@ -103,6 +111,10 @@ else:
         # type: (float) -> datetime
         return datetime.fromtimestamp(timestamp, timezone.utc)
 
+    def duration_in_milliseconds(delta):
+        # type: (timedelta) -> float
+        return delta / timedelta(milliseconds=1)
+
     def implements_str(x):
         # type: (T) -> T
         return x
@@ -128,29 +140,74 @@ def with_metaclass(meta, *bases):
     return type.__new__(MetaClass, "temporary_class", (), {})
 
 
-def check_thread_support():
-    # type: () -> None
+def check_uwsgi_thread_support():
+    # type: () -> bool
+    # We check two things here:
+    #
+    # 1. uWSGI doesn't run in threaded mode by default -- issue a warning if
+    #    that's the case.
+    #
+    # 2. Additionally, if uWSGI is running in preforking mode (default), it needs
+    #    the --py-call-uwsgi-fork-hooks option for the SDK to work properly. This
+    #    is because any background threads spawned before the main process is
+    #    forked are NOT CLEANED UP IN THE CHILDREN BY DEFAULT even if
+    #    --enable-threads is on. One has to explicitly provide
+    #    --py-call-uwsgi-fork-hooks to force uWSGI to run regular cpython
+    #    after-fork hooks that take care of cleaning up stale thread data.
     try:
         from uwsgi import opt  # type: ignore
     except ImportError:
-        return
+        return True
+
+    from sentry_sdk.consts import FALSE_VALUES
+
+    def enabled(option):
+        # type: (str) -> bool
+        value = opt.get(option, False)
+        if isinstance(value, bool):
+            return value
+
+        if isinstance(value, bytes):
+            try:
+                value = value.decode()
+            except Exception:
+                pass
+
+        return value and str(value).lower() not in FALSE_VALUES
 
     # When `threads` is passed in as a uwsgi option,
     # `enable-threads` is implied on.
-    if "threads" in opt:
-        return
+    threads_enabled = "threads" in opt or enabled("enable-threads")
+    fork_hooks_on = enabled("py-call-uwsgi-fork-hooks")
+    lazy_mode = enabled("lazy-apps") or enabled("lazy")
 
-    # put here because of circular import
-    from sentry_sdk.consts import FALSE_VALUES
-
-    if str(opt.get("enable-threads", "0")).lower() in FALSE_VALUES:
+    if lazy_mode and not threads_enabled:
         from warnings import warn
 
         warn(
             Warning(
-                "We detected the use of uwsgi with disabled threads.  "
-                "This will cause issues with the transport you are "
-                "trying to use.  Please enable threading for uwsgi.  "
-                '(Add the "enable-threads" flag).'
+                "IMPORTANT: "
+                "We detected the use of uWSGI without thread support. "
+                "This might lead to unexpected issues. "
+                'Please run uWSGI with "--enable-threads" for full support.'
             )
         )
+
+        return False
+
+    elif not lazy_mode and (not threads_enabled or not fork_hooks_on):
+        from warnings import warn
+
+        warn(
+            Warning(
+                "IMPORTANT: "
+                "We detected the use of uWSGI in preforking mode without "
+                "thread support. This might lead to crashing workers. "
+                'Please run uWSGI with both "--enable-threads" and '
+                '"--py-call-uwsgi-fork-hooks" for full support.'
+            )
+        )
+
+        return False
+
+    return True

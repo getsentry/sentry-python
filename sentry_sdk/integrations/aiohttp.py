@@ -48,13 +48,12 @@ if TYPE_CHECKING:
     from aiohttp import TraceRequestStartParams, TraceRequestEndParams
     from types import SimpleNamespace
     from typing import Any
-    from typing import Dict
     from typing import Optional
     from typing import Tuple
     from typing import Union
 
     from sentry_sdk.utils import ExcInfo
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
@@ -141,7 +140,7 @@ class AioHttpIntegration(Integration):
                         transaction.set_http_status(response.status)
                         return response
 
-        Application._handle = sentry_app_handle  # type: ignore[method-assign]
+        Application._handle = sentry_app_handle
 
         old_urldispatcher_resolve = UrlDispatcher.resolve
 
@@ -173,7 +172,7 @@ class AioHttpIntegration(Integration):
 
             return rv
 
-        UrlDispatcher.resolve = sentry_urldispatcher_resolve  # type: ignore[method-assign]
+        UrlDispatcher.resolve = sentry_urldispatcher_resolve
 
         old_client_session_init = ClientSession.__init__
 
@@ -190,7 +189,7 @@ class AioHttpIntegration(Integration):
             kwargs["trace_configs"] = client_trace_configs
             return old_client_session_init(*args, **kwargs)
 
-        ClientSession.__init__ = init  # type: ignore[method-assign]
+        ClientSession.__init__ = init
 
 
 def create_trace_config():
@@ -213,9 +212,10 @@ def create_trace_config():
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
         )
         span.set_data(SPANDATA.HTTP_METHOD, method)
-        span.set_data("url", parsed_url.url)
-        span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-        span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        if parsed_url is not None:
+            span.set_data("url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
         if should_propagate_trace(hub, str(params.url)):
             for key, value in hub.iter_trace_propagation_headers(span):
@@ -255,10 +255,10 @@ def create_trace_config():
 def _make_request_processor(weak_request):
     # type: (weakref.ReferenceType[Request]) -> EventProcessor
     def aiohttp_processor(
-        event,  # type: Dict[str, Any]
-        hint,  # type: Dict[str, Tuple[type, BaseException, Any]]
+        event,  # type: Event
+        hint,  # type: dict[str, Tuple[type, BaseException, Any]]
     ):
-        # type: (...) -> Dict[str, Any]
+        # type: (...) -> Event
         request = weak_request()
         if request is None:
             return event

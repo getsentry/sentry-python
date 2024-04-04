@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         BreadcrumbHint,
         ExcInfo,
         MeasurementUnit,
+        LogLevelStr,
     )
     from sentry_sdk.tracing import Span
 
@@ -82,31 +83,31 @@ def capture_event(
     event,  # type: Event
     hint=None,  # type: Optional[Hint]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Any
+    **scope_kwargs  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Hub.current.capture_event(event, hint, scope=scope, **scope_args)
+    return Hub.current.capture_event(event, hint, scope=scope, **scope_kwargs)
 
 
 @hubmethod
 def capture_message(
     message,  # type: str
-    level=None,  # type: Optional[str]
+    level=None,  # type: Optional[LogLevelStr]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Any
+    **scope_kwargs  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Hub.current.capture_message(message, level, scope=scope, **scope_args)
+    return Hub.current.capture_message(message, level, scope=scope, **scope_kwargs)
 
 
 @hubmethod
 def capture_exception(
     error=None,  # type: Optional[Union[BaseException, ExcInfo]]
     scope=None,  # type: Optional[Any]
-    **scope_args  # type: Any
+    **scope_kwargs  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Hub.current.capture_exception(error, scope=scope, **scope_args)
+    return Hub.current.capture_exception(error, scope=scope, **scope_kwargs)
 
 
 @hubmethod
@@ -189,7 +190,7 @@ def set_user(value):
 
 @scopemethod
 def set_level(value):
-    # type: (str) -> None
+    # type: (LogLevelStr) -> None
     return Hub.current.scope.set_level(value)
 
 
@@ -205,6 +206,7 @@ def flush(
 @hubmethod
 def last_event_id():
     # type: () -> Optional[str]
+
     return Hub.current.last_event_id()
 
 

@@ -4,6 +4,7 @@ import linecache
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -74,7 +75,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import EndpointType, Event, ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -381,6 +382,13 @@ class AnnotatedValue(object):
         # type: (Optional[Any], Dict[str, Any]) -> None
         self.value = value
         self.metadata = metadata
+
+    def __eq__(self, other):
+        # type: (Any) -> bool
+        if not isinstance(other, AnnotatedValue):
+            return False
+
+        return self.value == other.value and self.metadata == other.metadata
 
     @classmethod
     def removed_because_raw_data(cls):
@@ -967,7 +975,7 @@ def to_string(value):
 
 
 def iter_event_stacktraces(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -981,14 +989,14 @@ def iter_event_stacktraces(event):
 
 
 def iter_event_frames(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
+    # type: (Event, Optional[List[str]], Optional[List[str]], Optional[str]) -> Event
     for stacktrace in iter_event_stacktraces(event):
         set_in_app_in_frames(
             stacktrace.get("frames"),
@@ -1066,7 +1074,7 @@ def event_from_exception(
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
@@ -1118,6 +1126,39 @@ def _is_in_project_root(abs_path, project_root):
     return False
 
 
+def _truncate_by_bytes(string, max_bytes):
+    # type: (str, int) -> str
+    """
+    Truncate a UTF-8-encodable string to the last full codepoint so that it fits in max_bytes.
+    """
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if isinstance(string, bytes):
+        truncated = string[: max_bytes - 3]
+    else:
+        truncated = string.encode("utf-8")[: max_bytes - 3].decode(
+            "utf-8", errors="ignore"
+        )
+
+    return truncated + "..."
+
+
+def _get_size_in_bytes(value):
+    # type: (str) -> Optional[int]
+    # This function technically supports bytes, but only for Python 2 compat.
+    # XXX remove support for bytes when we drop Python 2
+    if not isinstance(value, (bytes, text_type)):
+        return None
+
+    if isinstance(value, bytes):
+        return len(value)
+
+    try:
+        return len(value.encode("utf-8"))
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
 def strip_string(value, max_length=None):
     # type: (str, Optional[int]) -> Union[AnnotatedValue, str]
     if not value:
@@ -1126,17 +1167,27 @@ def strip_string(value, max_length=None):
     if max_length is None:
         max_length = DEFAULT_MAX_VALUE_LENGTH
 
-    length = len(value.encode("utf-8"))
+    byte_size = _get_size_in_bytes(value)
+    text_size = None
+    if isinstance(value, text_type):
+        text_size = len(value)
 
-    if length > max_length:
-        return AnnotatedValue(
-            value=value[: max_length - 3] + "...",
-            metadata={
-                "len": length,
-                "rem": [["!limit", "x", max_length - 3, max_length]],
-            },
-        )
-    return value
+    if byte_size is not None and byte_size > max_length:
+        # truncate to max_length bytes, preserving code points
+        truncated_value = _truncate_by_bytes(value, max_length)
+    elif text_size is not None and text_size > max_length:
+        # fallback to truncating by string length
+        truncated_value = value[: max_length - 3] + "..."
+    else:
+        return value
+
+    return AnnotatedValue(
+        value=truncated_value,
+        metadata={
+            "len": byte_size or text_size,
+            "rem": [["!limit", "x", max_length - 3, max_length]],
+        },
+    )
 
 
 def parse_version(version):
@@ -1248,24 +1299,49 @@ def _make_threadlocal_contextvars(local):
     class ContextVar(object):
         # Super-limited impl of ContextVar
 
-        def __init__(self, name):
-            # type: (str) -> None
+        def __init__(self, name, default=None):
+            # type: (str, Any) -> None
             self._name = name
+            self._default = default
             self._local = local()
+            self._original_local = local()
 
-        def get(self, default):
+        def get(self, default=None):
             # type: (Any) -> Any
-            return getattr(self._local, "value", default)
+            return getattr(self._local, "value", default or self._default)
 
         def set(self, value):
-            # type: (Any) -> None
+            # type: (Any) -> Any
+            token = str(random.getrandbits(64))
+            original_value = self.get()
+            setattr(self._original_local, token, original_value)
             self._local.value = value
+            return token
+
+        def reset(self, token):
+            # type: (Any) -> None
+            self._local.value = getattr(self._original_local, token)
+            del self._original_local[token]
 
     return ContextVar
 
 
+def _make_noop_copy_context():
+    # type: () -> Callable[[], Any]
+    class NoOpContext:
+        def run(self, func, *args, **kwargs):
+            # type: (Callable[..., Any], *Any, **Any) -> Any
+            return func(*args, **kwargs)
+
+    def copy_context():
+        # type: () -> NoOpContext
+        return NoOpContext()
+
+    return copy_context
+
+
 def _get_contextvars():
-    # type: () -> Tuple[bool, type]
+    # type: () -> Tuple[bool, type, Callable[[], Any]]
     """
     Figure out the "right" contextvars installation to use. Returns a
     `contextvars.ContextVar`-like class with a limited API.
@@ -1281,17 +1357,17 @@ def _get_contextvars():
             # `aiocontextvars` is absolutely required for functional
             # contextvars on Python 3.6.
             try:
-                from aiocontextvars import ContextVar
+                from aiocontextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
         else:
             # On Python 3.7 contextvars are functional.
             try:
-                from contextvars import ContextVar
+                from contextvars import ContextVar, copy_context
 
-                return True, ContextVar
+                return True, ContextVar, copy_context
             except ImportError:
                 pass
 
@@ -1299,10 +1375,10 @@ def _get_contextvars():
 
     from threading import local
 
-    return False, _make_threadlocal_contextvars(local)
+    return False, _make_threadlocal_contextvars(local), _make_noop_copy_context()
 
 
-HAS_REAL_CONTEXTVARS, ContextVar = _get_contextvars()
+HAS_REAL_CONTEXTVARS, ContextVar, copy_context = _get_contextvars()
 
 CONTEXTVARS_ERROR_MESSAGE = """
 
@@ -1590,6 +1666,7 @@ def _generate_installed_modules():
     try:
         from importlib import metadata
 
+        yielded = set()
         for dist in metadata.distributions():
             name = dist.metadata["Name"]
             # `metadata` values may be `None`, see:
@@ -1597,9 +1674,10 @@ def _generate_installed_modules():
             # and
             # https://github.com/python/importlib_metadata/issues/371
             if name is not None:
-                version = metadata.version(name)
-                if version is not None:
-                    yield _normalize_module_name(name), version
+                normalized_name = _normalize_module_name(name)
+                if dist.version is not None and normalized_name not in yielded:
+                    yield normalized_name, dist.version
+                    yielded.add(normalized_name)
 
     except ImportError:
         # < py3.8
@@ -1665,3 +1743,74 @@ else:
     def now():
         # type: () -> float
         return time.perf_counter()
+
+
+try:
+    from gevent import get_hub as get_gevent_hub
+    from gevent.monkey import is_module_patched
+except ImportError:
+
+    def get_gevent_hub():
+        # type: () -> Any
+        return None
+
+    def is_module_patched(*args, **kwargs):
+        # type: (*Any, **Any) -> bool
+        # unable to import from gevent means no modules have been patched
+        return False
+
+
+def is_gevent():
+    # type: () -> bool
+    return is_module_patched("threading") or is_module_patched("_thread")
+
+
+def get_current_thread_meta(thread=None):
+    # type: (Optional[threading.Thread]) -> Tuple[Optional[int], Optional[str]]
+    """
+    Try to get the id of the current thread, with various fall backs.
+    """
+
+    # if a thread is specified, that takes priority
+    if thread is not None:
+        try:
+            thread_id = thread.ident
+            thread_name = thread.name
+            if thread_id is not None:
+                return thread_id, thread_name
+        except AttributeError:
+            pass
+
+    # if the app is using gevent, we should look at the gevent hub first
+    # as the id there differs from what the threading module reports
+    if is_gevent():
+        gevent_hub = get_gevent_hub()
+        if gevent_hub is not None:
+            try:
+                # this is undocumented, so wrap it in try except to be safe
+                return gevent_hub.thread_ident, None
+            except AttributeError:
+                pass
+
+    # use the current thread's id if possible
+    try:
+        thread = threading.current_thread()
+        thread_id = thread.ident
+        thread_name = thread.name
+        if thread_id is not None:
+            return thread_id, thread_name
+    except AttributeError:
+        pass
+
+    # if we can't get the current thread id, fall back to the main thread id
+    try:
+        thread = threading.main_thread()
+        thread_id = thread.ident
+        thread_name = thread.name
+        if thread_id is not None:
+            return thread_id, thread_name
+    except AttributeError:
+        pass
+
+    # we've tried everything, time to give up
+    return None, None

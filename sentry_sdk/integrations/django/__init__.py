@@ -472,7 +472,7 @@ def _patch_get_response():
 def _make_wsgi_request_event_processor(weak_request, integration):
     # type: (Callable[[], WSGIRequest], DjangoIntegration) -> EventProcessor
     def wsgi_request_event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -570,7 +570,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
-    # type: (WSGIRequest, Dict[str, Any]) -> None
+    # type: (WSGIRequest, Event) -> None
     user_info = event.setdefault("user", {})
 
     user = getattr(request, "user", None)

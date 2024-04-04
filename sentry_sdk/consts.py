@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import Any
     from typing import Sequence
+    from typing import Tuple
     from typing_extensions import TypedDict
 
     from sentry_sdk.integrations import Integration
@@ -190,6 +191,18 @@ class SPANDATA:
     Example: "http.handler"
     """
 
+    THREAD_ID = "thread.id"
+    """
+    Identifier of a thread from where the span originated. This should be a string.
+    Example: "7972576320"
+    """
+
+    THREAD_NAME = "thread.name"
+    """
+    Label identifying a thread from where the span originated. This should be a string.
+    Example: "MainThread"
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
@@ -218,6 +231,8 @@ class OP:
     MIDDLEWARE_STARLITE = "middleware.starlite"
     MIDDLEWARE_STARLITE_RECEIVE = "middleware.starlite.receive"
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
+    OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
+    OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -260,6 +275,8 @@ class ClientConstructor(object):
         https_proxy=None,  # type: Optional[str]
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
+        socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
+        keep_alive=False,  # type: bool
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -290,7 +307,7 @@ class ClientConstructor(object):
         max_value_length=DEFAULT_MAX_VALUE_LENGTH,  # type: int
         enable_backpressure_handling=True,  # type: bool
         error_sampler=None,  # type: Optional[Callable[[Event, Hint], Union[float, bool]]]
-        enable_db_query_source=False,  # type: bool
+        enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
     ):
@@ -316,4 +333,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.39.1"
+VERSION = "1.44.1"

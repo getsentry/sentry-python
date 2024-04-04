@@ -1,6 +1,9 @@
-import sys
+import os
 import pytest
+import sys
+from datetime import datetime
 
+from sentry_sdk._compat import PY2
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
@@ -11,7 +14,13 @@ from sentry_sdk import capture_message, start_transaction, configure_scope
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
+from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
+
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -146,6 +155,62 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
+)
+def test_transactions_no_engine_url(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        _experiments={"record_sql_params": True},
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    Base = declarative_base()  # noqa: N806
+
+    class Person(Base):
+        __tablename__ = "person"
+        id = Column(Integer, primary_key=True)
+        name = Column(String(250), nullable=False)
+
+    class Address(Base):
+        __tablename__ = "address"
+        id = Column(Integer, primary_key=True)
+        street_name = Column(String(250))
+        street_number = Column(String(250))
+        post_code = Column(String(250), nullable=False)
+        person_id = Column(Integer, ForeignKey("person.id"))
+        person = relationship(Person)
+
+    engine = create_engine("sqlite:///:memory:")
+    engine.url = None
+    Base.metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine)  # noqa: N806
+    session = Session()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        with session.begin_nested():
+            session.query(Person).first()
+
+        for _ in range(2):
+            with pytest.raises(IntegrityError):
+                with session.begin_nested():
+                    session.add(Person(id=1, name="bob"))
+                    session.add(Person(id=1, name="bob"))
+
+        with session.begin_nested():
+            session.query(Person).first()
+
+    (event,) = events
+
+    for span in event["spans"]:
+        assert span["data"][SPANDATA.DB_SYSTEM] == "sqlite"
+        assert SPANDATA.DB_NAME not in span["data"]
+        assert SPANDATA.SERVER_ADDRESS not in span["data"]
+        assert SPANDATA.SERVER_PORT not in span["data"]
+
+
 def test_long_sql_query_preserved(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1,
@@ -227,15 +292,13 @@ def test_engine_name_not_string(sentry_init):
         con.execute(text("SELECT 0"))
 
 
-@pytest.mark.parametrize("enable_db_query_source", [None, False])
-def test_query_source_disabled(sentry_init, capture_events, enable_db_query_source):
+def test_query_source_disabled(sentry_init, capture_events):
     sentry_options = {
         "integrations": [SqlalchemyIntegration()],
         "enable_tracing": True,
+        "enable_db_query_source": False,
+        "db_query_source_threshold_ms": 0,
     }
-    if enable_db_query_source is not None:
-        sentry_options["enable_db_query_source"] = enable_db_query_source
-        sentry_options["db_query_source_threshold_ms"] = 0
 
     sentry_init(**sentry_options)
 
@@ -272,6 +335,56 @@ def test_query_source_disabled(sentry_init, capture_events, enable_db_query_sour
             assert SPANDATA.CODE_NAMESPACE not in data
             assert SPANDATA.CODE_FILEPATH not in data
             assert SPANDATA.CODE_FUNCTION not in data
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+@pytest.mark.parametrize("enable_db_query_source", [None, True])
+def test_query_source_enabled(sentry_init, capture_events, enable_db_query_source):
+    sentry_options = {
+        "integrations": [SqlalchemyIntegration()],
+        "enable_tracing": True,
+        "db_query_source_threshold_ms": 0,
+    }
+    if enable_db_query_source is not None:
+        sentry_options["enable_db_query_source"] = enable_db_query_source
+
+    sentry_init(**sentry_options)
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+        session.add(bob)
+
+        assert session.query(Person).first() == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
             break
     else:
         raise AssertionError("No db span found")
@@ -327,7 +440,223 @@ def test_query_source(sentry_init, capture_events):
             assert data.get(SPANDATA.CODE_FILEPATH).endswith(
                 "tests/integrations/sqlalchemy/test_sqlalchemy.py"
             )
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
             assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+def test_query_source_with_module_in_search_path(sentry_init, capture_events):
+    """
+    Test that query source is relative to the path of the module it ran in
+    """
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        enable_tracing=True,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+    )
+    events = capture_events()
+
+    from sqlalchemy_helpers.helpers import (
+        add_model_to_session,
+        query_first_model_from_session,
+    )
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+
+        add_model_to_session(bob, session)
+
+        assert query_first_model_from_session(Person, session) == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
+            assert type(data.get(SPANDATA.CODE_LINENO)) == int
+            assert data.get(SPANDATA.CODE_LINENO) > 0
+            if not PY2:
+                assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
+                assert (
+                    data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
+                )
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
+            assert data.get(SPANDATA.CODE_FUNCTION) == "query_first_model_from_session"
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        enable_tracing=True,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=100,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+        session.add(bob)
+
+        class fake_record_sql_queries:  # noqa: N801
+            def __init__(self, *args, **kwargs):
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+
+                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
+
+            def __enter__(self):
+                return self.span
+
+            def __exit__(self, type, value, traceback):
+                pass
+
+        with mock.patch(
+            "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            assert session.query(Person).first() == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO not in data
+            assert SPANDATA.CODE_NAMESPACE not in data
+            assert SPANDATA.CODE_FILEPATH not in data
+            assert SPANDATA.CODE_FUNCTION not in data
+
+            break
+    else:
+        raise AssertionError("No db span found")
+
+
+def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        enable_tracing=True,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=100,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test_transaction", sampled=True):
+        Base = declarative_base()  # noqa: N806
+
+        class Person(Base):
+            __tablename__ = "person"
+            id = Column(Integer, primary_key=True)
+            name = Column(String(250), nullable=False)
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+
+        Session = sessionmaker(bind=engine)  # noqa: N806
+        session = Session()
+
+        bob = Person(name="Bob")
+        session.add(bob)
+
+        class fake_record_sql_queries:  # noqa: N801
+            def __init__(self, *args, **kwargs):
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+
+                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
+
+            def __enter__(self):
+                return self.span
+
+            def __exit__(self, type, value, traceback):
+                pass
+
+        with mock.patch(
+            "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            assert session.query(Person).first() == bob
+
+    (event,) = events
+
+    for span in event["spans"]:
+        if span.get("op") == "db" and span.get("description").startswith(
+            "SELECT person"
+        ):
+            data = span.get("data", {})
+
+            assert SPANDATA.CODE_LINENO in data
+            assert SPANDATA.CODE_NAMESPACE in data
+            assert SPANDATA.CODE_FILEPATH in data
+            assert SPANDATA.CODE_FUNCTION in data
+
+            assert type(data.get(SPANDATA.CODE_LINENO)) == int
+            assert data.get(SPANDATA.CODE_LINENO) > 0
+            assert (
+                data.get(SPANDATA.CODE_NAMESPACE)
+                == "tests.integrations.sqlalchemy.test_sqlalchemy"
+            )
+            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                "tests/integrations/sqlalchemy/test_sqlalchemy.py"
+            )
+
+            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+            assert is_relative_path
+
+            assert (
+                data.get(SPANDATA.CODE_FUNCTION)
+                == "test_query_source_if_duration_over_threshold"
+            )
             break
     else:
         raise AssertionError("No db span found")
