@@ -7,7 +7,7 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
-from sentry_sdk._compat import datetime_utcnow, reraise
+from sentry_sdk._compat import datetime_utcnow, duration_in_milliseconds, reraise
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -158,7 +158,7 @@ def _make_request_event_processor(gcp_event, configured_timeout, initial_time):
         final_time = datetime_utcnow()
         time_diff = final_time - initial_time
 
-        execution_duration_in_millis = time_diff.microseconds / MILLIS_TO_SECONDS
+        execution_duration_in_millis = duration_in_milliseconds(time_diff)
 
         extra = event.setdefault("extra", {})
         extra["google cloud functions"] = {

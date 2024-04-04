@@ -15,7 +15,7 @@ from sentry_sdk.hub import Hub, _should_send_default_pii
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
 from sentry_sdk.utils import (
     AnnotatedValue,
     HAS_REAL_CONTEXTVARS,
@@ -472,7 +472,7 @@ def _patch_get_response():
 def _make_wsgi_request_event_processor(weak_request, integration):
     # type: (Callable[[], WSGIRequest], DjangoIntegration) -> EventProcessor
     def wsgi_request_event_processor(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         # if the request is gone we are fine not logging the data from
         # it.  This might happen if the processor is pushed away to
         # another thread.
@@ -570,7 +570,7 @@ class DjangoRequestExtractor(RequestExtractor):
 
 
 def _set_user_info(request, event):
-    # type: (WSGIRequest, Dict[str, Any]) -> None
+    # type: (WSGIRequest, Event) -> None
     user_info = event.setdefault("user", {})
 
     user = getattr(request, "user", None)
@@ -638,7 +638,12 @@ def install_sql_hook():
                         self.mogrify,
                         options,
                     )
-            return real_execute(self, sql, params)
+            result = real_execute(self, sql, params)
+
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
+        return result
 
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
@@ -650,7 +655,13 @@ def install_sql_hook():
             hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
             _set_db_data(span, self)
-            return real_executemany(self, sql, param_list)
+
+            result = real_executemany(self, sql, param_list)
+
+        with capture_internal_exceptions():
+            add_query_source(hub, span)
+
+        return result
 
     def connect(self):
         # type: (BaseDatabaseWrapper) -> None
@@ -686,7 +697,7 @@ def _set_db_data(span, cursor_or_db):
     is_psycopg2 = (
         hasattr(cursor_or_db, "connection")
         and hasattr(cursor_or_db.connection, "get_dsn_parameters")
-        and inspect.isfunction(cursor_or_db.connection.get_dsn_parameters)
+        and inspect.isroutine(cursor_or_db.connection.get_dsn_parameters)
     )
     if is_psycopg2:
         connection_params = cursor_or_db.connection.get_dsn_parameters()
@@ -695,7 +706,7 @@ def _set_db_data(span, cursor_or_db):
             hasattr(cursor_or_db, "connection")
             and hasattr(cursor_or_db.connection, "info")
             and hasattr(cursor_or_db.connection.info, "get_parameters")
-            and inspect.isfunction(cursor_or_db.connection.info.get_parameters)
+            and inspect.isroutine(cursor_or_db.connection.info.get_parameters)
         )
         if is_psycopg3:
             connection_params = cursor_or_db.connection.info.get_parameters()

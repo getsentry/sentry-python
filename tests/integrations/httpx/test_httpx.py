@@ -7,6 +7,7 @@ import responses
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
+from tests.conftest import ApproxDict
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -46,15 +47,17 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-        assert crumb["data"] == {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-            "extra": "foo",
-        }
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "reason": "OK",
+                "extra": "foo",
+            }
+        )
 
 
 @pytest.mark.parametrize(
@@ -291,9 +294,15 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == {
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-        "reason": "OK",
-        # no url related data
-    }
+    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            # no url related data
+        }
+    )
+
+    assert "url" not in event["breadcrumbs"]["values"][0]["data"]
+    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
+    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]

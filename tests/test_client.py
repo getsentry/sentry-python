@@ -5,8 +5,8 @@ import pytest
 import subprocess
 import sys
 import time
-
 from textwrap import dedent
+
 from sentry_sdk import (
     Hub,
     Client,
@@ -20,7 +20,7 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
-from sentry_sdk._compat import reraise, text_type, PY2
+from sentry_sdk._compat import text_type, PY2
 from sentry_sdk.utils import HAS_CHAINED_EXCEPTIONS
 from sentry_sdk.utils import logger
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -358,24 +358,27 @@ def test_simple_transport(sentry_init):
 
 
 def test_ignore_errors(sentry_init, capture_events):
-    class MyDivisionError(ZeroDivisionError):
-        pass
+    with mock.patch(
+        "sentry_sdk.scope.Scope._capture_internal_exception"
+    ) as mock_capture_internal_exception:
 
-    def raise_it(exc_info):
-        reraise(*exc_info)
+        class MyDivisionError(ZeroDivisionError):
+            pass
 
-    sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
-    Hub.current._capture_internal_exception = raise_it
+        sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
 
-    def e(exc):
-        try:
-            raise exc
-        except Exception:
-            capture_exception()
+        def e(exc):
+            try:
+                raise exc
+            except Exception:
+                capture_exception()
 
-    e(ZeroDivisionError())
-    e(MyDivisionError())
-    pytest.raises(EventCapturedError, lambda: e(ValueError()))
+        e(ZeroDivisionError())
+        e(MyDivisionError())
+        e(ValueError())
+
+        assert mock_capture_internal_exception.call_count == 1
+        assert mock_capture_internal_exception.call_args[0][0][0] == EventCapturedError
 
 
 def test_with_locals_deprecation_enabled(sentry_init):
@@ -1313,3 +1316,43 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
 
         # Ensure two arguments (the event and hint) were passed to the sampler function
         assert len(test_config.sampler_function_mock.call_args[0]) == 2
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "opt,missing_flags",
+    [
+        # lazy mode with enable-threads, no warning
+        [{"enable-threads": True, "lazy-apps": True}, []],
+        [{"enable-threads": "true", "lazy-apps": b"1"}, []],
+        # preforking mode with enable-threads and py-call-uwsgi-fork-hooks, no warning
+        [{"enable-threads": True, "py-call-uwsgi-fork-hooks": True}, []],
+        [{"enable-threads": b"true", "py-call-uwsgi-fork-hooks": b"on"}, []],
+        # lazy mode, no enable-threads, warning
+        [{"lazy-apps": True}, ["--enable-threads"]],
+        [{"enable-threads": b"false", "lazy-apps": True}, ["--enable-threads"]],
+        [{"enable-threads": b"0", "lazy": True}, ["--enable-threads"]],
+        # preforking mode, no enable-threads or py-call-uwsgi-fork-hooks, warning
+        [{}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
+        [{"processes": b"2"}, ["--enable-threads", "--py-call-uwsgi-fork-hooks"]],
+        [{"enable-threads": True}, ["--py-call-uwsgi-fork-hooks"]],
+        [{"enable-threads": b"1"}, ["--py-call-uwsgi-fork-hooks"]],
+        [
+            {"enable-threads": b"false"},
+            ["--enable-threads", "--py-call-uwsgi-fork-hooks"],
+        ],
+        [{"py-call-uwsgi-fork-hooks": True}, ["--enable-threads"]],
+    ],
+)
+def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
+    uwsgi = mock.MagicMock()
+    uwsgi.opt = opt
+    with mock.patch.dict("sys.modules", uwsgi=uwsgi):
+        sentry_init(profiles_sample_rate=1.0)
+        if missing_flags:
+            assert len(recwarn) == 1
+            record = recwarn.pop()
+            for flag in missing_flags:
+                assert flag in str(record.message)
+        else:
+            assert not recwarn

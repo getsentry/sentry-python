@@ -10,6 +10,7 @@ from sentry_sdk.integrations.celery import (
 )
 
 from sentry_sdk._compat import text_type
+from tests.conftest import ApproxDict
 
 from celery import Celery, VERSION
 from celery.bin import worker
@@ -218,6 +219,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     assert execution_event["spans"] == []
     assert submission_event["spans"] == [
         {
+            "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
@@ -593,3 +595,18 @@ def test_apply_async_from_beat_no_span(sentry_init):
         ],
         headers={},
     )
+
+
+def test_apply_async_no_args(init_celery):
+    celery = init_celery()
+
+    @celery.task
+    def example_task():
+        return "success"
+
+    try:
+        result = example_task.apply_async(None, {})
+    except TypeError:
+        pytest.fail("Calling `apply_async` without arguments raised a TypeError")
+
+    assert result.get() == "success"

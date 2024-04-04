@@ -1,10 +1,12 @@
-name: Test {{ framework }}
+{% with lowercase_group=group | replace(" ", "_") | lower %}
+name: Test {{ group }}
 
 on:
   push:
     branches:
       - master
       - release/**
+      - sentry-sdk-2.0
 
   {% if needs_github_secrets %}
   # XXX: We are using `pull_request_target` instead of `pull_request` because we want
@@ -45,22 +47,9 @@ jobs:
 {% include "check_permissions.jinja" %}
 {% endif %}
 
-{% if py_versions.pinned %}
-{% with category="pinned", versions=py_versions.pinned %}
-{% include "test.jinja" %}
-{% endwith %}
-{% endif %}
-
-{% if py_versions.py27 %}
-{% with category="py27", versions=py_versions.py27 %}
-{% include "test.jinja" %}
-{% endwith %}
-{% endif %}
-
-{% if py_versions.latest %}
-{% with category="latest", versions=py_versions.latest %}
-{% include "test.jinja" %}
-{% endwith %}
-{% endif %}
+{% for category in categories %}
+{% include "test_group.jinja" %}
+{% endfor %}
 
 {% include "check_required.jinja" %}
+{% endwith %}
