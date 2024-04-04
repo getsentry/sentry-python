@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
     from sentry_sdk.scope import Scope as SentryScope
+    from sentry_sdk._types import Event
 
 try:
     import starlette  # type: ignore
@@ -407,9 +408,9 @@ def patch_request_response():
                     info = await extractor.extract_request_info()
 
                     def _make_request_event_processor(req, integration):
-                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
                         def event_processor(event, hint):
-                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                            # type: (Event, Dict[str, Any]) -> Event
 
                             # Add info from request to event
                             request_info = event.get("request", {})
@@ -455,9 +456,9 @@ def patch_request_response():
                     cookies = extractor.extract_cookies_from_request()
 
                     def _make_request_event_processor(req, integration):
-                        # type: (Any, Any) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, Any]]
+                        # type: (Any, Any) -> Callable[[Event, dict[str, Any]], Event]
                         def event_processor(event, hint):
-                            # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+                            # type: (Event, dict[str, Any]) -> Event
 
                             # Extract information from request
                             request_info = event.get("request", {})

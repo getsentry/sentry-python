@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import io
 import gzip
+import socket
 import time
 from datetime import timedelta
 from collections import defaultdict
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Iterable
+    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import Type
@@ -38,6 +40,21 @@ try:
     from urllib.request import getproxies
 except ImportError:
     from urllib import getproxies  # type: ignore
+
+
+KEEP_ALIVE_SOCKET_OPTIONS = []
+for option in [
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+]:
+    try:
+        KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))
+    except AttributeError:
+        # a specific option might not be available on specific systems,
+        # e.g. TCP_KEEPIDLE doesn't exist on macOS
+        pass
 
 
 class Transport(object):
@@ -127,10 +144,22 @@ def _parse_rate_limits(header, now=None):
 
     for limit in header.split(","):
         try:
-            retry_after, categories, _ = limit.strip().split(":", 2)
+            parameters = limit.strip().split(":")
+            retry_after, categories = parameters[:2]
+
             retry_after = now + timedelta(seconds=int(retry_after))
             for category in categories and categories.split(";") or (None,):
-                yield category, retry_after
+                if category == "metric_bucket":
+                    try:
+                        namespaces = parameters[4].split(";")
+                    except IndexError:
+                        namespaces = []
+
+                    if not namespaces or "custom" in namespaces:
+                        yield category, retry_after
+
+                else:
+                    yield category, retry_after
         except (LookupError, ValueError):
             continue
 
@@ -193,6 +222,12 @@ class HttpTransport(Transport):
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
                 quantity = len(item.get_bytes()) or 1
+            if data_category == "statsd":
+                # The envelope item type used for metrics is statsd
+                # whereas the client report category for discarded events
+                # is metric_bucket
+                data_category = "metric_bucket"
+
         elif data_category is None:
             raise TypeError("data category not provided")
 
@@ -319,7 +354,14 @@ class HttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
+
+            # The envelope item type used for metrics is statsd
+            # whereas the rate limit category is metric_bucket
+            if bucket == "statsd":
+                bucket = "metric_bucket"
+
             ts = self._disabled_until.get(bucket)
+
             return ts is not None and ts > datetime_utcnow()
 
         return _disabled(category) or _disabled(None)
@@ -385,7 +427,7 @@ class HttpTransport(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default"):
+                if item.data_category in ("transaction", "error", "default", "statsd"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:
@@ -446,8 +488,22 @@ class HttpTransport(Transport):
             "ca_certs": ca_certs or certifi.where(),
         }
 
-        if self.options["socket_options"]:
-            options["socket_options"] = self.options["socket_options"]
+        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
+
+        if self.options["socket_options"] is not None:
+            socket_options = self.options["socket_options"]
+
+        if self.options["keep_alive"]:
+            if socket_options is None:
+                socket_options = []
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
 
         return options
 

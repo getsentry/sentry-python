@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.44.1
+
+### Various fixes & improvements
+
+- Make `monitor` async friendly (#2912) by @sentrivana
+
+  You can now decorate your async functions with the `monitor`
+  decorator and they will correctly report their duration
+  and completion status.
+
+- Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
+
+## 1.44.0
+
+### Various fixes & improvements
+
+- ref: Define types at runtime (#2914) by @szokeasaurusrex
+- Explicit reexport of types (#2866) (#2913) by @szokeasaurusrex
+- feat(profiling): Add thread data to spans (#2843) by @Zylphrex
+
+## 1.43.0
+
+### Various fixes & improvements
+
+- Add optional `keep_alive` (#2842) by @sentrivana
+
+  If you're experiencing frequent network issues between the SDK and Sentry,
+  you can try turning on TCP keep-alive:
+
+  ```python
+  import sentry_sdk
+
+  sentry_sdk.init(
+      # ...your usual settings...
+      keep_alive=True,
+  )
+  ```
+
+- Add support for Celery Redbeat cron tasks (#2643) by @kwigley
+
+  The SDK now supports the Redbeat scheduler in addition to the default
+  Celery Beat scheduler for auto instrumenting crons. See
+  [the docs](https://docs.sentry.io/platforms/python/integrations/celery/crons/)
+  for more information about how to set this up.
+
+- `aws_event` can be an empty list (#2849) by @sentrivana
+- Re-export `Event` in `types.py` (#2829) by @szokeasaurusrex
+- Small API docs improvement (#2828) by @antonpirker
+- Fixed OpenAI tests (#2834) by @antonpirker
+- Bump `checkouts/data-schemas` from `ed078ed` to `8232f17` (#2832) by @dependabot
+
+## 1.42.0
+
+### Various fixes & improvements
+
+- **New integration:** [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/) (#2791) by @colin-sentry
+
+  We added an integration for OpenAI to capture errors and also performance data when using the OpenAI Python SDK.
+
+  Useage:
+
+  This integrations is auto-enabling, so if you have the `openai` package in your project it will be enabled. Just initialize Sentry before you create your OpenAI client.
+
+  ```python
+  from openai import OpenAI
+
+  import sentry_sdk
+
+  sentry_sdk.init(
+      dsn="___PUBLIC_DSN___",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+  )
+
+  client = OpenAI()
+  ```
+
+  For more information, see the documentation for [OpenAI integration](https://docs.sentry.io/platforms/python/integrations/openai/).
+
+- Discard open OpenTelemetry spans after 10 minutes (#2801) by @antonpirker
+- Propagate sentry-trace and baggage headers to Huey tasks (#2792) by @cnschn
+- Added Event type (#2753) by @szokeasaurusrex
+- Improve scrub_dict typing (#2768) by @szokeasaurusrex
+- Dependencies: bump types-protobuf from 4.24.0.20240302 to 4.24.0.20240311 (#2797) by @dependabot
+
 ## 1.41.0
 
 ### Various fixes & improvements
