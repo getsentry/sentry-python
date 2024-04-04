@@ -275,7 +275,7 @@ def test_trace_from_headers_if_performance_disabled(
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -297,7 +297,7 @@ def test_user_captured(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
@@ -358,7 +358,7 @@ def test_management_command_raises():
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(sentry_init, capture_events, with_integration):
     sentry_init(
