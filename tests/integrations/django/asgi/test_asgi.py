@@ -25,6 +25,7 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
+@pytest.mark.forked
 async def test_basic(sentry_init, capture_events, application):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
