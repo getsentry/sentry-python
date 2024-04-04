@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.44.1
+
+### Various fixes & improvements
+
+- Make `monitor` async friendly (#2912) by @sentrivana
+
+  You can now decorate your async functions with the `monitor`
+  decorator and they will correctly report their duration
+  and completion status.
+
+- Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
+
+## 1.44.0
+
+### Various fixes & improvements
+
+- ref: Define types at runtime (#2914) by @szokeasaurusrex
+- Explicit reexport of types (#2866) (#2913) by @szokeasaurusrex
+- feat(profiling): Add thread data to spans (#2843) by @Zylphrex
+
 ## 1.43.0
 
 ### Various fixes & improvements
