@@ -3,6 +3,11 @@ from __future__ import absolute_import
 import sys
 import time
 
+try:
+    from typing import cast
+except ImportError:
+    cast = lambda _, o: o
+
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -429,13 +434,13 @@ def _get_humanized_interval(seconds):
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
         ("minute", 60.0),
-    )  # type: tuple[tuple[MonitorConfigScheduleUnit, float]]
+    )
 
     seconds = float(seconds)
     for unit, divider in TIME_UNITS:
         if seconds >= divider:
             interval = int(seconds / divider)
-            return (interval, unit)
+            return (interval, cast("MonitorConfigScheduleUnit", unit))
 
     return (int(seconds), "second")
 
