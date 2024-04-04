@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._compat import datetime_utcnow, utc_from_timestamp, PY2
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.continuous_profiler import get_profiler_id
 from sentry_sdk._types import TYPE_CHECKING
 
 
@@ -179,6 +180,7 @@ class Span(object):
 
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
+        self.set_profiler_id(get_profiler_id())
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -434,6 +436,11 @@ class Span(object):
 
             if thread_name is not None:
                 self.set_data(SPANDATA.THREAD_NAME, thread_name)
+
+    def set_profiler_id(self, profiler_id):
+        # type: (Optional[str]) -> None
+        if profiler_id is not None:
+            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
 
     def set_http_status(self, http_status):
         # type: (int) -> None

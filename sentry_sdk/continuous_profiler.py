@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import List
     from typing import Optional
+    from typing import Union
     from typing_extensions import TypedDict
     from sentry_sdk._types import ContinuousProfilerMode
     from sentry_sdk.profiler import (
@@ -117,6 +118,13 @@ def teardown_continuous_profiler():
     _scheduler = None
 
 
+def get_profiler_id():
+    # type: () -> Union[str, None]
+    if _scheduler is None:
+        return None
+    return _scheduler.profiler_id
+
+
 def try_ensure_continuous_profiler_running():
     # type: () -> None
     if _scheduler is None:
@@ -157,6 +165,13 @@ class ContinuousScheduler(object):
         self.buffer = ProfileBuffer(
             self.options, PROFILE_BUFFER_SECONDS, self.capture_func
         )
+
+    @property
+    def profiler_id(self):
+        # type: () -> Union[str, None]
+        if self.buffer is None:
+            return None
+        return self.buffer.profiler_id
 
     def make_sampler(self):
         # type: () -> Callable[..., None]

@@ -206,6 +206,12 @@ class SPANDATA:
     Example: "MainThread"
     """
 
+    PROFILER_ID = "profiler.id"
+    """
+    Label identifying the profiler id that the span occurred in. This should be a string.
+    Example: "5249fbada8d5416482c2f6e47e337372"
+    """
+
 
 class OP:
     CACHE_GET_ITEM = "cache.get_item"
