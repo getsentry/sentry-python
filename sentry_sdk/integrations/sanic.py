@@ -342,6 +342,8 @@ def _capture_exception(exception):
             client_options=client.options,
             mechanism={"type": "sanic", "handled": False},
         )
+        if hint and hasattr(hint["exc_info"][0], "quiet") and hint["exc_info"][0].quiet:
+            return
         hub.capture_event(event, hint=hint)
 
 
