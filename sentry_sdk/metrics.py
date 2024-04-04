@@ -751,7 +751,7 @@ def _get_aggregator_and_update_tags(key, tags):
     return client.metrics_aggregator, local_aggregator, updated_tags
 
 
-def incr(
+def increment(
     key,  # type: str
     value=1.0,  # type: float
     unit="none",  # type: MeasurementUnit
@@ -766,6 +766,10 @@ def incr(
         aggregator.add(
             "c", key, value, unit, tags, timestamp, local_aggregator, stacklevel
         )
+
+
+# alias as incr is relatively common in python
+incr = increment
 
 
 class _Timing(object):
