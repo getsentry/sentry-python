@@ -33,6 +33,22 @@ def _break_world_contextmanager(name):
         return "Hello, {}".format(name)
 
 
+@sentry_sdk.monitor(monitor_slug="ghi789", monitor_config=None)
+def _no_monitor_config():
+    return
+
+
+@sentry_sdk.monitor(
+    monitor_slug="ghi789",
+    monitor_config={
+        "schedule": {"type": "crontab", "value": "0 0 * * *"},
+        "failure_issue_threshold": 5,
+    },
+)
+def _with_monitor_config():
+    return
+
+
 def test_decorator(sentry_init):
     sentry_init()
 
@@ -45,7 +61,9 @@ def test_decorator(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="abc123", status="in_progress"),
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -70,7 +88,9 @@ def test_decorator_error(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="def456", status="in_progress"),
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -93,7 +113,9 @@ def test_contextmanager(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="abc123", status="in_progress"),
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -118,7 +140,9 @@ def test_contextmanager_error(sentry_init):
         # Check for initial checkin
         fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="def456", status="in_progress"),
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
@@ -194,6 +218,8 @@ def test_monitor_config(sentry_init, capture_envelopes):
 
     monitor_config = {
         "schedule": {"type": "crontab", "value": "0 0 * * *"},
+        "failure_issue_threshold": 5,
+        "recovery_threshold": 5,
     }
 
     capture_checkin(monitor_slug="abc123", monitor_config=monitor_config)
@@ -209,6 +235,41 @@ def test_monitor_config(sentry_init, capture_envelopes):
 
     assert check_in["monitor_slug"] == "abc123"
     assert "monitor_config" not in check_in
+
+
+def test_decorator_monitor_config(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    _with_monitor_config()
+
+    assert len(envelopes) == 2
+
+    for check_in_envelope in envelopes:
+        assert len(check_in_envelope.items) == 1
+        check_in = check_in_envelope.items[0].payload.json
+
+        assert check_in["monitor_slug"] == "ghi789"
+        assert check_in["monitor_config"] == {
+            "schedule": {"type": "crontab", "value": "0 0 * * *"},
+            "failure_issue_threshold": 5,
+        }
+
+
+def test_decorator_no_monitor_config(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    _no_monitor_config()
+
+    assert len(envelopes) == 2
+
+    for check_in_envelope in envelopes:
+        assert len(check_in_envelope.items) == 1
+        check_in = check_in_envelope.items[0].payload.json
+
+        assert check_in["monitor_slug"] == "ghi789"
+        assert "monitor_config" not in check_in
 
 
 def test_capture_checkin_sdk_not_initialized():
