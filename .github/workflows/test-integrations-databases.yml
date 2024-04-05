@@ -48,7 +48,7 @@ jobs:
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: my_db
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
@@ -126,7 +126,7 @@ jobs:
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: my_db
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
