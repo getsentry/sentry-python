@@ -40,7 +40,9 @@ def test_orm_queries(sentry_init, capture_events):
         person_id = Column(Integer, ForeignKey("person.id"))
         person = relationship(Person)
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)  # noqa: N806
@@ -100,7 +102,9 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
         person_id = Column(Integer, ForeignKey("person.id"))
         person = relationship(Person)
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)  # noqa: N806
@@ -171,7 +175,9 @@ def test_transactions_no_engine_url(sentry_init, capture_events):
         person_id = Column(Integer, ForeignKey("person.id"))
         person = relationship(Person)
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     engine.url = None
     Base.metadata.create_all(engine)
 
@@ -207,7 +213,9 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     )
     events = capture_events()
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     with start_transaction(name="test"):
         with engine.connect() as con:
             con.execute(text(" UNION ".join("SELECT {}".format(i) for i in range(100))))
@@ -234,7 +242,9 @@ def test_large_event_not_truncated(sentry_init, capture_events):
         event["message"] = long_str
         return event
 
-    engine = create_engine("sqlite:///:memory:?check_same_thread=false")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     with start_transaction(name="test"):
         with engine.connect() as con:
             for _ in range(1500):
@@ -274,7 +284,9 @@ def test_engine_name_not_string(sentry_init):
         integrations=[SqlalchemyIntegration()],
     )
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     engine.dialect.name = b"sqlite"
 
     with engine.connect() as con:
@@ -301,7 +313,9 @@ def test_query_source_disabled(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -351,7 +365,9 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -396,7 +412,9 @@ def test_query_source(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -464,7 +482,9 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -520,7 +540,9 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -584,7 +606,9 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
