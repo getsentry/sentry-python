@@ -6,5 +6,5 @@ import pytest
 # (we have "default" and "postgres" at the time of writing this)
 try:
     pytest_mark_django_db = partial(pytest.mark.django_db, databases="__all__")
-except Exception:
+except (TypeError, ValueError, AttributeError):
     pytest_mark_django_db = partial(pytest.mark.django_db)
