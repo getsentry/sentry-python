@@ -744,8 +744,13 @@ class Scope(object):
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
-        profile = Profile(transaction, hub=hub)
-        profile._set_initial_sampling_decision(sampling_context=sampling_context)
+        if transaction.sampled:
+            profile = Profile(
+                transaction.sampled, transaction._start_timestamp_monotonic_ns, hub=hub
+            )
+            profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
+            transaction._profile = profile
 
         try_ensure_continuous_profiler_running()
 

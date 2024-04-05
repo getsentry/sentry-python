@@ -63,7 +63,6 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing_extensions import TypedDict
 
-    import sentry_sdk.tracing
     from sentry_sdk._types import Event, SamplingContext, ProfilerMode
 
     ThreadId = str
@@ -378,7 +377,8 @@ MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 class Profile(object):
     def __init__(
         self,
-        transaction,  # type: sentry_sdk.tracing.Transaction
+        sampled,  # type: Optional[bool]
+        start_ns,  # type: int
         hub=None,  # type: Optional[sentry_sdk.Hub]
         scheduler=None,  # type: Optional[Scheduler]
     ):
@@ -388,11 +388,7 @@ class Profile(object):
 
         self.event_id = uuid.uuid4().hex  # type: str
 
-        # Here, we assume that the sampling decision on the transaction has been finalized.
-        #
-        # We cannot keep a reference to the transaction around here because it'll create
-        # a reference cycle. So we opt to pull out just the necessary attributes.
-        self.sampled = transaction.sampled  # type: Optional[bool]
+        self.sampled = sampled  # type: Optional[bool]
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
@@ -400,7 +396,7 @@ class Profile(object):
         self.active_thread_id = None  # type: Optional[int]
 
         try:
-            self.start_ns = transaction._start_timestamp_monotonic_ns  # type: int
+            self.start_ns = start_ns  # type: int
         except AttributeError:
             self.start_ns = 0
 
@@ -414,8 +410,6 @@ class Profile(object):
         self.samples = []  # type: List[ProcessedSample]
 
         self.unique_samples = 0
-
-        transaction._profile = self
 
     def update_active_thread_id(self):
         # type: () -> None

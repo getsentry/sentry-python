@@ -663,8 +663,7 @@ def test_max_profile_duration_reached(scheduler_class):
     ]
 
     with scheduler_class(frequency=1000) as scheduler:
-        transaction = Transaction(sampled=True)
-        with Profile(transaction, scheduler=scheduler) as profile:
+        with Profile(True, 0, scheduler=scheduler) as profile:
             # profile just started, it's active
             assert profile.active
 
@@ -819,8 +818,7 @@ def test_profile_processing(
     expected,
 ):
     with NoopScheduler(frequency=1000) as scheduler:
-        transaction = Transaction(sampled=True)
-        with Profile(transaction, scheduler=scheduler) as profile:
+        with Profile(True, 0, scheduler=scheduler) as profile:
             for ts, sample in samples:
                 # force the sample to be written at a time relative to the
                 # start of the profile
