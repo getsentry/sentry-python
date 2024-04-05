@@ -234,7 +234,9 @@ def test_large_event_not_truncated(sentry_init, capture_events):
         event["message"] = long_str
         return event
 
-    engine = create_engine("sqlite:///:memory:?check_same_thread=false")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     with start_transaction(name="test"):
         with engine.connect() as con:
             for _ in range(1500):
