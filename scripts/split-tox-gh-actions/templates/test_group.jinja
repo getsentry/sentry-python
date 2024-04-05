@@ -57,9 +57,11 @@
       - name: Setup Test Env
         run: |
           pip install coverage tox
+          {% if needs_postgres %}
           set -x # print commands that are executed
           export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_{{ category }}          
           psql postgresql://postgres:sentry@localhost:5432 -c "drop database if exists test_${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
+          {% endif %}
 
       - name: Erase coverage
         run: |
