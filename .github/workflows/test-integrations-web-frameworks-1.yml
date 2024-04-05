@@ -121,7 +121,7 @@ jobs:
     env:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
+      SENTRY_PYTHON_TEST_POSTGRES_NAME: django_db
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
@@ -130,7 +130,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
+          set -x # print commands that are executed
           pip install coverage tox
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
       - name: Erase coverage
@@ -139,6 +141,7 @@ jobs:
       - name: Test django pinned
         run: |
           set -x # print commands that are executed
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test flask pinned
         run: |
