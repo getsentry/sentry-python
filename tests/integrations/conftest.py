@@ -29,3 +29,13 @@ def capture_exceptions(monkeypatch):
         return errors
 
     return inner
+
+
+@pytest.fixture(scope='session')
+def django_db_setup():
+    print("Setting up Django database #################################################")
+    # settings.DATABASES['default'] = {
+    #     'ENGINE': 'django.db.backends.mysql',
+    #     'HOST': 'db.example.com',
+    #     'NAME': 'external_db',
+    # }
