@@ -1,6 +1,7 @@
 pip
 pytest
 pytest-cov
+pytest-django
 pytest-forked
 pytest-localserver
 pytest-watch
