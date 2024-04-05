@@ -5,7 +5,7 @@ from werkzeug.test import Client
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.conftest import werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
-from tests.integrations.django.utils import pytest_mark_django_db_decorator
+from tests.integrations.django.utils import pytest_mark_django_db
 
 try:
     from django.urls import reverse
@@ -19,7 +19,7 @@ def client():
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
+@pytest_mark_django_db()
 def test_scrub_django_session_cookies_removed(
     sentry_init,
     client,
@@ -37,7 +37,7 @@ def test_scrub_django_session_cookies_removed(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
+@pytest_mark_django_db()
 def test_scrub_django_session_cookies_filtered(
     sentry_init,
     client,
@@ -59,7 +59,7 @@ def test_scrub_django_session_cookies_filtered(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
+@pytest_mark_django_db()
 def test_scrub_django_custom_session_cookies_filtered(
     sentry_init,
     client,
