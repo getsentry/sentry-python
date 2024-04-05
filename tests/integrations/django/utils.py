@@ -2,6 +2,9 @@ from functools import partial
 
 import pytest
 
-# Request access to all configured databases 
-# (we have "default" and "postgres")
-pytest_mark_django_db = partial(pytest.mark.django_db, databases="__all__")
+# Request access to all configured databases
+# (we have "default" and "postgres" at the time of writing this)
+try:
+    pytest_mark_django_db = partial(pytest.mark.django_db, databases="__all__")
+except Exception:
+    pytest_mark_django_db = partial(pytest.mark.django_db)

@@ -29,4 +29,3 @@ def capture_exceptions(monkeypatch):
         return errors
 
     return inner
-
