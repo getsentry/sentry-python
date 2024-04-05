@@ -61,7 +61,7 @@ jobs:
         run: |
           pip install coverage tox
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           psql postgresql://postgres:sentry@localhost:5432 -c "drop database if exists ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
@@ -71,32 +71,32 @@ jobs:
       - name: Test asyncpg latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test redis latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test rediscluster latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
@@ -149,7 +149,7 @@ jobs:
         run: |
           pip install coverage tox
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           psql postgresql://postgres:sentry@localhost:5432 -c "drop database if exists ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
           psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
@@ -159,32 +159,32 @@ jobs:
       - name: Test asyncpg pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test redis pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test rediscluster pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}          
+          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
