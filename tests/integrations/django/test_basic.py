@@ -28,7 +28,7 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span
 from tests.conftest import ApproxDict, unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
-from tests.integrations.django.utils import pytest_mark_django_db
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 DJANGO_VERSION = DJANGO_VERSION[:2]
 
@@ -275,7 +275,7 @@ def test_trace_from_headers_if_performance_disabled(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -297,7 +297,7 @@ def test_user_captured(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
@@ -358,7 +358,7 @@ def test_management_command_raises():
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(sentry_init, capture_events, with_integration):
     sentry_init(
@@ -391,7 +391,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 def test_sql_dict_query_params(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -426,7 +426,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 def test_response_trace(sentry_init, client, capture_events, render_span_tree):
     pytest.importorskip("rest_framework")
     sentry_init(
@@ -456,7 +456,7 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
     ],
 )
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -488,7 +488,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -548,7 +548,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_trace(sentry_init, client, capture_events, render_span_tree):
     """
     Verify we record a span when opening a new database.
@@ -585,7 +585,7 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_breadcrumbs(sentry_init, capture_events):
     """
     Verify we record a breadcrumb when opening a new database.
@@ -621,7 +621,7 @@ def test_django_connect_breadcrumbs(sentry_init, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_db_connection_span_data(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -1119,7 +1119,7 @@ def test_get_receiver_name():
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_middleware(
     sentry_init, client, capture_events, use_django_caching_with_middlewares
@@ -1145,7 +1145,7 @@ def test_cache_spans_disabled_middleware(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_decorator(
     sentry_init, client, capture_events, use_django_caching
@@ -1171,7 +1171,7 @@ def test_cache_spans_disabled_decorator(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_disabled_templatetag(
     sentry_init, client, capture_events, use_django_caching
@@ -1197,7 +1197,7 @@ def test_cache_spans_disabled_templatetag(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_middleware(
     sentry_init, client, capture_events, use_django_caching_with_middlewares
@@ -1243,7 +1243,7 @@ def test_cache_spans_middleware(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
@@ -1285,7 +1285,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
 
 
 @pytest.mark.forked
-@pytest_mark_django_db()
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 def test_cache_spans_templatetag(
     sentry_init, client, capture_events, use_django_caching

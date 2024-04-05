@@ -19,7 +19,7 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
 
 from tests.conftest import unpack_werkzeug_response
-from tests.integrations.django.utils import pytest_mark_django_db
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
 
 
@@ -29,7 +29,7 @@ def client():
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_disabled(sentry_init, client, capture_events):
     sentry_options = {
         "integrations": [DjangoIntegration()],
@@ -67,7 +67,7 @@ def test_query_source_disabled(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 @pytest.mark.parametrize("enable_db_query_source", [None, True])
 def test_query_source_enabled(
     sentry_init, client, capture_events, enable_db_query_source
@@ -111,7 +111,7 @@ def test_query_source_enabled(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -164,7 +164,7 @@ def test_query_source(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_with_module_in_search_path(sentry_init, client, capture_events):
     """
     Test that query source is relative to the path of the module it ran in
@@ -218,7 +218,7 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -281,7 +281,7 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_with_in_app_include(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -327,7 +327,7 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_no_query_source_if_duration_too_short(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -385,7 +385,7 @@ def test_no_query_source_if_duration_too_short(sentry_init, client, capture_even
 
 
 @pytest.mark.forked
-@pytest_mark_django_db(transaction=True)
+@pytest_mark_django_db_decorator(transaction=True)
 def test_query_source_if_duration_over_threshold(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
