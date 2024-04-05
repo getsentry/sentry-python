@@ -58,7 +58,7 @@ def parse_metrics(bytes):
 
 @minimum_python_37_with_gevent
 @pytest.mark.forked
-def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
+def test_increment(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
@@ -67,7 +67,8 @@ def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    metrics.increment("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    # python specific alias
     metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
     Hub.current.flush()
 
@@ -487,8 +488,8 @@ def test_multiple(sentry_init, capture_envelopes):
     metrics.gauge("my-gauge", 20.0, tags={"x": "y"}, timestamp=ts)
     metrics.gauge("my-gauge", 30.0, tags={"x": "y"}, timestamp=ts)
     for _ in range(10):
-        metrics.incr("counter-1", 1.0, timestamp=ts)
-    metrics.incr("counter-2", 1.0, timestamp=ts)
+        metrics.increment("counter-1", 1.0, timestamp=ts)
+    metrics.increment("counter-2", 1.0, timestamp=ts)
 
     Hub.current.flush()
 
@@ -589,7 +590,7 @@ def test_metric_summaries(
     with start_transaction(
         op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
     ) as transaction:
-        metrics.incr("root-counter", timestamp=ts)
+        metrics.increment("root-counter", timestamp=ts)
         with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
             for x in range(10):
                 metrics.distribution("my-dist", float(x), timestamp=ts)
@@ -859,7 +860,7 @@ def test_before_emit_metric(
         tags["extra"] = "foo"
         del tags["release"]
         # this better be a noop!
-        metrics.incr("shitty-recursion")
+        metrics.increment("shitty-recursion")
         return True
 
     sentry_init(
@@ -873,8 +874,8 @@ def test_before_emit_metric(
     )
     envelopes = capture_envelopes()
 
-    metrics.incr("removed-metric", 1.0)
-    metrics.incr("actual-metric", 1.0)
+    metrics.increment("removed-metric", 1.0)
+    metrics.increment("actual-metric", 1.0)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -906,7 +907,7 @@ def test_aggregator_flush(
     )
     envelopes = capture_envelopes()
 
-    metrics.incr("a-metric", 1.0)
+    metrics.increment("a-metric", 1.0)
     Hub.current.flush()
 
     assert len(envelopes) == 1
@@ -925,7 +926,7 @@ def test_tag_serialization(
     )
     envelopes = capture_envelopes()
 
-    metrics.incr(
+    metrics.increment(
         "counter",
         tags={
             "no-value": None,
@@ -970,12 +971,12 @@ def test_flush_recursion_protection(
     real_capture_envelope = test_client.transport.capture_envelope
 
     def bad_capture_envelope(*args, **kwargs):
-        metrics.incr("bad-metric")
+        metrics.increment("bad-metric")
         return real_capture_envelope(*args, **kwargs)
 
     monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
 
-    metrics.incr("counter")
+    metrics.increment("counter")
 
     # flush twice to see the inner metric
     Hub.current.flush()
@@ -1004,12 +1005,12 @@ def test_flush_recursion_protection_background_flush(
     real_capture_envelope = test_client.transport.capture_envelope
 
     def bad_capture_envelope(*args, **kwargs):
-        metrics.incr("bad-metric")
+        metrics.increment("bad-metric")
         return real_capture_envelope(*args, **kwargs)
 
     monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
 
-    metrics.incr("counter")
+    metrics.increment("counter")
 
     # flush via sleep and flag
     Hub.current.client.metrics_aggregator._force_flush = True
