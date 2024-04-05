@@ -238,7 +238,7 @@ def test_large_event_not_truncated(sentry_init, capture_events):
         "sqlite:///:memory:", connect_args={"check_same_thread": False}
     )
     with start_transaction(name="test"):
-        with engine.connect() as con:
+        with engine.connect(check_same_thread=False) as con:
             for _ in range(1500):
                 con.execute(
                     text(" UNION ".join("SELECT {}".format(i) for i in range(100)))
