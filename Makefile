@@ -56,12 +56,12 @@ apidocs: .venv
 	uv pip install --editable .
 	uv pip install -U -r ./docs-requirements.txt
 	rm -rf docs/_build
-	@sphinx-build -vv -W -b html docs/ docs/_build
+	sphinx-build -vv -W -b html docs/ docs/_build
 .PHONY: apidocs
 
 apidocs-hotfix: apidocs
 	uv pip install ghp-import
-	@ghp-import -pf docs/_build
+	ghp-import -pf docs/_build
 .PHONY: apidocs-hotfix
 
 aws-lambda-layer: dist
