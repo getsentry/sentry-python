@@ -73,14 +73,16 @@ _sanitize_tag_key = partial(re.compile(r"[^\w\-.\/]+", re.UNICODE).sub, "")
 def _sanitize_tag_value(value):
     # type: (str) -> str
     return value.translate(
-        {
-            "\n": "\\n",
-            "\r": "\\r",
-            "\t": "\\t",
-            "\\": "\\\\",
-            "|": "\\u{7c}",
-            ",": "\\u{2c}",
-        }
+        str.maketrans(
+            {
+                "\n": "\\n",
+                "\r": "\\r",
+                "\t": "\\t",
+                "\\": "\\\\",
+                "|": "\\u{7c}",
+                ",": "\\u{2c}",
+            }
+        )
     )
 
 
