@@ -808,12 +808,12 @@ def test_tag_normalization(
     ts = time.time()
     envelopes = capture_envelopes()
 
-    # fmt: off
     metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
     metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
+    # fmt: off
     metrics.distribution("c", 1.0, tags={u"foö-bar": u"snöwmän"}, timestamp=ts)
-    metrics.distribution("d", 1.0, tags={"route": "GET /foo"}, timestamp=ts)
     # fmt: on
+    metrics.distribution("d", 1.0, tags={"route": "GET /foo"}, timestamp=ts)
     Hub.current.flush()
 
     (envelope,) = envelopes
@@ -824,29 +824,27 @@ def test_tag_normalization(
 
     assert len(m) == 4
     assert m[0][4] == {
-        "foo-bar": "$foo",
+        "foo-bar": "%$foo",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
-
     assert m[1][4] == {
-        "foo_bar": "blah{}",
+        "foobar": "blah{}",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
-
     # fmt: off
     assert m[2][4] == {
-        "fo_-bar": u"snöwmän",
+        u"foö-bar": u"snöwmän",
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
     }
+    # fmt: on
     assert m[3][4] == {
         "release": "fun-release@1.0.0",
         "environment": "not-fun-env",
         "route": "GET /foo",
     }
-    # fmt: on
 
 
 @minimum_python_37_with_gevent
