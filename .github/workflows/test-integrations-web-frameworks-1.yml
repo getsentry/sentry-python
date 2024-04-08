@@ -138,7 +138,7 @@ jobs:
           set -x # print commands that are executed
           . .venv/bin/activate
           uv pip list
-          tox -v
+          tox --version
           which tox
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test flask pinned
