@@ -59,9 +59,6 @@
           uv venv
           . .venv/bin/activate
           uv pip install coverage tox
-
-      - name: Erase coverage
-        run: |
           coverage erase
 
       {% for framework in frameworks %}

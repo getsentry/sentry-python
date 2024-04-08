@@ -77,8 +77,6 @@ jobs:
           uv venv
           . .venv/bin/activate
           uv pip install coverage tox
-      - name: Erase coverage
-        run: |
           coverage erase
       - name: Test aws_lambda pinned
         run: |

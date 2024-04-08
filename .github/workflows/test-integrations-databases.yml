@@ -61,8 +61,6 @@ jobs:
           uv venv
           . .venv/bin/activate
           uv pip install coverage tox
-      - name: Erase coverage
-        run: |
           coverage erase
       - name: Test asyncpg latest
         run: |
@@ -139,8 +137,6 @@ jobs:
           uv venv
           . .venv/bin/activate
           uv pip install coverage tox
-      - name: Erase coverage
-        run: |
           coverage erase
       - name: Test asyncpg pinned
         run: |
