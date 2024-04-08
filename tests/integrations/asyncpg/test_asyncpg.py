@@ -16,7 +16,7 @@ PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
 PG_PORT = 5432
 PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
 PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
-PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "asyncpg_test_db")
+PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 
 import datetime
 from contextlib import contextmanager
