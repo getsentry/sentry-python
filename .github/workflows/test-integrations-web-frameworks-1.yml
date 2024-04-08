@@ -47,10 +47,9 @@ jobs:
           - 5432:5432
     env:
       MATRIX_PYTHON_VERSION: ${{ matrix.python-version }}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: my_db
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
       - uses: actions/setup-python@v5
@@ -59,31 +58,24 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage tox
-          set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest          
-          psql postgresql://postgres:sentry@localhost:5432 -c "drop database if exists test_${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
       - name: Erase coverage
         run: |
           coverage erase
       - name: Test django latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test flask latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-flask-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test starlette latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test fastapi latest
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_latest
           ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
@@ -122,10 +114,9 @@ jobs:
           - 5432:5432
     env:
       MATRIX_PYTHON_VERSION: ${{ matrix.python-version }}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: my_db
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
       - uses: actions/setup-python@v5
@@ -134,31 +125,24 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install coverage tox
-          set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned          
-          psql postgresql://postgres:sentry@localhost:5432 -c "drop database if exists test_${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
       - name: Erase coverage
         run: |
           coverage erase
       - name: Test django pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test flask pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-flask" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test starlette pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlette" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test fastapi pinned
         run: |
           set -x # print commands that are executed
-          export SENTRY_PYTHON_TEST_POSTGRES_NAME=${SENTRY_PYTHON_TEST_POSTGRES_NAME}_${MATRIX_PYTHON_VERSION/\./}_pinned
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
