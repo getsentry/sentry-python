@@ -39,8 +39,6 @@ class LayerBuilder:
         # because Lambda does not support the newest versions of some packages)
         subprocess.check_call(
             [
-                sys.executable,
-                "-m",
                 "pip",
                 "install",
                 "-r",

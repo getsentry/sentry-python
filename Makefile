@@ -15,22 +15,26 @@ help:
 	@false
 
 .venv:
-	virtualenv -ppython3 $(VENV_PATH)
-	$(VENV_PATH)/bin/pip install tox
+	pip install uv
+	uv venv $(VENV_PATH)
+	. $(VENV_PATH)/bin/activate
+	uv pip install tox tox-uv
 
 dist: .venv
 	rm -rf dist dist-serverless build
-	$(VENV_PATH)/bin/pip install wheel setuptools
-	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
+	uv pip install wheel setuptools
+	python setup.py sdist bdist_wheel
+
 .PHONY: dist
 
 format: .venv
-	$(VENV_PATH)/bin/tox -e linters --notest
-	.tox/linters/bin/black .
+	uv pip install black
+	black .
+
 .PHONY: format
 
 test: .venv
-	@$(VENV_PATH)/bin/tox -e py3.12
+	tox -e py3.12
 .PHONY: test
 
 test-all: .venv
@@ -41,7 +45,7 @@ check: lint test
 .PHONY: check
 
 lint: .venv
-	@set -e && $(VENV_PATH)/bin/tox -e linters || ( \
+	@set -e && tox -e linters || ( \
 		echo "================================"; \
 		echo "Bad formatting? Run: make format"; \
 		echo "================================"; \
@@ -49,18 +53,18 @@ lint: .venv
 .PHONY: lint
 
 apidocs: .venv
-	@$(VENV_PATH)/bin/pip install --editable .
-	@$(VENV_PATH)/bin/pip install -U -r ./docs-requirements.txt
+	uv pip install --editable .
+	uv pip install -U -r ./docs-requirements.txt
 	rm -rf docs/_build
-	@$(VENV_PATH)/bin/sphinx-build -vv -W -b html docs/ docs/_build
+	@sphinx-build -vv -W -b html docs/ docs/_build
 .PHONY: apidocs
 
 apidocs-hotfix: apidocs
-	@$(VENV_PATH)/bin/pip install ghp-import
-	@$(VENV_PATH)/bin/ghp-import -pf docs/_build
+	uv pip install ghp-import
+	@ghp-import -pf docs/_build
 .PHONY: apidocs-hotfix
 
 aws-lambda-layer: dist
-	$(VENV_PATH)/bin/pip install -r aws-lambda-layer-requirements.txt
-	$(VENV_PATH)/bin/python -m scripts.build_aws_lambda_layer
+	uv pip install -r aws-lambda-layer-requirements.txt
+	python -m scripts.build_aws_lambda_layer
 .PHONY: aws-lambda-layer
