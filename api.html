@@ -4,14 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Top Level API - sentry-python 2.0.0rc4 documentation</title>
+      <title>Top Level API - sentry-python 2.0.0rc3 documentation</title>
     <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" />
 
   <script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(sessionStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=aecf457f" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=d42a0c83" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=aa21bc99" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,6 +36,7 @@
     <div class="sy-head-links" id="NavLinks">
       <nav class="sy-head-nav"></nav>
       <div class="sy-head-extra flex items-center print:hidden">
+        
 <form class="searchbox flex items-center" action="search.html" method="get">
   <input type="text" name="q" placeholder="Search" />
   <kbd>/</kbd>
@@ -528,13 +529,13 @@ be used to pop the scope again.</p>
 <p>Context manager that forks the current scope and runs the wrapped code in it.
 After the wrapped code is executed, the original scope is restored.</p>
 <p>Example Usage:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="kn">import</span> <span class="nn">sentry_sdk</span>
-</span><span id="1-2">
-</span><span id="1-3"><span class="k">with</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">new_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
-</span><span id="1-4">    <span class="n">scope</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="s2">&quot;color&quot;</span><span class="p">,</span> <span class="s2">&quot;green&quot;</span><span class="p">)</span>
-</span><span id="1-5">    <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span> <span class="c1"># will include `color` tag.</span>
-</span><span id="1-6">
-</span><span id="1-7"><span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello, again&quot;</span><span class="p">)</span> <span class="c1"># will NOT include `color` tag.</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span data-line="1"><span class="kn">import</span> <span class="nn">sentry_sdk</span>
+</span><span data-line="2">
+</span><span data-line="3"><span class="k">with</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">new_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">scope</span><span class="p">:</span>
+</span><span data-line="4">    <span class="n">scope</span><span class="o">.</span><span class="n">set_tag</span><span class="p">(</span><span class="s2">&quot;color&quot;</span><span class="p">,</span> <span class="s2">&quot;green&quot;</span><span class="p">)</span>
+</span><span data-line="5">    <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span> <span class="c1"># will include `color` tag.</span>
+</span><span data-line="6">
+</span><span data-line="7"><span class="n">sentry_sdk</span><span class="o">.</span><span class="n">capture_message</span><span class="p">(</span><span class="s2">&quot;hello, again&quot;</span><span class="p">)</span> <span class="c1"># will NOT include `color` tag.</span>
 </span></pre></div>
 </div>
 <dl class="field-list simple">
@@ -548,6 +549,12 @@ After the wrapped code is executed, the original scope is restored.</p>
 </section>
 
         </article>
+        <button class="back-to-top" type="button">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+  </svg>
+  <span>Back to top</span>
+</button>
         
         <div class="navigation flex print:hidden">
   <div class="navigation-prev">
@@ -596,10 +603,10 @@ After the wrapped code is executed, the original scope is restored.</p>
     </div>
   </div>
 </footer></div>
-      <script src="_static/documentation_options.js?v=aa9da443"></script>
+      <script src="_static/documentation_options.js?v=6114348e"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="_static/shibuya.js?v=999236dc"></script>
+      <script src="_static/shibuya.js?v=9aab5f5b"></script>
     
 </body>
 </html>
