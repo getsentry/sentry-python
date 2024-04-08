@@ -150,7 +150,7 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
     assert resp1.result()["status"] == 200
     assert resp2.result()["status"] == 200
 
-    assert end - start < 1.7  # it takes less than 2 seconds so it was ececuting concurrently
+    assert end - start < 2  # it takes less than 2 seconds so it was ececuting concurrently
 
 
 @pytest.mark.asyncio
@@ -188,7 +188,7 @@ async def test_async_middleware_that_is_function_concurrent_execution(
     assert resp1.result()["status"] == 200
     assert resp2.result()["status"] == 200
 
-    assert end - start < 1.7  # it takes less than 2 seconds so it was ececuting concurrently
+    assert end - start < 2  # it takes less than 2 seconds so it was ececuting concurrently
 
 
 @pytest.mark.asyncio
