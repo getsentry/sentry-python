@@ -30,8 +30,7 @@ jobs:
           python-version: 3.12
 
       - run: |
-          pip install uv
-          uv pip install tox tox-uv
+          pip install tox tox-uv
           tox -e linters
 
   check-ci-config:

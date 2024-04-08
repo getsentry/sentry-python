@@ -74,6 +74,8 @@ jobs:
       - name: Setup Test Env
         run: |
           pip install uv
+          uv venv
+          . .venv/bin/activate
           uv pip install coverage tox
       - name: Erase coverage
         run: |
