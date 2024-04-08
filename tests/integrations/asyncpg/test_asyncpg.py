@@ -12,11 +12,11 @@ The tests use the following credentials to establish a database connection.
 import os
 
 
-PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
-PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "foo")
-PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "bar")
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
 PG_PORT = 5432
+PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
+PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
+PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "asyncpg_test_db")
 
 import datetime
 from contextlib import contextmanager

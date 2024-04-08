@@ -124,9 +124,9 @@ try:
         "ENGINE": db_engine,
         "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
         "PORT": 5432,
-        "NAME": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_NAME", f"myapp_db_{random.randint(0, 1000)}"),
         "USER": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres"),
-        "PASSWORD": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "postgres"),
+        "PASSWORD": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry"),
+        "NAME": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_NAME", f"myapp_db_{random.randint(0, 1000)}"),
     }
 except (ImportError, KeyError):
     from sentry_sdk.utils import logger

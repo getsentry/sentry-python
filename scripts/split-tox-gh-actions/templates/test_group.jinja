@@ -32,7 +32,6 @@
         ports:
           - 5432:5432
     env:
-      MATRIX_PYTHON_VERSION: {% raw %}${{ matrix.python-version }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
