@@ -32,10 +32,10 @@
         ports:
           - 5432:5432
     env:
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
+
     {% endif %}
 
     steps:
@@ -56,10 +56,6 @@
       - name: Setup Test Env
         run: |
           pip install coverage tox
-          {% if needs_postgres %}
-          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
-          {% endif %}
 
       - name: Erase coverage
         run: |
@@ -69,7 +65,6 @@
       - name: Test {{ framework }} {{ category }}
         run: |
           set -x # print commands that are executed
-
           {% if category == "pinned" %}
           ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           {% elif category == "latest" %}

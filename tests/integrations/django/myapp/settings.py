@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.0/ref/settings/
 """
 
+import random
+
 # We shouldn't access settings while setting up integrations. Initialize SDK
 # here to provoke any errors that might occur.
 import sentry_sdk
@@ -121,11 +123,13 @@ try:
 
     DATABASES["postgres"] = {
         "ENGINE": db_engine,
-        "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
-        "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
-        "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
         "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
         "PORT": 5432,
+        "USER": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres"),
+        "PASSWORD": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry"),
+        "NAME": os.environ.get(
+            "SENTRY_PYTHON_TEST_POSTGRES_NAME", f"myapp_db_{random.randint(0, 1000)}"
+        ),
     }
 except (ImportError, KeyError):
     from sentry_sdk.utils import logger
