@@ -79,6 +79,7 @@ jobs:
           ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
+          . .venv/bin/activate
           coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v4
@@ -146,6 +147,7 @@ jobs:
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
+          . .venv/bin/activate
           coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v4

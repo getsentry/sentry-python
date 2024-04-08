@@ -74,6 +74,7 @@
 
       - name: Generate coverage XML
         run: |
+          . .venv/bin/activate
           coverage combine .coverage*
           coverage xml -i
 
