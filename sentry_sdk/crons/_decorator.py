@@ -4,8 +4,16 @@ from inspect import iscoroutinefunction
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-    from typing import Any, cast, overload, ParamSpec, TypeVar, Union
+    from typing import (
+        Any,
+        Awaitable,
+        Callable,
+        cast,
+        overload,
+        ParamSpec,
+        TypeVar,
+        Union,
+    )
 
     P = ParamSpec("P")
     R = TypeVar("R")
