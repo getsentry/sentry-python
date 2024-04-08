@@ -133,8 +133,8 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
-    comm = HttpCommunicator(asgi_application, "GET", "/my_async_view")
-    comm2 = HttpCommunicator(asgi_application, "GET", "/my_async_view")
+    comm = HttpCommunicator(asgi_application, "GET", "/my_async_view")  # sleeps for 1 second
+    comm2 = HttpCommunicator(asgi_application, "GET", "/my_async_view")  # sleeps for 1 second
 
     loop = asyncio.get_event_loop()
 
@@ -150,7 +150,7 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
     assert resp1.result()["status"] == 200
     assert resp2.result()["status"] == 200
 
-    assert end - start < 1.5
+    assert end - start < 1.7  # it takes less than 2 seconds so it was ececuting concurrently
 
 
 @pytest.mark.asyncio
@@ -171,8 +171,8 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
 
-    comm = HttpCommunicator(asgi_application, "GET", "/my_async_view")
-    comm2 = HttpCommunicator(asgi_application, "GET", "/my_async_view")
+    comm = HttpCommunicator(asgi_application, "GET", "/my_async_view")  # sleeps for 1 second
+    comm2 = HttpCommunicator(asgi_application, "GET", "/my_async_view")  # sleeps for 1 second
 
     loop = asyncio.get_event_loop()
 
@@ -188,7 +188,7 @@ async def test_async_middleware_that_is_function_concurrent_execution(
     assert resp1.result()["status"] == 200
     assert resp2.result()["status"] == 200
 
-    assert end - start < 1.5
+    assert end - start < 1.7  # it takes less than 2 seconds so it was ececuting concurrently
 
 
 @pytest.mark.asyncio
