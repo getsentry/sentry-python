@@ -38,28 +38,34 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox
-      - name: Erase coverage
-        run: |
+          pip install uv
+          uv venv
+          . .venv/bin/activate
+          uv pip install coverage tox tox-uv
           coverage erase
       - name: Test gevent latest
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test grpc latest
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh "py${{ matrix.python-version }}-grpc-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test httpx latest
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test requests latest
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh "py${{ matrix.python-version }}-requests-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
+          . .venv/bin/activate
           coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v4
@@ -86,28 +92,34 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox
-      - name: Erase coverage
-        run: |
+          pip install uv
+          uv venv
+          . .venv/bin/activate
+          uv pip install coverage tox tox-uv
           coverage erase
       - name: Test gevent pinned
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test grpc pinned
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test httpx pinned
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test requests pinned
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
+          . .venv/bin/activate
           coverage combine .coverage*
           coverage xml -i
       - uses: codecov/codecov-action@v4
