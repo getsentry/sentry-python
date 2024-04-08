@@ -76,11 +76,12 @@ jobs:
           pip install uv
           uv venv
           . .venv/bin/activate
-          uv pip install coverage tox
+          uv pip install coverage tox tox-uv
           coverage erase
       - name: Test aws_lambda pinned
         run: |
           set -x # print commands that are executed
+          . .venv/bin/activate
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
