@@ -17,6 +17,9 @@ class MonitorMixin:
         @overload
         def __call__(self, fn):
             # type: (Callable[P, Awaitable[Any]]) -> Callable[P, Awaitable[Any]]
+            # Unfortunately, mypy does not give us any reliable way to type check the
+            # return value of an Awaitable (i.e. async function) for this overload,
+            # since calling iscouroutinefunction narrows the type to Callable[P, Awaitable[Any]].
             ...
 
         @overload
