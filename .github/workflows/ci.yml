@@ -30,7 +30,8 @@ jobs:
           python-version: 3.12
 
       - run: |
-          pip install tox
+          pip install uv
+          uv pip install tox tox-uv
           tox -e linters
 
   check-ci-config:
@@ -45,7 +46,8 @@ jobs:
           python-version: 3.12
 
       - run: |
-          pip install jinja2
+          pip install uv
+          uv pip install jinja2
           python scripts/split-tox-gh-actions/split-tox-gh-actions.py --fail-on-changes
 
   build_lambda_layer:
@@ -67,7 +69,6 @@ jobs:
       - name: Build Packages
         run: |
           echo "Creating directory containing Python SDK Lambda Layer"
-          pip install virtualenv
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
       - name: Upload Python Packages
@@ -89,7 +90,6 @@ jobs:
           python-version: 3.12
 
       - run: |
-          pip install virtualenv
           make apidocs
           cd docs/_build && zip -r gh-pages ./
 
