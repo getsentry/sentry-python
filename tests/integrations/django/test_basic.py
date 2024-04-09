@@ -29,7 +29,7 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.tracing import Span
 from tests.conftest import ApproxDict, unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
-from tests.integrations.django.myapp.views import myapp_custom_signal_silenced
+from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 DJANGO_VERSION = DJANGO_VERSION[:2]
@@ -1040,7 +1040,7 @@ EXPECTED_SIGNALS_SPANS_FILTERED = """\
 - op="http.server": description=null
   - op="event.django": description="django.db.reset_queries"
   - op="event.django": description="django.db.close_old_connections"
-  - op="event.django": description="tests.integrations.django.myapp.views.signal_handler"\
+  - op="event.django": description="tests.integrations.django.myapp.signals.signal_handler"\
 """
 
 
@@ -1073,7 +1073,7 @@ def test_signals_spans_filtering(sentry_init, client, capture_events, render_spa
     assert transaction["spans"][2]["op"] == "event.django"
     assert (
         transaction["spans"][2]["description"]
-        == "tests.integrations.django.myapp.views.signal_handler"
+        == "tests.integrations.django.myapp.signals.signal_handler"
     )
 
 

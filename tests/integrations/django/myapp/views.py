@@ -2,8 +2,6 @@ import json
 import threading
 
 from django import VERSION
-from django.core import signals
-from django.dispatch import receiver
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -15,6 +13,11 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
+
+from tests.integrations.django.myapp.signals import (
+    myapp_custom_signal,
+    myapp_custom_signal_silenced,
+)
 
 try:
     from rest_framework.decorators import api_view
@@ -255,20 +258,6 @@ else:
     my_async_view = None
     thread_ids_async = None
     post_echo_async = None
-
-
-myapp_custom_signal = signals.Signal()
-myapp_custom_signal_silenced = signals.Signal()
-
-
-@receiver(myapp_custom_signal)
-def signal_handler(sender, **kwargs):
-    assert sender == "hello"
-
-
-@receiver(myapp_custom_signal_silenced)
-def signal_handler_silenced(sender, **kwargs):
-    assert sender == "hello"
 
 
 @csrf_exempt
