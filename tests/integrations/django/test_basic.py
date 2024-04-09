@@ -29,6 +29,7 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.tracing import Span
 from tests.conftest import ApproxDict, unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
+from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 DJANGO_VERSION = DJANGO_VERSION[:2]
@@ -1033,6 +1034,47 @@ def test_signals_spans_disabled(sentry_init, client, capture_events):
 
     assert message["message"] == "hi"
     assert not transaction["spans"]
+
+
+EXPECTED_SIGNALS_SPANS_FILTERED = """\
+- op="http.server": description=null
+  - op="event.django": description="django.db.reset_queries"
+  - op="event.django": description="django.db.close_old_connections"
+  - op="event.django": description="tests.integrations.django.myapp.signals.signal_handler"\
+"""
+
+
+def test_signals_spans_filtering(sentry_init, client, capture_events, render_span_tree):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=False,
+                signals_denylist=[
+                    myapp_custom_signal_silenced,
+                ],
+            ),
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("send_myapp_custom_signal"))
+
+    (transaction,) = events
+
+    assert render_span_tree(transaction) == EXPECTED_SIGNALS_SPANS_FILTERED
+
+    assert transaction["spans"][0]["op"] == "event.django"
+    assert transaction["spans"][0]["description"] == "django.db.reset_queries"
+
+    assert transaction["spans"][1]["op"] == "event.django"
+    assert transaction["spans"][1]["description"] == "django.db.close_old_connections"
+
+    assert transaction["spans"][2]["op"] == "event.django"
+    assert (
+        transaction["spans"][2]["description"]
+        == "tests.integrations.django.myapp.signals.signal_handler"
+    )
 
 
 def test_csrf(sentry_init, client):
