@@ -1,3 +1,8 @@
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping  # type: ignore[attr-defined]
+
 from importlib import import_module
 import os
 import uuid
@@ -5,6 +10,7 @@ import random
 import socket
 
 from sentry_sdk._compat import (
+    PY37,
     datetime_utcnow,
     string_types,
     text_type,
@@ -20,6 +26,7 @@ from sentry_sdk.utils import (
     get_type_name,
     get_default_release,
     handle_in_app,
+    is_gevent,
     logger,
 )
 from sentry_sdk.serializer import serialize
@@ -36,7 +43,7 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, setup_profiler
+from sentry_sdk.profiler import has_profiling_enabled, Profile, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight
@@ -145,6 +152,12 @@ def _get_options(*args, **kwargs):
 
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber()
+
+    if rv["socket_options"] and not isinstance(rv["socket_options"], list):
+        logger.warning(
+            "Ignoring socket_options because of unexpected format. See urllib3.HTTPConnection.socket_options for the expected format."
+        )
+        rv["socket_options"] = None
 
     return rv
 
@@ -256,14 +269,22 @@ class _Client(object):
             self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
             experiments = self.options.get("_experiments", {})
             if experiments.get("enable_metrics", True):
-                from sentry_sdk.metrics import MetricsAggregator
+                # Context vars are not working correctly on Python <=3.6
+                # with gevent.
+                metrics_supported = not is_gevent() or PY37
+                if metrics_supported:
+                    from sentry_sdk.metrics import MetricsAggregator
 
-                self.metrics_aggregator = MetricsAggregator(
-                    capture_func=_capture_envelope,
-                    enable_code_locations=bool(
-                        experiments.get("metric_code_locations", True)
-                    ),
-                )
+                    self.metrics_aggregator = MetricsAggregator(
+                        capture_func=_capture_envelope,
+                        enable_code_locations=bool(
+                            experiments.get("metric_code_locations", True)
+                        ),
+                    )
+                else:
+                    logger.info(
+                        "Metrics not supported on Python 3.6 and lower with gevent."
+                    )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:
@@ -377,7 +398,7 @@ class _Client(object):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = text_type(self.options[key]).strip()
+                event[key] = text_type(self.options[key]).strip()  # type: ignore[literal-required]
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -551,7 +572,7 @@ class _Client(object):
             errored = True
             for error in exceptions:
                 mechanism = error.get("mechanism")
-                if mechanism and mechanism.get("handled") is False:
+                if isinstance(mechanism, Mapping) and mechanism.get("handled") is False:
                     crashed = True
                     break
 
@@ -643,7 +664,7 @@ class _Client(object):
             headers = {
                 "event_id": event_opt["event_id"],
                 "sent_at": format_timestamp(datetime_utcnow()),
-            }
+            }  # type: dict[str, object]
 
             if dynamic_sampling_context:
                 headers["trace"] = dynamic_sampling_context
@@ -651,7 +672,7 @@ class _Client(object):
             envelope = Envelope(headers=headers)
 
             if is_transaction:
-                if profile is not None:
+                if isinstance(profile, Profile):
                     envelope.add_profile(profile.to_json(event_opt, self.options))
                 envelope.add_transaction(event_opt)
             elif is_checkin:

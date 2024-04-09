@@ -27,7 +27,7 @@ from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.tracing import Span
-from tests.conftest import unpack_werkzeug_response
+from tests.conftest import ApproxDict, unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.myapp.views import myapp_custom_signal_silenced
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -1279,14 +1279,14 @@ def test_cache_spans_middleware(
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert first_event["spans"][0]["data"] == {"cache.hit": False}
+    assert first_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert len(second_event["spans"]) == 2
     assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert second_event["spans"][0]["data"] == {"cache.hit": False}
+    assert second_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
@@ -1321,14 +1321,14 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert first_event["spans"][0]["data"] == {"cache.hit": False}
+    assert first_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert len(second_event["spans"]) == 2
     assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
-    assert second_event["spans"][0]["data"] == {"cache.hit": False}
+    assert second_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
@@ -1365,7 +1365,7 @@ def test_cache_spans_templatetag(
     assert first_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
-    assert first_event["spans"][0]["data"] == {"cache.hit": False}
+    assert first_event["spans"][0]["data"] == ApproxDict({"cache.hit": False})
 
     assert len(second_event["spans"]) == 1
     assert second_event["spans"][0]["op"] == "cache.get_item"

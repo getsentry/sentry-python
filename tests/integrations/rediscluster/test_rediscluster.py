@@ -4,6 +4,7 @@ from sentry_sdk import capture_message
 from sentry_sdk.api import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
+from tests.conftest import ApproxDict
 
 try:
     from unittest import mock
@@ -56,12 +57,14 @@ def test_rediscluster_basic(rediscluster_cls, sentry_init, capture_events):
     assert crumb == {
         "category": "redis",
         "message": "GET 'foobar'",
-        "data": {
-            "db.operation": "GET",
-            "redis.key": "foobar",
-            "redis.command": "GET",
-            "redis.is_cluster": True,
-        },
+        "data": ApproxDict(
+            {
+                "db.operation": "GET",
+                "redis.key": "foobar",
+                "redis.command": "GET",
+                "redis.is_cluster": True,
+            }
+        ),
         "timestamp": crumb["timestamp"],
         "type": "redis",
     }
@@ -96,16 +99,18 @@ def test_rediscluster_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == {
-        "redis.commands": {
-            "count": 3,
-            "first_ten": expected_first_ten,
-        },
-        SPANDATA.DB_SYSTEM: "redis",
-        SPANDATA.DB_NAME: "1",
-        SPANDATA.SERVER_ADDRESS: "localhost",
-        SPANDATA.SERVER_PORT: 63791,
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "redis.commands": {
+                "count": 3,
+                "first_ten": expected_first_ten,
+            },
+            SPANDATA.DB_SYSTEM: "redis",
+            SPANDATA.DB_NAME: "1",
+            SPANDATA.SERVER_ADDRESS: "localhost",
+            SPANDATA.SERVER_PORT: 63791,
+        }
+    )
     assert span["tags"] == {
         "redis.transaction": False,  # For Cluster, this is always False
         "redis.is_cluster": True,
@@ -127,12 +132,14 @@ def test_db_connection_attributes_client(sentry_init, capture_events, redisclust
     (event,) = events
     (span,) = event["spans"]
 
-    assert span["data"] == {
-        SPANDATA.DB_SYSTEM: "redis",
-        SPANDATA.DB_NAME: "1",
-        SPANDATA.SERVER_ADDRESS: "localhost",
-        SPANDATA.SERVER_PORT: 63791,
-    }
+    assert span["data"] == ApproxDict(
+        {
+            SPANDATA.DB_SYSTEM: "redis",
+            SPANDATA.DB_NAME: "1",
+            SPANDATA.SERVER_ADDRESS: "localhost",
+            SPANDATA.SERVER_PORT: 63791,
+        }
+    )
 
 
 @pytest.mark.parametrize("rediscluster_cls", rediscluster_classes)
@@ -155,13 +162,15 @@ def test_db_connection_attributes_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == {
-        "redis.commands": {
-            "count": 1,
-            "first_ten": ["GET 'foo'"],
-        },
-        SPANDATA.DB_SYSTEM: "redis",
-        SPANDATA.DB_NAME: "1",
-        SPANDATA.SERVER_ADDRESS: "localhost",
-        SPANDATA.SERVER_PORT: 63791,
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "redis.commands": {
+                "count": 1,
+                "first_ten": ["GET 'foo'"],
+            },
+            SPANDATA.DB_SYSTEM: "redis",
+            SPANDATA.DB_NAME: "1",
+            SPANDATA.SERVER_ADDRESS: "localhost",
+            SPANDATA.SERVER_PORT: 63791,
+        }
+    )

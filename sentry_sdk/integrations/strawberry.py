@@ -29,11 +29,11 @@ except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, List, Optional
+    from typing import Any, Callable, Generator, List, Optional
     from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 ignore_logger("strawberry.execution")
@@ -144,6 +144,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         operation_type = "query"
         op = OP.GRAPHQL_QUERY
+
+        if self.execution_context.query is None:
+            self.execution_context.query = ""
 
         if self.execution_context.query.strip().startswith("mutation"):
             operation_type = "mutation"
@@ -349,21 +352,21 @@ def _make_request_event_processor(execution_context):
     # type: (ExecutionContext) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    request_data["data"] = {"query": execution_context.query}
+                    data = {"query": execution_context.query}
 
                     if execution_context.variables:
-                        request_data["data"]["variables"] = execution_context.variables
+                        data["variables"] = execution_context.variables
                     if execution_context.operation_name:
-                        request_data["data"][
-                            "operationName"
-                        ] = execution_context.operation_name
+                        data["operationName"] = execution_context.operation_name
+
+                    request_data["data"] = data
 
             else:
                 try:
@@ -380,7 +383,7 @@ def _make_response_event_processor(response_data):
     # type: (GraphQLHTTPResponse) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
             if _should_send_default_pii():
                 contexts = event.setdefault("contexts", {})

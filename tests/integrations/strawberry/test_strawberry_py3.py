@@ -25,6 +25,7 @@ from sentry_sdk.integrations.strawberry import (
     SentryAsyncExtension,
     SentrySyncExtension,
 )
+from tests.conftest import ApproxDict
 
 
 parameterize_strawberry_test = pytest.mark.parametrize(
@@ -351,12 +352,14 @@ def test_capture_transaction_on_error(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Query.error"
-    assert resolve_span["data"] == {
-        "graphql.field_name": "error",
-        "graphql.parent_type": "Query",
-        "graphql.field_path": "Query.error",
-        "graphql.path": "error",
-    }
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "error",
+            "graphql.parent_type": "Query",
+            "graphql.field_path": "Query.error",
+            "graphql.path": "error",
+        }
+    )
 
 
 @parameterize_strawberry_test
@@ -429,12 +432,14 @@ def test_capture_transaction_on_success(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Query.hello"
-    assert resolve_span["data"] == {
-        "graphql.field_name": "hello",
-        "graphql.parent_type": "Query",
-        "graphql.field_path": "Query.hello",
-        "graphql.path": "hello",
-    }
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "hello",
+            "graphql.parent_type": "Query",
+            "graphql.field_path": "Query.hello",
+            "graphql.path": "hello",
+        }
+    )
 
 
 @parameterize_strawberry_test
@@ -507,12 +512,14 @@ def test_transaction_no_operation_name(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Query.hello"
-    assert resolve_span["data"] == {
-        "graphql.field_name": "hello",
-        "graphql.parent_type": "Query",
-        "graphql.field_path": "Query.hello",
-        "graphql.path": "hello",
-    }
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "hello",
+            "graphql.parent_type": "Query",
+            "graphql.field_path": "Query.hello",
+            "graphql.path": "hello",
+        }
+    )
 
 
 @parameterize_strawberry_test
@@ -585,9 +592,38 @@ def test_transaction_mutation(
     resolve_span = resolve_spans[0]
     assert resolve_span["parent_span_id"] == query_span["span_id"]
     assert resolve_span["description"] == "resolving Mutation.change"
-    assert resolve_span["data"] == {
-        "graphql.field_name": "change",
-        "graphql.parent_type": "Mutation",
-        "graphql.field_path": "Mutation.change",
-        "graphql.path": "change",
-    }
+    assert resolve_span["data"] == ApproxDict(
+        {
+            "graphql.field_name": "change",
+            "graphql.parent_type": "Mutation",
+            "graphql.field_path": "Mutation.change",
+            "graphql.path": "change",
+        }
+    )
+
+
+@parameterize_strawberry_test
+def test_handle_none_query_gracefully(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=async_execution),
+        ]
+        + framework_integrations,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    client.post("/graphql", json={})
+
+    assert len(events) == 0, "expected no events to be sent to Sentry"

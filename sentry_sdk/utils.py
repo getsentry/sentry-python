@@ -75,7 +75,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import EndpointType, ExcInfo
+    from sentry_sdk._types import EndpointType, Event, ExcInfo
 
 
 epoch = datetime(1970, 1, 1)
@@ -106,9 +106,16 @@ def get_git_revision():
     # type: () -> Optional[str]
     try:
         with open(os.path.devnull, "w+") as null:
+            # prevent command prompt windows from popping up on windows
+            startupinfo = None
+            if sys.platform == "win32" or sys.platform == "cygwin":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
             revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
+                    startupinfo=startupinfo,
                     stdout=subprocess.PIPE,
                     stderr=null,
                     stdin=null,
@@ -975,7 +982,7 @@ def to_string(value):
 
 
 def iter_event_stacktraces(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     if "stacktrace" in event:
         yield event["stacktrace"]
     if "threads" in event:
@@ -989,14 +996,14 @@ def iter_event_stacktraces(event):
 
 
 def iter_event_frames(event):
-    # type: (Dict[str, Any]) -> Iterator[Dict[str, Any]]
+    # type: (Event) -> Iterator[Dict[str, Any]]
     for stacktrace in iter_event_stacktraces(event):
         for frame in stacktrace.get("frames") or ():
             yield frame
 
 
 def handle_in_app(event, in_app_exclude=None, in_app_include=None, project_root=None):
-    # type: (Dict[str, Any], Optional[List[str]], Optional[List[str]], Optional[str]) -> Dict[str, Any]
+    # type: (Event, Optional[List[str]], Optional[List[str]], Optional[str]) -> Event
     for stacktrace in iter_event_stacktraces(event):
         set_in_app_in_frames(
             stacktrace.get("frames"),
@@ -1074,7 +1081,7 @@ def event_from_exception(
     client_options=None,  # type: Optional[Dict[str, Any]]
     mechanism=None,  # type: Optional[Dict[str, Any]]
 ):
-    # type: (...) -> Tuple[Dict[str, Any], Dict[str, Any]]
+    # type: (...) -> Tuple[Event, Dict[str, Any]]
     exc_info = exc_info_from_error(exc_info)
     hint = event_hint_with_exc_info(exc_info)
     return (
@@ -1746,8 +1753,13 @@ else:
 
 
 try:
+    from gevent import get_hub as get_gevent_hub
     from gevent.monkey import is_module_patched
 except ImportError:
+
+    def get_gevent_hub():
+        # type: () -> Any
+        return None
 
     def is_module_patched(*args, **kwargs):
         # type: (*Any, **Any) -> bool
@@ -1758,3 +1770,54 @@ except ImportError:
 def is_gevent():
     # type: () -> bool
     return is_module_patched("threading") or is_module_patched("_thread")
+
+
+def get_current_thread_meta(thread=None):
+    # type: (Optional[threading.Thread]) -> Tuple[Optional[int], Optional[str]]
+    """
+    Try to get the id of the current thread, with various fall backs.
+    """
+
+    # if a thread is specified, that takes priority
+    if thread is not None:
+        try:
+            thread_id = thread.ident
+            thread_name = thread.name
+            if thread_id is not None:
+                return thread_id, thread_name
+        except AttributeError:
+            pass
+
+    # if the app is using gevent, we should look at the gevent hub first
+    # as the id there differs from what the threading module reports
+    if is_gevent():
+        gevent_hub = get_gevent_hub()
+        if gevent_hub is not None:
+            try:
+                # this is undocumented, so wrap it in try except to be safe
+                return gevent_hub.thread_ident, None
+            except AttributeError:
+                pass
+
+    # use the current thread's id if possible
+    try:
+        thread = threading.current_thread()
+        thread_id = thread.ident
+        thread_name = thread.name
+        if thread_id is not None:
+            return thread_id, thread_name
+    except AttributeError:
+        pass
+
+    # if we can't get the current thread id, fall back to the main thread id
+    try:
+        thread = threading.main_thread()
+        thread_id = thread.ident
+        thread_name = thread.name
+        if thread_id is not None:
+            return thread_id, thread_name
+    except AttributeError:
+        pass
+
+    # we've tried everything, time to give up
+    return None, None
