@@ -168,6 +168,14 @@ def _wrap_apply_async(f):
         # type: (*Any, **Any) -> Any
         task = args[0]
 
+        from pprint import pprint
+
+        print("######### args (producer) #############")
+        pprint(args)
+        print("######### kwargs (producer) #############")
+        pprint(kwargs)
+        # TODO: this is the producer side. here we can add data from args/kwargs to the span.
+
         # Do not create a span when the task is a Celery Beat task
         # (Because we do not have a transaction in that case)
         span_mgr = (
@@ -272,6 +280,15 @@ def _wrap_tracer(task, f):
     def _inner(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with isolation_scope() as scope:
+            from pprint import pprint
+
+            print("######### args (consumer) #############")
+            pprint(args)
+            print("######### kwargs (consumer) #############")
+            pprint(kwargs)
+            # TODO: this is where the consumer picks up the task and processes it.
+            #       in the args you find a lot of information about the task that can be added to the transaction
+
             scope._name = "celery"
             scope.clear_breadcrumbs()
             scope.add_event_processor(_make_event_processor(task, *args, **kwargs))
