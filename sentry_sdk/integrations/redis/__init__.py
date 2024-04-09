@@ -228,6 +228,11 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
         if data_should_be_truncated:
             description = description[: integration.max_data_size - len("...")] + "..."
 
+        # TODO: Here we could also create the caching spans.
+        # TODO: also need to check if the `name` (if this is the cache key value) matches the prefix we want to configure in __init__ of the integration
+        #       Questions:
+        #       -) We should probablby have the OP.DB_REDIS span and a separate OP.CACHE_GET_ITEM (or set_item) span, right?
+        #       -) We probably need to research what redis commands are used by caching libs.
         with hub.start_span(op=OP.DB_REDIS, description=description) as span:
             set_db_data_fn(span, self)
             _set_client_data(span, is_cluster, name, *args)
@@ -368,6 +373,7 @@ class RedisIntegration(Integration):
     def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE):
         # type: (int) -> None
         self.max_data_size = max_data_size
+        # TODO: add some prefix that users can set to specify a cache key
 
     @staticmethod
     def setup_once():
