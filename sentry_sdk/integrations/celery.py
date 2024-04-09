@@ -178,6 +178,12 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
+        from pprint import pprint
+        print("######### args #############")
+        pprint(args)
+        print("######### kwargs #############")
+        pprint(kwargs)
+        # TODO: this is the producer side. here we can add data from args/kwargs to the span.
         span_mgr = (
             hub.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
             if not task_started_from_beat
@@ -274,6 +280,13 @@ def _wrap_tracer(task, f):
             if transaction is None:
                 return f(*args, **kwargs)
 
+            from pprint import pprint
+            print("######### args #############")
+            pprint(args)
+            print("######### kwargs #############")
+            pprint(kwargs)
+            # TODO: this is where the consumer picks up the task and processes it.
+            #       in the args you find a lot of information about the task that can be added to the transaction
             with hub.start_transaction(
                 transaction,
                 custom_sampling_context={
