@@ -113,7 +113,7 @@ if TYPE_CHECKING:
         "session",
         "internal",
         "profile",
-        "statsd",
+        "metric_bucket",
         "monitor",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
