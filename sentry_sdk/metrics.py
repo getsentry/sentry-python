@@ -78,21 +78,28 @@ GOOD_TRANSACTION_SOURCES = frozenset(
 _sanitize_unit = partial(re.compile(r"[^\w]+").sub, "")
 _sanitize_metric_key = partial(re.compile(r"[^\w\-.]+").sub, "_")
 _sanitize_tag_key = partial(re.compile(r"[^\w\-.\/]+", re.UNICODE).sub, "")
+_TAG_VALUE_SANITIZATION_TABLE = {
+    "\n": "\\n",
+    "\r": "\\r",
+    "\t": "\\t",
+    "\\": "\\\\",
+    "|": "\\u{7c}",
+    ",": "\\u{2c}",
+}
 
 
 def _sanitize_tag_value(value):
     # type: (str) -> str
-    table = maketrans(
-        {
-            "\n": "\\n",
-            "\r": "\\r",
-            "\t": "\\t",
-            "\\": "\\\\",
-            "|": "\\u{7c}",
-            ",": "\\u{2c}",
-        }
+    return "".join(
+        [
+            (
+                _TAG_VALUE_SANITIZATION_TABLE[char]
+                if char in _TAG_VALUE_SANITIZATION_TABLE
+                else char
+            )
+            for char in value
+        ]
     )
-    return value.translate(table)
 
 
 def get_code_location(stacklevel):
