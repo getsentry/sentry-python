@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         TracesSampler,
         TransactionProcessor,
         MetricTags,
+        MetricValue,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -51,7 +52,7 @@ if TYPE_CHECKING:
             "metrics_summary_sample_rate": Optional[float],
             "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
             "before_emit_metric": Optional[
-                Callable[[str, Any, MeasurementUnit, MetricTags], bool]
+                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
             ],
             "metric_code_locations": Optional[bool],
         },
