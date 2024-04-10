@@ -704,7 +704,7 @@ def _get_aggregator():
 
 
 def _get_aggregator_and_update_tags(key, value, unit, tags):
-    # type: (str, MetricValue, MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
+    # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
     hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
