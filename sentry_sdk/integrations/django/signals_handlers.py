@@ -78,7 +78,11 @@ def patch_signals():
             return wrapper
 
         integration = hub.get_integration(DjangoIntegration)
-        if integration and integration.signals_spans:
+        if (
+            integration
+            and integration.signals_spans
+            and self not in integration.signals_denylist
+        ):
             for idx, receiver in enumerate(sync_receivers):
                 sync_receivers[idx] = sentry_sync_receiver_wrapper(receiver)
 

@@ -557,6 +557,8 @@ class MetricsAggregator(object):
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
 
+        # For sets, we only record that a value has been added to the set but not which one.
+        # See develop docs: https://develop.sentry.dev/sdk/metrics/#sets
         if local_aggregator is not None:
             local_value = float(added if ty == "s" else value)
             local_aggregator.add(ty, key, local_value, unit, serialized_tags)
@@ -708,8 +710,6 @@ def _get_aggregator_and_update_tags(key, tags):
     if client is None or client.metrics_aggregator is None:
         return None, None, tags
 
-    experiments = client.options.get("_experiments", {})
-
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
@@ -725,20 +725,9 @@ def _get_aggregator_and_update_tags(key, tags):
         if transaction_name:
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
-            sample_rate = experiments.get("metrics_summary_sample_rate")
-            # We default the sample rate of metrics summaries to 1.0 only when the sample rate is `None` since we
-            # want to honor the user's decision if they pass a valid float.
-            if sample_rate is None:
-                sample_rate = 1.0
-            should_summarize_metric_callback = experiments.get(
-                "should_summarize_metric"
-            )
-            if random.random() < sample_rate and (
-                should_summarize_metric_callback is None
-                or should_summarize_metric_callback(key, updated_tags)
-            ):
-                local_aggregator = scope._span._get_local_aggregator()
+            local_aggregator = scope._span._get_local_aggregator()
 
+    experiments = client.options.get("_experiments", {})
     before_emit_callback = experiments.get("before_emit_metric")
     if before_emit_callback is not None:
         with recursion_protection() as in_metrics:
@@ -749,7 +738,7 @@ def _get_aggregator_and_update_tags(key, tags):
     return client.metrics_aggregator, local_aggregator, updated_tags
 
 
-def incr(
+def increment(
     key,  # type: str
     value=1.0,  # type: float
     unit="none",  # type: MeasurementUnit
@@ -764,6 +753,10 @@ def incr(
         aggregator.add(
             "c", key, value, unit, tags, timestamp, local_aggregator, stacklevel
         )
+
+
+# alias as incr is relatively common in python
+incr = increment
 
 
 class _Timing(object):
