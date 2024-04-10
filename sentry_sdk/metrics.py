@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import wraps, partial
 
 import sentry_sdk
-from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
+from sentry_sdk._compat import PY2, text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
     ContextVar,
     now,
@@ -53,6 +53,14 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
+if PY2:
+    maketrans = str.maketrans
+else:
+    import string
+
+    maketrans = string.maketrans
+
+
 _in_metrics = ContextVar("in_metrics", default=False)
 _set = set  # set is shadowed below
 
@@ -73,7 +81,7 @@ _sanitize_tag_key = partial(re.compile(r"[^\w\-.\/]+", re.UNICODE).sub, "")
 def _sanitize_tag_value(value):
     # type: (str) -> str
     return value.translate(
-        str.maketrans(
+        maketrans(
             {
                 "\n": "\\n",
                 "\r": "\\r",
