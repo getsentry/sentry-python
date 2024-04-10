@@ -571,18 +571,13 @@ def test_transaction_name(
 
 @minimum_python_37_with_gevent
 @pytest.mark.forked
-@pytest.mark.parametrize("sample_rate", [1.0, None])
 def test_metric_summaries(
-    sentry_init, capture_envelopes, sample_rate, maybe_monkeypatched_threading
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={
-            "enable_metrics": True,
-            "metrics_summary_sample_rate": sample_rate,
-        },
     )
     ts = time.time()
     envelopes = capture_envelopes()
@@ -678,121 +673,6 @@ def test_metric_summaries(
         "release": "fun-release@1.0.0",
         "transaction": "/foo",
     }
-
-
-@minimum_python_37_with_gevent
-@pytest.mark.forked
-def test_metrics_summary_disabled(
-    sentry_init, capture_envelopes, maybe_monkeypatched_threading
-):
-    sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
-        enable_tracing=True,
-        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 0.0},
-    )
-    ts = time.time()
-    envelopes = capture_envelopes()
-
-    with start_transaction(
-        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
-    ) as transaction:
-        with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
-            pass
-
-    Hub.current.flush()
-
-    (transaction, envelope) = envelopes
-
-    # Metrics Emission
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
-
-    assert len(m) == 1
-    assert m[0][1] == "my-timer-metric@second"
-    assert m[0][2] == "d"
-    assert len(m[0][3]) == 1
-    assert m[0][4] == {
-        "a": "b",
-        "transaction": "/foo",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
-
-    # Measurement Attachment
-    t = transaction.items[0].get_transaction_event()
-    assert "_metrics_summary" not in t
-    assert "_metrics_summary" not in t["spans"][0]
-
-
-@minimum_python_37_with_gevent
-@pytest.mark.forked
-def test_metrics_summary_filtered(
-    sentry_init, capture_envelopes, maybe_monkeypatched_threading
-):
-    def should_summarize_metric(key, tags):
-        return key == "foo"
-
-    sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
-        enable_tracing=True,
-        _experiments={
-            "enable_metrics": True,
-            "metrics_summary_sample_rate": 1.0,
-            "should_summarize_metric": should_summarize_metric,
-        },
-    )
-    ts = time.time()
-    envelopes = capture_envelopes()
-
-    with start_transaction(
-        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
-    ) as transaction:
-        metrics.timing("foo", value=3.0, tags={"a": "b"}, timestamp=ts)
-        metrics.timing("foo", value=2.0, tags={"b": "c"}, timestamp=ts)
-        metrics.timing("bar", value=1.0, tags={"a": "b"}, timestamp=ts)
-
-    Hub.current.flush()
-
-    (transaction, envelope) = envelopes
-
-    # Metrics Emission
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
-
-    assert len(m) == 3
-    assert m[0][1] == "bar@second"
-    assert m[1][1] == "foo@second"
-    assert m[2][1] == "foo@second"
-
-    # Measurement Attachment
-    t = transaction.items[0].get_transaction_event()["_metrics_summary"]
-    assert len(t["d:foo@second"]) == 2
-    assert {
-        "tags": {
-            "a": "b",
-            "environment": "not-fun-env",
-            "release": "fun-release@1.0.0",
-            "transaction": "/foo",
-        },
-        "min": 3.0,
-        "max": 3.0,
-        "count": 1,
-        "sum": 3.0,
-    } in t["d:foo@second"]
-    assert {
-        "tags": {
-            "b": "c",
-            "environment": "not-fun-env",
-            "release": "fun-release@1.0.0",
-            "transaction": "/foo",
-        },
-        "min": 2.0,
-        "max": 2.0,
-        "count": 1,
-        "sum": 2.0,
-    } in t["d:foo@second"]
 
 
 @minimum_python_37_with_gevent
