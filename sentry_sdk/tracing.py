@@ -10,8 +10,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
 )
-from sentry_sdk._types import TYPE_CHECKING
-
+from sentry_sdk._types import TYPE_CHECKING, MeasurementValue
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -153,16 +152,6 @@ class _SpanRecorder:
             span._span_recorder = None
         else:
             self.spans.append(span)
-
-
-class MeasurementValue(TypedDict):
-    """A measurement is an indexed, numeric value on a span or transaction.
-    It can be something like score.total to represent a webvital value, or ai.total_tokens
-    to represent the number of tokens used during that span's execution.
-    """
-
-    value: float
-    unit: Optional[MeasurementUnit]
 
 
 class Span:
