@@ -80,18 +80,17 @@ _sanitize_tag_key = partial(re.compile(r"[^\w\-.\/]+", re.UNICODE).sub, "")
 
 def _sanitize_tag_value(value):
     # type: (str) -> str
-    return value.translate(
-        maketrans(
-            {
-                "\n": "\\n",
-                "\r": "\\r",
-                "\t": "\\t",
-                "\\": "\\\\",
-                "|": "\\u{7c}",
-                ",": "\\u{2c}",
-            }
-        )
+    table = maketrans(
+        {
+            "\n": "\\n",
+            "\r": "\\r",
+            "\t": "\\t",
+            "\\": "\\\\",
+            "|": "\\u{7c}",
+            ",": "\\u{2c}",
+        }
     )
+    return value.translate(table)
 
 
 def get_code_location(stacklevel):
