@@ -734,9 +734,10 @@ def test_tag_normalization(
 def test_before_emit_metric(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
-    def before_emit(key, tags):
-        if key == "removed-metric":
+    def before_emit(key, value, unit, tags):
+        if key == "removed-metric" or value == 47 or unit == "unsupported":
             return False
+
         tags["extra"] = "foo"
         del tags["release"]
         # this better be a noop!
@@ -755,6 +756,8 @@ def test_before_emit_metric(
     envelopes = capture_envelopes()
 
     metrics.increment("removed-metric", 1.0)
+    metrics.increment("another-removed-metric", 47)
+    metrics.increment("yet-another-removed-metric", 1.0, unit="unsupported")
     metrics.increment("actual-metric", 1.0)
     Hub.current.flush()
 
