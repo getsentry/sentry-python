@@ -954,7 +954,6 @@ def test_transaction_name(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -1015,7 +1014,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = starlette_app_factory()
@@ -1057,7 +1055,6 @@ def test_transaction_name_in_middleware(
             StarletteIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()

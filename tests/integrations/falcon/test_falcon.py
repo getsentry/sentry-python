@@ -112,7 +112,7 @@ def test_transaction_style(
 
 
 def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -140,7 +140,7 @@ def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
 
 
 def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -164,7 +164,7 @@ def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
 
 
 def test_raised_4xx_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -188,7 +188,7 @@ def test_http_status(sentry_init, capture_exceptions, capture_events):
     This just demonstrates, that if Falcon raises a HTTPStatus with code 500
     (instead of a HTTPError with code 500) Sentry will not capture it.
     """
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):

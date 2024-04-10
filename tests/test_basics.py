@@ -439,7 +439,7 @@ def test_integration_scoping(sentry_init, capture_events):
 def test_client_initialized_within_scope(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
-    sentry_init(debug=True)
+    sentry_init()
 
     with push_scope():
         Hub.current.bind_client(Client())
@@ -455,7 +455,7 @@ def test_client_initialized_within_scope(sentry_init, caplog):
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
     caplog.set_level(logging.WARNING)
 
-    sentry_init(debug=True)
+    sentry_init()
 
     old_stack = list(Hub.current._stack)
 
@@ -475,7 +475,7 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
 def test_scope_popped_too_soon(sentry_init, caplog):
     caplog.set_level(logging.ERROR)
 
-    sentry_init(debug=True)
+    sentry_init()
 
     old_stack = list(Hub.current._stack)
 
@@ -519,7 +519,7 @@ def test_scope_event_processor_order(sentry_init, capture_events):
 
 
 def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
-    sentry_init(debug=True)
+    sentry_init()
     events = capture_events()
     capture_event({}, level="info", extras={"foo": "bar"})
     (event,) = events

@@ -361,7 +361,7 @@ def test_retry(celery, capture_events):
 )
 @pytest.mark.forked
 def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
-    celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
+    celery = init_celery(traces_sample_rate=1.0, backend="redis")
 
     events = capture_events_forksafe()
 

@@ -125,7 +125,7 @@ def test_errors(
     testing,
     integration_enabled_params,
 ):
-    sentry_init(debug=True, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
 
     app.debug = debug
     app.testing = testing
