@@ -155,25 +155,14 @@ class _SpanRecorder:
             self.spans.append(span)
 
 
-class MeasurementValue:
+class MeasurementValue(TypedDict):
     """A measurement is an indexed, numeric value on a span or transaction.
     It can be something like score.total to represent a webvital value, or ai.total_tokens
     to represent the number of tokens used during that span's execution.
     """
 
-    __slots__ = "value", "unit"
-
-    def __init__(self, value, unit=None):
-        # type: (float, Optional[MeasurementUnit]) -> None
-        self.value = value
-        self.unit = unit
-
-    def to_json(self):
-        # type: () -> dict[str, Any]
-        rv = {"value": self.value}
-        if self.unit is not None:
-            rv["unit"] = self.unit
-        return rv
+    value: float
+    unit: Optional[MeasurementUnit]
 
 
 class Span:
@@ -513,7 +502,7 @@ class Span:
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        self._measurements[name] = MeasurementValue(value, unit)
+        self._measurements[name] = {"value": value, "unit": unit}
 
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
@@ -626,7 +615,7 @@ class Span:
                 rv["_metrics_summary"] = metrics_summary
 
         if len(self._measurements) > 0:
-            rv["measurements"] = {k: v.to_json() for k, v in self._measurements.items()}
+            rv["measurements"] = self._measurements
 
         tags = self._tags
         if tags:
@@ -841,7 +830,7 @@ class Transaction(Span):
             event["profile"] = self._profile
             self._profile = None
 
-        event["measurements"] = {k: v.to_json() for k, v in self._measurements.items()}
+        event["measurements"] = self._measurements
 
         # This is here since `to_json` is not invoked.  This really should
         # be gone when we switch to onlyspans.
@@ -854,7 +843,7 @@ class Transaction(Span):
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        self._measurements[name] = MeasurementValue(value, unit)
+        self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
