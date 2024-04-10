@@ -677,56 +677,99 @@ def test_metric_summaries(
 
 @minimum_python_37_with_gevent
 @pytest.mark.forked
-def test_tag_normalization(
-    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+@pytest.mark.parametrize(
+    "metric_name,metric_unit,expected_name",
+    [
+        ("first-metric", "nano-second", "first-metric@nanosecond"),
+        ("another_metric?", "nano second", "another_metric_@nanosecond"),
+        (
+            "metric",
+            "nanosecond",
+            "metric@nanosecond",
+        ),
+        (
+            "my.amaze.metric I guess",
+            "nano|\nsecond",
+            "my.amaze.metric_I_guess@nanosecond",
+        ),
+        # fmt: off
+        (u"métríc", u"nanöseconď", u"m_tr_c@nansecon"),
+        # fmt: on
+    ],
+)
+def test_metric_name_normalization(
+    sentry_init,
+    capture_envelopes,
+    metric_name,
+    metric_unit,
+    expected_name,
+    maybe_monkeypatched_threading,
 ):
     sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
         _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
-    ts = time.time()
     envelopes = capture_envelopes()
 
-    # fmt: off
-    metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
-    metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
-    metrics.distribution("c", 1.0, tags={u"foö-bar": u"snöwmän"}, timestamp=ts)
-    metrics.distribution("d", 1.0, tags={"route": "GET /foo"}, timestamp=ts)
-    # fmt: on
+    metrics.distribution(metric_name, 1.0, unit=metric_unit)
+
     Hub.current.flush()
 
     (envelope,) = envelopes
 
     assert len(envelope.items) == 1
     assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
 
-    assert len(m) == 4
-    assert m[0][4] == {
-        "foo-bar": "$foo",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
+    parsed_metrics = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert len(parsed_metrics) == 1
 
-    assert m[1][4] == {
-        "foo_bar": "blah{}",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
+    name = parsed_metrics[0][1]
+    assert name == expected_name
 
-    # fmt: off
-    assert m[2][4] == {
-        "fo_-bar": u"snöwmän",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
-    assert m[3][4] == {
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-        "route": "GET /foo",
-    }
-    # fmt: on
+
+@minimum_python_37_with_gevent
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "metric_tag,expected_tag",
+    [
+        ({"f-oo|bar": "%$foo/"}, {"f-oobar": "%$foo/"}),
+        ({"foo$.$.$bar": "blah{}"}, {"foo..bar": "blah{}"}),
+        # fmt: off
+        ({u"foö-bar": u"snöwmän"}, {u"fo-bar": u"snöwmän"},),
+        # fmt: on
+        ({"route": "GET /foo"}, {"route": "GET /foo"}),
+        ({"__bar__": "this | or , that"}, {"__bar__": "this \\u{7c} or \\u{2c} that"}),
+        ({"foo/": "hello!\n\r\t\\"}, {"foo/": "hello!\\n\\r\\t\\\\"}),
+    ],
+)
+def test_metric_tag_normalization(
+    sentry_init,
+    capture_envelopes,
+    metric_tag,
+    expected_tag,
+    maybe_monkeypatched_threading,
+):
+    sentry_init(
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
+    )
+    envelopes = capture_envelopes()
+
+    metrics.distribution("a", 1.0, tags=metric_tag)
+
+    Hub.current.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+
+    parsed_metrics = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert len(parsed_metrics) == 1
+
+    tags = parsed_metrics[0][4]
+
+    expected_tag_key, expected_tag_value = expected_tag.popitem()
+    assert expected_tag_key in tags
+    assert tags[expected_tag_key] == expected_tag_value
 
 
 @minimum_python_37_with_gevent
