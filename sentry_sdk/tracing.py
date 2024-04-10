@@ -163,18 +163,17 @@ class MeasurementValue:
 
     __slots__ = "value", "unit"
 
-    def __init__(
-        self,
-        value,  # type: float,
-        unit=None,  # type: Optional[MeasurementUnit]
-    ):
+    def __init__(self, value, unit=None):
+        # type: (float, Optional[MeasurementUnit]) -> None
         self.value = value
         self.unit = unit
 
     def to_json(self):
+        # type: () -> dict[str, Any]
         rv = {"value": self.value}
         if self.unit is not None:
             rv["unit"] = self.unit
+        return rv
 
 
 class Span:
