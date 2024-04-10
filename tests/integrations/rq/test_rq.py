@@ -17,8 +17,10 @@ def _patch_rq_get_server_version(monkeypatch):
 
     https://github.com/jamesls/fakeredis/issues/273
     """
-
-    from distutils.version import StrictVersion
+    try:
+        from distutils.version import StrictVersion
+    except ImportError:
+        return
 
     if parse_version(rq.VERSION) <= (1, 5, 1):
         for k in (

@@ -1,15 +1,14 @@
-pip  # always use newest pip
-mock ; python_version<'3.3'
+pip
 pytest
-pytest-cov==2.8.1
-pytest-forked<=1.4.0
-pytest-localserver==0.5.1  # TODO(py3): 0.6.0 drops 2.7 support: https://github.com/pytest-dev/pytest-localserver/releases/tag/v0.6.0
-pytest-watch==4.2.0
-tox==3.7.0
-jsonschema==3.2.0
-pyrsistent==0.16.0 # TODO(py3): 0.17.0 requires python3, see https://github.com/tobgu/pyrsistent/issues/205
-executing<2.0.0  # TODO(py3): 2.0.0 requires python3
+pytest-cov
+pytest-forked
+pytest-localserver
+pytest-watch
+jsonschema
+pyrsistent
+executing
 asttokens
 responses
 pysocks
 ipdb
+setuptools

@@ -46,10 +46,9 @@ jobs:
         ports:
           - 5432:5432
     env:
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
       - uses: actions/setup-python@v5
@@ -58,9 +57,7 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
-          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -124,10 +121,9 @@ jobs:
         ports:
           - 5432:5432
     env:
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
       - uses: actions/checkout@v4.1.1
       - uses: actions/setup-python@v5
@@ -136,9 +132,7 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
-          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
