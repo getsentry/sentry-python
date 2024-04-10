@@ -261,7 +261,7 @@ class Item(object):
         elif ty == "profile":
             return "profile"
         elif ty == "statsd":
-            return "statsd"
+            return "metric_bucket"
         elif ty == "check_in":
             return "monitor"
         else:
