@@ -731,7 +731,7 @@ def test_metric_name_normalization(
         ({"f-oo|bar": "%$foo/"}, {"f-oobar": "%$foo/"}),
         ({"foo$.$.$bar": "blah{}"}, {"foo..bar": "blah{}"}),
         # fmt: off
-        ({u"foö-bar": u"snöwmän"}, {"foö-bar": u"snöwmän"},),
+        ({u"foö-bar": u"snöwmän"}, {u"foö-bar": u"snöwmän"},),
         # fmt: on
         ({"route": "GET /foo"}, {"route": "GET /foo"}),
         ({"__bar__": "this | or , that"}, {"__bar__": "this \\u{7c} or \\u{2c} that"}),
