@@ -342,6 +342,7 @@ class OP:
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
     OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
     OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
+    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
     LANGCHAIN_RUN = "ai.run.langchain"
     LANGCHAIN_TOOL = "ai.tool.langchain"
     LANGCHAIN_AGENT = "ai.agent.langchain"

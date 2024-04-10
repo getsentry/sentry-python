@@ -275,7 +275,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
-                op=OP.LANGCHAIN_RUN,
+                op=(
+                    OP.LANGCHAIN_RUN
+                    if kwargs.get("parent_run_id") is not None
+                    else OP.LANGCHAIN_PIPELINE
+                ),
                 description=kwargs.get("name") or "Chain execution",
             )
             metadata = kwargs.get("metadata")
