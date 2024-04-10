@@ -854,7 +854,7 @@ def test_tag_normalization(
 def test_before_emit_metric(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
-    def before_emit(key, tags, value, unit):
+    def before_emit(key, value, unit, tags):
         if key == "removed-metric" or value == 47 or unit == "unsupported":
             return False
 

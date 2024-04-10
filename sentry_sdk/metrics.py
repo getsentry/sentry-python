@@ -703,8 +703,8 @@ def _get_aggregator():
     )
 
 
-def _get_aggregator_and_update_tags(key, tags, value, unit):
-    # type: (str, Optional[MetricTags], Any, MeasurementUnit) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
+def _get_aggregator_and_update_tags(key, value, unit, tags):
+    # type: (str, Any, MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
     hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
@@ -745,7 +745,7 @@ def _get_aggregator_and_update_tags(key, tags, value, unit):
     if before_emit_callback is not None:
         with recursion_protection() as in_metrics:
             if not in_metrics:
-                if not before_emit_callback(key, updated_tags, value, unit):
+                if not before_emit_callback(key, value, unit, updated_tags):
                     return None, None, updated_tags
 
     return client.metrics_aggregator, local_aggregator, updated_tags
@@ -762,7 +762,7 @@ def increment(
     # type: (...) -> None
     """Increments a counter."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-        key, tags, value, unit
+        key, value, unit, tags
     )
     if aggregator is not None:
         aggregator.add(
@@ -825,9 +825,9 @@ class _Timing(object):
         assert self._span, "did not enter"
         aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
             self.key,
-            self.tags,
             self.value,
             self.unit,
+            self.tags,
         )
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
@@ -883,7 +883,7 @@ def timing(
     """
     if value is not None:
         aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-            key, tags, value, unit
+            key, value, unit, tags
         )
         if aggregator is not None:
             aggregator.add(
@@ -903,7 +903,7 @@ def distribution(
     # type: (...) -> None
     """Emits a distribution."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-        key, tags, value, unit
+        key, value, unit, tags
     )
     if aggregator is not None:
         aggregator.add(
@@ -922,7 +922,7 @@ def set(
     # type: (...) -> None
     """Emits a set."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-        key, tags, value, unit
+        key, value, unit, tags
     )
     if aggregator is not None:
         aggregator.add(
@@ -941,7 +941,7 @@ def gauge(
     # type: (...) -> None
     """Emits a gauge."""
     aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-        key, tags, value, unit
+        key, value, unit, tags
     )
     if aggregator is not None:
         aggregator.add(

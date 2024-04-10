@@ -51,7 +51,7 @@ if TYPE_CHECKING:
             "metrics_summary_sample_rate": Optional[float],
             "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
             "before_emit_metric": Optional[
-                Callable[[str, MetricTags, Any, MeasurementUnit], bool]
+                Callable[[str, Any, MeasurementUnit, MetricTags], bool]
             ],
             "metric_code_locations": Optional[bool],
         },
