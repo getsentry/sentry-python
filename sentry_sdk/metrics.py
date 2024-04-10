@@ -11,7 +11,7 @@ from datetime import datetime
 from functools import wraps, partial
 
 import sentry_sdk
-from sentry_sdk._compat import PY2, text_type, utc_from_timestamp, iteritems
+from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
     ContextVar,
     now,
@@ -51,16 +51,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricTagsInternal
     from sentry_sdk._types import MetricType
     from sentry_sdk._types import MetricValue
-
-
-if PY2:
-    import string
-
-    def maketrans(mapping):
-        return string.maketrans(*map(lambda s: "".join(s), zip(*mapping.viewitems())))
-
-else:
-    maketrans = str.maketrans
 
 
 _in_metrics = ContextVar("in_metrics", default=False)
