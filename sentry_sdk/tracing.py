@@ -155,6 +155,28 @@ class _SpanRecorder:
             self.spans.append(span)
 
 
+class MeasurementValue:
+    """A measurement is an indexed, numeric value on a span or transaction.
+    It can be something like score.total to represent a webvital value, or ai.total_tokens
+    to represent the number of tokens used during that span's execution.
+    """
+
+    __slots__ = "value", "unit"
+
+    def __init__(
+        self,
+        value,  # type: float,
+        unit=None,  # type: Optional[MeasurementUnit]
+    ):
+        self.value = value
+        self.unit = unit
+
+    def to_json(self):
+        rv = {"value": self.value}
+        if self.unit is not None:
+            rv["unit"] = self.unit
+
+
 class Span:
     """A span holds timing information of a block of code.
     Spans can have multiple child spans thus forming a span tree.
@@ -189,6 +211,7 @@ class Span:
         "sampled",
         "op",
         "description",
+        "_measurements",
         "start_timestamp",
         "_start_timestamp_monotonic_ns",
         "status",
@@ -229,6 +252,7 @@ class Span:
         self.status = status
         self.hub = hub
         self.scope = scope
+        self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
@@ -488,6 +512,10 @@ class Span:
         # type: (str) -> None
         self.status = value
 
+    def set_measurement(self, name, value, unit=""):
+        # type: (str, float, MeasurementUnit) -> None
+        self._measurements[name] = MeasurementValue(value, unit)
+
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
 
@@ -598,6 +626,9 @@ class Span:
             if metrics_summary:
                 rv["_metrics_summary"] = metrics_summary
 
+        if len(self._measurements) > 0:
+            rv["measurements"] = {k: v.to_json() for k, v in self._measurements.items()}
+
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -674,7 +705,7 @@ class Transaction(Span):
         self.source = source
         self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
-        self._measurements = {}  # type: Dict[str, Any]
+        self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
@@ -811,7 +842,7 @@ class Transaction(Span):
             event["profile"] = self._profile
             self._profile = None
 
-        event["measurements"] = self._measurements
+        event["measurements"] = {k: v.to_json() for k, v in self._measurements.items()}
 
         # This is here since `to_json` is not invoked.  This really should
         # be gone when we switch to onlyspans.
@@ -824,7 +855,7 @@ class Transaction(Span):
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
-        self._measurements[name] = {"value": value, "unit": unit}
+        self._measurements[name] = MeasurementValue(value, unit)
 
     def set_context(self, key, value):
         # type: (str, Any) -> None
