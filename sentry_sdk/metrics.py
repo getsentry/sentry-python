@@ -56,7 +56,9 @@ if TYPE_CHECKING:
 if PY2:
     import string
 
-    maketrans = string.maketrans
+    def maketrans(mapping):
+        return string.maketrans(zip(*mapping.viewitems()))
+
 else:
     maketrans = str.maketrans
 
