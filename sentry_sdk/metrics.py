@@ -703,14 +703,12 @@ def _get_aggregator():
     )
 
 
-def _get_aggregator_and_update_tags(key, tags):
-    # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
+def _get_aggregator_and_update_tags(key, value, unit, tags):
+    # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
     hub = sentry_sdk.Hub.current
     client = hub.client
     if client is None or client.metrics_aggregator is None:
         return None, None, tags
-
-    experiments = client.options.get("_experiments", {})
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
@@ -727,25 +725,14 @@ def _get_aggregator_and_update_tags(key, tags):
         if transaction_name:
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
-            sample_rate = experiments.get("metrics_summary_sample_rate")
-            # We default the sample rate of metrics summaries to 1.0 only when the sample rate is `None` since we
-            # want to honor the user's decision if they pass a valid float.
-            if sample_rate is None:
-                sample_rate = 1.0
-            should_summarize_metric_callback = experiments.get(
-                "should_summarize_metric"
-            )
-            if random.random() < sample_rate and (
-                should_summarize_metric_callback is None
-                or should_summarize_metric_callback(key, updated_tags)
-            ):
-                local_aggregator = scope._span._get_local_aggregator()
+            local_aggregator = scope._span._get_local_aggregator()
 
+    experiments = client.options.get("_experiments", {})
     before_emit_callback = experiments.get("before_emit_metric")
     if before_emit_callback is not None:
         with recursion_protection() as in_metrics:
             if not in_metrics:
-                if not before_emit_callback(key, updated_tags):
+                if not before_emit_callback(key, value, unit, updated_tags):
                     return None, None, updated_tags
 
     return client.metrics_aggregator, local_aggregator, updated_tags
@@ -761,7 +748,9 @@ def increment(
 ):
     # type: (...) -> None
     """Increments a counter."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "c", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -822,7 +811,10 @@ class _Timing(object):
         # type: (Any, Any, Any) -> None
         assert self._span, "did not enter"
         aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-            self.key, self.tags
+            self.key,
+            self.value,
+            self.unit,
+            self.tags,
         )
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
@@ -877,7 +869,9 @@ def timing(
     - it can be used as a decorator
     """
     if value is not None:
-        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+            key, value, unit, tags
+        )
         if aggregator is not None:
             aggregator.add(
                 "d", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -895,7 +889,9 @@ def distribution(
 ):
     # type: (...) -> None
     """Emits a distribution."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "d", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -912,7 +908,9 @@ def set(
 ):
     # type: (...) -> None
     """Emits a set."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "s", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -929,7 +927,9 @@ def gauge(
 ):
     # type: (...) -> None
     """Emits a gauge."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "g", key, value, unit, tags, timestamp, local_aggregator, stacklevel

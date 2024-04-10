@@ -3,6 +3,11 @@ from __future__ import absolute_import
 import sys
 import time
 
+try:
+    from typing import cast
+except ImportError:
+    cast = lambda _, o: o
+
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk._compat import reraise
@@ -31,7 +36,15 @@ if TYPE_CHECKING:
     from typing import Union
 
     from sentry_sdk.tracing import Span
-    from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
+    from sentry_sdk._types import (
+        EventProcessor,
+        Event,
+        Hint,
+        ExcInfo,
+        MonitorConfig,
+        MonitorConfigScheduleType,
+        MonitorConfigScheduleUnit,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -416,7 +429,7 @@ def _get_headers(task):
 
 
 def _get_humanized_interval(seconds):
-    # type: (float) -> Tuple[int, str]
+    # type: (float) -> Tuple[int, MonitorConfigScheduleUnit]
     TIME_UNITS = (  # noqa: N806
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
@@ -427,17 +440,17 @@ def _get_humanized_interval(seconds):
     for unit, divider in TIME_UNITS:
         if seconds >= divider:
             interval = int(seconds / divider)
-            return (interval, unit)
+            return (interval, cast("MonitorConfigScheduleUnit", unit))
 
     return (int(seconds), "second")
 
 
 def _get_monitor_config(celery_schedule, app, monitor_name):
-    # type: (Any, Celery, str) -> Dict[str, Any]
-    monitor_config = {}  # type: Dict[str, Any]
-    schedule_type = None  # type: Optional[str]
+    # type: (Any, Celery, str) -> MonitorConfig
+    monitor_config = {}  # type: MonitorConfig
+    schedule_type = None  # type: Optional[MonitorConfigScheduleType]
     schedule_value = None  # type: Optional[Union[str, int]]
-    schedule_unit = None  # type: Optional[str]
+    schedule_unit = None  # type: Optional[MonitorConfigScheduleUnit]
 
     if isinstance(celery_schedule, crontab):
         schedule_type = "crontab"
