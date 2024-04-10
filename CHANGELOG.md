@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.45.0
+
+### Various fixes & improvements
+
+- fix(metrics): Change `data_category` from `statsd` to `metric_bucket` (#2954) by @cleptric
+- feat(metrics): New normalization of keys, values, units (#2946) by @sentrivana
+- feat(typing): Make monitor_config a TypedDict (#2931) by @sentrivana
+- feat(metrics): Add value, unit to before_emit_metric (#2958) by @sentrivana
+- chore: Remove experimental metric summary options (#2957) by @sentrivana
+- fix(profiler): Accessing __mro__ might throw a ValueError (#2952) by @sentrivana
+- feat(integrations): Add django signals_denylist to filter signals that are attached to by signals_span (#2758) by @lieryan
+- build(deps): bump types-protobuf from 4.24.0.20240311 to 4.24.0.20240408 (#2941) by @dependabot
+- ref(crons): Remove deprecated `typing` imports (#2945) by @szokeasaurusrex
+- fix(crons): Fix type hints for monitor decorator (#2944) by @szokeasaurusrex
+- Suppress prompt spawned by subprocess when using pythonw (#2936) by @antonpirker
+- fix(integrations): Handle None-value in GraphQL query #2715 (#2762) by @czyber
+- feat: incr -> increment for metrics (#2588) by @mitsuhiko
+- Disable Codecov Check Run Annotations (#2537) by @eliatcodecov
+- Add devenv-requirements.txt and update env setup instructions (#2761) by @arr-ee
+- Do not send "quiet" Sanic exceptions to Sentry. (#2821) by @hamedsh
+- feat(metrics): Implement metric_bucket rate limits (#2933) by @cleptric
+- feat(crons): Allow to upsert monitors (#2929) by @sentrivana
+
 ## 1.44.1
 
 ### Various fixes & improvements
