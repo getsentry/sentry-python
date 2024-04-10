@@ -65,9 +65,9 @@ GOOD_TRANSACTION_SOURCES = frozenset(
     ]
 )
 
-_sanitize_unit = partial(re.compile(r"[^\w]+").sub, "")
-_sanitize_metric_key = partial(re.compile(r"[^\w\-.]+").sub, "_")
-_sanitize_tag_key = partial(re.compile(r"[^\w\-.\/]+", re.UNICODE).sub, "")
+_sanitize_unit = partial(re.compile(r"[^a-zA-Z0-9_]+").sub, "")
+_sanitize_metric_key = partial(re.compile(r"[^a-zA-Z0-9_\-.]+").sub, "_")
+_sanitize_tag_key = partial(re.compile(r"[^a-zA-Z0-9_\-.\/]+").sub, "")
 _TAG_VALUE_SANITIZATION_TABLE = {
     "\n": "\\n",
     "\r": "\\r",
