@@ -57,7 +57,7 @@ if PY2:
     import string
 
     def maketrans(mapping):
-        return string.maketrans(zip(*mapping.viewitems()))
+        return string.maketrans(*map(lambda s: "".join(s), zip(*mapping.viewitems())))
 
 else:
     maketrans = str.maketrans
