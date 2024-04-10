@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        MeasurementUnit,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
@@ -49,7 +50,9 @@ if TYPE_CHECKING:
             "enable_metrics": Optional[bool],
             "metrics_summary_sample_rate": Optional[float],
             "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
-            "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "before_emit_metric": Optional[
+                Callable[[str, MetricTags, Any, MeasurementUnit], bool]
+            ],
             "metric_code_locations": Optional[bool],
         },
         total=False,
