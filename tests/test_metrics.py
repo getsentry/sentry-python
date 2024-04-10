@@ -692,6 +692,9 @@ def test_metric_summaries(
             "nano|\nsecond",
             "my.amaze.metric_I_guess@nanosecond",
         ),
+        # format: off
+        ("métríc", "nanöseconď", "mtrc@nansecon"),
+        # format: on
     ],
 )
 def test_metric_name_normalization(
