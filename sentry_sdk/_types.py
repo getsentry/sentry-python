@@ -88,7 +88,7 @@ if TYPE_CHECKING:
             "level": LogLevelStr,
             "logentry": Mapping[str, object],
             "logger": str,
-            "measurements": dict[str, object],
+            "measurements": dict[str, MeasurementValue],
             "message": str,
             "modules": dict[str, str],
             "monitor_config": Mapping[str, object],
