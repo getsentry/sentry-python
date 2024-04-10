@@ -277,6 +277,19 @@ _Plus 2 more_
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
 
 
+## 1.44.1
+
+### Various fixes & improvements
+
+- Make `monitor` async friendly (#2912) by @sentrivana
+
+  You can now decorate your async functions with the `monitor`
+  decorator and they will correctly report their duration
+  and completion status.
+
+- Fixed `Event | None` runtime `TypeError` (#2928) by @szokeasaurusrex
+
+
 ## 1.44.0
 
 ### Various fixes & improvements

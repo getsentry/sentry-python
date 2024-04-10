@@ -13,12 +13,13 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import TypeVar
-    from typing import Union
+    from collections.abc import Callable
+    from typing import Any, Optional, TypeVar, Union
+    from sentry_sdk._types import (
+        MonitorConfig,
+        MonitorConfigScheduleType,
+        MonitorConfigScheduleUnit,
+    )
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -42,7 +43,7 @@ except ImportError:
 
 
 def _get_headers(task):
-    # type: (Task) -> Dict[str, Any]
+    # type: (Task) -> dict[str, Any]
     headers = task.request.get("headers") or {}
 
     # flatten nested headers
@@ -56,11 +57,11 @@ def _get_headers(task):
 
 
 def _get_monitor_config(celery_schedule, app, monitor_name):
-    # type: (Any, Celery, str) -> Dict[str, Any]
-    monitor_config = {}  # type: Dict[str, Any]
-    schedule_type = None  # type: Optional[str]
+    # type: (Any, Celery, str) -> MonitorConfig
+    monitor_config = {}  # type: MonitorConfig
+    schedule_type = None  # type: Optional[MonitorConfigScheduleType]
     schedule_value = None  # type: Optional[Union[str, int]]
-    schedule_unit = None  # type: Optional[str]
+    schedule_unit = None  # type: Optional[MonitorConfigScheduleUnit]
 
     if isinstance(celery_schedule, crontab):
         schedule_type = "crontab"
@@ -242,7 +243,7 @@ def _setup_celery_beat_signals():
 
 
 def crons_task_success(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
+    # type: (Task, dict[Any, Any]) -> None
     logger.debug("celery_task_success %s", sender)
     headers = _get_headers(sender)
 
@@ -263,7 +264,7 @@ def crons_task_success(sender, **kwargs):
 
 
 def crons_task_failure(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
+    # type: (Task, dict[Any, Any]) -> None
     logger.debug("celery_task_failure %s", sender)
     headers = _get_headers(sender)
 
@@ -284,7 +285,7 @@ def crons_task_failure(sender, **kwargs):
 
 
 def crons_task_retry(sender, **kwargs):
-    # type: (Task, Dict[Any, Any]) -> None
+    # type: (Task, dict[Any, Any]) -> None
     logger.debug("celery_task_retry %s", sender)
     headers = _get_headers(sender)
 

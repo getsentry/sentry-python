@@ -74,6 +74,11 @@ urlpatterns = [
         name="csrf_hello_not_exempt",
     ),
     path("sync/thread_ids", views.thread_ids_sync, name="thread_ids_sync"),
+    path(
+        "send-myapp-custom-signal",
+        views.send_myapp_custom_signal,
+        name="send_myapp_custom_signal",
+    ),
 ]
 
 # async views

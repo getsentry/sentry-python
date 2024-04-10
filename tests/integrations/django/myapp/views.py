@@ -14,6 +14,11 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
 
+from tests.integrations.django.myapp.signals import (
+    myapp_custom_signal,
+    myapp_custom_signal_silenced,
+)
+
 try:
     from rest_framework.decorators import api_view
     from rest_framework.response import Response
@@ -251,3 +256,10 @@ async def post_echo_async(request):
 
 
 post_echo_async.csrf_exempt = True
+
+
+@csrf_exempt
+def send_myapp_custom_signal(request):
+    myapp_custom_signal.send(sender="hello")
+    myapp_custom_signal_silenced.send(sender="hello")
+    return HttpResponse("ok")

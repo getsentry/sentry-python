@@ -110,6 +110,7 @@ class DjangoIntegration(Integration):
     middleware_spans = None
     signals_spans = None
     cache_spans = None
+    signals_denylist = []  # type: list[signals.Signal]
 
     def __init__(
         self,
@@ -117,8 +118,9 @@ class DjangoIntegration(Integration):
         middleware_spans=True,
         signals_spans=True,
         cache_spans=False,
+        signals_denylist=None,
     ):
-        # type: (str, bool, bool, bool) -> None
+        # type: (str, bool, bool, bool, Optional[list[signals.Signal]]) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -128,6 +130,7 @@ class DjangoIntegration(Integration):
         self.middleware_spans = middleware_spans
         self.signals_spans = signals_spans
         self.cache_spans = cache_spans
+        self.signals_denylist = signals_denylist or []
 
     @staticmethod
     def setup_once():

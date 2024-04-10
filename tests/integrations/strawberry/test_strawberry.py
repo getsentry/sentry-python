@@ -600,3 +600,30 @@ def test_transaction_mutation(
             "graphql.path": "change",
         }
     )
+
+
+@parameterize_strawberry_test
+def test_handle_none_query_gracefully(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=async_execution),
+        ]
+        + framework_integrations,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    client.post("/graphql", json={})
+
+    assert len(events) == 0, "expected no events to be sent to Sentry"

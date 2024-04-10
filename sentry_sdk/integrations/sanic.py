@@ -329,6 +329,10 @@ def _capture_exception(exception):
             client_options=sentry_sdk.get_client().options,
             mechanism={"type": "sanic", "handled": False},
         )
+
+        if hint and hasattr(hint["exc_info"][0], "quiet") and hint["exc_info"][0].quiet:
+            return
+
         sentry_sdk.capture_event(event, hint=hint)
 
 

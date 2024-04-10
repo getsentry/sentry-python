@@ -1,10 +1,11 @@
 import time
+from typing import cast
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Tuple
+    from typing import Any, Tuple
+    from sentry_sdk._types import MonitorConfigScheduleUnit
 
 
 def _now_seconds_since_epoch():
@@ -18,7 +19,7 @@ def _now_seconds_since_epoch():
 
 
 def _get_humanized_interval(seconds):
-    # type: (float) -> Tuple[int, str]
+    # type: (float) -> Tuple[int, MonitorConfigScheduleUnit]
     TIME_UNITS = (  # noqa: N806
         ("day", 60 * 60 * 24.0),
         ("hour", 60 * 60.0),
@@ -29,7 +30,7 @@ def _get_humanized_interval(seconds):
     for unit, divider in TIME_UNITS:
         if seconds >= divider:
             interval = int(seconds / divider)
-            return (interval, unit)
+            return (interval, cast("MonitorConfigScheduleUnit", unit))
 
     return (int(seconds), "second")
 

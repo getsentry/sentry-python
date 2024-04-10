@@ -37,10 +37,12 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        MeasurementUnit,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
         MetricTags,
+        MetricValue,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -57,9 +59,9 @@ if TYPE_CHECKING:
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
-            "metrics_summary_sample_rate": Optional[float],
-            "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
-            "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "before_emit_metric": Optional[
+                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
+            ],
             "metric_code_locations": Optional[bool],
         },
         total=False,
