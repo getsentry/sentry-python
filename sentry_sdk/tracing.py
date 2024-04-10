@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     logger,
     nanosecond_time,
 )
-from sentry_sdk._types import TYPE_CHECKING, MeasurementValue
+from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
@@ -31,7 +31,12 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+    from sentry_sdk._types import (
+        Event,
+        MeasurementUnit,
+        SamplingContext,
+        MeasurementValue,
+    )
 
     class SpanKwargs(TypedDict, total=False):
         trace_id: str
