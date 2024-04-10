@@ -1,7 +1,7 @@
 sentryPythonDeleteTestFunctions
 ===============================
 
-This AWS Lambda function deletes all AWS Lambda function in the current AWS account that are prefixed with `test_`.
+This AWS Lambda function deletes all AWS Lambda functions in the current AWS account that are prefixed with `test_`.
 The functions that are deleted are created by the Google Actions CI checks running on every PR of the `sentry-python` repository.
 
 The Lambda function has been deployed here:
