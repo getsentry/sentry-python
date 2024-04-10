@@ -54,11 +54,11 @@ if TYPE_CHECKING:
 
 
 if PY2:
-    maketrans = str.maketrans
-else:
     import string
 
     maketrans = string.maketrans
+else:
+    maketrans = str.maketrans
 
 
 _in_metrics = ContextVar("in_metrics", default=False)
