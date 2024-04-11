@@ -433,13 +433,13 @@ class Scope(object):
 
     def _extract_propagation_context(self, incoming_data):
         # type: (Dict[str, Any]) -> Optional[PropagationContext]
-        context = None
+        propagation_context = None
 
         normalized_data = normalize_incoming_data(incoming_data)
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
         if baggage_header:
-            context = PropagationContext()
-            context.dynamic_sampling_context = Baggage.from_incoming_header(
+            propagation_context = PropagationContext()
+            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
                 baggage_header
             ).dynamic_sampling_context()
 
@@ -447,11 +447,11 @@ class Scope(object):
         if sentry_trace_header:
             sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
             if sentrytrace_data is not None:
-                if context is None:
-                    context = PropagationContext()
-                context.update(sentrytrace_data)
+                if propagation_context is None:
+                    propagation_context = PropagationContext()
+                propagation_context.update(sentrytrace_data)
 
-        return context
+        return propagation_context
 
     def set_new_propagation_context(self):
         # type: () -> None
@@ -469,10 +469,9 @@ class Scope(object):
         if there is no `incoming_data` create new `_propagation_context`, but do NOT overwrite if already existing.
         """
         if incoming_data:
-            context = self._extract_propagation_context(incoming_data)
-
-            if context is not None:
-                self._propagation_context = context
+            propagation_context = self._extract_propagation_context(incoming_data)
+            if propagation_context is not None:
+                self._propagation_context = propagation_context
 
         if self._propagation_context is None and self._type != ScopeType.CURRENT:
             self.set_new_propagation_context()
