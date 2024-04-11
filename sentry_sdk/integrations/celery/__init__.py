@@ -280,12 +280,14 @@ def _wrap_tracer(task, f):
     def _inner(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         with isolation_scope() as scope:
-            from pprint import pprint
 
             print("######### args (consumer) #############")
-            pprint(args)
+            print(args)
             print("######### kwargs (consumer) #############")
-            pprint(kwargs)
+            print(kwargs)
+
+            print("######### task #############")
+            print(task.request.retries)
             # TODO: this is where the consumer picks up the task and processes it.
             #       in the args you find a lot of information about the task that can be added to the transaction
 
@@ -340,6 +342,11 @@ def _wrap_task_call(task, f):
     @wraps(f)
     def _inner(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+
+        print("######### args (task call) #############")
+        print(task.request.retries)
+        print("######### kwargs (task call) #############")
+        print(kwargs)
         try:
             return f(*args, **kwargs)
         except Exception:
