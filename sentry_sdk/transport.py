@@ -144,10 +144,22 @@ def _parse_rate_limits(header, now=None):
 
     for limit in header.split(","):
         try:
-            retry_after, categories, _ = limit.strip().split(":", 2)
+            parameters = limit.strip().split(":")
+            retry_after, categories = parameters[:2]
+
             retry_after = now + timedelta(seconds=int(retry_after))
             for category in categories and categories.split(";") or (None,):
-                yield category, retry_after
+                if category == "metric_bucket":
+                    try:
+                        namespaces = parameters[4].split(";")
+                    except IndexError:
+                        namespaces = []
+
+                    if not namespaces or "custom" in namespaces:
+                        yield category, retry_after
+
+                else:
+                    yield category, retry_after
         except (LookupError, ValueError):
             continue
 
@@ -210,6 +222,7 @@ class HttpTransport(Transport):
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
                 quantity = len(item.get_bytes()) or 1
+
         elif data_category is None:
             raise TypeError("data category not provided")
 
@@ -336,7 +349,14 @@ class HttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
+
+            # The envelope item type used for metrics is statsd
+            # whereas the rate limit category is metric_bucket
+            if bucket == "statsd":
+                bucket = "metric_bucket"
+
             ts = self._disabled_until.get(bucket)
+
             return ts is not None and ts > datetime_utcnow()
 
         return _disabled(category) or _disabled(None)
@@ -402,7 +422,7 @@ class HttpTransport(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default"):
+                if item.data_category in ("transaction", "error", "default", "statsd"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:

@@ -346,7 +346,7 @@ else:
                 for cls in frame.f_locals["self"].__class__.__mro__:
                     if name in cls.__dict__:
                         return "{}.{}".format(cls.__name__, name)
-        except AttributeError:
+        except (AttributeError, ValueError):
             pass
 
         # if it was a class method, (decorated with `@classmethod`)
@@ -362,7 +362,7 @@ else:
                 for cls in frame.f_locals["cls"].__mro__:
                     if name in cls.__dict__:
                         return "{}.{}".format(cls.__name__, name)
-        except AttributeError:
+        except (AttributeError, ValueError):
             pass
 
         # nothing we can do if it is a staticmethod (decorated with @staticmethod)

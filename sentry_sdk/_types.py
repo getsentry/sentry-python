@@ -114,7 +114,7 @@ if TYPE_CHECKING:
         "internal",
         "profile",
         "profile_chunk",
-        "statsd",
+        "metric_bucket",
         "monitor",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
@@ -180,3 +180,37 @@ if TYPE_CHECKING:
 
     BucketKey = Tuple[MetricType, str, MeasurementUnit, MetricTagsInternal]
     MetricMetaKey = Tuple[MetricType, str, MeasurementUnit]
+
+    MonitorConfigScheduleType = Literal["crontab", "interval"]
+    MonitorConfigScheduleUnit = Literal[
+        "year",
+        "month",
+        "week",
+        "day",
+        "hour",
+        "minute",
+        "second",  # not supported in Sentry and will result in a warning
+    ]
+
+    MonitorConfigSchedule = TypedDict(
+        "MonitorConfigSchedule",
+        {
+            "type": MonitorConfigScheduleType,
+            "value": Union[int, str],
+            "unit": MonitorConfigScheduleUnit,
+        },
+        total=False,
+    )
+
+    MonitorConfig = TypedDict(
+        "MonitorConfig",
+        {
+            "schedule": MonitorConfigSchedule,
+            "timezone": str,
+            "checkin_margin": int,
+            "max_runtime": int,
+            "failure_issue_threshold": int,
+            "recovery_threshold": int,
+        },
+        total=False,
+    )

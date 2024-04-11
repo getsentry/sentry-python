@@ -106,9 +106,16 @@ def get_git_revision():
     # type: () -> Optional[str]
     try:
         with open(os.path.devnull, "w+") as null:
+            # prevent command prompt windows from popping up on windows
+            startupinfo = None
+            if sys.platform == "win32" or sys.platform == "cygwin":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
             revision = (
                 subprocess.Popen(
                     ["git", "rev-parse", "HEAD"],
+                    startupinfo=startupinfo,
                     stdout=subprocess.PIPE,
                     stderr=null,
                     stdin=null,

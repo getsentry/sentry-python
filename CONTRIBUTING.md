@@ -8,7 +8,6 @@ This file outlines the process to contribute to the SDK itself. For contributing
 
 Please search the [issue tracker](https://github.com/getsentry/sentry-python/issues) before creating a new issue (a problem or an improvement request). Please also ask in our [Sentry Community on Discord](https://discord.com/invite/Ww9hbqr) before submitting a new issue. There are a ton of great people in our Discord community ready to help you!
 
-
 ## Submitting Changes
 
 - Fork the `sentry-python` repo and prepare your changes.
@@ -64,7 +63,7 @@ This will make sure that your commits will have the correct coding style.
 ```bash
 cd sentry-python
 
-pip install -r linter-requirements.txt
+pip install -r devenv-requirements.txt
 
 pip install pre-commit
 
@@ -75,12 +74,8 @@ That's it. You should be ready to make changes, run tests, and make commits! If 
 
 ## Running Tests
 
-To run the tests, first setup your development environment according to the instructions above. Then, install the required packages for running tests with the following command:
-```bash
-pip install -r test-requirements.txt
-```
+You can run all tests with the following command:
 
-Once the requirements are installed, you can run all tests with the following command:
 ```bash
 pytest tests/
 ```
