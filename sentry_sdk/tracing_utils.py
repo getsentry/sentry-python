@@ -332,17 +332,34 @@ class PropagationContext:
         "dynamic_sampling_context",
     )
 
-    def __init__(self):
-        # type: () -> None
-        self._trace_id = None  # type: Optional[str]
-        self._span_id = None  # type: Optional[str]
-        self.parent_span_id = None  # type: Optional[str]
-        self.parent_sampled = None  # type: Optional[bool]
-        self.dynamic_sampling_context = None  # type: Optional[Dict[str, str]]
+    def __init__(
+        self,
+        trace_id=None,  # type: Optional[str]
+        span_id=None,  # type: Optional[str]
+        parent_span_id=None,  # type: Optional[str]
+        parent_sampled=None,  # type: Optional[bool]
+        dynamic_sampling_context=None,  # type: Optional[Dict[str, str]]
+    ):
+        # type: (...) -> None
+        self._trace_id = trace_id
+        """The trace id of the Sentry trace."""
+
+        self._span_id = span_id
+        """The span id of the currently executing span."""
+
+        self.parent_span_id = parent_span_id
+        """The id of the parent span that started this span. The parent span could also be a span in an upstream service."""
+
+        self.parent_sampled = parent_sampled
+        """Boolean indicator if the parent span was sampled. Important when the parent span originated in an upstream service, because we watn to sample the whole trace, or nothing from the trace."""
+
+        self.dynamic_sampling_context = dynamic_sampling_context
+        """Data that is used for dynamic sampling decisions."""
 
     @property
     def trace_id(self):
         # type: () -> str
+        """The trace id of the Sentry trace."""
         if not self._trace_id:
             self._trace_id = uuid.uuid4().hex
 
@@ -356,6 +373,7 @@ class PropagationContext:
     @property
     def span_id(self):
         # type: () -> str
+        """The span id of the currently executed span."""
         if not self._span_id:
             self._span_id = uuid.uuid4().hex[16:]
 
@@ -368,6 +386,9 @@ class PropagationContext:
 
     def update(self, other_dict):
         # type: (Dict[str, Any]) -> None
+        """
+        Updates the PropagationContext with data from the given dictionary.
+        """
         for key, value in other_dict.items():
             setattr(self, key, value)
 
