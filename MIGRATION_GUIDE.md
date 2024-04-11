@@ -14,6 +14,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 - The `_ScopeManager` was moved from `sentry_sdk.hub` to `sentry_sdk.scope`.
+- The signature for the metrics callback function set with `before_emit_metric` has changed from `before_emit_metric(key, tags)` to `before_emit_metric(key, value, unit, tags)`
 - Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
 - `sentry_sdk.tracing_utils.add_query_source()`: Removed the `hub` parameter. It is not necessary anymore.
@@ -76,6 +77,8 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - `sentry_sdk.utils.Auth.get_api_url`'s now accepts a `sentry_sdk.consts.EndpointType` enum instead of a string as its only parameter. We recommend omitting this argument when calling the function, since the parameter's default value is the only possible `sentry_sdk.consts.EndpointType` value. The parameter exists for future compatibility.
 - Removed `tracing_utils_py2.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 - Removed the `sentry_sdk.profiler.Scheduler.stop_profiling` method. Any calls to this method can simply be removed, since this was a no-op method.
+- Removed the experimental `metrics_summary_sample_rate` config option.
+- Removed the experimental `should_summarize_metric` config option.
 
 ## Deprecated
 
