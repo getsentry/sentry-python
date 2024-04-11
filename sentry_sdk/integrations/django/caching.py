@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from typing import Callable
 
 
+# TODO: In new Django there is also `aget` and `aget_many` methods
+# TODO: for also creating spans for setting cache there is a `set`, `aset`, `add`, `aadd` methods
+#       see https://github.com/django/django/blob/main/django/core/cache/backends/base.py
 METHODS_TO_INSTRUMENT = [
     "get",
     "get_many",
@@ -70,6 +73,7 @@ def _patch_cache_method(cache, method_name):
 def _patch_cache(cache):
     # type: (CacheHandler) -> None
     if not hasattr(cache, "_sentry_patched"):
+        # TODO: Here we can also patch the set methods (see TODO above)
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name)
         cache._sentry_patched = True
