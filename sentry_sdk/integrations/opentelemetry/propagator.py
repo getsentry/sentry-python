@@ -17,6 +17,8 @@ from opentelemetry.trace import (  # type: ignore
     SpanContext,
     TraceFlags,
 )
+
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -24,17 +26,14 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
 )
-
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
-from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
-    from typing import Set
+    from typing import Optional, Set
 
 
 class SentryPropagator(TextMapPropagator):  # type: ignore
@@ -107,7 +106,9 @@ class SentryPropagator(TextMapPropagator):  # type: ignore
         if sentry_span.containing_transaction:
             baggage = sentry_span.containing_transaction.get_baggage()
             if baggage:
-                setter.set(carrier, BAGGAGE_HEADER_NAME, baggage.serialize())
+                baggage_data = baggage.serialize()
+                if baggage_data:
+                    setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)
 
     @property
     def fields(self):
