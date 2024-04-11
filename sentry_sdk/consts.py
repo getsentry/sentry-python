@@ -270,6 +270,11 @@ class SPANDATA:
     e.g. the queue name or topic.
     """
 
+    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
+    """
+    Number of retries/attempts to process a message.
+    """
+
     SERVER_ADDRESS = "server.address"
     """
     Name of the database host.
