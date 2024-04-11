@@ -1,6 +1,5 @@
 import os
 import sys
-import uuid
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
@@ -18,6 +17,7 @@ from sentry_sdk.tracing_utils import (
     extract_sentrytrace_data,
     has_tracing_enabled,
     normalize_incoming_data,
+    PropagationContext,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -196,7 +196,7 @@ class Scope(object):
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
-        self._propagation_context = None  # type: Optional[Dict[str, Any]]
+        self._propagation_context = None  # type: Optional[PropagationContext]
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -431,14 +431,15 @@ class Scope(object):
 
         return incoming_trace_information or None
 
-    def _extract_propagation_context(self, data):
-        # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
-        context = {}  # type: Dict[str, Any]
-        normalized_data = normalize_incoming_data(data)
+    def _extract_propagation_context(self, incoming_data):
+        # type: (Dict[str, Any]) -> Optional[PropagationContext]
+        context = None
 
+        normalized_data = normalize_incoming_data(incoming_data)
         baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
         if baggage_header:
-            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
+            context = PropagationContext()
+            context.dynamic_sampling_context = Baggage.from_incoming_header(
                 baggage_header
             ).dynamic_sampling_context()
 
@@ -446,41 +447,18 @@ class Scope(object):
         if sentry_trace_header:
             sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
             if sentrytrace_data is not None:
+                if context is None:
+                    context = PropagationContext()
                 context.update(sentrytrace_data)
 
-        only_baggage_no_sentry_trace = (
-            "dynamic_sampling_context" in context and "trace_id" not in context
-        )
-        if only_baggage_no_sentry_trace:
-            context.update(self._create_new_propagation_context())
-
-        if context:
-            if not context.get("span_id"):
-                context["span_id"] = uuid.uuid4().hex[16:]
-
-            return context
-
-        return None
-
-    def _create_new_propagation_context(self):
-        # type: () -> Dict[str, Any]
-        return {
-            "trace_id": uuid.uuid4().hex,
-            "span_id": uuid.uuid4().hex[16:],
-            "parent_span_id": None,
-            "dynamic_sampling_context": None,
-        }
+        return context
 
     def set_new_propagation_context(self):
         # type: () -> None
         """
         Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
         """
-        self._propagation_context = self._create_new_propagation_context()
-        logger.debug(
-            "[Tracing] Create new propagation context: %s",
-            self._propagation_context,
-        )
+        self._propagation_context = PropagationContext()
 
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
@@ -495,10 +473,6 @@ class Scope(object):
 
             if context is not None:
                 self._propagation_context = context
-                logger.debug(
-                    "[Tracing] Extracted propagation context from incoming data: %s",
-                    self._propagation_context,
-                )
 
         if self._propagation_context is None and self._type != ScopeType.CURRENT:
             self.set_new_propagation_context()
@@ -514,11 +488,11 @@ class Scope(object):
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context["dynamic_sampling_context"] = (
+            self._propagation_context.dynamic_sampling_context = (
                 baggage.dynamic_sampling_context()
             )
 
-        return self._propagation_context["dynamic_sampling_context"]
+        return self._propagation_context.dynamic_sampling_context
 
     def get_traceparent(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[str]
@@ -535,8 +509,8 @@ class Scope(object):
         # If this scope has a propagation context, return traceparent from there
         if self._propagation_context is not None:
             traceparent = "%s-%s" % (
-                self._propagation_context["trace_id"],
-                self._propagation_context["span_id"],
+                self._propagation_context.trace_id,
+                self._propagation_context.span_id,
             )
             return traceparent
 
@@ -557,8 +531,8 @@ class Scope(object):
 
         # If this scope has a propagation context, return baggage from there
         if self._propagation_context is not None:
-            dynamic_sampling_context = self._propagation_context.get(
-                "dynamic_sampling_context"
+            dynamic_sampling_context = (
+                self._propagation_context.dynamic_sampling_context
             )
             if dynamic_sampling_context is None:
                 return Baggage.from_options(self)
@@ -577,9 +551,9 @@ class Scope(object):
             return None
 
         trace_context = {
-            "trace_id": self._propagation_context["trace_id"],
-            "span_id": self._propagation_context["span_id"],
-            "parent_span_id": self._propagation_context["parent_span_id"],
+            "trace_id": self._propagation_context.trace_id,
+            "span_id": self._propagation_context.span_id,
+            "parent_span_id": self._propagation_context.parent_span_id,
             "dynamic_sampling_context": self.get_dynamic_sampling_context(),
         }  # type: Dict[str, Any]
 
@@ -667,7 +641,7 @@ class Scope(object):
                             yield header
 
     def get_active_propagation_context(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> Optional[PropagationContext]
         if self._propagation_context is not None:
             return self._propagation_context
 
@@ -679,7 +653,7 @@ class Scope(object):
         if isolation_scope._propagation_context is not None:
             return isolation_scope._propagation_context
 
-        return {}
+        return None
 
     def clear(self):
         # type: () -> None
@@ -1069,12 +1043,11 @@ class Scope(object):
             span = self.span or Scope.get_isolation_scope().span
 
             if span is None:
-                # New spans get the `trace_id`` from the scope
+                # New spans get the `trace_id` from the scope
                 if "trace_id" not in kwargs:
-
-                    trace_id = self.get_active_propagation_context().get("trace_id")
-                    if trace_id is not None:
-                        kwargs["trace_id"] = trace_id
+                    propagation_context = self.get_active_propagation_context()
+                    if propagation_context is not None:
+                        kwargs["trace_id"] = propagation_context.trace_id
 
                 span = Span(**kwargs)
             else:

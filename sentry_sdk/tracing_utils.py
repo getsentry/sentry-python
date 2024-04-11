@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from datetime import timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
+import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -318,6 +319,59 @@ def _format_sql(cursor, sql):
     return real_sql or to_string(sql)
 
 
+class PropagationContext:
+    """
+    The PropagationContext represents the data of a trace in Sentry.
+    """
+
+    __slots__ = (
+        "_trace_id",
+        "_span_id",
+        "parent_span_id",
+        "parent_sampled",
+        "dynamic_sampling_context",
+    )
+
+    def __init__(self):
+        # type: () -> None
+        self._trace_id = None  # type: Optional[str]
+        self._span_id = None  # type: Optional[str]
+        self.parent_span_id = None  # type: Optional[str]
+        self.parent_sampled = None  # type: Optional[bool]
+        self.dynamic_sampling_context = None  # type: Optional[Dict[str, str]]
+
+    @property
+    def trace_id(self):
+        # type: () -> str
+        if not self._trace_id:
+            self._trace_id = uuid.uuid4().hex
+
+        return self._trace_id
+
+    @trace_id.setter
+    def trace_id(self, value):
+        # type: (str) -> None
+        self._trace_id = value
+
+    @property
+    def span_id(self):
+        # type: () -> str
+        if not self._span_id:
+            self._span_id = uuid.uuid4().hex[16:]
+
+        return self._span_id
+
+    @span_id.setter
+    def span_id(self, value):
+        # type: (str) -> None
+        self._span_id = value
+
+    def update(self, other_dict):
+        # type: (Dict[str, Any]) -> None
+        for key, value in other_dict.items():
+            setattr(self, key, value)
+
+
 class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
@@ -381,8 +435,8 @@ class Baggage:
         options = client.options
         propagation_context = scope._propagation_context
 
-        if propagation_context is not None and "trace_id" in propagation_context:
-            sentry_items["trace_id"] = propagation_context["trace_id"]
+        if propagation_context is not None:
+            sentry_items["trace_id"] = propagation_context.trace_id
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]

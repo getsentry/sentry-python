@@ -154,11 +154,11 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
 
         assert (
             error_event["contexts"]["trace"]["trace_id"]
-            == scope._propagation_context["trace_id"]
+            == scope._propagation_context.trace_id
         )
         assert (
             error_event["contexts"]["trace"]["span_id"]
-            != scope._propagation_context["span_id"]
+            != scope._propagation_context.span_id
         )
         assert error_event["transaction"] == "dummy_task"
         assert "celery_task_id" in error_event["tags"]
