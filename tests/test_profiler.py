@@ -19,7 +19,6 @@ from sentry_sdk.profiler import (
     get_frame_name,
     setup_profiler,
 )
-from sentry_sdk.tracing import Transaction
 from sentry_sdk._lru_cache import LRUCache
 
 try:
