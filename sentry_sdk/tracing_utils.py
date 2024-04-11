@@ -348,10 +348,13 @@ class PropagationContext:
         """The span id of the currently executing span."""
 
         self.parent_span_id = parent_span_id
-        """The id of the parent span that started this span. The parent span could also be a span in an upstream service."""
+        """The id of the parent span that started this span.
+        The parent span could also be a span in an upstream service."""
 
         self.parent_sampled = parent_sampled
-        """Boolean indicator if the parent span was sampled. Important when the parent span originated in an upstream service, because we watn to sample the whole trace, or nothing from the trace."""
+        """Boolean indicator if the parent span was sampled.
+        Important when the parent span originated in an upstream service,
+        because we watn to sample the whole trace, or nothing from the trace."""
 
         self.dynamic_sampling_context = dynamic_sampling_context
         """Data that is used for dynamic sampling decisions."""
