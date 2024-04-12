@@ -431,28 +431,6 @@ class Scope(object):
 
         return incoming_trace_information or None
 
-    def _extract_propagation_context(self, incoming_data):
-        # type: (Dict[str, Any]) -> Optional[PropagationContext]
-        propagation_context = None
-
-        normalized_data = normalize_incoming_data(incoming_data)
-        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
-        if baggage_header:
-            propagation_context = PropagationContext()
-            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
-                baggage_header
-            ).dynamic_sampling_context()
-
-        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
-        if sentry_trace_header:
-            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
-            if sentrytrace_data is not None:
-                if propagation_context is None:
-                    propagation_context = PropagationContext()
-                propagation_context.update(sentrytrace_data)
-
-        return propagation_context
-
     def set_new_propagation_context(self):
         # type: () -> None
         """
@@ -463,18 +441,18 @@ class Scope(object):
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
-        Makes sure the propagation context (`_propagation_context`) is set.
-        The propagation context only lives on the current scope.
-        If there is `incoming_data` overwrite existing `_propagation_context`.
-        if there is no `incoming_data` create new `_propagation_context`, but do NOT overwrite if already existing.
+        Makes sure the propagation context is set on the scope.
+        If there is `incoming_data` overwrite existing propagation context.
+        If there is no `incoming_data` create new propagation context, but do NOT overwrite if already existing.
         """
         if incoming_data:
-            propagation_context = self._extract_propagation_context(incoming_data)
+            propagation_context = PropagationContext.from_incoming_data(incoming_data)
             if propagation_context is not None:
                 self._propagation_context = propagation_context
 
-        if self._propagation_context is None and self._type != ScopeType.CURRENT:
-            self.set_new_propagation_context()
+        if self._type != ScopeType.CURRENT:
+            if self._propagation_context is None:
+                self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
