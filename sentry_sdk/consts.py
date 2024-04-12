@@ -97,24 +97,6 @@ class SPANDATA:
     Example: [{"role": "user", "message": "hello"}]
     """
 
-    AI_COMPLETION_TOKENS_USED = "ai.completion_tokens.used"
-    """
-    The number of tokens used to respond to an AI model request
-    Example: 10
-    """
-
-    AI_PROMPT_TOKENS_USED = "ai.prompt_tokens.used"
-    """
-    The number of tokens used to process the input text to an AI model request
-    Example: 20
-    """
-
-    AI_TOTAL_TOKENS_USED = "ai.total_tokens.used"
-    """
-    The number of tokens used in total to process an AI model request
-    Example: 30
-    """
-
     AI_MODEL_ID = "ai.model_id"
     """
     The unique descriptor of the model being execugted

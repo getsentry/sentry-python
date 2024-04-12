@@ -140,7 +140,9 @@ def _wrap_chat_completion_create(f):
         streaming = kwargs.get("stream")
 
         span = sentry_sdk.start_span(
-            op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE, description="Chat Completion"
+            op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
+            origin="auto.ai.openai",
+            description="Chat Completion",
         )
         span.__enter__()
         try:
@@ -223,6 +225,7 @@ def _wrap_embeddings_create(f):
         # type: (*Any, **Any) -> Any
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
+            origin="auto.ai.openai",
             description="OpenAI Embedding Creation",
         ) as span:
             integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)

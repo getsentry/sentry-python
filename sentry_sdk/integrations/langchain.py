@@ -127,6 +127,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def _create_span(self, run_id, parent_id, **kwargs):
         # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> Span
 
+        if "origin" not in kwargs:
+            kwargs["origin"] = "auto.ai.langchain"
+
         span = None  # type: Optional[Span]
         if parent_id:
             parent_span = self.span_map[parent_id]  # type: Optional[WatchedSpan]
