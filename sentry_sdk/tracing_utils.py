@@ -393,7 +393,10 @@ class PropagationContext:
         Updates the PropagationContext with data from the given dictionary.
         """
         for key, value in other_dict.items():
-            setattr(self, key, value)
+            try:
+                setattr(self, key, value)
+            except AttributeError:
+                pass
 
 
 class Baggage:
