@@ -29,7 +29,7 @@ def test_context_with_values():
     assert ctx.trace_id == "1234567890abcdef1234567890abcdef"
     assert ctx.span_id == "1234567890abcdef"
     assert ctx.parent_span_id == "abcdef1234567890"
-    assert ctx.parent_sampled == True
+    assert ctx.parent_sampled
     assert ctx.dynamic_sampling_context == {
         "foo": "bar",
     }
@@ -77,7 +77,7 @@ def test_update():
     assert ctx.span_id is not None  # this sets _span_id
     assert ctx._span_id is not None
     assert ctx.parent_span_id == "Z234567890abcdef"
-    assert ctx.parent_sampled == False
+    assert not ctx.parent_sampled
     assert ctx.dynamic_sampling_context is None
 
     assert not hasattr(ctx, "foo")

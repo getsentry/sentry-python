@@ -14,7 +14,6 @@ from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
-    extract_sentrytrace_data,
     has_tracing_enabled,
     normalize_incoming_data,
     PropagationContext,
