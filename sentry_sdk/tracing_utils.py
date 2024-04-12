@@ -11,10 +11,6 @@ import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.tracing import (
-    BAGGAGE_HEADER_NAME,
-    SENTRY_TRACE_HEADER_NAME,
-)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     filename_for_module,
@@ -676,7 +672,11 @@ def get_current_span(scope=None):
 
 
 # Circular imports
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    LOW_QUALITY_TRANSACTION_SOURCES,
+    SENTRY_TRACE_HEADER_NAME,
+)
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
