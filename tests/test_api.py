@@ -2,6 +2,7 @@ import pytest
 from unittest import mock
 
 from sentry_sdk import (
+    capture_exception,
     continue_trace,
     get_baggage,
     get_client,
@@ -9,6 +10,7 @@ from sentry_sdk import (
     get_traceparent,
     is_initialized,
     start_transaction,
+    set_tags,
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
@@ -135,3 +137,45 @@ def test_get_client():
     assert client is not None
     assert client.__class__ == NonRecordingClient
     assert not client.is_active()
+
+
+def raise_and_capture():
+    """Raise an exception and capture it.
+
+    This is a utility function for test_set_tags.
+    """
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        capture_exception()
+
+
+def test_set_tags(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    set_tags({"tag1": "value1", "tag2": "value2"})
+    raise_and_capture()
+
+    (*_, event) = events
+    assert event["tags"] == {"tag1": "value1", "tag2": "value2"}, "Setting tags failed"
+
+    set_tags({"tag2": "updated", "tag3": "new"})
+    raise_and_capture()
+
+    (*_, event) = events
+    assert event["tags"] == {
+        "tag1": "value1",
+        "tag2": "updated",
+        "tag3": "new",
+    }, "Updating tags failed"
+
+    set_tags({})
+    raise_and_capture()
+
+    (*_, event) = events
+    assert event["tags"] == {
+        "tag1": "value1",
+        "tag2": "updated",
+        "tag3": "new",
+    }, "Upating tags with empty dict changed tags"
