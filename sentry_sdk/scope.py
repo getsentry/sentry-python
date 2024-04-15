@@ -35,7 +35,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Mapping, MutableMapping
 
     from typing import Any
     from typing import Callable
@@ -798,6 +798,10 @@ class Scope(object):
         :param value: Value of the tag to set.
         """
         self._tags[key] = value
+
+    def set_tags(self, tags):
+        # type: (Mapping[str, object]) -> None
+        self._tags.update(tags)
 
     def remove_tag(self, key):
         # type: (str) -> None
