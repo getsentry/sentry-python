@@ -796,3 +796,29 @@ def test_should_send_default_pii_false(sentry_init):
     sentry_init(send_default_pii=False)
 
     assert should_send_default_pii() is False
+
+
+def test_set_tags():
+    scope = Scope()
+    scope.set_tags({"tag1": "value1", "tag2": "value2"})
+    event = scope.apply_to_event({}, {})
+
+    assert event["tags"] == {"tag1": "value1", "tag2": "value2"}, "Setting tags failed"
+
+    scope.set_tags({"tag2": "updated", "tag3": "new"})
+    event = scope.apply_to_event({}, {})
+
+    assert event["tags"] == {
+        "tag1": "value1",
+        "tag2": "updated",
+        "tag3": "new",
+    }, "Updating tags failed"
+
+    scope.set_tags({})
+    event = scope.apply_to_event({}, {})
+
+    assert event["tags"] == {
+        "tag1": "value1",
+        "tag2": "updated",
+        "tag3": "new",
+    }, "Upating tags with empty dict changed tags"
