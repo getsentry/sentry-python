@@ -188,6 +188,7 @@ class Span:
         "same_process_as_parent",
         "sampled",
         "op",
+        "origin",
         "description",
         "start_timestamp",
         "_start_timestamp_monotonic_ns",
@@ -211,6 +212,7 @@ class Span:
         same_process_as_parent=True,  # type: bool
         sampled=None,  # type: Optional[bool]
         op=None,  # type: Optional[str]
+        origin=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
         hub=None,  # type: Optional[sentry_sdk.Hub]  # deprecated
         status=None,  # type: Optional[str]
@@ -225,6 +227,7 @@ class Span:
         self.same_process_as_parent = same_process_as_parent
         self.sampled = sampled
         self.op = op
+        self.origin = origin
         self.description = description
         self.status = status
         self.hub = hub
@@ -585,6 +588,7 @@ class Span:
             "parent_span_id": self.parent_span_id,
             "same_process_as_parent": self.same_process_as_parent,
             "op": self.op,
+            "origin": self.origin,
             "description": self.description,
             "start_timestamp": self.start_timestamp,
             "timestamp": self.timestamp,
