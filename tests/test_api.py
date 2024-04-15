@@ -178,4 +178,4 @@ def test_set_tags(sentry_init, capture_events):
         "tag1": "value1",
         "tag2": "updated",
         "tag3": "new",
-    }, "Upating tags with empty dict changed tags"
+    }, "Updating tags with empty dict changed tags"
