@@ -801,6 +801,21 @@ class Scope(object):
 
     def set_tags(self, tags):
         # type: (Mapping[str, object]) -> None
+        """Sets multiple tags at once.
+
+        This method updates multiple tags at once. The tags are passed as a dictionary
+        or other mapping type.
+
+        Calling this method is equivalent to calling `set_tag` on each key-value pair
+        in the mapping. If a tag key already exists in the scope, its value will be
+        updated. If the tag key does not exist in the scope, the key-value pair will
+        be added to the scope.
+
+        This method only modifies tag keys in the `tags` mapping passed to the method.
+        `scope.set_tags({})` is, therefore, a no-op.
+
+        :param tags: A mapping of tag keys to tag values to set.
+        """
         self._tags.update(tags)
 
     def remove_tag(self, key):
