@@ -1,11 +1,11 @@
 # Sentry SDK 2.0 Migration Guide
 
-Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed.
+Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common migration patterns.
 
 ## New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
-- As part of refactoring the [inner workings](https://docs.sentry.io/platforms/python/enriching-events/scopes/) of the SDK we added new top-level APIs for custom instrumentation called `new_scope` and `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
+- While refactoring the [inner workings](https://docs.sentry.io/platforms/python/enriching-events/scopes/) of the SDK we added new top-level APIs for custom instrumentation called `new_scope` and `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
 ## Changed
 
@@ -145,7 +145,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   # do something with `scope`
   ```
 
-  When to use `get_current_scope()` and `get_isolation_scope()` depends on how long the change to the scope should apply. If you want it to affect the whole request-response cycle or the whole execution of task, use the isolation scope. If it's more localized, use the current scope.
+  When to use `get_current_scope()` and `get_isolation_scope()` depends on how long the change to the scope should be in effect. If you want the changed scope to affect the whole request-response cycle or the whole execution of task, use the isolation scope. If it's more localized, use the current scope.
 
 - `push_scope` is deprecated. Fork the current or the isolation scope instead.
 
@@ -174,7 +174,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
       # do something with `scope`
   ```
 
-  `new_scope()` will fork the current scope, while `isolation_scope()` will fork the isolation scope. Isolation scopes roughly translate to transactions, so if you're looking to create a new separated scope for a whole request-response cycle or task execution, go for `isolation_scope()`. If you want to wrap a smaller unit code, fork the current scope instead with `new_scope()`.
+  `new_scope()` will fork the current scope, while `isolation_scope()` will fork the isolation scope. The lifecycle of a single isolation scope roughly translates to the lifecycle of a transaction in most cases, so if you're looking to create a new separated scope for a whole request-response cycle or task execution, go for `isolation_scope()`. If you want to wrap a smaller unit code, fork the current scope instead with `new_scope()`.
 
 - Accessing the client via the hub has been deprecated. Use the top-level `sentry_sdk.get_client()` to get the current client.
 - `profiler_mode` and `profiles_sample_rate` have been deprecated as `_experiments` options. Use them as top level options instead:
