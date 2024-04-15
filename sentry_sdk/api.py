@@ -8,6 +8,8 @@ from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from typing import Any
     from typing import Dict
     from typing import Generator
@@ -64,6 +66,7 @@ __all__ = [
     "set_level",
     "set_measurement",
     "set_tag",
+    "set_tags",
     "set_user",
     "start_span",
     "start_transaction",
@@ -237,6 +240,12 @@ def push_scope(  # noqa: F811
 def set_tag(key, value):
     # type: (str, Any) -> None
     return Scope.get_isolation_scope().set_tag(key, value)
+
+
+@scopemethod
+def set_tags(tags):
+    # type: (Mapping[str, object]) -> None
+    Scope.get_isolation_scope().set_tags(tags)
 
 
 @scopemethod
