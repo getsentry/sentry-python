@@ -209,7 +209,17 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     else:
         assert execution_event["contexts"]["trace"]["status"] == "ok"
 
-    assert execution_event["spans"] == []
+    assert len(execution_event["spans"]) == 1
+    assert (
+        execution_event["spans"][0].items()
+        >= {
+            "trace_id": str(transaction.trace_id),
+            "same_process_as_parent": True,
+            "op": "queue.process",
+            "description": "dummy_task",
+            "data": ApproxDict(),
+        }.items()
+    )
     assert submission_event["spans"] == [
         {
             "data": ApproxDict(),
@@ -606,3 +616,46 @@ def test_apply_async_no_args(init_celery):
         pytest.fail("Calling `apply_async` without arguments raised a TypeError")
 
     assert result.get() == "success"
+
+
+@pytest.mark.parametrize("routing_key", ("celery", "custom"))
+@mock.patch("celery.app.task.Task.request")
+def test_messaging_destination_name_default_exchange(
+    mock_request, routing_key, init_celery, capture_events
+):
+    celery_app = init_celery(enable_tracing=True)
+    events = capture_events()
+    mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
+
+    @celery_app.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.destination.name"] == routing_key
+
+
+@mock.patch("celery.app.task.Task.request")
+def test_messaging_destination_name_nondefault_exchange(
+    mock_request, init_celery, capture_events
+):
+    """
+    Currently, we only capture the routing key as the messaging.destination.name when
+    we are using the default exchange (""). This is because the default exchange ensures
+    that the routing key is the queue name. Other exchanges may not guarantee this
+    behavior.
+    """
+    celery_app = init_celery(enable_tracing=True)
+    events = capture_events()
+    mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
+
+    @celery_app.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.destination.name" not in span["data"]
