@@ -16,6 +16,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import Scope
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -177,13 +178,13 @@ def _wrap_apply_async(f):
         )  # type: Union[Span, NoOpMgr]
 
         with span_mgr as span:
-            incoming_headers = kwargs.get("headers") or {}
+            kwarg_headers = kwargs.get("headers") or {}
             integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
 
             # If Sentry Crons monitoring for Celery Beat tasks is enabled
             # add start timestamp of task,
             if integration is not None and integration.monitor_beat_tasks:
-                incoming_headers.update(
+                kwarg_headers.update(
                     {
                         "sentry-monitor-start-timestamp-s": "%.9f"
                         % _now_seconds_since_epoch(),
@@ -194,7 +195,7 @@ def _wrap_apply_async(f):
             default_propagate_traces = (
                 integration.propagate_traces if integration is not None else True
             )
-            propagate_traces = incoming_headers.pop(
+            propagate_traces = kwarg_headers.pop(
                 "sentry-propagate-traces", default_propagate_traces
             )
 
@@ -208,21 +209,27 @@ def _wrap_apply_async(f):
                     # Set Sentry trace data in the headers of the Celery task
                     if sentry_trace_headers:
                         # Make sure we don't overwrite existing baggage
-                        incoming_baggage = incoming_headers.get(BAGGAGE_HEADER_NAME)
+                        incoming_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
                         sentry_baggage = sentry_trace_headers.get(BAGGAGE_HEADER_NAME)
 
                         combined_baggage = sentry_baggage or incoming_baggage
                         if sentry_baggage and incoming_baggage:
-                            combined_baggage = "{},{}".format(
-                                incoming_baggage,
-                                sentry_baggage,
+                            # Merge incoming and sentry baggage, where the sentry trace information
+                            # in the incoming baggage takes precedence and the third-party items
+                            # are concatenated.
+                            incoming = Baggage.from_incoming_header(incoming_baggage)
+                            combined = Baggage.from_incoming_header(sentry_baggage)
+                            combined.sentry_items.update(incoming.sentry_items)
+                            combined.third_party_items += (
+                                "," + incoming.third_party_items
                             )
+                            combined_baggage = combined.serialize()
 
                         # Set Sentry trace data to the headers of the Celery task
-                        incoming_headers.update(sentry_trace_headers)
+                        kwarg_headers.update(sentry_trace_headers)
 
                         if combined_baggage:
-                            incoming_headers[BAGGAGE_HEADER_NAME] = combined_baggage
+                            kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
                         # Set sentry trace data also to the inner headers of the Celery task
                         # https://github.com/celery/celery/issues/4875
@@ -230,11 +237,11 @@ def _wrap_apply_async(f):
                         # Need to setdefault the inner headers too since other
                         # tracing tools (dd-trace-py) also employ this exact
                         # workaround and we don't want to break them.
-                        incoming_headers.setdefault("headers", {}).update(
+                        kwarg_headers.setdefault("headers", {}).update(
                             sentry_trace_headers
                         )
                         if combined_baggage:
-                            incoming_headers["headers"][
+                            kwarg_headers["headers"][
                                 BAGGAGE_HEADER_NAME
                             ] = combined_baggage
 
@@ -245,13 +252,13 @@ def _wrap_apply_async(f):
             # Need to setdefault the inner headers too since other
             # tracing tools (dd-trace-py) also employ this exact
             # workaround and we don't want to break them.
-            incoming_headers.setdefault("headers", {})
-            for key, value in incoming_headers.items():
+            kwarg_headers.setdefault("headers", {})
+            for key, value in kwarg_headers.items():
                 if key.startswith("sentry-"):
-                    incoming_headers["headers"][key] = value
+                    kwarg_headers["headers"][key] = value
 
             # Run the task (with updated headers in kwargs)
-            kwargs["headers"] = incoming_headers
+            kwargs["headers"] = kwarg_headers
 
             return f(*args, **kwargs)
 
