@@ -209,7 +209,17 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     else:
         assert execution_event["contexts"]["trace"]["status"] == "ok"
 
-    assert execution_event["spans"] == []
+    assert len(execution_event["spans"]) == 1
+    assert (
+        execution_event["spans"][0].items()
+        >= {
+            "trace_id": str(transaction.trace_id),
+            "same_process_as_parent": True,
+            "op": "queue.task.celery",
+            "description": "dummy_task",
+            "data": ApproxDict(),
+        }.items()
+    )
     assert submission_event["spans"] == [
         {
             "data": ApproxDict(),

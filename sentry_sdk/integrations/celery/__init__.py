@@ -306,6 +306,18 @@ def _wrap_tracer(task, f):
     return _inner  # type: ignore
 
 
+def _set_messaging_destination_name(task, span):
+    # type: (Any, Span) -> None
+    """Set "messaging.destination.name" tag for span"""
+    with capture_internal_exceptions():
+        delivery_info = task.request.delivery_info
+        routing_key = delivery_info.get("routing_key")
+        if delivery_info.get("exchange") == "" and routing_key is not None:
+            # Empty exchange indicates the default exchange, meaning the tasks
+            # are sent to the queue with the same name as the routing key.
+            span.set_data("messaging.destination.name", routing_key)
+
+
 def _wrap_task_call(task, f):
     # type: (Any, F) -> F
 
@@ -313,13 +325,19 @@ def _wrap_task_call(task, f):
     # see it. Also celery's reported stacktrace is untrustworthy.
 
     # functools.wraps is important here because celery-once looks at this
-    # method's name.
+    # method's name. @ensure_integration_enabled internally calls functools.wraps,
+    # but if we ever remove the @ensure_integration_enabled decorator, we need
+    # to add @functools.wraps(f) here.
     # https://github.com/getsentry/sentry-python/issues/421
-    @wraps(f)
+    @ensure_integration_enabled(CeleryIntegration, f)
     def _inner(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         try:
-            return f(*args, **kwargs)
+            with sentry_sdk.start_span(
+                op=OP.QUEUE_TASK_CELERY, description=task.name
+            ) as span:
+                _set_messaging_destination_name(task, span)
+                return f(*args, **kwargs)
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
