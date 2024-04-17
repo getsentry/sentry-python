@@ -53,7 +53,10 @@ __all__ = [
     "flush",
     "get_baggage",
     "get_client",
+    "get_current_scope",
     "get_current_span",
+    "get_global_scope",
+    "get_isolation_scope",
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
@@ -366,3 +369,18 @@ def continue_trace(environ_or_headers, op=None, name=None, source=None):
     return Scope.get_isolation_scope().continue_trace(
         environ_or_headers, op, name, source
     )
+
+
+def get_global_scope():
+    """Returns the global scope."""
+    return Scope.get_global_scope()
+
+
+def get_isolation_scope():
+    """Returns the currently active isolation scope."""
+    return Scope.get_isolation_scope()
+
+
+def get_current_scope():
+    """Returns the currently active current scope."""
+    return Scope.get_current_scope()
