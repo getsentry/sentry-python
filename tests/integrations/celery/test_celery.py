@@ -616,3 +616,19 @@ def test_apply_async_no_args(init_celery):
         pytest.fail("Calling `apply_async` without arguments raised a TypeError")
 
     assert result.get() == "success"
+
+
+@mock.patch("celery.app.task.Task.request")
+def test_messaging_destination_name(mock_request, init_celery, capture_events):
+    celery_app = init_celery(enable_tracing=True)
+    events = capture_events()
+    mock_request.delivery_info = {"routing_key": "celery", "exchange": ""}
+
+    @celery_app.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.destination.name"] == "celery"
