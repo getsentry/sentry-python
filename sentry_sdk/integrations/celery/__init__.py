@@ -220,10 +220,8 @@ def _wrap_apply_async(f):
                             incoming = Baggage.from_incoming_header(incoming_baggage)
                             combined = Baggage.from_incoming_header(sentry_baggage)
                             combined.sentry_items.update(incoming.sentry_items)
-                            combined.third_party_items += (
-                                "," + incoming.third_party_items
-                            )
-                            combined_baggage = combined.serialize()
+                            combined.third_party_items = ",".join([x for x in [combined.third_party_items, incoming.third_party_items] if x is not None and x != ""])
+                            combined_baggage = combined.serialize(include_third_party=True)
 
                         # Set Sentry trace data to the headers of the Celery task
                         kwarg_headers.update(sentry_trace_headers)

@@ -529,6 +529,40 @@ def test_baggage_propagation(init_celery):
         )
 
 
+def test_baggage_propagation_sentry_items(init_celery):
+    BAGGAGE_VALUE = (
+        "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
+        "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+    )
+
+    celery = init_celery(traces_sample_rate=1.0, release="abcdef")
+
+    @celery.task(name="dummy_task", bind=True)
+    def dummy_task(self, x, y):
+        return _get_headers(self)
+
+    with start_transaction() as transaction:
+        result = dummy_task.apply_async(
+            args=(1, 0),
+            headers={"baggage": BAGGAGE_VALUE},
+        ).get()
+
+        assert sorted(result["baggage"].split(",")) == sorted(
+            [
+                "sentry-release=abcdef",
+                "sentry-trace_id=771a43a4192642f0b136d5159a501700",  # NOT transaction.trace_id!
+                "sentry-environment=production",
+                "sentry-public_key=49d0f7386ad645858ae85020e393bef3",
+                "sentry-sample_rate=0.01337",
+                "sentry-sampled=true",
+                "other-vendor-value-1=foo;bar;baz",
+                "other-vendor-value-2=foo;bar;",
+                "sentry-user_id=Am%C3%A9lie",
+            ]
+        )
+
+
 def test_sentry_propagate_traces_override(init_celery):
     """
     Test if the `sentry-propagate-traces` header given to `apply_async`
