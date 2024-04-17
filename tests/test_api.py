@@ -5,7 +5,10 @@ from sentry_sdk import (
     continue_trace,
     get_baggage,
     get_client,
+    get_current_scope,
     get_current_span,
+    get_global_scope,
+    get_isolation_scope,
     get_traceparent,
     is_initialized,
     start_transaction,
@@ -135,3 +138,9 @@ def test_get_client():
     assert client is not None
     assert client.__class__ == NonRecordingClient
     assert not client.is_active()
+
+
+def test_get_scope():
+    assert get_current_scope() == Scope.get_current_scope()
+    assert get_isolation_scope() == Scope.get_isolation_scope()
+    assert get_global_scope() == Scope.get_global_scope()
