@@ -372,15 +372,18 @@ def continue_trace(environ_or_headers, op=None, name=None, source=None):
 
 
 def get_global_scope():
+    # type: () -> Scope
     """Returns the global scope."""
     return Scope.get_global_scope()
 
 
 def get_isolation_scope():
+    # type: () -> Scope
     """Returns the currently active isolation scope."""
     return Scope.get_isolation_scope()
 
 
 def get_current_scope():
+    # type: () -> Scope
     """Returns the currently active current scope."""
     return Scope.get_current_scope()
