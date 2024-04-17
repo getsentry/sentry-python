@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from flask import Flask, request, jsonify
 from graphene import ObjectType, String, Schema
 
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.graphene import GrapheneIntegration
@@ -201,3 +202,82 @@ def test_no_event_if_no_errors_sync(sentry_init, capture_events):
     client.post("/graphql", json=query)
 
     assert len(events) == 0
+
+
+def test_graphql_span_holds_query_information(sentry_init, capture_events):
+    sentry_init(
+        integrations=[GrapheneIntegration(), FlaskIntegration()],
+        enable_tracing=True,
+        default_integrations=False,
+    )
+    events = capture_events()
+
+    schema = Schema(query=Query)
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server_sync():
+        data = request.get_json()
+        result = schema.execute(data["query"], operation_name=data.get("operationName"))
+        return jsonify(result.data), 200
+
+    query = {
+        "query": "query GreetingQuery { hello }",
+        "operationName": "GreetingQuery",
+    }
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert len(event["spans"]) == 1
+
+    (span,) = event["spans"]
+    assert span["op"] == OP.GRAPHQL_QUERY
+    assert span["description"] == query["operationName"]
+    assert span["data"]["graphql.document"] == query["query"]
+    assert span["data"]["graphql.operation.name"] == query["operationName"]
+    assert span["data"]["graphql.operation.type"] == "query"
+
+
+def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            GrapheneIntegration(),
+        ],
+        default_integrations=False,
+    )
+    events = capture_events()
+
+    schema = Schema(query=Query)
+
+    sync_app = Flask(__name__)
+
+    @sync_app.route("/graphql", methods=["POST"])
+    def graphql_server_sync():
+        data = request.get_json()
+        result = schema.execute(data["query"], operation_name=data.get("operationName"))
+        return jsonify(result.data), 200
+
+    query = {
+        "query": "query ErrorQuery { goodbye }",
+        "operationName": "ErrorQuery",
+    }
+    client = sync_app.test_client()
+    client.post("/graphql", json=query)
+
+    assert len(events) == 1
+
+    (event,) = events
+    assert len(event["breadcrumbs"]) == 1
+
+    breadcrumbs = event["breadcrumbs"]["values"]
+    assert len(breadcrumbs) == 1
+
+    (breadcrumb,) = breadcrumbs
+    assert breadcrumb["category"] == "graphql.operation"
+    assert breadcrumb["data"]["operation_name"] == query["operationName"]
+    assert breadcrumb["data"]["operation_type"] == "query"
+    assert breadcrumb["type"] == "default"
