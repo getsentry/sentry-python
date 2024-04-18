@@ -156,10 +156,13 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
 
 
 def do_stuff_with_kwargs(kwargs, span, integration):
+    # Note: kwargs can contain headers=None, so no setdefault!
+    # Unsure which backend though.
+
     kwarg_headers = kwargs.get("headers") or {}
     propagate_traces = kwarg_headers.pop(
         "sentry-propagate-traces", integration.propagate_traces
-    )
+    ) # this is popped here, because it is also popped outside of this function
 
     with capture_internal_exceptions():
         headers = (
@@ -237,6 +240,8 @@ def _wrap_apply_async(f):
 
             return f(*args, **kwargs)
 
+        # This did never work, because the args is never "BEAT"!
+        # see refactoring in rc4 to see how this is checked now. (in some other code the tracing info is reset, i think)
         try:
             task_started_from_beat = args[1][0] == "BEAT"
         except (IndexError, TypeError):
