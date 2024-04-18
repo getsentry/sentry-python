@@ -161,6 +161,12 @@ def _wrap_apply_async(f):
     @ensure_integration_enabled(CeleryIntegration, f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
+        print("\n\n\n\n\n\n\n\n")
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        print(f'kwargs incoming:')
+        from pprint import pprint
+        pprint(kwargs)
+
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
         kwarg_headers = kwargs.get("headers") or {}
@@ -170,6 +176,10 @@ def _wrap_apply_async(f):
         )
 
         if not propagate_traces:
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("111 kwargs updated:")
+            pprint(kwargs)
+
             return f(*args, **kwargs)
 
         try:
@@ -231,6 +241,10 @@ def _wrap_apply_async(f):
                             kwarg_headers["headers"][key] = value
 
                     kwargs["headers"] = kwarg_headers
+
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("222 kwargs updated:")
+            pprint(kwargs)
 
             return f(*args, **kwargs)
 
