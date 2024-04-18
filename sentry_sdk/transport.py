@@ -192,7 +192,6 @@ class HttpTransport(Transport):
         Transport.__init__(self, options)
         assert self.parsed_dsn is not None
         self.options = options  # type: Dict[str, Any]
-        self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
         self._disabled_until = {}  # type: Dict[DataCategory, datetime]
         self._retry = urllib3.util.Retry()
@@ -215,6 +214,9 @@ class HttpTransport(Transport):
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
             proxy_headers=options["proxy_headers"],
+        )
+        self._worker = BackgroundWorker(
+            sender=EnvelopeSender(self), queue_size=options["transport_queue_size"]
         )
 
         from sentry_sdk import Hub
@@ -396,6 +398,7 @@ class HttpTransport(Transport):
         # type: (...) -> None
 
         # remove all items from the envelope which are over quota
+        print("sending")
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
@@ -543,14 +546,14 @@ class HttpTransport(Transport):
         # type: (...) -> None
         hub = self.hub_cls.current
 
-        def send_envelope_wrapper():
-            # type: () -> None
-            with hub:
-                with capture_internal_exceptions():
-                    self._send_envelope(envelope)
-                    self._flush_client_reports()
+        # def send_envelope_wrapper():
+        #     # type: () -> None
+        #     with hub:
+        #         with capture_internal_exceptions():
+        #             self._send_envelope(envelope)
+        #             self._flush_client_reports()
 
-        if not self._worker.submit(send_envelope_wrapper):
+        if not self._worker.submit(envelope):
             self.on_dropped_event("full_queue")
             for item in envelope.items:
                 self.record_lost_event("queue_overflow", item=item)
@@ -564,13 +567,33 @@ class HttpTransport(Transport):
         logger.debug("Flushing HTTP transport")
 
         if timeout > 0:
-            self._worker.submit(lambda: self._flush_client_reports(force=True))
+            # self._worker.submit(FlushClientReportsJob(self))
             self._worker.flush(timeout, callback)
 
     def kill(self):
         # type: () -> None
         logger.debug("Killing HTTP transport")
         self._worker.kill()
+
+
+class EnvelopeSender:
+    def __init__(self, transport):
+        # type: (Transport) -> None
+        self.transport = transport
+
+    def __call__(self, envelope) -> None:
+        print(f"Called with {envelope}")
+        self.transport._send_envelope(envelope)
+        self.transport._flush_client_reports()
+
+
+class FlushClientReportsJob:
+    def __init__(self, transport):
+        # type: (Transport) -> None
+        self.transport = transport
+
+    def __call__(self) -> None:
+        self.transport._flush_client_reports(force=True)
 
 
 class _FunctionTransport(Transport):
