@@ -24,10 +24,12 @@ if TYPE_CHECKING:
         Event,
         EventProcessor,
         Hint,
+        MeasurementUnit,
         ProfilerMode,
         TracesSampler,
         TransactionProcessor,
         MetricTags,
+        MetricValue,
     )
 
     # Experiments are feature flags to enable and disable certain unstable SDK
@@ -47,9 +49,9 @@ if TYPE_CHECKING:
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
             "enable_metrics": Optional[bool],
-            "metrics_summary_sample_rate": Optional[float],
-            "should_summarize_metric": Optional[Callable[[str, MetricTags], bool]],
-            "before_emit_metric": Optional[Callable[[str, MetricTags], bool]],
+            "before_emit_metric": Optional[
+                Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
+            ],
             "metric_code_locations": Optional[bool],
         },
         total=False,
@@ -191,6 +193,18 @@ class SPANDATA:
     Example: "http.handler"
     """
 
+    THREAD_ID = "thread.id"
+    """
+    Identifier of a thread from where the span originated. This should be a string.
+    Example: "7972576320"
+    """
+
+    THREAD_NAME = "thread.name"
+    """
+    Label identifying a thread from where the span originated. This should be a string.
+    Example: "MainThread"
+    """
+
 
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
@@ -265,6 +279,7 @@ class ClientConstructor(object):
         ignore_errors=[],  # type: Sequence[Union[type, str]]  # noqa: B006
         max_request_body_size="medium",  # type: str
         socket_options=None,  # type: Optional[List[Tuple[int, int, int | bytes]]]
+        keep_alive=False,  # type: bool
         before_send=None,  # type: Optional[EventProcessor]
         before_breadcrumb=None,  # type: Optional[BreadcrumbProcessor]
         debug=None,  # type: Optional[bool]
@@ -321,4 +336,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.42.0"
+VERSION = "1.45.0"

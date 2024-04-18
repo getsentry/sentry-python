@@ -13,8 +13,8 @@ from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.transport import _parse_rate_limits
-from sentry_sdk.envelope import Envelope, parse_json
+from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
+from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 try:
@@ -165,6 +165,66 @@ def test_socket_options(make_client):
 
     options = client.transport._get_pool_options([])
     assert options["socket_options"] == socket_options
+
+
+def test_keep_alive_true(make_client):
+    client = make_client(keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_keep_alive_off_by_default(make_client):
+    client = make_client()
+    options = client.transport._get_pool_options([])
+    assert "socket_options" not in options
+
+
+def test_socket_options_override_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=False)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
+def test_socket_options_merge_with_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    client = make_client(socket_options=[])
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == []
 
 
 def test_transport_infinite_loop(capturing_server, request, make_client):
@@ -406,3 +466,114 @@ def test_complex_limits_without_data_category(
     client.flush()
 
     assert len(capturing_server.captured) == 0
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_metric_bucket_limits(capturing_server, response_code, make_client):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded:custom"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="statsd"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set(["metric_bucket"])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "transaction"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "client_report"
+    report = parse_json(envelope.items[0].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
+    ]
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_metric_bucket_limits_with_namespace(
+    capturing_server, response_code, make_client
+):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded:foo"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="statsd"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set([])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "statsd"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "transaction"
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_metric_bucket_limits_with_all_namespaces(
+    capturing_server, response_code, make_client
+):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="statsd"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set(["metric_bucket"])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "transaction"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "client_report"
+    report = parse_json(envelope.items[0].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
+    ]
