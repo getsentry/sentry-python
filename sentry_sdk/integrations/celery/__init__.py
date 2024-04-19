@@ -228,6 +228,8 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
+        # Do not create a span when the task is a Celery Beat task
+        # (Because we do not have a transaction in that case)
         span_mgr = (
             sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
             if not Scope.get_isolation_scope()._name == "celery-beat"
