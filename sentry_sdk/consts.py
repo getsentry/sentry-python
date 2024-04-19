@@ -53,6 +53,7 @@ if TYPE_CHECKING:
                 Callable[[str, MetricValue, MeasurementUnit, MetricTags], bool]
             ],
             "metric_code_locations": Optional[bool],
+            "features": Optional[bool],
         },
         total=False,
     )
