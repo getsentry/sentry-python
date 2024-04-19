@@ -155,15 +155,12 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
-def do_stuff_with_kwargs(kwargs, span, integration):
-    # Note: kwargs can contain headers=None, so no setdefault!
-    # Unsure which backend though.
-
-    kwarg_headers = kwargs.get("headers") or {}
-    propagate_traces = kwarg_headers.pop(
-        "sentry-propagate-traces", integration.propagate_traces
-    ) # this is popped here, because it is also popped outside of this function
-
+def _update_celery_task_headers(kwarg_headers, span, integration):
+    # type: (dict, Optional[Span], CeleryIntegration) -> dict
+    """
+    Updates the headers of the Celery task with the tracing information
+    and eventually Sentry Crons monitroing information.
+    """
     with capture_internal_exceptions():
         headers = (
             dict(Scope.get_current_scope().iter_trace_propagation_headers(span))
@@ -208,9 +205,7 @@ def do_stuff_with_kwargs(kwargs, span, integration):
                 if key.startswith("sentry-"):
                     kwarg_headers["headers"][key] = value
 
-            kwargs["headers"] = kwarg_headers
-
-    return kwargs
+    return kwarg_headers
 
 
 def _wrap_apply_async(f):
@@ -256,7 +251,7 @@ def _wrap_apply_async(f):
         )  # type: Union[Span, NoOpMgr]
 
         with span_mgr as span:
-            kwargs = do_stuff_with_kwargs(kwargs, span, integration)
+            kwargs["headers"] = _update_celery_task_headers(kwarg_headers, span, integration)
 
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             print("222 kwargs updated:")
