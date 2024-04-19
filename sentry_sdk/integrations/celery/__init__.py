@@ -215,13 +215,6 @@ def _wrap_apply_async(f):
     @ensure_integration_enabled(CeleryIntegration, f)
     def apply_async(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        print("\n\n\n\n\n\n\n\n")
-        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        print("kwargs incoming:")
-        from pprint import pprint
-
-        pprint(kwargs)
-
         # Note: kwargs can contain headers=None, so no setdefault!
         # Unsure which backend though.
         kwarg_headers = kwargs.get("headers") or {}
@@ -231,24 +224,13 @@ def _wrap_apply_async(f):
         )
 
         if not propagate_traces:
-            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            print("111 kwargs updated:")
-            pprint(kwargs)
-
             return f(*args, **kwargs)
-
-        # This did never work, because the args is never "BEAT"!
-        # see refactoring in rc4 to see how this is checked now. (in some other code the tracing info is reset, i think)
-        try:
-            task_started_from_beat = args[1][0] == "BEAT"
-        except (IndexError, TypeError):
-            task_started_from_beat = False
 
         task = args[0]
 
         span_mgr = (
             sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
-            if not task_started_from_beat
+            if not Scope.get_isolation_scope()._name == "celery-beat"
             else NoOpMgr()
         )  # type: Union[Span, NoOpMgr]
 
@@ -256,10 +238,6 @@ def _wrap_apply_async(f):
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
-            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            print("222 kwargs updated:")
-            pprint(kwargs)
-
             return f(*args, **kwargs)
 
     return apply_async  # type: ignore
