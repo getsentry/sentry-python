@@ -155,11 +155,11 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
-def _update_celery_task_headers(kwarg_headers, span, integration):
-    # type: (dict, Optional[Span], CeleryIntegration) -> dict
+def _update_celery_task_headers(kwarg_headers, span, monitor_beat_tasks):
+    # type: (dict[str, Any], Optional[Span], bool) -> dict[str, Any]
     """
     Updates the headers of the Celery task with the tracing information
-    and eventually Sentry Crons monitroing information.
+    and eventually Sentry Crons monitoring information for beat tasks.
     """
     with capture_internal_exceptions():
         headers = (
@@ -167,7 +167,7 @@ def _update_celery_task_headers(kwarg_headers, span, integration):
             if span is not None
             else {}
         )
-        if integration.monitor_beat_tasks:
+        if monitor_beat_tasks:
             headers.update(
                 {
                     "sentry-monitor-start-timestamp-s": "%.9f"
@@ -216,8 +216,9 @@ def _wrap_apply_async(f):
         # type: (*Any, **Any) -> Any
         print("\n\n\n\n\n\n\n\n")
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        print(f'kwargs incoming:')
+        print("kwargs incoming:")
         from pprint import pprint
+
         pprint(kwargs)
 
         # Note: kwargs can contain headers=None, so no setdefault!
@@ -251,7 +252,9 @@ def _wrap_apply_async(f):
         )  # type: Union[Span, NoOpMgr]
 
         with span_mgr as span:
-            kwargs["headers"] = _update_celery_task_headers(kwarg_headers, span, integration)
+            kwargs["headers"] = _update_celery_task_headers(
+                kwarg_headers, span, integration.monitor_beat_tasks
+            )
 
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             print("222 kwargs updated:")
