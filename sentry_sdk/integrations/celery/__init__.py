@@ -155,12 +155,13 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
-def _update_celery_task_headers(kwarg_headers, span, monitor_beat_tasks):
+def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     # type: (dict[str, Any], Optional[Span], bool) -> dict[str, Any]
     """
     Updates the headers of the Celery task with the tracing information
     and eventually Sentry Crons monitoring information for beat tasks.
     """
+    updated_headers = original_headers.copy()
     with capture_internal_exceptions():
         headers = (
             dict(Scope.get_current_scope().iter_trace_propagation_headers(span))
@@ -176,7 +177,7 @@ def _update_celery_task_headers(kwarg_headers, span, monitor_beat_tasks):
             )
 
         if headers:
-            existing_baggage = kwarg_headers.get(BAGGAGE_HEADER_NAME)
+            existing_baggage = updated_headers.get(BAGGAGE_HEADER_NAME)
             sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
 
             combined_baggage = sentry_baggage or existing_baggage
@@ -186,26 +187,26 @@ def _update_celery_task_headers(kwarg_headers, span, monitor_beat_tasks):
                     sentry_baggage,
                 )
 
-            kwarg_headers.update(headers)
+            updated_headers.update(headers)
             if combined_baggage:
-                kwarg_headers[BAGGAGE_HEADER_NAME] = combined_baggage
+                updated_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
             # https://github.com/celery/celery/issues/4875
             #
             # Need to setdefault the inner headers too since other
             # tracing tools (dd-trace-py) also employ this exact
             # workaround and we don't want to break them.
-            kwarg_headers.setdefault("headers", {}).update(headers)
+            updated_headers.setdefault("headers", {}).update(headers)
             if combined_baggage:
-                kwarg_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
+                updated_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
 
             # Add the Sentry options potentially added in `sentry_apply_entry`
             # to the headers (done when auto-instrumenting Celery Beat tasks)
-            for key, value in kwarg_headers.items():
+            for key, value in updated_headers.items():
                 if key.startswith("sentry-"):
-                    kwarg_headers["headers"][key] = value
+                    updated_headers["headers"][key] = value
 
-    return kwarg_headers
+    return updated_headers
 
 
 def _wrap_apply_async(f):
@@ -255,7 +256,6 @@ def _wrap_apply_async(f):
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
-
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             print("222 kwargs updated:")
             pprint(kwargs)
