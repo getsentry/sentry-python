@@ -20,6 +20,7 @@ def get_word_length(word: str) -> int:
 
 
 global stream_result_mock  # type: Mock
+global llm_type  # type: str
 
 
 class MockOpenAI(ChatOpenAI):
@@ -33,14 +34,26 @@ class MockOpenAI(ChatOpenAI):
         for x in stream_result_mock():
             yield x
 
+    @property
+    def _llm_type(self) -> str:
+        return llm_type
+
 
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [(True, True), (True, False), (False, True), (False, False)],
+    "send_default_pii, include_prompts, use_unknown_llm_type",
+    [
+        (True, True, False),
+        (True, False, False),
+        (False, True, False),
+        (False, False, True),
+    ],
 )
 def test_langchain_agent(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init, capture_events, send_default_pii, include_prompts, use_unknown_llm_type
 ):
+    global llm_type
+    llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
+
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
@@ -143,6 +156,14 @@ def test_langchain_agent(
 
     # We can't guarantee anything about the "shape" of the langchain execution graph
     assert len(list(x for x in tx["spans"] if x["op"] == "ai.run.langchain")) > 0
+
+    if use_unknown_llm_type:
+        assert "ai_prompt_tokens_used" in chat_spans[0]["measurements"]
+        assert "ai_total_tokens_used" in chat_spans[0]["measurements"]
+    else:
+        # important: to avoid double counting, we do *not* measure
+        # tokens used if we have an explicit integration (e.g. OpenAI)
+        assert "measurements" not in chat_spans[0]
 
     if send_default_pii and include_prompts:
         assert (

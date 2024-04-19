@@ -60,6 +60,10 @@ DATA_FIELDS = {
     "tags": SPANDATA.AI_TAGS,
 }
 
+# To avoid double collecting tokens, we do *not* measure
+# token counts for models for which we have an explicit integration
+NO_COLLECT_TOKEN_MODELS = ["openai-chat"]
+
 
 class LangchainIntegration(Integration):
     identifier = "langchain"
@@ -82,6 +86,8 @@ class WatchedSpan:
     span = None  # type: Span
     num_completion_tokens = 0  # type: int
     num_prompt_tokens = 0  # type: int
+    no_collect_tokens = False  # type: bool
+    children = []  # type: List[WatchedSpan]
 
     def __init__(self, span):
         # type: (Span) -> None
@@ -104,7 +110,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         # type: () -> None
 
         while len(self.span_map) > self.max_span_map_size:
-            self.span_map.popitem(last=False)[1].span.__exit__(None, None, None)
+            run_id, watched_span = self.span_map.popitem(last=False)
+            self._exit_span(watched_span, run_id)
 
     def _handle_error(self, run_id, error):
         # type: (UUID, Any) -> None
@@ -125,24 +132,30 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         return parsed
 
     def _create_span(self, run_id, parent_id, **kwargs):
-        # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> Span
+        # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> WatchedSpan
 
         if "origin" not in kwargs:
             kwargs["origin"] = "auto.ai.langchain"
 
-        span = None  # type: Optional[Span]
+        watched_span = None  # type: Optional[WatchedSpan]
         if parent_id:
             parent_span = self.span_map[parent_id]  # type: Optional[WatchedSpan]
             if parent_span:
-                span = parent_span.span.start_child(**kwargs)
-        if span is None:
-            span = sentry_sdk.start_span(**kwargs)
+                watched_span = WatchedSpan(parent_span.span.start_child(**kwargs))
+                parent_span.children.append(watched_span)
+        if watched_span is None:
+            watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
-        span.__enter__()
-        watched_span = WatchedSpan(span)
+        watched_span.span.__enter__()
         self.span_map[run_id] = watched_span
         self.gc_span_map()
-        return span
+        return watched_span
+
+    def _exit_span(self, span_data, run_id):
+        # type: (SentryLangchainCallback, WatchedSpan, UUID) -> None
+
+        span_data.span.__exit__(None, None, None)
+        del self.span_map[run_id]
 
     def on_llm_start(
         self,
@@ -162,12 +175,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             all_params = kwargs.get("invocation_params", {})
             all_params.update(serialized.get("kwargs", {}))
-            span = self._create_span(
+            watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_RUN,
                 description=kwargs.get("name") or "Langchain LLM call",
             )
+            span = watched_span.span
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, prompts)
             for k, v in DATA_FIELDS.items():
@@ -182,14 +196,18 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             all_params = kwargs.get("invocation_params", {})
             all_params.update(serialized.get("kwargs", {}))
-            span = self._create_span(
+            watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
                 description=kwargs.get("name") or "Langchain Chat Model",
             )
+            span = watched_span.span
             model = all_params.get(
                 "model", all_params.get("model_name", all_params.get("model_id"))
+            )
+            watched_span.no_collect_tokens = any(
+                x in all_params.get("_type", "") for x in NO_COLLECT_TOKEN_MODELS
             )
             if not model and "anthropic" in all_params.get("_type"):
                 model = "claude-2"
@@ -207,11 +225,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             for k, v in DATA_FIELDS.items():
                 if k in all_params:
                     set_data_normalized(span, v, all_params[k])
-            for list_ in messages:
-                for message in list_:
-                    self.span_map[run_id].num_prompt_tokens += count_tokens(
-                        message.content
-                    ) + count_tokens(message.type)
+            if not watched_span.no_collect_tokens:
+                for list_ in messages:
+                    for message in list_:
+                        self.span_map[run_id].num_prompt_tokens += count_tokens(
+                            message.content
+                        ) + count_tokens(message.type)
 
     def on_llm_new_token(self, token, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, str, UUID, Any) -> Any
@@ -220,7 +239,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
             span_data = self.span_map[run_id]
-            if not span_data:
+            if not span_data or span_data.no_collect_tokens:
                 return
             span_data.num_completion_tokens += count_tokens(token)
 
@@ -246,22 +265,22 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     [[x.text for x in list_] for list_ in response.generations],
                 )
 
-            if token_usage:
-                record_token_usage(
-                    span_data.span,
-                    token_usage.get("prompt_tokens"),
-                    token_usage.get("completion_tokens"),
-                    token_usage.get("total_tokens"),
-                )
-            else:
-                record_token_usage(
-                    span_data.span,
-                    span_data.num_prompt_tokens,
-                    span_data.num_completion_tokens,
-                )
+            if not span_data.no_collect_tokens:
+                if token_usage:
+                    record_token_usage(
+                        span_data.span,
+                        token_usage.get("prompt_tokens"),
+                        token_usage.get("completion_tokens"),
+                        token_usage.get("total_tokens"),
+                    )
+                else:
+                    record_token_usage(
+                        span_data.span,
+                        span_data.num_prompt_tokens,
+                        span_data.num_completion_tokens,
+                    )
 
-            span_data.span.__exit__(None, None, None)
-            del self.span_map[run_id]
+            self._exit_span(span_data, run_id)
 
     def on_llm_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
@@ -275,7 +294,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-            span = self._create_span(
+            watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=(
@@ -287,7 +306,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             metadata = kwargs.get("metadata")
             if metadata:
-                set_data_normalized(span, SPANDATA.AI_METADATA, metadata)
+                set_data_normalized(watched_span.span, SPANDATA.AI_METADATA, metadata)
 
     def on_chain_end(self, outputs, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], UUID, Any) -> Any
@@ -299,8 +318,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             span_data = self.span_map[run_id]
             if not span_data:
                 return
-            span_data.span.__exit__(None, None, None)
-            del self.span_map[run_id]
+            self._exit_span(span_data, run_id)
 
     def on_chain_error(self, error, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
@@ -312,14 +330,16 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-            span = self._create_span(
+            watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_AGENT,
                 description=action.tool or "AI tool usage",
             )
             if action.tool_input and should_send_default_pii() and self.include_prompts:
-                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, action.tool_input)
+                set_data_normalized(
+                    watched_span.span, SPANDATA.AI_INPUT_MESSAGES, action.tool_input
+                )
 
     def on_agent_finish(self, finish, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, AgentFinish, UUID, Any) -> Any
@@ -334,8 +354,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 set_data_normalized(
                     span_data.span, SPANDATA.AI_RESPONSES, finish.return_values.items()
                 )
-            span_data.span.__exit__(None, None, None)
-            del self.span_map[run_id]
+            self._exit_span(span_data, run_id)
 
     def on_tool_start(self, serialized, input_str, *, run_id, **kwargs):
         # type: (SentryLangchainCallback, Dict[str, Any], str, UUID, Any) -> Any
@@ -343,7 +362,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         with capture_internal_exceptions():
             if not run_id:
                 return
-            span = self._create_span(
+            watched_span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_TOOL,
@@ -353,11 +372,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
-                    span, SPANDATA.AI_INPUT_MESSAGES, kwargs.get("inputs", [input_str])
+                    watched_span.span,
+                    SPANDATA.AI_INPUT_MESSAGES,
+                    kwargs.get("inputs", [input_str]),
                 )
                 if kwargs.get("metadata"):
                     set_data_normalized(
-                        span, SPANDATA.AI_METADATA, kwargs.get("metadata")
+                        watched_span.span, SPANDATA.AI_METADATA, kwargs.get("metadata")
                     )
 
     def on_tool_end(self, output, *, run_id, **kwargs):
@@ -372,8 +393,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 return
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span_data.span, SPANDATA.AI_RESPONSES, output)
-            span_data.span.__exit__(None, None, None)
-            del self.span_map[run_id]
+            self._exit_span(span_data, run_id)
 
     def on_tool_error(self, error, *args, run_id, **kwargs):
         # type: (SentryLangchainCallback, Union[Exception, KeyboardInterrupt], UUID, Any) -> Any
