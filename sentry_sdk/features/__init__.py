@@ -1,6 +1,6 @@
 import threading
 import time
-import requests
+import urllib3
 
 from enum import Enum
 from typing import Any
@@ -8,25 +8,80 @@ from typing import Callable
 
 
 class ErrorCode(Enum):
+    """Error code encountered during feature evaluation.
+
+    Returning error codes allows application developers to handle error
+    responses intelligently without the need to parse error messages.
+    """
+
+    # The flag could not be found in the feature set. It might have
+    # been deleted, disabled, or exists in a different environment.
     FLAG_NOT_FOUND = 0
+    # An error was raised that does not match one of the other error
+    # codes.
     GENERAL = 1
+    # Something about the context object does not match the
+    # requirements of the provider. This could mean a rule-set could
+    # not be evaluated.
     INVALID_CONTEXT = 2
+    # We expected a response object to have a certain shape but it did
+    # not. This can happen if the protocol is upgraded prior to the
+    # SDK.
     PARSE_ERROR = 3
+    # The request made to the provider resolved but it returned an
+    # error. We may have previously fetched a configuration that we
+    # have cached in memory. Its okay to return the most recent value
+    # with this error_code attached.
     PROVIDER_FATAL = 4
+    # We made a request to the remote feature provider but it hasn't
+    # resolved yet.
     PROVIDER_NOT_READY = 5
+    # TODO: ...
     TARGETING_KEY_MISSING = 6
+    # We expected a response value of type `T` but recieved of type of
+    # not `T`. This could mean the caller has made an incorrect
+    # assumption about a remote value's type or that the type was
+    # changed on the server and the application has yet to be updated.
     TYPE_MISMATCH = 7
 
 
 class Reason(Enum):
+    """The reason or source of a feature evaluation result.
+
+    Reasons are required and must always be returned. Reasons allow
+    application developers to make decisions about what level of trust
+    to give a feature evaluation result. Some implementers may wish to
+    be safe and never trust a stale feature. Others may choose to
+    always trust the result of the evaluation.
+    """
+
+    # The source of the feature value was found in the cache. This
+    # reason code is likely only appropriate in situations where we
+    # loaded the features from disk.
     CACHED = 0
+    # The application provided default was returned.
     DEFAULT = 1
+    # The application provided default was returned because the feature
+    # was disabled by the remote management system.
     DISABLED = 2
+    # The application provided default was returned because of an
+    # error.
     ERROR = 3
+    # The response value was the result of random or psuedo-random
+    # assignment.
     SPLIT = 4
+    # The response value was pulled from the cache _and_ the most
+    # recent request to the provider failed _or_ the provider has
+    # closed and is no longer making requests to the remote management
+    # system.
     STALE = 5
+    # The response value is statically defined in the configuration
+    # with no variants attached.
     STATIC = 6
+    # The response value is the result of a successful dynamic
+    # evaluation of one of the variants.
     TARGETING_MATCH = 7
+    # We have no idea where the value came from.
     UNKNOWN = 8
 
 
@@ -34,26 +89,22 @@ class EvaluationResult:
 
     def __init__(
         self,
-        reason,
-        value,
-        error_code=None,
-        error_message=None,
-        flag_metadata={},
-        variant=None,
+        reason,  # type: str
+        value,  # type: str | int | bool | float | dict
+        error_code=None,  # type: str | None
+        error_message=None,  # type: str | None
+        flag_metadata=None,  # type: dict[str, bool | int | str] | None
+        variant=None,  # type: str | None
     ):
-        # type: (dict[str, str | int | bool], str, Any, str | None, str | None, str | None) -> None
         self.error_code = error_code
         self.error_message = error_message
-        self.flag_metadata = flag_metadata
+        self.flag_metadata = flag_metadata or {}
         self.reason = reason
         self.value = value
         self.variant = variant
 
 
 # EVALUATION_CONTEXT = dict[str, "JSON_VALUE"]
-
-# FLAG_METADATA = dict[str, str | int | bool]
-
 # JSON_VALUE = (
 #     bool | int | float | str | None | list["JSON_VALUE"] | dict[str, "JSON_VALUE"]
 # )
@@ -67,51 +118,48 @@ class EvaluationResult:
 #     variant: str | None
 
 
-class FeatureProvider:
-    """Feature provider interface.
-
-    OpenFeature compatible feature evaluation interface.
-    """
+class OpenFeatureProvider:
+    """OpenFeature compatible provider interface."""
 
     def __init__(self, request_fn, poll_interval=60.0):
         # type: (Callable[[Callable[[Any], None], dict[str, str]], None], float) -> None
-        self._manager = FeatureManager(request_fn, poll_interval)
+        self.provider = FeatureProvider(request_fn, poll_interval)
 
     def dispose(self):
         # type: () -> None
-        self._manager.close()
+        self.provider.close()
 
     def resolveBooleanValue(self, flagKey, defaultValue, context):
         # type: (str, bool, dict[str, str]) -> EvaluationResult
-        result = self._manager.get(
+        result = self.provider.get(
             flagKey, defaultValue, context=context, expected_type=bool
         )
         return result
 
     def resolveNumberValue(self, flagKey, defaultValue, context):
         # type: (str, int | float, dict[str, str]) -> EvaluationResult
-        result = self._manager.get(
+        result = self.provider.get(
             flagKey, defaultValue, context=context, expected_type=(int, float)
         )
         return result
 
     def resolveStringValue(self, flagKey, defaultValue, context):
         # type: (str, str, dict[str, str]) -> EvaluationResult
-        result = self._manager.get(
+        result = self.provider.get(
             flagKey, defaultValue, context=context, expected_type=str
         )
         return result
 
     def resolveStructureValue(self, flagKey, defaultValue, context):
         # type: (str, dict[str, str], dict[str, str]) -> EvaluationResult
-        result = self._manager.get(
+        result = self.provider.get(
             flagKey, defaultValue, context=context, expected_type=dict
         )
         return result
 
 
-class FeatureManager:
-    """Feature manager."""
+class FeatureProvider:
+    """Feature provider."""
 
     def __init__(self, request_fn, poll_interval=60.0):
         self.features = {}
@@ -136,8 +184,9 @@ class FeatureManager:
         with self._lock:
             return self._evaluate_feature(key, default, context, expected_type)
 
-    def update(self, response) -> None:
-        if response.status_code != 200:
+    def update(self, response):
+        # type: (urllib3.BaseHTTPResponse) -> None
+        if response.status != 200:
             return None
 
         feature_set = response.json()
@@ -152,27 +201,28 @@ class FeatureManager:
         """Wait for a feature-set before proceeding."""
         return self._task.wait(timeout)
 
-    def _evaluate_feature(self, key, default, context, expected_type):
-        # type: (str, Any, dict[str, bool | float | int | str], type) -> None
+    def _evaluate_feature(self, key, default, context, expected_type=None):
+        # type: (str, Any, dict[str, bool | float | int | str], type | tuple[type, ...] | None) -> None
         if not self.ready:
             return EvaluationResult(
-                reason=Reason.DEFAULT,
+                reason=Reason.ERROR,
                 error_code=ErrorCode.PROVIDER_NOT_READY,
                 value=default,
             )
 
         if key not in self.features:
             return EvaluationResult(
-                reason=Reason.DEFAULT,
+                reason=Reason.ERROR,
                 error_code=ErrorCode.FLAG_NOT_FOUND,
                 value=default,
             )
 
+        # TODO: Version 0 extraction logic. No consideration for variants or rollout.
         value = self.features["value"]
 
-        if not isinstance(value, expected_type):
+        if expected_type is not None and not isinstance(value, expected_type):
             return EvaluationResult(
-                reason=Reason.DEFAULT,
+                reason=Reason.ERROR,
                 error_code=ErrorCode.TYPE_MISMATCH,
                 value=default,
             )
@@ -191,19 +241,22 @@ class PollResourceTask:
     stop. On successful poll the resource identifier (ETag) is extraced
     and a response message is passed to the state machine.
 
-    :param state_machine:
+    :param provider:
     :param request_fn:
     :param poll_interval:
     """
 
     def __init__(
-        self, state_machine, request_fn, poll_interval, auto_start=True
-    ) -> None:
-        # type: (FeatureManager, Callable[[Callable[[Any], None], dict[str, str]], None], float, bool) -> None
+        self,
+        provider,  # type: FeatureProvider
+        request_fn,  # type: Callable[[Callable[[Any], None], dict[str, str]], None]
+        poll_interval,  # type: float
+        auto_start=True,  # type: bool
+    ):
         self._closed = False
         self._fetch_event = threading.Event()
         self._last_fetch = 0
-        self._state_machine = state_machine
+        self._provider = provider
         self._poll_count = 0
         self._refresh = poll_interval
         self._request_fn = request_fn
@@ -240,8 +293,12 @@ class PollResourceTask:
             return None
 
         def callback(response):
-            self._resource_version = _get_resource_version(response)
-            self._state_machine.update(response)
+            # type: (urllib3.BaseHTTPResponse) -> None
+            resource_version = response.headers.get("ETag")
+            if resource_version:
+                self._resource_version = resource_version
+
+            self._provider.update(response)
             self._fetch_event.set()
 
         self._request_fn(callback, headers={"ETag": self._resource_version})
@@ -276,15 +333,3 @@ class PollResourceTask:
             return True
         else:
             return self._fetch_event.wait(timeout)
-
-
-def _get_resource_version(response):
-    """Return the version identifier for the feature-set."""
-    if response.status_code == 200:
-        return response["ETag"]
-
-
-def _fetch_feature_set(url, name, callback, headers):
-    """Fetch the named feature-set from the provider."""
-    response = requests.get(url + f"?name={name}", headers=headers)
-    callback(response)
