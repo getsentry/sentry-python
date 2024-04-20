@@ -1,4 +1,3 @@
-import functools
 import threading
 import time
 import requests
@@ -74,9 +73,8 @@ class FeatureProvider:
     OpenFeature compatible feature evaluation interface.
     """
 
-    def __init__(self, url, name, poll_interval=60.0):
-        # type: (str, str, float) -> None
-        request_fn = functools.partial(_fetch_feature_set, url, name)
+    def __init__(self, request_fn, poll_interval=60.0):
+        # type: (Callable[[Callable[[Any], None], dict[str, str]], None], float) -> None
         self._manager = FeatureManager(request_fn, poll_interval)
 
     def dispose(self):
