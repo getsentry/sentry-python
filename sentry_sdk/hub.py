@@ -43,6 +43,7 @@ if TYPE_CHECKING:
         LogLevelStr,
     )
     from sentry_sdk.consts import ClientConstructor
+    from sentry_sdk.features import EvaluationResult
 
     T = TypeVar("T")
 
@@ -704,6 +705,102 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         client, scope = self._stack[-1]
         return scope.trace_propagation_meta(span=span, client=client)
+
+    # Exposed feature operations.
+    #
+    # Sentry is both the provider and the SDK implementation so there
+    # is some redundancy in defintions between this and the provider
+    # definition.
+    #
+    # The Sentry SDK does not claim or attempt to be an OpenFeature
+    # compatible SDK. Instead it uses an OpenFeature-compatible provider
+    # interface to expose the feature sets Sentry determines to be
+    # valuable. The provider can be extracted and used within a
+    # compliant OpenFeature SDK implementation.
+
+    def resolve_boolean_details(self, flag_key, default_value, context):
+        # type: (str, bool, dict[str, str]) -> EvaluationResult
+        context = self._build_feature_context(context)
+        return self.client.features.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=bool,
+        )
+
+    def resolve_integer_details(self, flag_key, default_value, context):
+        # type: (str, int, dict[str, str]) -> EvaluationResult
+        context = self._build_feature_context(context)
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=int,
+        )
+
+    def resolve_float_details(self, flag_key, default_value, context):
+        # type: (str, float, dict[str, str]) -> EvaluationResult
+        context = self._build_feature_context(context)
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=float,
+        )
+
+    def resolve_object_details(self, flag_key, default_value, context):
+        # type: (str, dict, dict[str, str]) -> EvaluationResult
+        context = self._build_feature_context(context)
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=dict,
+        )
+
+    def resolve_string_details(self, flag_key, default_value, context):
+        # type: (str, str, dict[str, str]) -> EvaluationResult
+        context = self._build_feature_context(context)
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=str,
+        )
+
+    def resolve_boolean_value(self, flag_key, default_value, context):
+        # type: (str, bool, dict[str, str]) -> bool
+        return self.resolve_boolean_details(flag_key, default_value, context).value
+
+    def resolve_integer_value(self, flag_key, default_value, context):
+        # type: (str, int, dict[str, str]) -> int
+        return self.resolve_boolean_details(flag_key, default_value, context).value
+
+    def resolve_float_value(self, flag_key, default_value, context):
+        # type: (str, float, dict[str, str]) -> float
+        return self.resolve_boolean_details(flag_key, default_value, context).value
+
+    def resolve_object_value(self, flag_key, default_value, context):
+        # type: (str, dict, dict[str, str]) -> dict
+        return self.resolve_boolean_details(flag_key, default_value, context).value
+
+    def resolve_string_value(self, flag_key, default_value, context):
+        # type: (str, str, dict[str, str]) -> str
+        return self.resolve_boolean_details(flag_key, default_value, context).value
+
+    def _build_feature_context(self, context):
+        # type: (dict[str, str] | None) -> dict[str, str]
+        if context is None:
+            context = {}
+        else:
+            context = dict(context)
+
+        context["release"] = self.client.options["release"]
+        context["environment"] = self.client.options["environment"]
+
+        # TODO: Extract tags and user_id from the scope and append to
+        # the context.
+        return context
 
 
 GLOBAL_HUB = Hub()
