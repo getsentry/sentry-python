@@ -253,6 +253,7 @@ class HttpTransport(Transport):
         headers,  # type: Dict[str, str]
         endpoint_type="store",  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
+        callback=None,  # type: Optional[Callable[[urllib3.BaseHTTPResponse], None]]
     ):
         # type: (...) -> None
 
@@ -301,12 +302,30 @@ class HttpTransport(Transport):
                 )
                 self.on_dropped_event("status_{}".format(response.status))
                 record_loss("network_error")
+
+            if callback is not None:
+                callback(response)
         finally:
             response.close()
 
     def on_dropped_event(self, reason):
         # type: (str) -> None
         return None
+
+    def request_features(
+        self,
+        callback,  # type: Callable[[urllib3.BaseHTTPResponse], None]
+        headers,  # type: dict[str, str]
+    ):
+        def request_fn():
+            self._send_request(
+                body=b"",
+                headers=headers,
+                endpoint_type="features",
+                callback=callback,
+            )
+
+        self._worker.submit(request_fn)
 
     def _fetch_pending_client_report(self, force=False, interval=60):
         # type: (bool, int) -> Optional[Item]
