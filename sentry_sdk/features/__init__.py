@@ -75,7 +75,8 @@ class FeatureProvider:
 
     def __init__(self, url, name, poll_interval=60.0):
         # type: (str, str, float) -> None
-        self._manager = FeatureManager(url, name, poll_interval)
+        request_fn = functools.partial(_fetch_feature_set, url, name)
+        self._manager = FeatureManager(request_fn, poll_interval)
 
     def dispose(self):
         # type: () -> None
@@ -113,12 +114,10 @@ class FeatureProvider:
 class FeatureManager:
     """Feature manager."""
 
-    def __init__(self, url, name, poll_interval=60.0):
+    def __init__(self, request_fn, poll_interval=60.0):
         self.features = {}
         self.version = None
         self._lock = threading.Lock()
-
-        request_fn = functools.partial(_fetch_feature_set, url, name)
         self._task = PollResourceTask(self, request_fn, poll_interval)
 
     @property
@@ -191,7 +190,9 @@ class PollResourceTask:
     :param poll_interval:
     """
 
-    def __init__(self, state_machine, request_fn, poll_interval) -> None:
+    def __init__(
+        self, state_machine, request_fn, poll_interval, auto_start=True
+    ) -> None:
         self._closed = False
         self._fetch_event = threading.Event()
         self._last_fetch = 0
@@ -201,15 +202,8 @@ class PollResourceTask:
         self._request_fn = request_fn
         self._resource_version = None
 
-        def poll_provider():
-            while not self._closed:
-                if self.next_poll_time < time.time():
-                    self.poll()
-                else:
-                    time.sleep(1)
-
-        self._thread = threading.Thread(target=poll_provider, daemon=True)
-        self._thread.start()
+        if auto_start:
+            self.start()
 
     @property
     def closed(self):
@@ -247,6 +241,19 @@ class PollResourceTask:
         self._last_fetch = time.time()
         self._poll_count += 1
 
+    def start(self):
+        """Start the polling thread."""
+
+        def poll_provider():
+            while not self.closed:
+                if self.next_poll_time < time.time():
+                    self.poll()
+                else:
+                    time.sleep(1)
+
+        self._thread = threading.Thread(target=poll_provider, daemon=True)
+        self._thread.start()
+
     def wait(self, timeout):
         """Wait for the initial polling operation to complete.
 
@@ -272,6 +279,3 @@ def _fetch_feature_set(url, name, callback, headers):
     """Fetch the named feature-set from the provider."""
     response = requests.get(url + f"?name={name}", headers=headers)
     callback(response)
-
-
-def _type_mismatch_result(): ...
