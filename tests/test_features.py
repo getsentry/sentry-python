@@ -65,7 +65,7 @@ def test_poll_resource_wait_slower():
     """Assert responses slower than the blocking wait return false."""
 
     def slow_response(callback, headers):
-        time.sleep(0.001)
+        time.sleep(0.001)  # TODO: not ideal to sleep in a test.
         callback(HTTPResponse(400, {"ETag": "hello"}, ""))
 
     task = PollResourceTask(StateMachine(), slow_response, 30.0)
@@ -88,3 +88,16 @@ def test_poll_resource_close():
     assert task._poll_count == 0
     assert task.next_poll_time == 30.0
     assert not task.ready
+    assert task.wait(timeout=1000) is True
+
+
+def test_poll_resource_poll_throttled():
+    """Assert calls to poll are throttled by the polling interval."""
+    task = PollResourceTask(StateMachine(), lambda a, headers: a, 0.001)
+    assert task._poll_count == 1
+
+    time.sleep(0.0011)  # TODO: not ideal to sleep in a test.
+    assert task._poll_count == 2
+
+    time.sleep(0.0021)  # TODO: not ideal to sleep in a test.
+    assert task._poll_count == 4
