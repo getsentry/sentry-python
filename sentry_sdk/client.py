@@ -39,6 +39,7 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
+from sentry_sdk.features import OpenFeatureProvider
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
@@ -255,6 +256,13 @@ class _Client(object):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
+        def _request_features(callback, headers):
+            # If the transport is not set when this function is invoked
+            # we'll need to wait poll-interval seconds before the
+            # features are fetched.
+            if self.transport is not None:
+                self.transport.request_features(callback, headers)
+
         try:
             _client_init_debug.set(self.options["debug"])
             self.transport = make_transport(self.options)
@@ -301,6 +309,13 @@ class _Client(object):
                 self.options["instrumenter"] = INSTRUMENTER.OTEL
                 _DEFAULT_INTEGRATIONS.append(
                     "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
+                )
+
+            self.features = None
+            if self.options["_experiments"].get("features", False):
+                self.features = OpenFeatureProvider(
+                    request_fn=_request_features,
+                    poll_interval=60.0,
                 )
 
             self.integrations = setup_integrations(
@@ -738,6 +753,7 @@ class _Client(object):
         if self.transport is not None:
             self.flush(timeout=timeout, callback=callback)
             self.session_flusher.kill()
+            self.features.dispose()
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.kill()
             if self.monitor:
