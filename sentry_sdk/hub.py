@@ -790,17 +790,27 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def _build_feature_context(self, context):
         # type: (dict[str, str] | None) -> dict[str, str]
-        if context is None:
-            context = {}
-        else:
-            context = dict(context)
+        enriched_context = {}
 
-        context["release"] = self.client.options["release"]
-        context["environment"] = self.client.options["environment"]
+        _, scope = self._stack[-1]
 
-        # TODO: Extract tags and user_id from the scope and append to
-        # the context.
-        return context
+        for tag, value in scope._tags.items():
+            enriched_context[tag] = value
+
+        if scope._user:
+            user_id = scope._user.get("id")
+            if user_id is not None:
+                enriched_context["user_id"] = user_id
+
+        enriched_context["release"] = self.client.options["release"]
+        enriched_context["environment"] = self.client.options["environment"]
+
+        # The user supplied context has the greatest prescedent and
+        # overwrites any key automatically set by the Sentry SDK.
+        if context:
+            enriched_context.update(context)
+
+        return enriched_context
 
 
 GLOBAL_HUB = Hub()
