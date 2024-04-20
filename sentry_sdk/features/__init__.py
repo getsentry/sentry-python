@@ -41,7 +41,10 @@ class ErrorCode(Enum):
     # We made a request to the remote feature provider but it hasn't
     # resolved yet.
     PROVIDER_NOT_READY = "PROVIDER_NOT_READY"
-    # TODO: ...
+    # Currently unused. The evaluation context may define a special
+    # "targeting_key" attribute for managing rollout in a deterministic
+    # way. The most recent protocol definition uses a context attribute
+    # defined explicitly within the feature.
     TARGETING_KEY_MISSING = "TARGETING_KEY_MISSING"
     # We expected a response value of type `T` but recieved of type of
     # not `T`. This could mean the caller has made an incorrect
