@@ -5,6 +5,7 @@ import requests
 
 from enum import Enum
 from typing import Any
+from typing import Callable
 
 
 class ErrorCode(Enum):
@@ -85,28 +86,28 @@ class FeatureProvider:
     def resolveBooleanValue(self, flagKey, defaultValue, context):
         # type: (str, bool, dict[str, str]) -> EvaluationResult
         result = self._manager.get(
-            flagKey, defaultValue, context=context, expected_types=(bool,)
+            flagKey, defaultValue, context=context, expected_type=bool
         )
         return result
 
     def resolveNumberValue(self, flagKey, defaultValue, context):
         # type: (str, int | float, dict[str, str]) -> EvaluationResult
         result = self._manager.get(
-            flagKey, defaultValue, context=context, expected_types=(int, float)
+            flagKey, defaultValue, context=context, expected_type=(int, float)
         )
         return result
 
     def resolveStringValue(self, flagKey, defaultValue, context):
         # type: (str, str, dict[str, str]) -> EvaluationResult
         result = self._manager.get(
-            flagKey, defaultValue, context=context, expected_types=(str,)
+            flagKey, defaultValue, context=context, expected_type=str
         )
         return result
 
     def resolveStructureValue(self, flagKey, defaultValue, context):
         # type: (str, dict[str, str], dict[str, str]) -> EvaluationResult
         result = self._manager.get(
-            flagKey, defaultValue, context=context, expected_types=(dict,)
+            flagKey, defaultValue, context=context, expected_type=dict
         )
         return result
 
@@ -121,16 +122,21 @@ class FeatureManager:
         self._task = PollResourceTask(self, request_fn, poll_interval)
 
     @property
-    def is_ready(self):
-        return self._task.is_ready
+    def closed(self):
+        return self._task.closed
+
+    @property
+    def ready(self):
+        return self._task.ready
 
     def close(self):
         self._task.close()
 
-    def get(self, key, default, context={}):
+    def get(self, key, default, context, expected_type):
+        # type: (str, Any, dict[str, bool | int | str], type | tuple[type, ...]) -> EvaluationResult
         # TODO: forces sequential reads.
         with self._lock:
-            return self._evaluate_feature(key, default, context)
+            return self._evaluate_feature(key, default, context, expected_type)
 
     def update(self, response) -> None:
         if response.status_code != 200:
@@ -144,11 +150,13 @@ class FeatureManager:
             self.features = features
 
     def wait(self, timeout):
+        # type: (float) -> bool
         """Wait for a feature-set before proceeding."""
         return self._task.wait(timeout)
 
-    def _evaluate_feature(self, key, default, context, expected_types):
-        if not self.is_ready:
+    def _evaluate_feature(self, key, default, context, expected_type):
+        # type: (str, Any, dict[str, bool | float | int | str], type) -> None
+        if not self.ready:
             return EvaluationResult(
                 reason=Reason.DEFAULT,
                 error_code=ErrorCode.PROVIDER_NOT_READY,
@@ -164,7 +172,7 @@ class FeatureManager:
 
         value = self.features["value"]
 
-        if not isinstance(value, expected_types):
+        if not isinstance(value, expected_type):
             return EvaluationResult(
                 reason=Reason.DEFAULT,
                 error_code=ErrorCode.TYPE_MISMATCH,
@@ -193,6 +201,7 @@ class PollResourceTask:
     def __init__(
         self, state_machine, request_fn, poll_interval, auto_start=True
     ) -> None:
+        # type: (FeatureManager, Callable[[Callable[[Any], None], dict[str, str]], None], float, bool) -> None
         self._closed = False
         self._fetch_event = threading.Event()
         self._last_fetch = 0
@@ -256,6 +265,7 @@ class PollResourceTask:
         self._thread.start()
 
     def wait(self, timeout):
+        # type: (float) -> bool
         """Wait for the initial polling operation to complete.
 
         We only wait for the initial feature-set fetch to complete. Once
