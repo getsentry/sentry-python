@@ -3,8 +3,13 @@ import time
 import urllib3
 
 from enum import Enum
-from typing import Any
-from typing import Callable
+
+from sentry_sdk._types import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from typing import Any
+    from typing import Callable
 
 
 class ErrorCode(Enum):
@@ -121,33 +126,50 @@ class OpenFeatureProvider:
         # type: () -> None
         self.provider.close()
 
-    def resolveBooleanValue(self, flagKey, defaultValue, context):
+    def resolve_boolean_details(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> EvaluationResult
-        result = self.provider.get(
-            flagKey, defaultValue, context=context, expected_type=bool
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=bool,
         )
-        return result
 
-    def resolveNumberValue(self, flagKey, defaultValue, context):
-        # type: (str, int | float, dict[str, str]) -> EvaluationResult
-        result = self.provider.get(
-            flagKey, defaultValue, context=context, expected_type=(int, float)
+    def resolve_integer_details(self, flag_key, default_value, context):
+        # type: (str, int, dict[str, str]) -> EvaluationResult
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=int,
         )
-        return result
 
-    def resolveStringValue(self, flagKey, defaultValue, context):
+    def resolve_float_details(self, flag_key, default_value, context):
+        # type: (str, float, dict[str, str]) -> EvaluationResult
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=float,
+        )
+
+    def resolve_object_details(self, flag_key, default_value, context):
+        # type: (str, dict, dict[str, str]) -> EvaluationResult
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=dict,
+        )
+
+    def resolve_string_details(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> EvaluationResult
-        result = self.provider.get(
-            flagKey, defaultValue, context=context, expected_type=str
+        return self.provider.get(
+            flag_key,
+            default_value,
+            context=context,
+            expected_type=str,
         )
-        return result
-
-    def resolveStructureValue(self, flagKey, defaultValue, context):
-        # type: (str, dict[str, str], dict[str, str]) -> EvaluationResult
-        result = self.provider.get(
-            flagKey, defaultValue, context=context, expected_type=dict
-        )
-        return result
 
 
 class FeatureProvider:
