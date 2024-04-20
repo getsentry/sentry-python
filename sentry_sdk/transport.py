@@ -99,6 +99,13 @@ class Transport(object):
         """
         raise NotImplementedError()
 
+    def request_features(
+        self,
+        callback,  # type: Callable[[urllib3.BaseHTTPResponse], None]
+        headers,  # type: dict[str, str]
+    ):
+        raise NotImplementedError()
+
     def flush(
         self,
         timeout,  # type: float
