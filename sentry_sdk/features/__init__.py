@@ -246,10 +246,11 @@ class PollResourceTask:
 
         def poll_provider():
             while not self.closed:
-                if self.next_poll_time < time.time():
+                remaining = self.next_poll_time - time.time()
+                if remaining <= 0:
                     self.poll()
                 else:
-                    time.sleep(1)
+                    time.sleep(remaining)
 
         self._thread = threading.Thread(target=poll_provider, daemon=True)
         self._thread.start()
