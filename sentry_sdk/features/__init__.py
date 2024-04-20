@@ -16,33 +16,33 @@ class ErrorCode(Enum):
 
     # The flag could not be found in the feature set. It might have
     # been deleted, disabled, or exists in a different environment.
-    FLAG_NOT_FOUND = 0
+    FLAG_NOT_FOUND = "FLAG_NOT_FOUND"
     # An error was raised that does not match one of the other error
     # codes.
-    GENERAL = 1
+    GENERAL = "GENERAL"
     # Something about the context object does not match the
     # requirements of the provider. This could mean a rule-set could
     # not be evaluated.
-    INVALID_CONTEXT = 2
+    INVALID_CONTEXT = "INVALID_CONTEXT"
     # We expected a response object to have a certain shape but it did
     # not. This can happen if the protocol is upgraded prior to the
     # SDK.
-    PARSE_ERROR = 3
+    PARSE_ERROR = "PARSE_ERROR"
     # The request made to the provider resolved but it returned an
     # error. We may have previously fetched a configuration that we
     # have cached in memory. Its okay to return the most recent value
     # with this error_code attached.
-    PROVIDER_FATAL = 4
+    PROVIDER_FATAL = "PROVIDER_FATAL"
     # We made a request to the remote feature provider but it hasn't
     # resolved yet.
-    PROVIDER_NOT_READY = 5
+    PROVIDER_NOT_READY = "PROVIDER_NOT_READY"
     # TODO: ...
-    TARGETING_KEY_MISSING = 6
+    TARGETING_KEY_MISSING = "TARGETING_KEY_MISSING"
     # We expected a response value of type `T` but recieved of type of
     # not `T`. This could mean the caller has made an incorrect
     # assumption about a remote value's type or that the type was
     # changed on the server and the application has yet to be updated.
-    TYPE_MISMATCH = 7
+    TYPE_MISMATCH = "TYPE_MISMATCH"
 
 
 class Reason(Enum):
@@ -58,31 +58,31 @@ class Reason(Enum):
     # The source of the feature value was found in the cache. This
     # reason code is likely only appropriate in situations where we
     # loaded the features from disk.
-    CACHED = 0
+    CACHED = "CACHED"
     # The application provided default was returned.
-    DEFAULT = 1
+    DEFAULT = "DEFAULT"
     # The application provided default was returned because the feature
     # was disabled by the remote management system.
-    DISABLED = 2
+    DISABLED = "DISABLED"
     # The application provided default was returned because of an
     # error.
-    ERROR = 3
+    ERROR = "ERROR"
     # The response value was the result of random or psuedo-random
     # assignment.
-    SPLIT = 4
+    SPLIT = "SPLIT"
     # The response value was pulled from the cache _and_ the most
     # recent request to the provider failed _or_ the provider has
     # closed and is no longer making requests to the remote management
     # system.
-    STALE = 5
+    STALE = "STALE"
     # The response value is statically defined in the configuration
     # with no variants attached.
-    STATIC = 6
+    STATIC = "STATIC"
     # The response value is the result of a successful dynamic
     # evaluation of one of the variants.
-    TARGETING_MATCH = 7
+    TARGETING_MATCH = "TARGETING_MATCH"
     # We have no idea where the value came from.
-    UNKNOWN = 8
+    UNKNOWN = "UNKNOWN"
 
 
 class EvaluationResult:
@@ -108,14 +108,6 @@ class EvaluationResult:
 # JSON_VALUE = (
 #     bool | int | float | str | None | list["JSON_VALUE"] | dict[str, "JSON_VALUE"]
 # )
-
-# class ResolutionDetails(Generic[T]):
-#     error_code: ERROR_CODES | None
-#     error_message: str | None
-#     flag_metadata: FLAG_METADATA
-#     reason: REASONS | str | None
-#     value: T
-#     variant: str | None
 
 
 class OpenFeatureProvider:
