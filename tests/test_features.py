@@ -3,7 +3,6 @@ from sentry_sdk.features import (
     PollResourceTask,
     Reason,
     ErrorCode,
-    Model,
     Pending,
     Failure,
     Success,
@@ -28,7 +27,7 @@ class HTTPResponse:
 
 class StateMachine:
     def __init__(self):
-        self._model = Model(Pending(), etag=None)
+        self._state = Pending()
 
     def update(self, message):
         pass
@@ -260,19 +259,19 @@ def _simple_string_feature(key, value):
             "default",
         ),
         (
-            FailureCached(_simple_string_feature("key", "value"), 0),
+            FailureCached(None, _simple_string_feature("key", "value"), 0),
             None,
             Reason.STALE,
             "value",
         ),
         (
-            Success(_simple_string_feature("key", "value"), 0),
+            Success(None, _simple_string_feature("key", "value"), 0),
             None,
             Reason.STATIC,
             "value",
         ),
         (
-            SuccessCached(_simple_string_feature("key", "value"), 0),
+            SuccessCached(None, _simple_string_feature("key", "value"), 0),
             None,
             Reason.CACHED,
             "value",
@@ -285,7 +284,7 @@ def test_evaluate_feature_simple_string_feature(state, error_code, reason, value
     Simple in this case means a strict key, value pairing with no variants.
     """
     result = evaluate_feature(
-        model=Model(state, None),
+        state=state,
         key="key",
         default="default",
         context={},
@@ -308,7 +307,7 @@ def test_evaluate_feature_simple_string_feature(state, error_code, reason, value
 def test_evaluate_feature_type_mismatch(state):
     """Assert mismatched types return the default an error code."""
     result = evaluate_feature(
-        model=Model(state(_simple_string_feature("key", "value"), 0), None),
+        state=state(None, _simple_string_feature("key", "value"), 0),
         key="key",
         default=0,
         context={},
