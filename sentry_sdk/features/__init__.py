@@ -287,9 +287,11 @@ class PollResourceTask:
             self._provider.update(response)
             self._fetch_event.set()
 
-        self._request_fn(
-            callback, headers={"If-None-Match": self._provider._state.etag}
-        )
+        headers = {}
+        if isinstance(self._provider._state, (Success, SuccessCached, FailureCached)):
+            headers["If-None-Match"] = self._provider._state.etag
+
+        self._request_fn(callback, headers=headers)
         self._last_fetch = time.time()
         self._poll_count += 1
 
