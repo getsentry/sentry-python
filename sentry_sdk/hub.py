@@ -708,17 +708,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     # Exposed feature operations.
     #
-    # Sentry is both the provider and the SDK implementation so there
-    # is some redundancy in defintions between this and the provider
-    # definition.
-    #
     # The Sentry SDK does not claim or attempt to be an OpenFeature
-    # compatible SDK. Instead it uses an OpenFeature-compatible provider
-    # interface to expose the feature sets Sentry determines to be
-    # valuable. The provider can be extracted and used within a
+    # compatible SDK. Instead it provides an OpenFeature-compatible
+    # provider interface to expose the feature sets Sentry determines
+    # to be valuable. The provider can be extracted and used within a
     # compliant OpenFeature SDK implementation.
 
-    def resolve_boolean_details(self, flag_key, default_value, context):
+    def get_boolean_feature(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.client.features.get(
@@ -728,7 +724,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=bool,
         )
 
-    def resolve_integer_details(self, flag_key, default_value, context):
+    def get_integer_feature(self, flag_key, default_value, context):
         # type: (str, int, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -738,7 +734,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=int,
         )
 
-    def resolve_float_details(self, flag_key, default_value, context):
+    def get_float_feature(self, flag_key, default_value, context):
         # type: (str, float, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -748,7 +744,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=float,
         )
 
-    def resolve_object_details(self, flag_key, default_value, context):
+    def get_object_feature(self, flag_key, default_value, context):
         # type: (str, dict, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -758,7 +754,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=dict,
         )
 
-    def resolve_string_details(self, flag_key, default_value, context):
+    def get_string_feature(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -768,25 +764,25 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=str,
         )
 
-    def resolve_boolean_value(self, flag_key, default_value, context):
+    def get_boolean_value(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> bool
-        return self.resolve_boolean_details(flag_key, default_value, context).value
+        return self.get_boolean_feature(flag_key, default_value, context).value
 
-    def resolve_integer_value(self, flag_key, default_value, context):
+    def get_integer_value(self, flag_key, default_value, context):
         # type: (str, int, dict[str, str]) -> int
-        return self.resolve_boolean_details(flag_key, default_value, context).value
+        return self.get_integer_feature(flag_key, default_value, context).value
 
-    def resolve_float_value(self, flag_key, default_value, context):
+    def get_float_value(self, flag_key, default_value, context):
         # type: (str, float, dict[str, str]) -> float
-        return self.resolve_boolean_details(flag_key, default_value, context).value
+        return self.get_float_feature(flag_key, default_value, context).value
 
-    def resolve_object_value(self, flag_key, default_value, context):
+    def get_object_value(self, flag_key, default_value, context):
         # type: (str, dict, dict[str, str]) -> dict
-        return self.resolve_boolean_details(flag_key, default_value, context).value
+        return self.get_object_feature(flag_key, default_value, context).value
 
-    def resolve_string_value(self, flag_key, default_value, context):
+    def get_string_value(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> str
-        return self.resolve_boolean_details(flag_key, default_value, context).value
+        return self.get_string_feature(flag_key, default_value, context).value
 
     def _build_feature_context(self, context):
         # type: (dict[str, str] | None) -> dict[str, str]

@@ -52,6 +52,8 @@ from sentry_sdk.spotlight import setup_spotlight
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import urllib3
+
     from typing import Any
     from typing import Callable
     from typing import Dict
@@ -256,7 +258,10 @@ class _Client(object):
             if self.transport is not None:
                 self.transport.capture_envelope(envelope)
 
-        def _request_features(callback, headers):
+        def _request_features(
+            callback,  # type: Callable[[urllib3.BaseHTTPResponse], None]
+            headers,  # type: dict[str, str]
+        ):
             # If the transport is not set when this function is invoked
             # we'll need to wait poll-interval seconds before the
             # features are fetched.
