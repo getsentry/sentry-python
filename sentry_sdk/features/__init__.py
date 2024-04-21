@@ -97,9 +97,9 @@ class EvaluationResult:
 
     def __init__(
         self,
-        reason,  # type: str
+        reason,  # type: Reason
         value,  # type: str | int | bool | float | dict
-        error_code=None,  # type: str | None
+        error_code=None,  # type: ErrorCode | None
         error_message=None,  # type: str | None
         flag_metadata=None,  # type: dict[str, bool | int | str] | None
         variant=None,  # type: str | None
@@ -121,9 +121,9 @@ class EvaluationResult:
 class OpenFeatureProvider:
     """OpenFeature compatible provider interface."""
 
-    def __init__(self, request_fn, poll_interval=60.0):
-        # type: (Callable[[Callable[[Any], None], dict[str, str]], None], float) -> None
-        self.provider = FeatureProvider(request_fn, poll_interval)
+    def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
+        # type: (Callable[[Callable[[Any], None], dict[str, str]], None], float, bool) -> None
+        self.provider = FeatureProvider(request_fn, poll_interval, auto_start)
 
     def dispose(self):
         # type: () -> None
@@ -178,11 +178,10 @@ class OpenFeatureProvider:
 class FeatureProvider:
     """Feature provider."""
 
-    def __init__(self, request_fn, poll_interval=60.0):
-        self.features = {}
-        self.version = None
+    def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
+        self._model = Model(request_state=Pending(), etag=None)
         self._lock = threading.Lock()
-        self._task = PollResourceTask(self, request_fn, poll_interval)
+        self._task = PollResourceTask(self, request_fn, poll_interval, auto_start)
 
     @property
     def closed(self):
@@ -203,15 +202,24 @@ class FeatureProvider:
 
     def update(self, response):
         # type: (urllib3.BaseHTTPResponse) -> None
-        if response.status != 200:
-            return None
-
-        feature_set = response.json()
-        features = {f["key"]: f for f in feature_set["features"]}
 
         with self._lock:
-            self.version = feature_set["version"]
-            self.features = features
+            if response.status == 200:
+                # The request succeeded and returned content. We don't
+                # care about the existing state. Everything is
+                # overwritten with fresh data.
+                feature_set = response.json()
+                features = {f["key"]: f for f in feature_set["features"]}
+                version = feature_set["version"]
+
+                self._model = Model(
+                    request_state=Success(features, version),
+                    etag=response.headers.get("ETag"),
+                )
+            elif response.status == 204:
+                self._model = _handle_cached_response(self._model)
+            else:
+                self._model = _handle_failure_response(self._model)
 
     def wait(self, timeout):
         # type: (float) -> bool
@@ -235,9 +243,11 @@ class FeatureProvider:
             )
 
         # TODO: Version 0 extraction logic. No consideration for variants or rollout.
-        value = self.features["value"]
+        reason = Reason.STATIC
+        value = self.features[key]["value"]
 
-        if expected_type is not None and not isinstance(value, expected_type):
+        # TODO: Doesn't work with bool and int combos
+        if not isinstance(value, expected_type):
             return EvaluationResult(
                 reason=Reason.ERROR,
                 error_code=ErrorCode.TYPE_MISMATCH,
@@ -245,7 +255,7 @@ class FeatureProvider:
             )
 
         return EvaluationResult(
-            reason=Reason.TARGETING_MATCH,
+            reason=reason,
             error_code=None,
             value=value,
         )
@@ -277,7 +287,6 @@ class PollResourceTask:
         self._poll_count = 0
         self._refresh = poll_interval
         self._request_fn = request_fn
-        self._resource_version = None
 
         if auto_start:
             self.start()
@@ -311,14 +320,10 @@ class PollResourceTask:
 
         def callback(response):
             # type: (urllib3.BaseHTTPResponse) -> None
-            resource_version = response.headers.get("ETag")
-            if resource_version:
-                self._resource_version = resource_version
-
             self._provider.update(response)
             self._fetch_event.set()
 
-        self._request_fn(callback, headers={"ETag": self._resource_version})
+        self._request_fn(callback, headers={"ETag": self._provider._model.etag})
         self._last_fetch = time.time()
         self._poll_count += 1
 
@@ -350,3 +355,100 @@ class PollResourceTask:
             return True
         else:
             return self._fetch_event.wait(timeout)
+
+
+# State machine utilities.
+
+
+class _HasFeatures(object):
+    def __init__(
+        self,
+        features,  # type: dict[str, Any]
+        version,  # type: int
+    ):
+        self.features = features
+        self.version = version
+
+
+class Pending(object):
+    """Pending request state containing no features."""
+
+    pass
+
+
+class Failure(object):
+    """Failure request state containing no features."""
+
+    pass
+
+
+class Success(_HasFeatures):
+    """Success request state containing fresh features."""
+
+    pass
+
+
+class SuccessCached(_HasFeatures):
+    """Success request state containing cached features."""
+
+    pass
+
+
+class FailureCached(_HasFeatures):
+    """Failure request state containing stale features."""
+
+    pass
+
+
+class Model(object):
+    """Data model definition for the features state machine.
+
+    A Model instance should be treated as immutable.
+    """
+
+    def __init__(
+        self,
+        request_state,  # type: Pending | Failure | Success | SuccessCached | FailureCached
+        etag,  # type: str | None
+    ):
+        self.request_state = request_state
+        self.etag = etag
+
+
+def _handle_cached_response(model):
+    # type: (Model) -> Model
+    if isinstance(model.request_state, (Success, SuccessCached, FailureCached)):
+        # The request succeeded but returned no content.
+        # That's okay we have cached features we can carry
+        # forward.
+        return Model(
+            request_state=SuccessCached(
+                model.request_state.features,
+                model.request_state.version,
+            ),
+            etag=model.etag,
+        )
+    else:
+        # The request succeeded but returned no content. We don't have
+        # any features in the cache and so can not make progress. We
+        # reset the state and wait for the next poll interval.
+        return Model(request_state=Pending(), etag=None)
+
+
+def _handle_failure_response(model):
+    # type: (Model) -> Model
+    if isinstance(model.request_state, (Pending, Failure)):
+        # The request failed and we were in a "Pending" or "Failure"
+        # state. There are no cached features. We reset the etag, which
+        # should not exist, because no features are cached.
+        return Model(request_state=Failure(), etag=None)
+    else:
+        # The request failed but we have cached features. There features
+        # are stale but we can still choose to use them.
+        return Model(
+            request_state=FailureCached(
+                model.request_state.features,
+                model.request_state.version,
+            ),
+            etag=model.etag,
+        )
