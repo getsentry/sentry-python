@@ -764,23 +764,23 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=str,
         )
 
-    def get_boolean_value(self, flag_key, default_value, context):
+    def get_boolean(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> bool
         return self.get_boolean_details(flag_key, default_value, context).value
 
-    def get_integer_value(self, flag_key, default_value, context):
+    def get_integer(self, flag_key, default_value, context):
         # type: (str, int, dict[str, str]) -> int
         return self.get_integer_details(flag_key, default_value, context).value
 
-    def get_float_value(self, flag_key, default_value, context):
+    def get_float(self, flag_key, default_value, context):
         # type: (str, float, dict[str, str]) -> float
         return self.get_float_details(flag_key, default_value, context).value
 
-    def get_object_value(self, flag_key, default_value, context):
+    def get_object(self, flag_key, default_value, context):
         # type: (str, dict, dict[str, str]) -> dict
         return self.get_object_details(flag_key, default_value, context).value
 
-    def get_string_value(self, flag_key, default_value, context):
+    def get_string(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> str
         return self.get_string_details(flag_key, default_value, context).value
 
