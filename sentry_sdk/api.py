@@ -211,6 +211,31 @@ def last_event_id():
 
 
 @hubmethod
+def get_boolean(key, default, context):
+    return Hub.current.get_boolean(key, default, context)
+
+
+@hubmethod
+def get_integer(key, default, context):
+    return Hub.current.get_integer(key, default, context)
+
+
+@hubmethod
+def get_float(key, default, context):
+    return Hub.current.get_float(key, default, context)
+
+
+@hubmethod
+def get_object(key, default, context):
+    return Hub.current.get_object(key, default, context)
+
+
+@hubmethod
+def get_string(key, default, context):
+    return Hub.current.get_string(key, default, context)
+
+
+@hubmethod
 def start_span(
     span=None,  # type: Optional[Span]
     **kwargs  # type: Any
