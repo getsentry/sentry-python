@@ -187,6 +187,10 @@ class FeatureProvider:
     def closed(self):
         return self._task.closed
 
+    @property
+    def state(self):
+        return self._state
+
     def close(self):
         self._task.close()
 
@@ -198,26 +202,18 @@ class FeatureProvider:
         expected_type,  # type: type | tuple[type, ...]
     ):
         # type: (...) -> EvaluationResult
-        with self._lock:
-            return evaluate_feature(self.model, key, default, context, expected_type)
+        # Because we're using immutable objects I believe this means we
+        # do not have to lock here since the "_state" variable's pointer
+        # will still exist after being overwritten in the
+        # `FeatureProvider` class.
+        #
+        # TODO: Have someone smarter than me fact check.
+        return evaluate_feature(self._state, key, default, context, expected_type)
 
     def update(self, response):
         # type: (urllib3.BaseHTTPResponse) -> None
-
         with self._lock:
-            if response.status == 200:
-                # The request succeeded and returned content. We don't
-                # care about the existing state. Everything is
-                # overwritten with fresh data.
-                feature_set = response.json()
-                features = {f["key"]: f for f in feature_set["features"]}
-                version = feature_set["version"]
-
-                self._state = Success(response.headers.get("ETag"), features, version)
-            elif response.status == 304:
-                self._state = _handle_cached_response(self._state)
-            else:
-                self._state = _handle_failure_response(self._state)
+            self._state = _handle_state_update(self._state, response)
 
     def wait(self, timeout):
         # type: (float) -> bool
@@ -231,10 +227,6 @@ class PollResourceTask:
     This class asynchronously polls a remote resource until signaled to
     stop. On successful poll the resource identifier (ETag) is extraced
     and a response message is passed to the state machine.
-
-    :param provider:
-    :param request_fn:
-    :param poll_interval:
     """
 
     def __init__(
@@ -368,6 +360,28 @@ class FailureCached(_HasFeatures):
     """Failure state containing stale features."""
 
     pass
+
+
+def _handle_state_update(
+    old_state,  # type: Pending | Failure | FailureCached | Success | SuccessCached
+    response,  # type: urllib3.BaseHTTPResponse
+):
+    # type: (...) -> Failure | FailureCached | Success | SuccessCached
+    #
+    # It is a type error to return a Pending state.
+    if response.status == 200:
+        # The request succeeded and returned content. We don't
+        # care about the existing state. Everything is
+        # overwritten with fresh data.
+        feature_set = response.json()
+        features = {f["key"]: f for f in feature_set["features"]}
+        version = feature_set["version"]
+
+        return Success(response.headers.get("ETag"), features, version)
+    elif response.status == 304:
+        return _handle_cached_response(old_state)
+    else:
+        return _handle_failure_response(old_state)
 
 
 def _handle_cached_response(
