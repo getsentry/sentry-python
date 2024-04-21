@@ -714,7 +714,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
     # to be valuable. The provider can be extracted and used within a
     # compliant OpenFeature SDK implementation.
 
-    def get_boolean_feature(self, flag_key, default_value, context):
+    def get_boolean_details(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.client.features.get(
@@ -724,7 +724,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=bool,
         )
 
-    def get_integer_feature(self, flag_key, default_value, context):
+    def get_integer_details(self, flag_key, default_value, context):
         # type: (str, int, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -734,7 +734,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=int,
         )
 
-    def get_float_feature(self, flag_key, default_value, context):
+    def get_float_details(self, flag_key, default_value, context):
         # type: (str, float, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -744,7 +744,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=float,
         )
 
-    def get_object_feature(self, flag_key, default_value, context):
+    def get_object_details(self, flag_key, default_value, context):
         # type: (str, dict, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -754,7 +754,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             expected_type=dict,
         )
 
-    def get_string_feature(self, flag_key, default_value, context):
+    def get_string_details(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
         return self.provider.get(
@@ -766,23 +766,23 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
     def get_boolean_value(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> bool
-        return self.get_boolean_feature(flag_key, default_value, context).value
+        return self.get_boolean_details(flag_key, default_value, context).value
 
     def get_integer_value(self, flag_key, default_value, context):
         # type: (str, int, dict[str, str]) -> int
-        return self.get_integer_feature(flag_key, default_value, context).value
+        return self.get_integer_details(flag_key, default_value, context).value
 
     def get_float_value(self, flag_key, default_value, context):
         # type: (str, float, dict[str, str]) -> float
-        return self.get_float_feature(flag_key, default_value, context).value
+        return self.get_float_details(flag_key, default_value, context).value
 
     def get_object_value(self, flag_key, default_value, context):
         # type: (str, dict, dict[str, str]) -> dict
-        return self.get_object_feature(flag_key, default_value, context).value
+        return self.get_object_details(flag_key, default_value, context).value
 
     def get_string_value(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> str
-        return self.get_string_feature(flag_key, default_value, context).value
+        return self.get_string_details(flag_key, default_value, context).value
 
     def _build_feature_context(self, context):
         # type: (dict[str, str] | None) -> dict[str, str]
