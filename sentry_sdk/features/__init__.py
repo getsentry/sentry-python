@@ -179,7 +179,7 @@ class FeatureProvider:
     """Feature provider."""
 
     def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
-        self._model = Model(request_state=Pending(), etag=None)
+        self._model = Model(state=Pending(), etag=None)
         self._lock = threading.Lock()
         self._task = PollResourceTask(self, request_fn, poll_interval, auto_start)
 
@@ -194,11 +194,16 @@ class FeatureProvider:
     def close(self):
         self._task.close()
 
-    def get(self, key, default, context, expected_type):
-        # type: (str, Any, dict[str, bool | int | str], type | tuple[type, ...]) -> EvaluationResult
-        # TODO: forces sequential reads.
+    def get(
+        self,
+        key,  # type: str
+        default,  # type: Any
+        context,  # type: dict[str, bool | int | str]
+        expected_type,  # type: type | tuple[type, ...]
+    ):
+        # type: (...) -> EvaluationResult
         with self._lock:
-            return self._evaluate_feature(key, default, context, expected_type)
+            return evaluate_feature(self.model, key, default, context, expected_type)
 
     def update(self, response):
         # type: (urllib3.BaseHTTPResponse) -> None
@@ -213,7 +218,7 @@ class FeatureProvider:
                 version = feature_set["version"]
 
                 self._model = Model(
-                    request_state=Success(features, version),
+                    state=Success(features, version),
                     etag=response.headers.get("ETag"),
                 )
             elif response.status == 204:
@@ -225,40 +230,6 @@ class FeatureProvider:
         # type: (float) -> bool
         """Wait for a feature-set before proceeding."""
         return self._task.wait(timeout)
-
-    def _evaluate_feature(self, key, default, context, expected_type=None):
-        # type: (str, Any, dict[str, bool | float | int | str], type | tuple[type, ...] | None) -> None
-        if not self.ready:
-            return EvaluationResult(
-                reason=Reason.ERROR,
-                error_code=ErrorCode.PROVIDER_NOT_READY,
-                value=default,
-            )
-
-        if key not in self.features:
-            return EvaluationResult(
-                reason=Reason.ERROR,
-                error_code=ErrorCode.FLAG_NOT_FOUND,
-                value=default,
-            )
-
-        # TODO: Version 0 extraction logic. No consideration for variants or rollout.
-        reason = Reason.STATIC
-        value = self.features[key]["value"]
-
-        # TODO: Doesn't work with bool and int combos
-        if not isinstance(value, expected_type):
-            return EvaluationResult(
-                reason=Reason.ERROR,
-                error_code=ErrorCode.TYPE_MISMATCH,
-                value=default,
-            )
-
-        return EvaluationResult(
-            reason=reason,
-            error_code=None,
-            value=value,
-        )
 
 
 class PollResourceTask:
@@ -371,31 +342,31 @@ class _HasFeatures(object):
 
 
 class Pending(object):
-    """Pending request state containing no features."""
+    """Pending state containing no features."""
 
     pass
 
 
 class Failure(object):
-    """Failure request state containing no features."""
+    """Failure state containing no features."""
 
     pass
 
 
 class Success(_HasFeatures):
-    """Success request state containing fresh features."""
+    """Success state containing fresh features."""
 
     pass
 
 
 class SuccessCached(_HasFeatures):
-    """Success request state containing cached features."""
+    """Success state containing cached features."""
 
     pass
 
 
 class FailureCached(_HasFeatures):
-    """Failure request state containing stale features."""
+    """Failure state containing stale features."""
 
     pass
 
@@ -408,47 +379,112 @@ class Model(object):
 
     def __init__(
         self,
-        request_state,  # type: Pending | Failure | Success | SuccessCached | FailureCached
+        state,  # type: Pending | Failure | Success | SuccessCached | FailureCached
         etag,  # type: str | None
     ):
-        self.request_state = request_state
+        self.state = state
         self.etag = etag
 
 
 def _handle_cached_response(model):
     # type: (Model) -> Model
-    if isinstance(model.request_state, (Success, SuccessCached, FailureCached)):
+    if isinstance(model.state, (Success, SuccessCached, FailureCached)):
         # The request succeeded but returned no content.
         # That's okay we have cached features we can carry
         # forward.
         return Model(
-            request_state=SuccessCached(
-                model.request_state.features,
-                model.request_state.version,
-            ),
+            state=SuccessCached(model.state.features, model.state.version),
             etag=model.etag,
         )
     else:
         # The request succeeded but returned no content. We don't have
         # any features in the cache and so can not make progress. We
         # reset the state and wait for the next poll interval.
-        return Model(request_state=Pending(), etag=None)
+        return Model(state=Pending(), etag=None)
 
 
 def _handle_failure_response(model):
     # type: (Model) -> Model
-    if isinstance(model.request_state, (Pending, Failure)):
+    if isinstance(model.state, (Pending, Failure)):
         # The request failed and we were in a "Pending" or "Failure"
         # state. There are no cached features. We reset the etag, which
         # should not exist, because no features are cached.
-        return Model(request_state=Failure(), etag=None)
+        return Model(state=Failure(), etag=None)
     else:
         # The request failed but we have cached features. There features
         # are stale but we can still choose to use them.
         return Model(
-            request_state=FailureCached(
-                model.request_state.features,
-                model.request_state.version,
-            ),
+            state=FailureCached(model.state.features, model.state.version),
             etag=model.etag,
         )
+
+
+def evaluate_feature(
+    model,  # type: Model
+    key,  # type: str
+    default,  # type: Any
+    context,  # type: dict[str, bool | float | int | str]
+    expected_type=None,  # type: type | tuple[type, ...] | None
+):
+    state = model.state
+
+    # Provider not ready because we're in a pending state which is
+    # reserved for providers which either need to start or restart the
+    # polling flow or wait until the request to the feature provider
+    # has resolved.
+    if isinstance(state, Pending):
+        return EvaluationResult(
+            reason=Reason.ERROR,
+            error_code=ErrorCode.PROVIDER_NOT_READY,
+            value=default,
+        )
+
+    # Provider fatal because we're in a failure state with no cached
+    # flags.
+    if isinstance(state, Failure):
+        return EvaluationResult(
+            reason=Reason.ERROR,
+            error_code=ErrorCode.PROVIDER_FATAL,
+            value=default,
+        )
+
+    # Flag doesn't exist in the set so we return not found.
+    if key not in state.features:
+        return EvaluationResult(
+            reason=Reason.ERROR,
+            error_code=ErrorCode.FLAG_NOT_FOUND,
+            value=default,
+        )
+
+    # TODO: Version 0 extraction logic. No consideration for variants
+    # or rollout.
+    value = state.features[key]["value"]
+
+    # Type mismatch because the type returned by the feature evaluation
+    # did not match the caller's expectations.
+    #
+    # TODO: Doesn't work with bool and int combos
+    if not isinstance(value, expected_type):
+        return EvaluationResult(
+            reason=Reason.ERROR,
+            error_code=ErrorCode.TYPE_MISMATCH,
+            value=default,
+        )
+
+    # For each state which has cached features there is a lowest
+    # prescedent reason which should be returned if no higher prescedent
+    # reason was found. Basically, the reason should be unchanged unless
+    # dynamic context evaluation was performed or some other error was
+    # discovered.
+    if isinstance(state, SuccessCached):
+        default_reason = Reason.CACHED
+    elif isinstance(state, Success):
+        default_reason = Reason.STATIC
+    elif isinstance(state, FailureCached):
+        default_reason = Reason.STALE
+
+    return EvaluationResult(
+        reason=default_reason,
+        error_code=None,
+        value=value,
+    )

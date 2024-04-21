@@ -1,4 +1,11 @@
-from sentry_sdk.features import OpenFeatureProvider, PollResourceTask, Reason, ErrorCode
+from sentry_sdk.features import (
+    OpenFeatureProvider,
+    PollResourceTask,
+    Reason,
+    ErrorCode,
+    Model,
+    Pending,
+)
 import time
 import pytest
 
@@ -16,10 +23,10 @@ class HTTPResponse:
 
 class StateMachine:
     def __init__(self):
-        self.messages = []
+        self._model = Model(Pending(), etag=None)
 
     def update(self, message):
-        self.messages.append(message)
+        pass
 
 
 # Test OpenFeatureProvider
