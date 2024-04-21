@@ -1,16 +1,14 @@
-from sentry_sdk.features import PollResourceTask
+from sentry_sdk.features import OpenFeatureProvider, PollResourceTask, Reason, ErrorCode
 import time
+import pytest
 
 
 class HTTPResponse:
 
-    def __init__(self, status_code, headers, content):
-        self.status_code = status_code
+    def __init__(self, status, headers, content):
+        self.status = status
         self.headers = headers
         self.content = content
-
-    def __getitem__(self, key):
-        return self.headers[key]
 
     def json(self):
         return self.content
@@ -22,6 +20,130 @@ class StateMachine:
 
     def update(self, message):
         self.messages.append(message)
+
+
+# Test OpenFeatureProvider
+
+
+@pytest.mark.parametrize(
+    "method,value",
+    [
+        ("resolve_boolean_details", True),
+        ("resolve_integer_details", 5),
+        ("resolve_float_details", 5.0),
+        ("resolve_object_details", {"hello": False}),
+        ("resolve_string_details", "Hello, world!"),
+    ],
+)
+def test_open_feature_resolve_details_static(method, value):
+    def request_fn(callback, headers):
+        callback(
+            HTTPResponse(
+                200,
+                {"ETag": "hello"},
+                {"version": 1, "features": [{"key": "feature_name", "value": value}]},
+            )
+        )
+
+    # Synchronous flag resolution.
+    provider = OpenFeatureProvider(request_fn, auto_start=False)
+    provider.provider._task.poll()
+
+    details = getattr(provider, method)("feature_name", None, context={})
+    assert details.error_code is None
+    assert details.error_message is None
+    assert details.flag_metadata == {}
+    assert details.reason == Reason.STATIC
+    assert details.value == value
+    assert details.variant is None
+
+
+@pytest.mark.parametrize(
+    "method,default",
+    [
+        ("resolve_boolean_details", False),
+        ("resolve_integer_details", 0),
+        ("resolve_float_details", 0.0),
+        ("resolve_object_details", {}),
+        ("resolve_string_details", ""),
+    ],
+)
+def test_open_feature_resolve_details_not_found(method, default):
+    def request_fn(callback, headers):
+        callback(HTTPResponse(200, {"ETag": "hello"}, {"version": 1, "features": []}))
+
+    # Synchronous flag resolution.
+    provider = OpenFeatureProvider(request_fn, auto_start=False)
+    provider.provider._task.poll()
+
+    details = getattr(provider, method)("key", default, context={})
+    assert details.error_code is ErrorCode.FLAG_NOT_FOUND
+    assert details.error_message is None
+    assert details.flag_metadata == {}
+    assert details.reason == Reason.ERROR
+    assert details.value == default
+    assert details.variant is None
+
+
+@pytest.mark.parametrize(
+    "method,default",
+    [
+        ("resolve_boolean_details", False),
+        ("resolve_integer_details", 0),
+        ("resolve_float_details", 0.0),
+        ("resolve_object_details", {}),
+        ("resolve_string_details", ""),
+    ],
+)
+def test_open_feature_resolve_details_not_ready(method, default):
+    def request_fn(callback, headers):
+        callback(HTTPResponse(200, {"ETag": "hello"}, {"version": 1, "features": []}))
+
+    # Synchronous flag resolution.
+    provider = OpenFeatureProvider(request_fn, auto_start=False)
+    # Explicitly commented to demonstrate the poll method has not been called.
+    # provider.provider._task.poll()
+
+    details = getattr(provider, method)("key", default, context={})
+    assert details.error_code is ErrorCode.PROVIDER_NOT_READY
+    assert details.error_message is None
+    assert details.flag_metadata == {}
+    assert details.reason == Reason.ERROR
+    assert details.value == default
+    assert details.variant is None
+
+
+@pytest.mark.parametrize(
+    "method,default,value",
+    [
+        ("resolve_boolean_details", False, None),
+        ("resolve_integer_details", 0, "hello"),
+        ("resolve_float_details", 0.0, False),
+        ("resolve_object_details", {}, "hello"),
+        ("resolve_string_details", "", 0),
+    ],
+)
+def test_open_feature_resolve_details_type_mismatch(method, default, value):
+    def request_fn(callback, headers):
+        callback(
+            HTTPResponse(
+                200,
+                {"ETag": "hello"},
+                {"version": 1, "features": [{"key": "a", "value": value}]},
+            )
+        )
+
+    # Synchronous flag resolution.
+    provider = OpenFeatureProvider(request_fn, auto_start=False)
+    provider.provider._task.poll()
+
+    details = getattr(provider, method)("a", default, context={})
+    assert details.error_code is ErrorCode.TYPE_MISMATCH
+    assert details.error_message is None
+    assert details.flag_metadata == {}
+    assert details.reason == Reason.ERROR
+    assert details.value == default
+    assert details.variant is None
 
 
 # Test PollResourceTask
