@@ -419,6 +419,9 @@ def _handle_failure_response(model):
         )
 
 
+# Feature evaluation.
+
+
 def evaluate_feature(
     model,  # type: Model
     key,  # type: str
@@ -456,8 +459,7 @@ def evaluate_feature(
             value=default,
         )
 
-    # TODO: Version 0 extraction logic. No consideration for variants
-    # or rollout.
+    # TODO: Pre-alpha extraction logic. No consideration for variants.
     value = state.features[key]["value"]
 
     # Type mismatch because the type returned by the feature evaluation
