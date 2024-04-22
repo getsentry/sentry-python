@@ -1,6 +1,6 @@
 # Protocol
 
-The features protocol is remote-configuration oriented. Meaning we focus on returning a value: `bool`, `float`, `int`, `object`, `str` above all else. `key` and `value` properties are always defined at the root of a feature object.
+The features protocol is remote-configuration oriented. Meaning we focus on returning a value (`bool`, `float`, `int`, `object`, `str`) above all else. `key` and `value` properties are always defined at the root of a feature object.
 
 Variants may be optionally supplied which allow the feature provider to change the `value` returned to the user.
 
