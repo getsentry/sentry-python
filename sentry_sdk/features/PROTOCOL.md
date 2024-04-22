@@ -29,17 +29,17 @@ Rules describe a set of conditions that should be applied against a local contex
 
 All rules belonging to a variant are `AND`ed together. `OR` is not supported.
 
-| Operator | Description                               | Types               |
-| -------- | ----------------------------------------- | ------------------- |
-| ==       | Equals.                                   | Any                 |
-| !=       | Not equals.                               | Any                 |
-| >=       | Greater than or equal to.                 | float, int          |
-| >        | Greater than.                             | float, int          |
-| <=       | Less than or equal to.                    | float, int          |
-| <        | Less than.                                | float, int          |
-| in       | Contains.                                 | hash map, list, str |
-| not in   | Does not contain.                         | hash map, list, str |
-| glob     | Match a pattern. \*str, str\*, or \*str\* | str                 |
+| Operator | Description                               | Types                |
+| -------- | ----------------------------------------- | -------------------- |
+| ==       | Equals.                                   | Any                  |
+| !=       | Not equals.                               | Any                  |
+| >=       | Greater than or equal to.                 | datetime, float, int |
+| >        | Greater than.                             | datetime, float, int |
+| <=       | Less than or equal to.                    | datetime, float, int |
+| <        | Less than.                                | datetime, float, int |
+| in       | Contains.                                 | hash map, list, str  |
+| not in   | Does not contain.                         | hash map, list, str  |
+| glob     | Match a pattern. \*str, str\*, or \*str\* | str                  |
 
 ## Example
 
