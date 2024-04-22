@@ -325,12 +325,39 @@ class HttpTransport(Transport):
         headers,  # type: dict[str, str]
     ):
         def request_fn():
-            self._send_request(
-                body=b"",
-                headers=headers,
-                endpoint_type="features",
-                callback=callback,
-            )
+            headers["User-Agent"] = str(self._auth.client)
+            headers["X-Sentry-Auth"] = str(self._auth.to_header())
+
+            try:
+                response = self._pool.request(
+                    "GET", self._auth.get_api_url("features"), headers=headers
+                )
+            except Exception:
+                self.on_dropped_event("network")
+                raise
+
+            try:
+                self._update_rate_limits(response)
+
+                if response.status == 429:
+                    # if we hit a 429.  Something was rate limited but we already
+                    # acted on this in `self._update_rate_limits`.  Note that we
+                    # do not want to record event loss here as we will have recorded
+                    # an outcome in relay already.
+                    self.on_dropped_event("status_429")
+
+                elif response.status not in (200, 301):
+                    logger.error(
+                        "Unexpected status code: %s (body: %s)",
+                        response.status,
+                        response.data,
+                    )
+                    self.on_dropped_event("status_{}".format(response.status))
+
+                if callback is not None:
+                    callback(response)
+            finally:
+                response.close()
 
         self._worker.submit(request_fn)
 
