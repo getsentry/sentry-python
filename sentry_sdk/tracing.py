@@ -747,7 +747,6 @@ class Transaction(Span):
             # We have no active client and therefore nowhere to send this transaction.
             return None
 
-        # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
             logger.debug("Discarding transaction because sampled = False")
 
