@@ -706,83 +706,35 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client, scope = self._stack[-1]
         return scope.trace_propagation_meta(span=span, client=client)
 
-    # Exposed feature operations.
-    #
-    # The Sentry SDK does not claim or attempt to be an OpenFeature
-    # compatible SDK. Instead it provides an OpenFeature-compatible
-    # provider interface to expose the feature sets Sentry determines
-    # to be valuable. The provider can be extracted and used within a
-    # compliant OpenFeature SDK implementation.
+    def get_feature_details(
+        self,
+        key,  # type: str
+        default,  # type: Any
+        context,  # type: dict[str, str]
+    ):
+        # type: (...) -> EvaluationResult
+        feature_provider = self.client.features
+        if feature_provider is None:
+            # Raising instead of returning "None". I don't want to
+            # confuse "None" responses with the value of the flag.
+            raise RuntimeError("Features not enabled.")
 
-    def get_boolean_details(self, flag_key, default_value, context):
-        # type: (str, bool, dict[str, str]) -> EvaluationResult
         context = self._build_feature_context(context)
-        return self.client.features.get(
-            flag_key,
-            default_value,
-            context=context,
-            expected_type=bool,
+
+        if isinstance(default, bool):
+            return feature_provider.resolve_boolean_details(key, default, context)
+        if isinstance(default, float):
+            return feature_provider.resolve_float_details(key, default, context)
+        if isinstance(default, int):
+            return feature_provider.resolve_integer_details(key, default, context)
+        if isinstance(default, str):
+            return feature_provider.resolve_string_details(key, default, context)
+        if isinstance(default, dict):
+            return feature_provider.resolve_object_details(key, default, context)
+
+        raise ValueError(
+            "Invalid type for default expected: bool, float, int, str, or dict."
         )
-
-    def get_integer_details(self, flag_key, default_value, context):
-        # type: (str, int, dict[str, str]) -> EvaluationResult
-        context = self._build_feature_context(context)
-        return self.provider.get(
-            flag_key,
-            default_value,
-            context=context,
-            expected_type=int,
-        )
-
-    def get_float_details(self, flag_key, default_value, context):
-        # type: (str, float, dict[str, str]) -> EvaluationResult
-        context = self._build_feature_context(context)
-        return self.provider.get(
-            flag_key,
-            default_value,
-            context=context,
-            expected_type=float,
-        )
-
-    def get_object_details(self, flag_key, default_value, context):
-        # type: (str, dict, dict[str, str]) -> EvaluationResult
-        context = self._build_feature_context(context)
-        return self.provider.get(
-            flag_key,
-            default_value,
-            context=context,
-            expected_type=dict,
-        )
-
-    def get_string_details(self, flag_key, default_value, context):
-        # type: (str, str, dict[str, str]) -> EvaluationResult
-        context = self._build_feature_context(context)
-        return self.provider.get(
-            flag_key,
-            default_value,
-            context=context,
-            expected_type=str,
-        )
-
-    def get_boolean(self, flag_key, default_value, context):
-        # type: (str, bool, dict[str, str]) -> bool
-        return self.get_boolean_details(flag_key, default_value, context).value
-
-    def get_integer(self, flag_key, default_value, context):
-        # type: (str, int, dict[str, str]) -> int
-        return self.get_integer_details(flag_key, default_value, context).value
-
-    def get_float(self, flag_key, default_value, context):
-        # type: (str, float, dict[str, str]) -> float
-        return self.get_float_details(flag_key, default_value, context).value
-
-    def get_object(self, flag_key, default_value, context):
-        # type: (str, dict, dict[str, str]) -> dict
-        return self.get_object_details(flag_key, default_value, context).value
-
-    def get_string(self, flag_key, default_value, context):
-        # type: (str, str, dict[str, str]) -> str
-        return self.get_string_details(flag_key, default_value, context).value
 
     def _build_feature_context(self, context):
         # type: (dict[str, str] | None) -> dict[str, str]

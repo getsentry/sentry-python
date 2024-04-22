@@ -4,6 +4,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
+from sentry_sdk.features import EvaluationResult
 
 if TYPE_CHECKING:
     from typing import Any
@@ -57,6 +58,8 @@ __all__ = [
     "get_traceparent",
     "get_baggage",
     "continue_trace",
+    "get_feature_details",
+    "get_feature_value",
 ]
 
 
@@ -211,28 +214,22 @@ def last_event_id():
 
 
 @hubmethod
-def get_boolean(key, default, context):
-    return Hub.current.get_boolean(key, default, context)
+def get_feature_details(
+    key,  # type: str
+    default,  # type: Any
+    context,  # type: dict[str, str]
+):
+    # type: (...) -> EvaluationResult
+    return Hub.current.get_feature_details(key, default, context)
 
 
 @hubmethod
-def get_integer(key, default, context):
-    return Hub.current.get_integer(key, default, context)
-
-
-@hubmethod
-def get_float(key, default, context):
-    return Hub.current.get_float(key, default, context)
-
-
-@hubmethod
-def get_object(key, default, context):
-    return Hub.current.get_object(key, default, context)
-
-
-@hubmethod
-def get_string(key, default, context):
-    return Hub.current.get_string(key, default, context)
+def get_feature_value(
+    key,  # type: str
+    default,  # type: bool | float | int | str | dict
+    context,  # type: dict[str, str]
+):
+    return get_feature_details(key, default, context).value
 
 
 @hubmethod
