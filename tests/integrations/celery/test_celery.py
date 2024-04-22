@@ -501,7 +501,13 @@ def test_task_headers(celery):
     # in the monkey patched version of `apply_async`
     # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
     result = dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
-    assert result.get() == sentry_crons_setup
+
+    expected_headers = sentry_crons_setup.copy()
+    # Newly added headers
+    expected_headers["sentry-trace"] = mock.ANY
+    expected_headers["baggage"] = mock.ANY
+
+    assert result.get() == expected_headers
 
 
 def test_baggage_propagation(init_celery):
