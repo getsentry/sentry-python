@@ -748,7 +748,13 @@ class Transaction(Span):
             return None
 
         if self._span_recorder is None:
-            logger.debug("Discarding transaction because sampled = False")
+            # Explicit check against False needed because self.sampled might be None
+            if self.sampled is False:
+                logger.debug("Discarding transaction because sampled = False")
+            else:
+                logger.debug(
+                    "Discarding transaction because it was not started with sentry_sdk.start_transaction"
+                )
 
             # This is not entirely accurate because discards here are not
             # exclusively based on sample rate but also traces sampler, but
