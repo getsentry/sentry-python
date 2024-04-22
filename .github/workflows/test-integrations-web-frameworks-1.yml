@@ -51,7 +51,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.3
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -120,7 +120,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.3
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -181,7 +181,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
       SENTRY_PYTHON_TEST_POSTGRES_HOST: postgres
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.3
       - name: Setup Test Env
         run: |
           pip install coverage "tox>=3,<4"
