@@ -40,7 +40,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
     # later in the code execution:
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope.set_transaction_name("new-transaction-name")
     ```
 - The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
@@ -130,18 +130,18 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  import sentry_sdk
 
-  scope = Scope.get_current_scope()
+  scope = sentry_sdk.get_current_scope()
   # do something with `scope`
   ```
 
   Or:
 
   ```python
-  from sentry_sdk.scope import Scope
+  import sentry_sdk
 
-  scope = Scope.get_isolation_scope()
+  scope = sentry_sdk.get_isolation_scope()
   # do something with `scope`
   ```
 
