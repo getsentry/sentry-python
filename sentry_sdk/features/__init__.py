@@ -192,16 +192,45 @@ class OpenFeatureProvider:
 
 
 class FeatureStateMachine:
-    """Feature finite state machine."""
+    """Feature finite state machine.
 
-    def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
-        self._state = Pending()
-        self._lock = threading.Lock()
-        self._task = PollResourceTask(self, request_fn, poll_interval, auto_start)
+    The state machine abstracts state managment by forcing writes to the
+    state through message passing via the `update` method and by forcing
+    reads through the `state` property. Immutable state instances means
+    previous versions of the state can be stored indefinitely in
+    supporting interfaces.
+
+    The state machine can exist in five enumerations:
+
+        - Pending
+        - Failure
+        - FailureCached
+        - Success
+        - SuccessCached
+
+    Each enumeration contains its own view of the feature state. For
+    example, `Pending` stores no state information other than itself
+    but `FailureCached` stores an etag and the previously cached
+    feature values.
+
+    The state machine also manages transitions between the states and
+    can error if illegal state transitions are performed. For example,
+    `Success` transitioning to `Pending` is impossible and is made
+    impossible by the type system.
+    """
+
+    def __init__(self, polling_fn, poll_interval=60.0, auto_start=True):
+        self.__state = Pending()
+        self.__lock = threading.Lock()
+        self.__task = PollResourceTask(self, polling_fn, poll_interval, auto_start)
 
     @property
     def closed(self):
-        return self._task.closed
+        """Return "True" if the state machine is closed.
+
+        Closed state-machines no longer accept updates.
+        """
+        return self.__task.closed
 
     @property
     def state(self):
@@ -211,20 +240,29 @@ class FeatureStateMachine:
         # the evaluation context without a need to lock.
         #
         # TODO: Have someone smarter than me fact check.
-        return self._state
+        return self.__state
 
     def close(self):
-        self._task.close()
+        """Close the polling task.
+
+        This freezes the state and will prevent new calls to the update
+        function from changing the state.
+        """
+        self.__task.close()
 
     def update(self, response):
+        """Update the feature state."""
         # type: (urllib3.BaseHTTPResponse) -> None
-        with self._lock:
-            self._state = _handle_state_update(self._state, response)
+        with self.__lock:
+            if self.closed:
+                return None
+
+            self.__state = _handle_state_update(self.__state, response)
 
     def wait(self, timeout):
         # type: (float) -> bool
-        """Wait for a feature-set before proceeding."""
-        return self._task.wait(timeout)
+        """Wait for the state machine to enter a ready state before continuing."""
+        return self.__task.wait(timeout)
 
 
 class PollResourceTask:
@@ -238,7 +276,7 @@ class PollResourceTask:
     def __init__(
         self,
         state_machine,  # type: FeatureStateMachine
-        request_fn,  # type: Callable[[Callable[[Any], None], dict[str, str]], None]
+        polling_fn,  # type: Callable[[Callable[[Any], None], dict[str, str]], None]
         poll_interval,  # type: float
         auto_start=True,  # type: bool
     ):
@@ -247,7 +285,7 @@ class PollResourceTask:
         self._last_fetch = 0
         self._poll_count = 0
         self._refresh = poll_interval
-        self._request_fn = request_fn
+        self._polling_fn = polling_fn
 
         # TODO: There's probably a better way to communicate than
         # embedding the state machine into the task. We could use
@@ -295,7 +333,7 @@ class PollResourceTask:
         ):
             headers["If-None-Match"] = self._state_machine.state.etag
 
-        self._request_fn(callback, headers=headers)
+        self._polling_fn(callback, headers=headers)
         self._last_fetch = time.time()
         self._poll_count += 1
 
