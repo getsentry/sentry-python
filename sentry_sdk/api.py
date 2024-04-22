@@ -224,7 +224,6 @@ def get_feature_details(
     return Hub.current.get_feature_details(key, default, context)
 
 
-@hubmethod
 def get_feature_value(
     key,  # type: str
     default,  # type: bool | float | int | str | dict
