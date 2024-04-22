@@ -94,6 +94,15 @@ class Reason(Enum):
 
 
 class EvaluationResult:
+    """Evaluation result metadata container.
+
+    :param reason: The reason the value was chosen.
+    :param value: The chosen value.
+    :param error_code: The type of error encountered.
+    :param error_message: Extra information relating to the error.
+    :param flag_metadata:
+    :param variant: The id of the variant selected.
+    """
 
     def __init__(
         self,
@@ -119,7 +128,11 @@ class EvaluationResult:
 
 
 class OpenFeatureProvider:
-    """OpenFeature compatible provider interface."""
+    """OpenFeature compatible provider interface.
+
+    OpenFeature requires typed access to feature values. A boolean
+    value must be extracted using a boolean extraction method.
+    """
 
     def __init__(self, state_machine):
         # type: (FeatureStateMachine) -> None
@@ -200,7 +213,7 @@ class FeatureStateMachine:
     previous versions of the state can be stored indefinitely in
     supporting interfaces.
 
-    The state machine can exist in five enumerations:
+    The state machine has five state enumerations:
 
         - Pending
         - Failure
@@ -269,8 +282,8 @@ class PollResourceTask:
     """HTTP resource polling task.
 
     This class asynchronously polls a remote resource until signaled to
-    stop. On successful poll the resource identifier (ETag) is extraced
-    and a response message is passed to the state machine.
+    stop. On successful poll a response message is passed to the state
+    machine.
     """
 
     def __init__(
