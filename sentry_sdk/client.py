@@ -39,7 +39,7 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
-from sentry_sdk.features import OpenFeatureProvider
+from sentry_sdk.features import OpenFeatureProvider, FeatureStateMachine
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
@@ -318,10 +318,8 @@ class _Client(object):
 
             self.features = None
             if self.options["_experiments"].get("features", False):
-                self.features = OpenFeatureProvider(
-                    request_fn=_request_features,
-                    poll_interval=60.0,
-                )
+                state_machine = FeatureStateMachine(_request_features, poll_interval=60)
+                self.features = OpenFeatureProvider(state_machine)
 
             self.integrations = setup_integrations(
                 self.options["integrations"],

@@ -801,7 +801,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         enriched_context["release"] = self.client.options["release"]
         enriched_context["environment"] = self.client.options["environment"]
 
-        # The user supplied context has the greatest prescedent and
+        # The user supplied context has the greatest prescedence and
         # overwrites any key automatically set by the Sentry SDK.
         if context:
             enriched_context.update(context)
