@@ -706,6 +706,14 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         client, scope = self._stack[-1]
         return scope.trace_propagation_meta(span=span, client=client)
 
+    def wait_until_features_ready(self, timeout=None):
+        # type: (float | None) -> bool
+        if timeout is None:
+            timeout = 2.0
+        if self.client is None or self.client.features is None:
+            return True
+        return self.client.features.state_machine.wait(timeout)
+
     def get_feature_details(
         self,
         key,  # type: str
@@ -713,24 +721,21 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         context,  # type: dict[str, str]
     ):
         # type: (...) -> EvaluationResult
-        feature_provider = self.client.features
-        if feature_provider is None:
-            # Raising instead of returning "None". I don't want to
-            # confuse "None" responses with the value of the flag.
-            raise RuntimeError("Features not enabled.")
+        if self.client is None or self.client.features is None:
+            return None
 
         context = self._build_feature_context(context)
 
         if isinstance(default, bool):
-            return feature_provider.resolve_boolean_details(key, default, context)
+            return self.client.features.resolve_boolean_details(key, default, context)
         if isinstance(default, float):
-            return feature_provider.resolve_float_details(key, default, context)
+            return self.client.features.resolve_float_details(key, default, context)
         if isinstance(default, int):
-            return feature_provider.resolve_integer_details(key, default, context)
+            return self.client.features.resolve_integer_details(key, default, context)
         if isinstance(default, str):
-            return feature_provider.resolve_string_details(key, default, context)
+            return self.client.features.resolve_string_details(key, default, context)
         if isinstance(default, dict):
-            return feature_provider.resolve_object_details(key, default, context)
+            return self.client.features.resolve_object_details(key, default, context)
 
         raise ValueError(
             "Invalid type for default expected: bool, float, int, str, or dict."

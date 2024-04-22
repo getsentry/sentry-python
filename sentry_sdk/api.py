@@ -60,6 +60,7 @@ __all__ = [
     "continue_trace",
     "get_feature_details",
     "get_feature_value",
+    "wait_until_features_ready",
 ]
 
 
@@ -230,6 +231,12 @@ def get_feature_value(
     context,  # type: dict[str, str]
 ):
     return get_feature_details(key, default, context).value
+
+
+@hubmethod
+def wait_until_features_ready(timeout=None):
+    # type: (float | None) -> bool
+    return Hub.current.wait_until_features_ready(timeout)
 
 
 @hubmethod
