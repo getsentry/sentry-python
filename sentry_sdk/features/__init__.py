@@ -121,9 +121,9 @@ class EvaluationResult:
 class OpenFeatureProvider:
     """OpenFeature compatible provider interface."""
 
-    def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
-        # type: (Callable[[Callable[[Any], None], dict[str, str]], None], float, bool) -> None
-        self.state_machine = FeatureStateMachine(request_fn, poll_interval, auto_start)
+    def __init__(self, state_machine):
+        # type: (FeatureStateMachine) -> None
+        self.state_machine = state_machine
 
     def dispose(self):
         # type: () -> None
@@ -291,9 +291,9 @@ class PollResourceTask:
 
         headers = {}
         if isinstance(
-            self._state_machine._state, (Success, SuccessCached, FailureCached)
+            self._state_machine.state, (Success, SuccessCached, FailureCached)
         ):
-            headers["If-None-Match"] = self._state_machine._state.etag
+            headers["If-None-Match"] = self._state_machine.state.etag
 
         self._request_fn(callback, headers=headers)
         self._last_fetch = time.time()
