@@ -440,6 +440,99 @@ _Plus 2 more_
 - Passing a function to `sentry_sdk.init`'s `transport` keyword argument has been deprecated. If you wish to provide a custom transport, please pass a `sentry_sdk.transport.Transport` instance or a subclass.
 - The parameter `propagate_hub` in `ThreadingIntegration()` was deprecated and renamed to `propagate_scope`.
 
+## 1.45.0
+
+This is the final 1.x release for the forseeable future. Development will continue on the 2.x release line. The first 2.x version will be available in the next few weeks.
+
+### Various fixes & improvements
+
+- Allow to upsert monitors (#2929) by @sentrivana
+
+  It's now possible to provide `monitor_config` to the `monitor` decorator/context manager directly:
+
+  ```python
+  from sentry_sdk.crons import monitor
+
+  # All keys except `schedule` are optional
+  monitor_config = {
+      "schedule": {"type": "crontab", "value": "0 0 * * *"},
+      "timezone": "Europe/Vienna",
+      "checkin_margin": 10,
+      "max_runtime": 10,
+      "failure_issue_threshold": 5,
+      "recovery_threshold": 5,
+  }
+  
+  @monitor(monitor_slug='<monitor-slug>', monitor_config=monitor_config)
+  def tell_the_world():
+      print('My scheduled task...')
+  ```
+
+  Check out [the cron docs](https://docs.sentry.io/platforms/python/crons/) for details.
+
+- Add Django `signals_denylist` to filter signals that are attached to by `signals_spans` (#2758) by @lieryan
+
+  If you want to exclude some Django signals from performance tracking, you can use the new `signals_denylist` Django option:
+
+  ```python
+  import django.db.models.signals
+  import sentry_sdk
+  
+  sentry_sdk.init(
+      ...
+      integrations=[
+          DjangoIntegration(
+              ...
+              signals_denylist=[
+                  django.db.models.signals.pre_init, 
+                  django.db.models.signals.post_init,
+              ],
+          ),
+      ],
+  )
+  ```
+
+- `increment` for metrics (#2588) by @mitsuhiko
+
+  `increment` and `inc` are equivalent, so you can pick whichever you like more.
+
+- Add `value`, `unit` to `before_emit_metric` (#2958) by @sentrivana
+
+  If you add a custom `before_emit_metric`, it'll now accept 4 arguments (the `key`, `value`, `unit` and `tags`) instead of just `key` and `tags`.
+
+  ```python
+  def before_emit(key, value, unit, tags):
+      if key == "removed-metric":
+          return False
+      tags["extra"] = "foo"
+      del tags["release"]
+      return True
+  
+  sentry_sdk.init(
+      ...
+      _experiments={
+          "before_emit_metric": before_emit,
+      }
+  )
+  ```
+
+- Remove experimental metric summary options (#2957) by @sentrivana
+
+  The `_experiments` options `metrics_summary_sample_rate` and `should_summarize_metric` have been removed.
+
+- New normalization rules for metric keys, names, units, tags (#2946) by @sentrivana
+- Change `data_category` from `statsd` to `metric_bucket` (#2954) by @cleptric
+- Accessing `__mro__` might throw a `ValueError` (#2952) by @sentrivana
+- Suppress prompt spawned by subprocess when using `pythonw` (#2936) by @collinbanko
+- Handle `None` in GraphQL query #2715 (#2762) by @czyber
+- Do not send "quiet" Sanic exceptions to Sentry (#2821) by @hamedsh
+- Implement `metric_bucket` rate limits (#2933) by @cleptric
+- Fix type hints for `monitor` decorator (#2944) by @szokeasaurusrex
+- Remove deprecated `typing` imports in crons (#2945) by @szokeasaurusrex
+- Make `monitor_config` a `TypedDict` (#2931) by @sentrivana
+- Add `devenv-requirements.txt` and update env setup instructions (#2761) by @arr-ee
+- Bump `types-protobuf` from `4.24.0.20240311` to `4.24.0.20240408` (#2941) by @dependabot
+- Disable Codecov check run annotations (#2537) by @eliatcodecov
 
 ## 1.44.1
 
