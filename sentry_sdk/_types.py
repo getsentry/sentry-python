@@ -117,7 +117,7 @@ if TYPE_CHECKING:
         "monitor",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
-    EndpointType = Literal["store", "envelope", "features"]
+    EndpointType = Literal["store", "envelope"]
 
     DurationUnit = Literal[
         "nanosecond",
