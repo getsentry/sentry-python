@@ -1,5 +1,9 @@
 # Protocol
 
+The features protocol is remote-configuration oriented. Meaning we focus on returning a value: `bool`, `float`, `int`, `object`, `str` above all else. `key` and `value` properties are always defined at the root of a feature object.
+
+Variants may be optionally supplied which allow the feature provider to change the `value` returned to the user.
+
 ## Variants
 
 Variants are optionally provided. Variants may return a value or they may not. If they do not return a value continue to the next variant or return the root `value`. Variants are ordered. If a variant is matched we break out of the variant processing loop and return the variant's value.
