@@ -54,8 +54,6 @@ if TYPE_CHECKING:
 
 
 _in_metrics = ContextVar("in_metrics", default=False)
-_sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
-_sanitize_value = partial(re.compile(r"[^\w\d\s_:/@\.{}\[\]$-]+", re.UNICODE).sub, "")
 _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
@@ -66,6 +64,32 @@ GOOD_TRANSACTION_SOURCES = frozenset(
         TRANSACTION_SOURCE_TASK,
     ]
 )
+
+_sanitize_unit = partial(re.compile(r"[^a-zA-Z0-9_]+").sub, "")
+_sanitize_metric_key = partial(re.compile(r"[^a-zA-Z0-9_\-.]+").sub, "_")
+_sanitize_tag_key = partial(re.compile(r"[^a-zA-Z0-9_\-.\/]+").sub, "")
+_TAG_VALUE_SANITIZATION_TABLE = {
+    "\n": "\\n",
+    "\r": "\\r",
+    "\t": "\\t",
+    "\\": "\\\\",
+    "|": "\\u{7c}",
+    ",": "\\u{2c}",
+}
+
+
+def _sanitize_tag_value(value):
+    # type: (str) -> str
+    return "".join(
+        [
+            (
+                _TAG_VALUE_SANITIZATION_TABLE[char]
+                if char in _TAG_VALUE_SANITIZATION_TABLE
+                else char
+            )
+            for char in value
+        ]
+    )
 
 
 def get_code_location(stacklevel):
@@ -269,7 +293,8 @@ def _encode_metrics(flushable_buckets):
     for timestamp, buckets in flushable_buckets:
         for bucket_key, metric in iteritems(buckets):
             metric_type, metric_name, metric_unit, metric_tags = bucket_key
-            metric_name = _sanitize_key(metric_name)
+            metric_name = _sanitize_metric_key(metric_name)
+            metric_unit = _sanitize_unit(metric_unit)
             _write(metric_name.encode("utf-8"))
             _write(b"@")
             _write(metric_unit.encode("utf-8"))
@@ -285,7 +310,7 @@ def _encode_metrics(flushable_buckets):
                 _write(b"|#")
                 first = True
                 for tag_key, tag_value in metric_tags:
-                    tag_key = _sanitize_key(tag_key)
+                    tag_key = _sanitize_tag_key(tag_key)
                     if not tag_key:
                         continue
                     if first:
@@ -294,7 +319,7 @@ def _encode_metrics(flushable_buckets):
                         _write(b",")
                     _write(tag_key.encode("utf-8"))
                     _write(b":")
-                    _write(_sanitize_value(tag_value).encode("utf-8"))
+                    _write(_sanitize_tag_value(tag_value).encode("utf-8"))
 
             _write(b"|T")
             _write(str(timestamp).encode("ascii"))
@@ -309,7 +334,9 @@ def _encode_locations(timestamp, code_locations):
 
     for key, loc in code_locations:
         metric_type, name, unit = key
-        mri = "{}:{}@{}".format(metric_type, _sanitize_key(name), unit)
+        mri = "{}:{}@{}".format(
+            metric_type, _sanitize_metric_key(name), _sanitize_unit(unit)
+        )
 
         loc["type"] = "location"
         mapping.setdefault(mri, []).append(loc)
