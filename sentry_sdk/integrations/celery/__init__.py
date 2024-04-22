@@ -189,8 +189,17 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
                 incoming = Baggage.from_incoming_header(existing_baggage)
                 combined = Baggage.from_incoming_header(sentry_baggage)
                 combined.sentry_items.update(incoming.sentry_items)
-                combined.third_party_items = ",".join([x for x in [combined.third_party_items, incoming.third_party_items] if x is not None and x != ""])
-                combined_baggage = combined.serialize(include_third_party=True)                
+                combined.third_party_items = ",".join(
+                    [
+                        x
+                        for x in [
+                            combined.third_party_items,
+                            incoming.third_party_items,
+                        ]
+                        if x is not None and x != ""
+                    ]
+                )
+                combined_baggage = combined.serialize(include_third_party=True)
 
             updated_headers.update(headers)
             if combined_baggage:
