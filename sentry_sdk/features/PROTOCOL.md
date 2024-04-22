@@ -10,13 +10,13 @@ Variants are optionally provided. Variants may return a value or they may not. I
 
 ## Distribution
 
-Random distribution among cohorts, for A/B testing purposes, can be defined under the `distributions` key. The sum of all the percentages in the list must equal to `100`. If it does not an error will be returned by the feature provider. If A/B testing is not desired a single distribution left at 100% is defined.
+The `distribution` key enables random distribution among cohorts for A/B testing purposes. The sum of all the percentages in the list must equal to `100`. If it does not an error will be returned by the feature provider. If A/B testing is not desired a single distribution left at 100% is defined.
 
 Deterministic distribution is managed by the `rollout` property.
 
 ## Rollout
 
-Rollouts can be `random` or `seed`ed. `seed` based rollouts have a targeting key defined under the `seed` attribute.
+Rollouts can be `random` or `seed`ed. `seed` based rollouts have a targeting key defined under the `seed` attribute. Rollouts do not need to add up to 100%. Given a local context none, some, or all rollouts could be matched. The convention is that the first variant matched is returned.
 
 | Type   | Description                                                |
 | ------ | ---------------------------------------------------------- |
@@ -52,8 +52,10 @@ All rules belonging to a variant are `AND`ed together. `OR` is not supported.
       "value": "1",
       "variants": [
         {
+          "id": "e7008a3fc1dd4a97bfdcf918d7f44530",
           "distribution": [
             {
+              "id": "e88a6b0afe4d427a95c90e129c584698",
               "percentage": 100,
               "value": "2"
             }
