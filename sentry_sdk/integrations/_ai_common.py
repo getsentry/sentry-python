@@ -1,7 +1,7 @@
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import logger
@@ -30,21 +30,3 @@ def set_data_normalized(span, key, value):
     # type: (Span, str, Any) -> None
     normalized = _normalize_data(value)
     span.set_data(key, normalized)
-
-
-def record_token_usage(
-    span, prompt_tokens=None, completion_tokens=None, total_tokens=None
-):
-    # type: (Span, Optional[int], Optional[int], Optional[int]) -> None
-    if prompt_tokens is not None:
-        span.set_measurement("ai_prompt_tokens_used", value=prompt_tokens)
-    if completion_tokens is not None:
-        span.set_measurement("ai_completion_tokens_used", value=completion_tokens)
-    if (
-        total_tokens is None
-        and prompt_tokens is not None
-        and completion_tokens is not None
-    ):
-        total_tokens = prompt_tokens + completion_tokens
-    if total_tokens is not None:
-        span.set_measurement("ai_total_tokens_used", total_tokens)

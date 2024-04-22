@@ -2,8 +2,9 @@ from functools import wraps
 
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.ai_analytics import record_token_usage
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations._ai_common import set_data_normalized, record_token_usage
+from sentry_sdk.integrations._ai_common import set_data_normalized
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, Iterator
@@ -141,7 +142,6 @@ def _wrap_chat_completion_create(f):
 
         span = sentry_sdk.start_span(
             op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
-            origin="auto.ai.openai",
             description="Chat Completion",
         )
         span.__enter__()
@@ -225,7 +225,6 @@ def _wrap_embeddings_create(f):
         # type: (*Any, **Any) -> Any
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
-            origin="auto.ai.openai",
             description="OpenAI Embedding Creation",
         ) as span:
             integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)

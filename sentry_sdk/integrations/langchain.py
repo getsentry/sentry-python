@@ -3,8 +3,9 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.ai_analytics import set_ai_pipeline_name, record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations._ai_common import set_data_normalized, record_token_usage
+from sentry_sdk.integrations._ai_common import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
 
@@ -88,6 +89,7 @@ class WatchedSpan:
     num_prompt_tokens = 0  # type: int
     no_collect_tokens = False  # type: bool
     children = []  # type: List[WatchedSpan]
+    is_pipeline = False  # type: bool
 
     def __init__(self, span):
         # type: (Span) -> None
@@ -134,9 +136,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def _create_span(self, run_id, parent_id, **kwargs):
         # type: (SentryLangchainCallback, UUID, Optional[Any], Any) -> WatchedSpan
 
-        if "origin" not in kwargs:
-            kwargs["origin"] = "auto.ai.langchain"
-
         watched_span = None  # type: Optional[WatchedSpan]
         if parent_id:
             parent_span = self.span_map[parent_id]  # type: Optional[WatchedSpan]
@@ -146,6 +145,11 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         if watched_span is None:
             watched_span = WatchedSpan(sentry_sdk.start_span(**kwargs))
 
+        if kwargs.get("op", "").startswith("ai.pipeline."):
+            if kwargs.get("description"):
+                set_ai_pipeline_name(kwargs.get("description"))
+            watched_span.is_pipeline = True
+
         watched_span.span.__enter__()
         self.span_map[run_id] = watched_span
         self.gc_span_map()
@@ -153,6 +157,9 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def _exit_span(self, span_data, run_id):
         # type: (SentryLangchainCallback, WatchedSpan, UUID) -> None
+
+        if span_data.is_pipeline:
+            set_ai_pipeline_name(None)
 
         span_data.span.__exit__(None, None, None)
         del self.span_map[run_id]
