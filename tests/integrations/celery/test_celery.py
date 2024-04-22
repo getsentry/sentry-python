@@ -414,7 +414,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     assert not runs
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 @pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
 def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
