@@ -123,15 +123,15 @@ class OpenFeatureProvider:
 
     def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
         # type: (Callable[[Callable[[Any], None], dict[str, str]], None], float, bool) -> None
-        self.provider = FeatureProvider(request_fn, poll_interval, auto_start)
+        self.state_machine = FeatureStateMachine(request_fn, poll_interval, auto_start)
 
     def dispose(self):
         # type: () -> None
-        self.provider.close()
+        self.state_machine.close()
 
     def resolve_boolean_details(self, flag_key, default_value, context):
         # type: (str, bool, dict[str, str]) -> EvaluationResult
-        return self.provider.get(
+        return self._resolve_details(
             flag_key,
             default_value,
             context=context,
@@ -140,7 +140,7 @@ class OpenFeatureProvider:
 
     def resolve_integer_details(self, flag_key, default_value, context):
         # type: (str, int, dict[str, str]) -> EvaluationResult
-        return self.provider.get(
+        return self._resolve_details(
             flag_key,
             default_value,
             context=context,
@@ -149,7 +149,7 @@ class OpenFeatureProvider:
 
     def resolve_float_details(self, flag_key, default_value, context):
         # type: (str, float, dict[str, str]) -> EvaluationResult
-        return self.provider.get(
+        return self._resolve_details(
             flag_key,
             default_value,
             context=context,
@@ -158,7 +158,7 @@ class OpenFeatureProvider:
 
     def resolve_object_details(self, flag_key, default_value, context):
         # type: (str, dict, dict[str, str]) -> EvaluationResult
-        return self.provider.get(
+        return self._resolve_details(
             flag_key,
             default_value,
             context=context,
@@ -167,16 +167,32 @@ class OpenFeatureProvider:
 
     def resolve_string_details(self, flag_key, default_value, context):
         # type: (str, str, dict[str, str]) -> EvaluationResult
-        return self.provider.get(
+        return self._resolve_details(
             flag_key,
             default_value,
             context=context,
             expected_type=str,
         )
 
+    def _resolve_details(
+        self,
+        key,  # type: str
+        default,  # type: Any
+        context,  # type: dict[str, bool | int | str]
+        expected_type,  # type: type | tuple[type, ...]
+    ):
+        # type: (...) -> EvaluationResult
+        return evaluate_feature(
+            self.state_machine.state,
+            key,
+            default,
+            context,
+            expected_type,
+        )
 
-class FeatureProvider:
-    """Feature provider."""
+
+class FeatureStateMachine:
+    """Feature finite state machine."""
 
     def __init__(self, request_fn, poll_interval=60.0, auto_start=True):
         self._state = Pending()
@@ -189,26 +205,16 @@ class FeatureProvider:
 
     @property
     def state(self):
+        # Because we're using immutable objects I believe this means we
+        # do not have to lock here since we're just updating a pointer
+        # on write. The instance will still exist and will be passed to
+        # the evaluation context without a need to lock.
+        #
+        # TODO: Have someone smarter than me fact check.
         return self._state
 
     def close(self):
         self._task.close()
-
-    def get(
-        self,
-        key,  # type: str
-        default,  # type: Any
-        context,  # type: dict[str, bool | int | str]
-        expected_type,  # type: type | tuple[type, ...]
-    ):
-        # type: (...) -> EvaluationResult
-        # Because we're using immutable objects I believe this means we
-        # do not have to lock here since the "_state" variable's pointer
-        # will still exist after being overwritten in the
-        # `FeatureProvider` class.
-        #
-        # TODO: Have someone smarter than me fact check.
-        return evaluate_feature(self._state, key, default, context, expected_type)
 
     def update(self, response):
         # type: (urllib3.BaseHTTPResponse) -> None
@@ -231,7 +237,7 @@ class PollResourceTask:
 
     def __init__(
         self,
-        provider,  # type: FeatureProvider
+        state_machine,  # type: FeatureStateMachine
         request_fn,  # type: Callable[[Callable[[Any], None], dict[str, str]], None]
         poll_interval,  # type: float
         auto_start=True,  # type: bool
@@ -239,10 +245,14 @@ class PollResourceTask:
         self._closed = False
         self._fetch_event = threading.Event()
         self._last_fetch = 0
-        self._provider = provider
         self._poll_count = 0
         self._refresh = poll_interval
         self._request_fn = request_fn
+
+        # TODO: There's probably a better way to communicate than
+        # embedding the state machine into the task. We could use
+        # callbacks to remove the dependency.
+        self._state_machine = state_machine
 
         if auto_start:
             self.start()
@@ -276,12 +286,14 @@ class PollResourceTask:
 
         def callback(response):
             # type: (urllib3.BaseHTTPResponse) -> None
-            self._provider.update(response)
+            self._state_machine.update(response)
             self._fetch_event.set()
 
         headers = {}
-        if isinstance(self._provider._state, (Success, SuccessCached, FailureCached)):
-            headers["If-None-Match"] = self._provider._state.etag
+        if isinstance(
+            self._state_machine._state, (Success, SuccessCached, FailureCached)
+        ):
+            headers["If-None-Match"] = self._state_machine._state.etag
 
         self._request_fn(callback, headers=headers)
         self._last_fetch = time.time()
