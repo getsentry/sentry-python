@@ -1,9 +1,11 @@
+from copy import copy
 import pytest
 
 from unittest import mock
 
 from sentry_sdk.integrations.celery import _update_celery_task_headers
 import sentry_sdk
+from sentry_sdk.tracing_utils import Baggage
 
 
 BAGGAGE_VALUE = (
@@ -115,17 +117,25 @@ def test_span_with_transaction_custom_headers(sentry_init):
 
             assert updated_headers["sentry-trace"] == span.to_traceparent()
             assert updated_headers["headers"]["sentry-trace"] == span.to_traceparent()
-            # This is probably the cause for https://github.com/getsentry/sentry-python/issues/2916
-            # If incoming baggage includes sentry data, we should not concatenate a new baggage value to it
-            # but just keep the incoming sentry baggage values and concatenate new third-party items to the baggage
-            # I have some code somewhere where I have implemented this.
-            assert (
-                updated_headers["baggage"]
-                == headers["baggage"] + "," + transaction.get_baggage().serialize()
+
+            incoming_baggage = Baggage.from_incoming_header(headers["baggage"])
+            combined_baggage = copy(transaction.get_baggage())
+            combined_baggage.sentry_items.update(incoming_baggage.sentry_items)
+            combined_baggage.third_party_items = ",".join(
+                [
+                    x
+                    for x in [
+                        combined_baggage.third_party_items,
+                        incoming_baggage.third_party_items,
+                    ]
+                    if x is not None and x != ""
+                ]
             )
-            assert (
-                updated_headers["headers"]["baggage"]
-                == headers["baggage"] + "," + transaction.get_baggage().serialize()
+            assert updated_headers["baggage"] == combined_baggage.serialize(
+                include_third_party=True
+            )
+            assert updated_headers["headers"]["baggage"] == combined_baggage.serialize(
+                include_third_party=True
             )
 
 

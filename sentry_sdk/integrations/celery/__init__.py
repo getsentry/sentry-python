@@ -16,6 +16,7 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import Scope
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -168,6 +169,7 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
             headers = dict(
                 Scope.get_current_scope().iter_trace_propagation_headers(span=span)
             )
+
         if monitor_beat_tasks:
             headers.update(
                 {
@@ -182,10 +184,23 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
 
             combined_baggage = sentry_baggage or existing_baggage
             if sentry_baggage and existing_baggage:
-                combined_baggage = "{},{}".format(
-                    existing_baggage,
-                    sentry_baggage,
+                # Merge incoming and sentry baggage, where the sentry trace information
+                # in the incoming baggage takes precedence and the third-party items
+                # are concatenated.
+                incoming = Baggage.from_incoming_header(existing_baggage)
+                combined = Baggage.from_incoming_header(sentry_baggage)
+                combined.sentry_items.update(incoming.sentry_items)
+                combined.third_party_items = ",".join(
+                    [
+                        x
+                        for x in [
+                            combined.third_party_items,
+                            incoming.third_party_items,
+                        ]
+                        if x is not None and x != ""
+                    ]
                 )
+                combined_baggage = combined.serialize(include_third_party=True)
 
             updated_headers.update(headers)
             if combined_baggage:
