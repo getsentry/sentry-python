@@ -202,9 +202,9 @@ def _filter_headers(headers):
     }
 
 
-def _in_http_status_code_range(code, code_range):
-    # type: (int, HttpStatusCodeRange) -> bool
-    for target in code_range:
+def _in_http_status_code_range(code, code_ranges):
+    # type: (int, list[HttpStatusCodeRange]) -> bool
+    for target in code_ranges:
         if isinstance(target, int):
             if code == target:
                 return True
