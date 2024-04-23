@@ -243,15 +243,7 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        # Do not create a span when the task is a Celery Beat task
-        # (Because we do not have a transaction in that case)
-        span_mgr = (
-            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
-            if not Scope.get_isolation_scope()._name == "celery-beat"
-            else NoOpMgr()
-        )  # type: Union[Span, NoOpMgr]
-
-        with span_mgr as span:
+        with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name) as span:
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
