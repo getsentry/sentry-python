@@ -21,36 +21,24 @@ def get_ai_pipeline_name():
     return _ai_pipeline_name.get()
 
 
-def ai_pipeline(description, op="ai.pipeline", **span_kwargs):
-    # type: (str, str, Any) -> Callable[..., Any]
+def ai_track(description, **span_kwargs):
+    # type: (str, Any) -> Callable[..., Any]
     def decorator(f):
         # type: (Callable[..., Any]) -> Callable[..., Any]
         @wraps(f)
         def wrapped(*args, **kwargs):
             # type: (Any, Any) -> Any
-            with start_span(description=description, op=op, **span_kwargs):
-                _ai_pipeline_name.set(description)
-                res = f(*args, **kwargs)
-                _ai_pipeline_name.set(None)
-                return res
-
-        return wrapped
-
-    return decorator
-
-
-def ai_run(description, op="ai.run", **span_kwargs):
-    # type: (str, str, Any) -> Callable[..., Any]
-    def decorator(f):
-        # type: (Callable[..., Any]) -> Callable[..., Any]
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            # type: (Any, Any) -> Any
+            curr_pipeline = _ai_pipeline_name.get()
+            op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
             with start_span(description=description, op=op, **span_kwargs) as span:
-                curr_pipeline = _ai_pipeline_name.get()
                 if curr_pipeline:
                     span.set_data("ai.pipeline.name", curr_pipeline)
-                return f(*args, **kwargs)
+                    return f(*args, **kwargs)
+                else:
+                    _ai_pipeline_name.set(description)
+                    res = f(*args, **kwargs)
+                    _ai_pipeline_name.set(None)
+                    return res
 
         return wrapped
 
