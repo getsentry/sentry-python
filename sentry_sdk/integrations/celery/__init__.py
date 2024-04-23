@@ -11,7 +11,7 @@ from sentry_sdk.integrations.celery.beat import (
     _patch_redbeat_maybe_due,
     _setup_celery_beat_signals,
 )
-from sentry_sdk.integrations.celery.utils import NoOpMgr, _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import TypeVar
-    from typing import Union
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
     from sentry_sdk.tracing import Span
@@ -243,15 +242,9 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        # Do not create a span when the task is a Celery Beat task
-        # (Because we do not have a transaction in that case)
-        span_mgr = (
-            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
-            if not Scope.get_isolation_scope()._name == "celery-beat"
-            else NoOpMgr()
-        )  # type: Union[Span, NoOpMgr]
-
-        with span_mgr as span:
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_SUBMIT_CELERY, description=task.name
+        ) as span:
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
