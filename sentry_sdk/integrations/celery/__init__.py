@@ -164,11 +164,12 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     """
     updated_headers = original_headers.copy()
     with capture_internal_exceptions():
-        headers = (
-            dict(Scope.get_current_scope().iter_trace_propagation_headers(span=span))
-            if span is not None
-            else {}
-        )
+        headers = {}
+        if span is not None:
+            headers = dict(
+                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
+            )
+
         if monitor_beat_tasks:
             headers.update(
                 {
