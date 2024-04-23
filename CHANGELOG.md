@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0rc6
+
+### Various fixes & improvements
+
+- Restore original behavior by always creating a span (#3005) by @antonpirker
+- Merge baggage headers (incoming and new created ones) (#3001) by @antonpirker
+- Fix duplicate baggage headers in Celery integration introduced in SDK 2.0 (#2993) by @antonpirker
+- Make it work with old and new newrelic versions (#2999) by @antonpirker
+- docs: Update migration guide wording (#2987) by @colin-sentry
+- docs: Tweak migration guide (#2979) by @colin-sentry
+- Small updates to migration guide (#2911) by @colin-sentry
+- Update CHANGELOG.md (51a906c1) by @sentrivana
+- release: 1.45.0 (7570e39a) by @getsentry-bot
+
 ## 2.0.0rc5
 
 ## New Features
