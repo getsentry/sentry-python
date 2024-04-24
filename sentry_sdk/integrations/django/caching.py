@@ -19,10 +19,12 @@ if TYPE_CHECKING:
 # TODO: for also creating spans for setting cache there is a `set`, `aset`, `add`, `aadd` methods
 #       see https://github.com/django/django/blob/main/django/core/cache/backends/base.py
 METHODS_TO_INSTRUMENT = [
-    # "set", 
+    "set",
+    "set_many",
     "get",
     "get_many",
 ]
+
 
 def _get_timeout(args, kwargs):
     # type: (Any, Any) -> Optional[int]
@@ -44,8 +46,8 @@ def _get_key(args, kwargs):
 def _get_span_description(method_name, args, kwargs):
     # type: (str, Any, Any) -> str
     description = "{} {}".format(
-        method_name, 
-        _get_key(args, kwargs), 
+        method_name,
+        _get_key(args, kwargs),
     )
     return description
 
@@ -57,9 +59,11 @@ def _patch_cache_method(cache, method_name, address, port):
     original_method = getattr(cache, method_name)
 
     @ensure_integration_enabled(DjangoIntegration, original_method)
-    def _instrument_call(cache, method_name, original_method, args, kwargs, address, port):
+    def _instrument_call(
+        cache, method_name, original_method, args, kwargs, address, port
+    ):
         # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[str]) -> Any
-        is_set_operation = method_name == "set"
+        is_set_operation = method_name.startswith("set")
 
         op = OP.CACHE_SET_ITEM if is_set_operation else OP.CACHE_GET_ITEM
         description = _get_span_description(method_name, args, kwargs)
@@ -69,7 +73,7 @@ def _patch_cache_method(cache, method_name, address, port):
 
             if address is not None:
                 span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
-                
+
             if port is not None:
                 span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
@@ -96,12 +100,14 @@ def _patch_cache_method(cache, method_name, address, port):
     @functools.wraps(original_method)
     def sentry_method(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        return _instrument_call(cache, method_name, original_method, args, kwargs, address, port)
+        return _instrument_call(
+            cache, method_name, original_method, args, kwargs, address, port
+        )
 
     setattr(cache, method_name, sentry_method)
 
 
-def _patch_cache(cache, address, port):
+def _patch_cache(cache, address=None, port=None):
     # type: (CacheHandler, Optional[str], Optional[str]) -> None
     if not hasattr(cache, "_sentry_patched"):
         # TODO: Here we can also patch the set methods (see TODO above)

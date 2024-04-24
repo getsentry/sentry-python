@@ -133,15 +133,15 @@ class SPANDATA:
     CACHE_KEY = "cache.key"
     """
     """
-    
+
     CACHE_TTL = "cache.ttl"
     """
     """
-    
+
     NETWORK_PEER_ADDRESS = "network.peer.address"
     """
     """
-    
+
     NETWORK_PEER_PORT = "network.peer.port"
     """
     """
