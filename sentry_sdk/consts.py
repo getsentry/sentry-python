@@ -134,10 +134,6 @@ class SPANDATA:
     """
     """
 
-    CACHE_TTL = "cache.ttl"
-    """
-    """
-
     NETWORK_PEER_ADDRESS = "network.peer.address"
     """
     """
