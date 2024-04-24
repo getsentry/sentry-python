@@ -14,15 +14,8 @@ from anthropic.resources import Messages
 
 if TYPE_CHECKING:
     from typing import Any, Iterator
-    from anthropic.types import (
-        MessageStartEvent,
-        MessageDeltaEvent,
-        MessageStopEvent,
-        ContentBlockStartEvent,
-        ContentBlockDeltaEvent,
-        ContentBlockStopEvent,
-        MessageStreamEvent,
-    )
+    from anthropic.types import MessageStreamEvent
+    from sentry_sdk.tracing import Span
 
 COMPLETION_TOKENS_USED = "ai.completion_tоkens.used"
 PROMPT_TOKENS_USED = "ai.prompt_tоkens.used"
@@ -63,6 +56,7 @@ class AnthropicIntegration(Integration):
 
 
 def _calculate_token_usage(result, span):
+    # type: (Messages, Span) -> None
     input_tokens = 0
     output_tokens = 0
     if hasattr(result, "usage"):
@@ -89,7 +83,9 @@ def _wrap_message_create(f):
         if not hub:
             return f(*args, **kwargs)
 
-        integration = hub.get_integration(AnthropicIntegration)
+        integration = hub.get_integration(
+            AnthropicIntegration
+        )  # type: AnthropicIntegration
         if not integration:
             return f(*args, **kwargs)
 
@@ -147,31 +143,19 @@ def _wrap_message_create(f):
                     with capture_internal_exceptions():
                         for event in old_iterator:
                             if hasattr(event, "type"):
-                                if (
-                                    event.type == "message_start"
-                                ):  # type: MessageStartEvent
+                                if event.type == "message_start":
                                     usage = event.message.usage
                                     input_tokens += usage.input_tokens
                                     output_tokens += usage.output_tokens
-                                elif (
-                                    event.type == "content_block_start"
-                                ):  # type: ContentBlockStartEvent
+                                elif event.type == "content_block_start":
                                     pass
-                                elif (
-                                    event.type == "content_block_delta"
-                                ):  # type: ContentBlockDeltaEvent
+                                elif event.type == "content_block_delta":
                                     content_blocks.append(event.delta.text)
-                                elif (
-                                    event.type == "content_block_stop"
-                                ):  # type: ContentBlockStopEvent
+                                elif event.type == "content_block_stop":
                                     pass
-                                elif (
-                                    event.type == "message_delta"
-                                ):  # type: MessageDeltaEvent
+                                elif event.type == "message_delta":
                                     output_tokens += event.usage.output_tokens
-                                elif (
-                                    event.type == "message_stop"
-                                ):  # type: MessageStopEvent
+                                elif event.type == "message_stop":
                                     continue
                             yield event
 
