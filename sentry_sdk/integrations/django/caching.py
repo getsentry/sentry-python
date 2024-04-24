@@ -51,6 +51,7 @@ def _patch_cache_method(cache, method_name, address, port):
         cache, method_name, original_method, args, kwargs, address, port
     ):
         # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[str]) -> Any
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         is_set_operation = method_name.startswith("set")
         is_get_operation = not is_set_operation
 
@@ -73,14 +74,17 @@ def _patch_cache_method(cache, method_name, address, port):
             item_size = None
             if is_get_operation:
                 if value:
-                    item_size = len(str(value))
+                    if integration.cache_spans_add_item_size:
+                        item_size = len(str(value))
                     span.set_data(SPANDATA.CACHE_HIT, True)
                 else:
                     span.set_data(SPANDATA.CACHE_HIT, False)
             else:
-                item_size = len(str(args[1]))
+                if integration.cache_spans_add_item_size:
+                    item_size = len(str(args[1]))
 
-            span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
+            if item_size is not None:
+                span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
 
             return value
 
