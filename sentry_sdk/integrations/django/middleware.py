@@ -2,6 +2,8 @@
 Create spans from Django middleware invocations
 """
 
+from typing import Any
+
 from django import VERSION as DJANGO_VERSION
 
 from sentry_sdk import Hub
@@ -34,10 +36,12 @@ else:
     import_string_name = "import_string"
 
 
-if DJANGO_VERSION < (3, 1):
-    _asgi_middleware_mixin_factory = lambda _: object
-else:
+DJANGO_SUPPORTS_ASYNC_MIDDLEWARE = DJANGO_VERSION >= (3, 1)
+if DJANGO_SUPPORTS_ASYNC_MIDDLEWARE:
     from .asgi import _asgi_middleware_mixin_factory
+else:
+    def _asgi_middleware_mixin_factory(_) -> Any:
+        return object
 
 
 def patch_django_middlewares():
@@ -126,7 +130,9 @@ def _wrap_middleware(middleware, middleware_name):
     class SentryWrappingMiddleware(
         _asgi_middleware_mixin_factory(_check_middleware_span)  # type: ignore
     ):
-        async_capable = getattr(middleware, "async_capable", False)
+        async_capable = DJANGO_SUPPORTS_ASYNC_MIDDLEWARE and getattr(
+            middleware, "async_capable", False
+        )
 
         def __init__(self, get_response=None, *args, **kwargs):
             # type: (Optional[Callable[..., Any]], *Any, **Any) -> None
