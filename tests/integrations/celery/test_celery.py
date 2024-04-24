@@ -215,7 +215,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
         >= {
             "trace_id": str(transaction.trace_id),
             "same_process_as_parent": True,
-            "op": "queue.task.celery",
+            "op": "queue.process",
             "description": "dummy_task",
             "data": ApproxDict(),
         }.items()

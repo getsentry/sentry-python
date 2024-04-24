@@ -334,7 +334,7 @@ def _wrap_task_call(task, f):
         # type: (*Any, **Any) -> Any
         try:
             with sentry_sdk.start_span(
-                op=OP.QUEUE_TASK_CELERY, description=task.name
+                op=OP.QUEUE_PROCESS, description=task.name
             ) as span:
                 _set_messaging_destination_name(task, span)
                 return f(*args, **kwargs)
