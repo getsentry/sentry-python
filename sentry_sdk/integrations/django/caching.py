@@ -50,17 +50,15 @@ def _get_span_description(method_name, args, kwargs):
     return description
 
 
-def _patch_cache_method(cache, method_name):
-    # type: (CacheHandler, str) -> None
+def _patch_cache_method(cache, method_name, address, port):
+    # type: (CacheHandler, str, Optional[str], Optional[str]) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
 
     original_method = getattr(cache, method_name)
 
     @ensure_integration_enabled(DjangoIntegration, original_method)
-    def _instrument_call(cache, method_name, original_method, args, kwargs):
-        # type: (CacheHandler, str, Callable[..., Any], Any, Any) -> Any
-        import ipdb; ipdb.set_trace()
-
+    def _instrument_call(cache, method_name, original_method, args, kwargs, address, port):
+        # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[str]) -> Any
         is_set_operation = method_name == "set"
 
         op = OP.CACHE_SET_ITEM if is_set_operation else OP.CACHE_GET_ITEM
@@ -68,6 +66,12 @@ def _patch_cache_method(cache, method_name):
 
         with sentry_sdk.start_span(op=op, description=description) as span:
             value = original_method(*args, **kwargs)
+
+            if address is not None:
+                span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+                
+            if port is not None:
+                span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
             key = _get_key(args, kwargs)
             if key != "":
@@ -92,17 +96,17 @@ def _patch_cache_method(cache, method_name):
     @functools.wraps(original_method)
     def sentry_method(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        return _instrument_call(cache, method_name, original_method, args, kwargs)
+        return _instrument_call(cache, method_name, original_method, args, kwargs, address, port)
 
     setattr(cache, method_name, sentry_method)
 
 
-def _patch_cache(cache):
-    # type: (CacheHandler) -> None
+def _patch_cache(cache, address, port):
+    # type: (CacheHandler, Optional[str], Optional[str]) -> None
     if not hasattr(cache, "_sentry_patched"):
         # TODO: Here we can also patch the set methods (see TODO above)
         for method_name in METHODS_TO_INSTRUMENT:
-            _patch_cache_method(cache, method_name)
+            _patch_cache_method(cache, method_name, address, port)
         cache._sentry_patched = True
 
 
@@ -138,7 +142,17 @@ def patch_caching():
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
-                    _patch_cache(cache)
+                    settings = self.settings[alias or "default"]
+                    # TODO: location can also be an array of locations
+                    # see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
+                    location = settings.get("LOCATION")
+                    if isinstance(location, str):
+                        if ":" in location:
+                            address, port = location.rsplit(":", 1)
+                        else:
+                            address, port = location, None
+
+                    _patch_cache(cache, address, port)
 
                 return cache
 

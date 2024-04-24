@@ -233,8 +233,8 @@ class SPANDATA:
 
 
 class OP:
-    CACHE_GET_ITEM = "cache.get_item"
-    CACHE_SET_ITEM = "cache.set_item"
+    CACHE_GET_ITEM = "cache.get"
+    CACHE_SET_ITEM = "cache.set"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
