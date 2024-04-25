@@ -415,11 +415,24 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
 @pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
 def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
-        import celery.app.trace as celery_mod
-        from newrelic.hooks.application_celery import instrument_celery_execute_trace
+        try:
+            # older newrelic versions
+            from newrelic.hooks.application_celery import (
+                instrument_celery_execute_trace,
+            )
+            import celery.app.trace as celery_trace_module
 
-        assert hasattr(celery_mod, "build_tracer")
-        instrument_celery_execute_trace(celery_mod)
+            assert hasattr(celery_trace_module, "build_tracer")
+            instrument_celery_execute_trace(celery_trace_module)
+
+        except ImportError:
+            # newer newrelic versions
+            from newrelic.hooks.application_celery import instrument_celery_app_base
+            import celery.app as celery_app_module
+
+            assert hasattr(celery_app_module, "Celery")
+            assert hasattr(celery_app_module.Celery, "send_task")
+            instrument_celery_app_base(celery_app_module)
 
     if newrelic_order == "sentry_first":
         celery = init_celery()
@@ -501,7 +514,13 @@ def test_task_headers(celery):
     # in the monkey patched version of `apply_async`
     # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
     result = dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
-    assert result.get() == sentry_crons_setup
+
+    expected_headers = sentry_crons_setup.copy()
+    # Newly added headers
+    expected_headers["sentry-trace"] = mock.ANY
+    expected_headers["baggage"] = mock.ANY
+
+    assert result.get() == expected_headers
 
 
 def test_baggage_propagation(init_celery):
