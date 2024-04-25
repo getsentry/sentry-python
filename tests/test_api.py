@@ -66,8 +66,8 @@ def test_traceparent_with_tracing_disabled(sentry_init):
 
     propagation_context = Scope.get_isolation_scope()._propagation_context
     expected_traceparent = "%s-%s" % (
-        propagation_context["trace_id"],
-        propagation_context["span_id"],
+        propagation_context.trace_id,
+        propagation_context.span_id,
     )
     assert get_traceparent() == expected_traceparent
 
@@ -78,7 +78,7 @@ def test_baggage_with_tracing_disabled(sentry_init):
     propagation_context = Scope.get_isolation_scope()._propagation_context
     expected_baggage = (
         "sentry-trace_id={},sentry-environment=dev,sentry-release=1.0.0".format(
-            propagation_context["trace_id"]
+            propagation_context.trace_id
         )
     )
     assert get_baggage() == expected_baggage
@@ -112,10 +112,10 @@ def test_continue_trace(sentry_init):
         assert transaction.name == "some name"
 
         propagation_context = Scope.get_isolation_scope()._propagation_context
-        assert propagation_context["trace_id"] == transaction.trace_id == trace_id
-        assert propagation_context["parent_span_id"] == parent_span_id
-        assert propagation_context["parent_sampled"] == parent_sampled
-        assert propagation_context["dynamic_sampling_context"] == {
+        assert propagation_context.trace_id == transaction.trace_id == trace_id
+        assert propagation_context.parent_span_id == parent_span_id
+        assert propagation_context.parent_sampled == parent_sampled
+        assert propagation_context.dynamic_sampling_context == {
             "trace_id": "566e3688a61d4bc888951642d6f14a19"
         }
 
