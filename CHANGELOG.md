@@ -2,12 +2,19 @@
 
 ## 2.0.0
 
+This is the first major update in a *long* time! 
+
+We dropped support for some ancient languages and frameworks (Yes, Python 2.7 is no longer supported). Additionally we refactored a big part of the foundation of the SDK (how data inside the SDK is handled).
+
+For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x 
+
 ### New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
 - Added new API for custom instrumentation: `new_scope`, `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
 ### Changed
+(These changes are all backwards-incompatible. Breaking Change (if you are just skimming for that phrase))
 
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
@@ -56,6 +63,7 @@
     </details>
 
 ### Removed
+(These changes are all backwards-incompatible. Breaking Change (if you are just skimming for that phrase))
 
 - Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
 - Removed support for Celery 3.\*.
