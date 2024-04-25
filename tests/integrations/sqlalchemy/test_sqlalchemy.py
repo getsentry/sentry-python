@@ -1,26 +1,21 @@
 import os
-import pytest
-import sys
 from datetime import datetime
+from unittest import mock
 
-from sentry_sdk._compat import PY2
+import pytest
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy import text
 
-from sentry_sdk import capture_message, start_transaction, configure_scope
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 def test_orm_queries(sentry_init, capture_events):
@@ -45,7 +40,9 @@ def test_orm_queries(sentry_init, capture_events):
         person_id = Column(Integer, ForeignKey("person.id"))
         person = relationship(Person)
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)  # noqa: N806
@@ -81,9 +78,6 @@ def test_orm_queries(sentry_init, capture_events):
     ]
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
-)
 def test_transactions(sentry_init, capture_events, render_span_tree):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
@@ -108,7 +102,9 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
         person_id = Column(Integer, ForeignKey("person.id"))
         person = relationship(Person)
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     Base.metadata.create_all(engine)
 
     Session = sessionmaker(bind=engine)  # noqa: N806
@@ -155,9 +151,6 @@ def test_transactions(sentry_init, capture_events, render_span_tree):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3,), reason="This sqla usage seems to be broken on Py2"
-)
 def test_transactions_no_engine_url(sentry_init, capture_events):
     sentry_init(
         integrations=[SqlalchemyIntegration()],
@@ -182,7 +175,9 @@ def test_transactions_no_engine_url(sentry_init, capture_events):
         person_id = Column(Integer, ForeignKey("person.id"))
         person = relationship(Person)
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     engine.url = None
     Base.metadata.create_all(engine)
 
@@ -218,7 +213,9 @@ def test_long_sql_query_preserved(sentry_init, capture_events):
     )
     events = capture_events()
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     with start_transaction(name="test"):
         with engine.connect() as con:
             con.execute(text(" UNION ".join("SELECT {}".format(i) for i in range(100))))
@@ -238,14 +235,16 @@ def test_large_event_not_truncated(sentry_init, capture_events):
 
     long_str = "x" * (DEFAULT_MAX_VALUE_LENGTH + 10)
 
-    with configure_scope() as scope:
+    scope = Scope.get_isolation_scope()
 
-        @scope.add_event_processor
-        def processor(event, hint):
-            event["message"] = long_str
-            return event
+    @scope.add_event_processor
+    def processor(event, hint):
+        event["message"] = long_str
+        return event
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     with start_transaction(name="test"):
         with engine.connect() as con:
             for _ in range(1500):
@@ -285,7 +284,9 @@ def test_engine_name_not_string(sentry_init):
         integrations=[SqlalchemyIntegration()],
     )
 
-    engine = create_engine("sqlite:///:memory:")
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     engine.dialect.name = b"sqlite"
 
     with engine.connect() as con:
@@ -312,7 +313,9 @@ def test_query_source_disabled(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -362,7 +365,9 @@ def test_query_source_enabled(sentry_init, capture_events, enable_db_query_sourc
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -407,7 +412,9 @@ def test_query_source(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -475,7 +482,9 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -502,11 +511,8 @@ def test_query_source_with_module_in_search_path(sentry_init, capture_events):
 
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
-            if not PY2:
-                assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
-                assert (
-                    data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
-                )
+            assert data.get(SPANDATA.CODE_NAMESPACE) == "sqlalchemy_helpers.helpers"
+            assert data.get(SPANDATA.CODE_FILEPATH) == "sqlalchemy_helpers/helpers.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
@@ -534,7 +540,9 @@ def test_no_query_source_if_duration_too_short(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806
@@ -598,7 +606,9 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
             id = Column(Integer, primary_key=True)
             name = Column(String(250), nullable=False)
 
-        engine = create_engine("sqlite:///:memory:")
+        engine = create_engine(
+            "sqlite:///:memory:", connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(engine)
 
         Session = sessionmaker(bind=engine)  # noqa: N806

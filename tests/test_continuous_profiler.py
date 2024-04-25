@@ -5,7 +5,6 @@ import pytest
 
 from sentry_sdk import start_transaction
 from sentry_sdk.continuous_profiler import setup_continuous_profiler
-from tests.test_profiler import requires_python_version
 
 try:
     from unittest import mock  # python 3.3 and above
@@ -30,7 +29,6 @@ def experimental_options(enabled, mode=None):
     }
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize("mode", [pytest.param("foo")])
 @pytest.mark.parametrize(
     "make_options",
@@ -41,7 +39,6 @@ def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling
         setup_continuous_profiler(make_options(True, mode), lambda envelope: None)
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -58,7 +55,6 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     setup_continuous_profiler(options, lambda envelope: None)
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [
@@ -78,7 +74,6 @@ def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling)
     assert not setup_continuous_profiler(options, lambda envelope: None)
 
 
-@requires_python_version(3, 3)
 @pytest.mark.parametrize(
     "mode",
     [

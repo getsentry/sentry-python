@@ -1,22 +1,12 @@
-try:
-    from collections.abc import Mapping
-except ImportError:
-    from collections import Mapping  # type: ignore[attr-defined]
-
-from importlib import import_module
 import os
 import uuid
 import random
 import socket
+from collections.abc import Mapping
+from datetime import datetime, timezone
+from importlib import import_module
 
-from sentry_sdk._compat import (
-    PY37,
-    datetime_utcnow,
-    string_types,
-    text_type,
-    iteritems,
-    check_uwsgi_thread_support,
-)
+from sentry_sdk._compat import PY37, check_uwsgi_thread_support
 from sentry_sdk.continuous_profiler import (
     has_continous_profiling_enabled,
     setup_continuous_profiler,
@@ -34,7 +24,7 @@ from sentry_sdk.utils import (
     logger,
 )
 from sentry_sdk.serializer import serialize
-from sentry_sdk.tracing import trace, has_tracing_enabled
+from sentry_sdk.tracing import trace
 from sentry_sdk.transport import HttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
@@ -63,10 +53,12 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk.integrations import Integration
-    from sentry_sdk.scope import Scope
     from sentry_sdk._types import Event, Hint
+    from sentry_sdk.integrations import Integration
+    from sentry_sdk.metrics import MetricsAggregator
+    from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
+    from sentry_sdk.transport import Transport
 
 
 _client_init_debug = ContextVar("client_init_debug")
@@ -81,7 +73,7 @@ SDK_INFO = {
 
 def _get_options(*args, **kwargs):
     # type: (*Optional[str], **Any) -> Dict[str, Any]
-    if args and (isinstance(args[0], (text_type, bytes, str)) or args[0] is None):
+    if args and (isinstance(args[0], (bytes, str)) or args[0] is None):
         dsn = args[0]  # type: Optional[str]
         args = args[1:]
     else:
@@ -95,28 +87,8 @@ def _get_options(*args, **kwargs):
     if dsn is not None and options.get("dsn") is None:
         options["dsn"] = dsn
 
-    for key, value in iteritems(options):
+    for key, value in options.items():
         if key not in rv:
-            # Option "with_locals" was renamed to "include_local_variables"
-            if key == "with_locals":
-                msg = (
-                    "Deprecated: The option 'with_locals' was renamed to 'include_local_variables'. "
-                    "Please use 'include_local_variables'. The option 'with_locals' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["include_local_variables"] = value
-                continue
-
-            # Option "request_bodies" was renamed to "max_request_body_size"
-            if key == "request_bodies":
-                msg = (
-                    "Deprecated: The option 'request_bodies' was renamed to 'max_request_body_size'. "
-                    "Please use 'max_request_body_size'. The option 'request_bodies' will be removed in the future."
-                )
-                logger.warning(msg)
-                rv["max_request_body_size"] = value
-                continue
-
             raise TypeError("Unknown option %r" % (key,))
 
         rv[key] = value
@@ -174,19 +146,101 @@ except Exception:
     module_not_found_error = ImportError  # type: ignore
 
 
-class _Client(object):
-    """The client is internally responsible for capturing the events and
+class BaseClient:
+    """
+    .. versionadded:: 2.0.0
+
+    The basic definition of a client that is used for sending data to Sentry.
+    """
+
+    def __init__(self, options=None):
+        # type: (Optional[Dict[str, Any]]) -> None
+        self.options = (
+            options if options is not None else DEFAULT_OPTIONS
+        )  # type: Dict[str, Any]
+
+        self.transport = None  # type: Optional[Transport]
+        self.monitor = None  # type: Optional[Monitor]
+        self.metrics_aggregator = None  # type: Optional[MetricsAggregator]
+
+    def __getstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return {"options": {}}
+
+    def __setstate__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        pass
+
+    @property
+    def dsn(self):
+        # type: () -> Optional[str]
+        return None
+
+    def should_send_default_pii(self):
+        # type: () -> bool
+        return False
+
+    def is_active(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
+        """
+        return False
+
+    def capture_event(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Optional[str]
+        return None
+
+    def capture_session(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def get_integration(self, *args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        return None
+
+    def close(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def flush(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        return None
+
+    def __enter__(self):
+        # type: () -> BaseClient
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # type: (Any, Any, Any) -> None
+        return None
+
+
+class NonRecordingClient(BaseClient):
+    """
+    .. versionadded:: 2.0.0
+
+    A client that does not send any events to Sentry. This is used as a fallback when the Sentry SDK is not yet initialized.
+    """
+
+    pass
+
+
+class _Client(BaseClient):
+    """
+    The client is internally responsible for capturing the events and
     forwarding them to sentry through the configured transport.  It takes
     the client options as keyword arguments and optionally the DSN as first
     argument.
 
-    Alias of :py:class:`Client`. (Was created for better intelisense support)
+    Alias of :py:class:`sentry_sdk.Client`. (Was created for better intelisense support)
     """
 
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        self.options = get_options(*args, **kwargs)  # type: Dict[str, Any]
-
+        super(_Client, self).__init__(options=get_options(*args, **kwargs))
         self._init_impl()
 
     def __getstate__(self):
@@ -359,6 +413,24 @@ class _Client(object):
             # need to check if it's safe to use them.
             check_uwsgi_thread_support()
 
+    def is_active(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client is active (able to send data to Sentry)
+        """
+        return True
+
+    def should_send_default_pii(self):
+        # type: () -> bool
+        """
+        .. versionadded:: 2.0.0
+
+        Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
+        """
+        return self.options.get("send_default_pii", False)
+
     @property
     def dsn(self):
         # type: () -> Optional[str]
@@ -374,7 +446,7 @@ class _Client(object):
         # type: (...) -> Optional[Event]
 
         if event.get("timestamp") is None:
-            event["timestamp"] = datetime_utcnow()
+            event["timestamp"] = datetime.now(timezone.utc)
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
@@ -417,7 +489,7 @@ class _Client(object):
 
         for key in "release", "environment", "server_name", "dist":
             if event.get(key) is None and self.options[key] is not None:
-                event[key] = text_type(self.options[key]).strip()  # type: ignore[literal-required]
+                event[key] = str(self.options[key]).strip()  # type: ignore[literal-required]
         if event.get("sdk") is None:
             sdk_info = dict(SDK_INFO)
             sdk_info["integrations"] = sorted(self.integrations.keys())
@@ -496,7 +568,7 @@ class _Client(object):
         for ignored_error in self.options["ignore_errors"]:
             # String types are matched against the type name in the
             # exception only
-            if isinstance(ignored_error, string_types):
+            if isinstance(ignored_error, str):
                 if ignored_error == error_full_name or ignored_error == error_type_name:
                     return True
             else:
@@ -599,7 +671,8 @@ class _Client(object):
 
         if session.user_agent is None:
             headers = (event.get("request") or {}).get("headers")
-            for k, v in iteritems(headers or {}):
+            headers_dict = headers if isinstance(headers, dict) else {}
+            for k, v in headers_dict.items():
                 if k.lower() == "user-agent":
                     user_agent = v
                     break
@@ -625,7 +698,6 @@ class _Client(object):
         :param hint: Contains metadata about the event that can be read from `before_send`, such as the original exception object or a HTTP request object.
 
         :param scope: An optional :py:class:`sentry_sdk.Scope` to apply to events.
-            The `scope` and `scope_kwargs` parameters are mutually exclusive.
 
         :returns: An event ID. May be `None` if there is no DSN set or of if the SDK decided to discard the event for other reasons. In such situations setting `debug=True` on `init()` may help.
         """
@@ -664,58 +736,40 @@ class _Client(object):
         ):
             return None
 
-        tracing_enabled = has_tracing_enabled(self.options)
         attachments = hint.get("attachments")
 
         trace_context = event_opt.get("contexts", {}).get("trace") or {}
         dynamic_sampling_context = trace_context.pop("dynamic_sampling_context", {})
 
-        # If tracing is enabled all events should go to /envelope endpoint.
-        # If no tracing is enabled only transactions, events with attachments, and checkins should go to the /envelope endpoint.
-        should_use_envelope_endpoint = (
-            tracing_enabled
-            or is_transaction
-            or is_checkin
-            or bool(attachments)
-            or bool(self.spotlight)
-        )
-        if should_use_envelope_endpoint:
-            headers = {
-                "event_id": event_opt["event_id"],
-                "sent_at": format_timestamp(datetime_utcnow()),
-            }  # type: dict[str, object]
+        headers = {
+            "event_id": event_opt["event_id"],
+            "sent_at": format_timestamp(datetime.now(timezone.utc)),
+        }  # type: dict[str, object]
 
-            if dynamic_sampling_context:
-                headers["trace"] = dynamic_sampling_context
+        if dynamic_sampling_context:
+            headers["trace"] = dynamic_sampling_context
 
-            envelope = Envelope(headers=headers)
+        envelope = Envelope(headers=headers)
 
-            if is_transaction:
-                if isinstance(profile, Profile):
-                    envelope.add_profile(profile.to_json(event_opt, self.options))
-                envelope.add_transaction(event_opt)
-            elif is_checkin:
-                envelope.add_checkin(event_opt)
-            else:
-                envelope.add_event(event_opt)
-
-            for attachment in attachments or ():
-                envelope.add_item(attachment.to_envelope_item())
-
-            if self.spotlight:
-                self.spotlight.capture_envelope(envelope)
-
-            if self.transport is None:
-                return None
-
-            self.transport.capture_envelope(envelope)
-
+        if is_transaction:
+            if isinstance(profile, Profile):
+                envelope.add_profile(profile.to_json(event_opt, self.options))
+            envelope.add_transaction(event_opt)
+        elif is_checkin:
+            envelope.add_checkin(event_opt)
         else:
-            if self.transport is None:
-                return None
+            envelope.add_event(event_opt)
 
-            # All other events go to the legacy /store/ endpoint (will be removed in the future).
-            self.transport.capture_event(event_opt)
+        for attachment in attachments or ():
+            envelope.add_item(attachment.to_envelope_item())
+
+        if self.spotlight:
+            self.spotlight.capture_envelope(envelope)
+
+        if self.transport is None:
+            return None
+
+        self.transport.capture_envelope(envelope)
 
         return event_id
 

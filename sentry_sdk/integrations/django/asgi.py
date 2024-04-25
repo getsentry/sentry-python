@@ -7,16 +7,22 @@ Since this file contains `async def` it is conditionally imported in
 """
 
 import asyncio
+import functools
 
 from django.core.handlers.wsgi import WSGIRequest
 
-from sentry_sdk import Hub, _functools
+import sentry_sdk
+from sentry_sdk import Scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import _should_send_default_pii
 
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
+)
 
 
 if TYPE_CHECKING:
@@ -50,7 +56,7 @@ def _make_asgi_request_event_processor(request):
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
@@ -66,13 +72,9 @@ def patch_django_asgi_handler_impl(cls):
 
     old_app = cls.__call__
 
+    @ensure_integration_enabled_async(DjangoIntegration, old_app)
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
-        hub = Hub.current
-        integration = hub.get_integration(DjangoIntegration)
-        if integration is None:
-            return await old_app(self, scope, receive, send)
-
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls), unsafe_context_data=True
         )._run_asgi3
@@ -85,18 +87,14 @@ def patch_django_asgi_handler_impl(cls):
     if modern_django_asgi_support:
         old_create_request = cls.create_request
 
+        @ensure_integration_enabled(DjangoIntegration, old_create_request)
         def sentry_patched_create_request(self, *args, **kwargs):
             # type: (Any, *Any, **Any) -> Any
-            hub = Hub.current
-            integration = hub.get_integration(DjangoIntegration)
-            if integration is None:
-                return old_create_request(self, *args, **kwargs)
+            request, error_response = old_create_request(self, *args, **kwargs)
+            scope = Scope.get_isolation_scope()
+            scope.add_event_processor(_make_asgi_request_event_processor(request))
 
-            with hub.configure_scope() as scope:
-                request, error_response = old_create_request(self, *args, **kwargs)
-                scope.add_event_processor(_make_asgi_request_event_processor(request))
-
-                return request, error_response
+            return request, error_response
 
         cls.create_request = sentry_patched_create_request
 
@@ -122,11 +120,9 @@ def patch_channels_asgi_handler_impl(cls):
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
+        @ensure_integration_enabled_async(DjangoIntegration, old_app)
         async def sentry_patched_asgi_handler(self, receive, send):
             # type: (Any, Any, Any) -> Any
-            if Hub.current.get_integration(DjangoIntegration) is None:
-                return await old_app(self, receive, send)
-
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls), unsafe_context_data=True
             )
@@ -141,20 +137,19 @@ def patch_channels_asgi_handler_impl(cls):
         patch_django_asgi_handler_impl(cls)
 
 
-def wrap_async_view(hub, callback):
-    # type: (Hub, Any) -> Any
-    @_functools.wraps(callback)
+def wrap_async_view(callback):
+    # type: (Any) -> Any
+    @functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
+        sentry_scope = Scope.get_isolation_scope()
+        if sentry_scope.profile is not None:
+            sentry_scope.profile.update_active_thread_id()
 
-        with hub.configure_scope() as sentry_scope:
-            if sentry_scope.profile is not None:
-                sentry_scope.profile.update_active_thread_id()
-
-            with hub.start_span(
-                op=OP.VIEW_RENDER, description=request.resolver_match.view_name
-            ):
-                return await callback(request, *args, **kwargs)
+        with sentry_sdk.start_span(
+            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
+        ):
+            return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
 

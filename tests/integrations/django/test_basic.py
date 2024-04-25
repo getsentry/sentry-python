@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import json
 import os
 import random
@@ -19,13 +17,14 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
-from sentry_sdk._compat import PY2, PY310
-from sentry_sdk import capture_message, capture_exception, configure_scope
+from sentry_sdk._compat import PY310
+from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.django.caching import _get_span_description
 from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span
 from tests.conftest import ApproxDict, unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
@@ -277,7 +276,7 @@ def test_trace_from_headers_if_performance_disabled(
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_user_captured(sentry_init, client, capture_events):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -299,7 +298,7 @@ def test_user_captured(sentry_init, client, capture_events):
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 def test_queryset_repr(sentry_init, capture_events):
     sentry_init(integrations=[DjangoIntegration()])
     events = capture_events()
@@ -340,17 +339,14 @@ def test_custom_error_handler_request_context(sentry_init, client, capture_event
     }
 
 
-def test_500(sentry_init, client, capture_events):
+def test_500(sentry_init, client):
     sentry_init(integrations=[DjangoIntegration()], send_default_pii=True)
-    events = capture_events()
 
     content, status, headers = unpack_werkzeug_response(client.get("/view-exc"))
     assert status.lower() == "500 internal server error"
     content = content.decode("utf-8")
 
-    (event,) = events
-    event_id = event["event_id"]
-    assert content == "Sentry error: %s" % event_id
+    assert content == "Sentry error."
 
 
 @pytest.mark.forked
@@ -363,7 +359,7 @@ def test_management_command_raises():
 
 
 @pytest.mark.forked
-@pytest.mark.django_db
+@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(sentry_init, capture_events, with_integration):
     sentry_init(
@@ -378,8 +374,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     sql = connection.cursor()
 
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(OperationalError):
         # table doesn't even exist
@@ -413,8 +408,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(ProgrammingError):
         sql.execute(
@@ -479,8 +473,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     sql = connections["postgres"].cursor()
 
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     events = capture_events()
 
@@ -513,8 +506,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    with configure_scope() as scope:
-        scope.clear_breadcrumbs()
+    Scope.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(DataError):
         names = ["foo", "bar"]
@@ -670,7 +662,7 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
 
 
 def test_set_db_data_custom_backend():
-    class DummyBackend(object):
+    class DummyBackend:
         # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
         def __getattr__(self, attr):
             return self
@@ -796,9 +788,8 @@ def test_template_tracing_meta(sentry_init, client, capture_events):
     assert match is not None
     assert match.group(1) == traceparent
 
-    # Python 2 does not preserve sort order
     rendered_baggage = match.group(2)
-    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
+    assert rendered_baggage == baggage
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
@@ -1156,13 +1147,10 @@ def test_get_receiver_name():
 
     name = _get_receiver_name(dummy)
 
-    if PY2:
-        assert name == "tests.integrations.django.test_basic.dummy"
-    else:
-        assert (
-            name
-            == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
-        )
+    assert (
+        name
+        == "tests.integrations.django.test_basic.test_get_receiver_name.<locals>.dummy"
+    )
 
     a_partial = partial(dummy)
     name = _get_receiver_name(a_partial)

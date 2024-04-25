@@ -95,9 +95,9 @@ GROUPS = {
     ],
     "Web Frameworks 1": [
         "django",
-        "fastapi",
         "flask",
         "starlette",
+        "fastapi",
     ],
     "Web Frameworks 2": [
         "aiohttp",
@@ -263,11 +263,6 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         if py_versions_latest[framework]:
             categories.add("latest")
             py_versions["latest"] |= set(py_versions_latest[framework])
-        if "2.7" in py_versions_pinned[framework]:
-            categories.add("py27")
-
-    py_versions["pinned"].discard("2.7")
-    py_versions["latest"].discard("2.7")
 
     context = {
         "group": group,

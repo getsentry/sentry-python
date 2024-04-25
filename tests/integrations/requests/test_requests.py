@@ -1,17 +1,13 @@
-import requests
-import responses
+from unittest import mock
 
 import pytest
+import requests
+import responses
 
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def test_crumb_capture(sentry_init, capture_events):

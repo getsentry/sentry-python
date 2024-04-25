@@ -1,11 +1,14 @@
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
     logger,
     parse_url,
 )
@@ -42,17 +45,14 @@ def _install_httpx_client():
     # type: () -> None
     real_send = Client.send
 
+    @ensure_integration_enabled(HttpxIntegration, real_send)
     def send(self, request, **kwargs):
         # type: (Client, Request, **Any) -> Response
-        hub = Hub.current
-        if hub.get_integration(HttpxIntegration) is None:
-            return real_send(self, request, **kwargs)
-
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with hub.start_span(
+        with sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (
@@ -66,8 +66,11 @@ def _install_httpx_client():
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-            if should_propagate_trace(hub, str(request.url)):
-                for key, value in hub.iter_trace_propagation_headers():
+            if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
+                for (
+                    key,
+                    value,
+                ) in Scope.get_current_scope().iter_trace_propagation_headers():
                     logger.debug(
                         "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                             key=key, value=value, url=request.url
@@ -95,17 +98,14 @@ def _install_httpx_async_client():
     # type: () -> None
     real_send = AsyncClient.send
 
+    @ensure_integration_enabled_async(HttpxIntegration, real_send)
     async def send(self, request, **kwargs):
         # type: (AsyncClient, Request, **Any) -> Response
-        hub = Hub.current
-        if hub.get_integration(HttpxIntegration) is None:
-            return await real_send(self, request, **kwargs)
-
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
-        with hub.start_span(
+        with sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (
@@ -119,8 +119,11 @@ def _install_httpx_async_client():
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-            if should_propagate_trace(hub, str(request.url)):
-                for key, value in hub.iter_trace_propagation_headers():
+            if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
+                for (
+                    key,
+                    value,
+                ) in Scope.get_current_scope().iter_trace_propagation_headers():
                     logger.debug(
                         "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                             key=key, value=value, url=request.url

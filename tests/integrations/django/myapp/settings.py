@@ -17,16 +17,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 
 sentry_sdk.init(integrations=[DjangoIntegration()])
 
-
 import os
 
-try:
-    # Django >= 1.10
-    from django.utils.deprecation import MiddlewareMixin
-except ImportError:
-    # Not required for Django <= 1.9, see:
-    # https://docs.djangoproject.com/en/1.10/topics/http/middleware/#upgrading-pre-django-1-10-style-middleware
-    MiddlewareMixin = object
+from django.utils.deprecation import MiddlewareMixin
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -128,11 +121,13 @@ try:
 
     DATABASES["postgres"] = {
         "ENGINE": db_engine,
-        "NAME": os.environ["SENTRY_PYTHON_TEST_POSTGRES_NAME"],
-        "USER": os.environ["SENTRY_PYTHON_TEST_POSTGRES_USER"],
-        "PASSWORD": os.environ["SENTRY_PYTHON_TEST_POSTGRES_PASSWORD"],
         "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
         "PORT": 5432,
+        "USER": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres"),
+        "PASSWORD": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry"),
+        "NAME": os.environ.get(
+            "SENTRY_PYTHON_TEST_POSTGRES_NAME", f"myapp_db_{os.getpid()}"
+        ),
     }
 except (ImportError, KeyError):
     from sentry_sdk.utils import logger

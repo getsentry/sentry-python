@@ -4,8 +4,8 @@ import sys
 import threading
 import time
 import uuid
+from datetime import datetime, timezone
 
-from sentry_sdk._compat import PY33, datetime_utcnow, text_type
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
@@ -66,10 +66,6 @@ def setup_continuous_profiler(options, capture_func):
 
     if _scheduler is not None:
         logger.debug("[Profiling] Continuous Profiler is already setup")
-        return False
-
-    if not PY33:
-        logger.warn("[Profiling] Continuous Profiler requires Python >= 3.3")
         return False
 
     if is_gevent():
@@ -403,7 +399,7 @@ class ProfileBuffer(object):
         #
         # Subtracting the start_monotonic_time here to find a fixed starting position
         # for relative monotonic timestamps for each sample.
-        self.start_timestamp = datetime_utcnow().timestamp() - self.start_monotonic_time
+        self.start_timestamp = datetime.now(timezone.utc).timestamp() - self.start_monotonic_time
 
     def write(self, monotonic_time, sample):
         # type: (float, ExtractedSample) -> None
@@ -498,8 +494,8 @@ class ProfileChunk(object):
             "version": "2",
         }
 
-        for key in "environment", "release", "dist":
+        for key in "release", "environment", "dist":
             if options[key] is not None:
-                payload[key] = text_type(options[key]).strip()
+                payload[key] = str(options[key]).strip()
 
         return payload

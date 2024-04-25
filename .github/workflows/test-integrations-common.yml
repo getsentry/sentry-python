@@ -25,20 +25,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -54,43 +54,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-common-py27:
-    name: Common (py27)
-    timeout-minutes: 30
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4.1.1
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test common py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-common" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Generate coverage XML
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-      - uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   check_required_tests:
     name: All Common tests passed
-    needs: [test-common-pinned, test-common-py27]
+    needs: test-common-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test-common-pinned.result, 'failure') || contains(needs.test-common-pinned.result, 'skipped')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-      - name: Check for 2.7 failures
-        if: contains(needs.test-common-py27.result, 'failure') || contains(needs.test-common-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
