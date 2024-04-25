@@ -14,18 +14,6 @@ _Bad software is everywhere, and we're tired of it. Sentry is on a mission to he
 
 This is the official Python SDK for [Sentry](http://sentry.io/)
 
----
-
-## Note about SDK 2.0.0rc1
-
-**Sentry SDK 2.0.0rc1** has been tested under load on Sentry itself. But we advice you to still be careful if you test this in production. 
-
-Please give it a spin and test it with your project. If you have any questions or feedback please contact us on [Discord](https://discord.gg/Ww9hbqr) in the [#sdk-chat](https://discord.com/channels/621778831602221064/1211958154984820776) channel or create a [GitHub Issue](https://github.com/getsentry/sentry-python/issues) or start a [GitHub Discussion](https://github.com/getsentry/sentry-python/discussions). 
-
-Thanks!
-
-https://discord.com/channels/621778831602221064/621783758739079168
-
 ## Getting Started
 
 ### Install
