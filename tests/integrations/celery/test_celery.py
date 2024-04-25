@@ -618,11 +618,14 @@ def test_apply_async_no_args(init_celery):
     assert result.get() == "success"
 
 
+@pytest.mark.parametrize("routing_key", ("celery", "custom"))
 @mock.patch("celery.app.task.Task.request")
-def test_messaging_destination_name(mock_request, init_celery, capture_events):
+def test_messaging_destination_name(
+    mock_request, routing_key, init_celery, capture_events
+):
     celery_app = init_celery(enable_tracing=True)
     events = capture_events()
-    mock_request.delivery_info = {"routing_key": "celery", "exchange": ""}
+    mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
     @celery_app.task()
     def task(): ...
@@ -631,4 +634,4 @@ def test_messaging_destination_name(mock_request, init_celery, capture_events):
 
     (event,) = events
     (span,) = event["spans"]
-    assert span["data"]["messaging.destination.name"] == "celery"
+    assert span["data"]["messaging.destination.name"] == routing_key
