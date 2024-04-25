@@ -14,7 +14,6 @@ from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
@@ -274,9 +273,11 @@ def _sentry_error_handler_lookup(self, exception, *args, **kwargs):
     return sentry_wrapped_error_handler
 
 
-@ensure_integration_enabled_async(SanicIntegration, old_handle_request)
 async def _legacy_handle_request(self, request, *args, **kwargs):
     # type: (Any, Request, *Any, **Any) -> Any
+    if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
+        return await old_handle_request(self, request, *args, **kwargs)
+
     weak_request = weakref.ref(request)
 
     with sentry_sdk.isolation_scope() as scope:

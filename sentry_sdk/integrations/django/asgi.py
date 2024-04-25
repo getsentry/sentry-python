@@ -21,7 +21,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
 )
 
 
@@ -72,9 +71,11 @@ def patch_django_asgi_handler_impl(cls):
 
     old_app = cls.__call__
 
-    @ensure_integration_enabled_async(DjangoIntegration, old_app)
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
+        if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls), unsafe_context_data=True
         )._run_asgi3
@@ -120,9 +121,11 @@ def patch_channels_asgi_handler_impl(cls):
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
-        @ensure_integration_enabled_async(DjangoIntegration, old_app)
         async def sentry_patched_asgi_handler(self, receive, send):
             # type: (Any, Any, Any) -> Any
+            if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
+                return await old_app(self, receive, send)
+
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls), unsafe_context_data=True
             )
