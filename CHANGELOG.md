@@ -14,7 +14,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
 - Added new API for custom instrumentation: `new_scope`, `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
 ### Changed
-(These changes are all backwards-incompatible. Breaking Change (if you are just skimming for that phrase))
+(These changes are all backwards-incompatible. **Breaking Change** (if you are just skimming for that phrase))
 
 - The Pyramid integration will not capture errors that might happen in `authenticated_userid()` in a custom `AuthenticationPolicy` class.
 - The method `need_code_loation` of the `MetricsAggregator` was renamed to `need_code_location`.
@@ -63,7 +63,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
     </details>
 
 ### Removed
-(These changes are all backwards-incompatible. Breaking Change (if you are just skimming for that phrase))
+(These changes are all backwards-incompatible. **Breaking Change** (if you are just skimming for that phrase))
 
 - Removed support for Python 2 and Python 3.5. The SDK now requires at least Python 3.6.
 - Removed support for Celery 3.\*.
