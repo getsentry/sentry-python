@@ -190,7 +190,7 @@ def test_tracing_disabled(
     assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
     assert (
         error_event["contexts"]["trace"]["trace_id"]
-        == scope._propagation_context["trace_id"]
+        == scope._propagation_context.trace_id
     )
 
 
