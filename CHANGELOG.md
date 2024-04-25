@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+- No documented changes.
+
 ## 2.0.0rc6
 
 ### Various fixes & improvements
