@@ -1,5 +1,6 @@
 from functools import wraps
 
+import sentry_sdk.utils
 from sentry_sdk import start_span
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import ContextVar
@@ -36,8 +37,18 @@ def ai_track(description, **span_kwargs):
                     return f(*args, **kwargs)
                 else:
                     _ai_pipeline_name.set(description)
-                    res = f(*args, **kwargs)
-                    _ai_pipeline_name.set(None)
+                    try:
+                        res = f(*args, **kwargs)
+                    except Exception as e:
+                        event, hint = sentry_sdk.utils.event_from_exception(
+                            e,
+                            client_options=sentry_sdk.get_client().options,
+                            mechanism={"type": "ai_monitoring", "handled": False},
+                        )
+                        sentry_sdk.capture_event(event, hint=hint)
+                        raise e from None
+                    finally:
+                        _ai_pipeline_name.set(None)
                     return res
 
         return wrapped

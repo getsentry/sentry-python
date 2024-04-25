@@ -2,7 +2,7 @@ from functools import wraps
 
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.ai_analytics import record_token_usage
+from sentry_sdk.ai_monitoring import record_token_usage
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations._ai_common import set_data_normalized
 

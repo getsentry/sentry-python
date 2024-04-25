@@ -3,7 +3,7 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.ai_analytics import set_ai_pipeline_name, record_token_usage
+from sentry_sdk.ai_monitoring import set_ai_pipeline_name, record_token_usage
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._ai_common import set_data_normalized
 from sentry_sdk.scope import should_send_default_pii
