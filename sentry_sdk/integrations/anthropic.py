@@ -98,12 +98,13 @@ def _wrap_message_create(f):
         span = sentry_sdk.start_span(
             op=OP.ANTHROPIC_MESSAGES_CREATE, description="Anthropic messages create"
         )
+        span.__enter__()
 
         try:
             result = f(*args, **kwargs)
         except Exception as exc:
             _capture_exception(exc)
-            span.finish()
+            span.__exit__(None, None, None)
             raise exc from None
 
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
@@ -128,7 +129,7 @@ def _wrap_message_create(f):
                         ),
                     )
                 _calculate_token_usage(result, span)
-                span.finish()
+                span.__exit__(None, None, None)
             elif hasattr(result, "_iterator"):
                 old_iterator = result._iterator
 
@@ -166,12 +167,12 @@ def _wrap_message_create(f):
                         span.set_data(PROMPT_TOKENS_USED, input_tokens)
                         span.set_data(COMPLETION_TOKENS_USED, output_tokens)
                         span.set_data("ai.streaming", True)
-                    span.finish()
+                    span.__exit__(None, None, None)
 
                 result._iterator = new_iterator()
             else:
                 span.set_data("unknown_response", True)
-                span.finish()
+                span.__exit__(None, None, None)
 
         return result
 
