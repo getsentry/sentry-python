@@ -30,7 +30,7 @@ jobs:
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.4
         with:
           persist-credentials: false
       - name: Check permissions on PR
@@ -53,7 +53,6 @@ jobs:
   test-aws_lambda-pinned:
     name: AWS Lambda (pinned)
     timeout-minutes: 30
-    needs: check-permissions
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -64,8 +63,9 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+    needs: check-permissions
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v5
@@ -73,7 +73,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase

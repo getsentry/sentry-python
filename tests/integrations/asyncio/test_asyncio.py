@@ -1,17 +1,13 @@
 import asyncio
 import inspect
 import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asyncio import AsyncioIntegration, patch_asyncio
-
-try:
-    from unittest.mock import MagicMock, patch
-except ImportError:
-    from mock import MagicMock, patch
 
 try:
     from contextvars import Context, ContextVar
@@ -71,7 +67,6 @@ async def test_create_task(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
         integrations=[
             AsyncioIntegration(),
         ],
@@ -115,7 +110,6 @@ async def test_gather(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
         integrations=[
             AsyncioIntegration(),
         ],
@@ -159,7 +153,6 @@ async def test_exception(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
         integrations=[
             AsyncioIntegration(),
         ],
@@ -250,7 +243,6 @@ def test_patch_asyncio(mock_get_running_loop):
 
 
 @minimum_python_37
-@pytest.mark.forked
 @patch("asyncio.get_running_loop")
 @patch("sentry_sdk.integrations.asyncio.Task")
 def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noqa: N803
@@ -280,7 +272,6 @@ def test_sentry_task_factory_no_factory(MockTask, mock_get_running_loop):  # noq
 
 
 @minimum_python_37
-@pytest.mark.forked
 @patch("asyncio.get_running_loop")
 def test_sentry_task_factory_with_factory(mock_get_running_loop):
     mock_loop = mock_get_running_loop.return_value

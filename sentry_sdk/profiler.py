@@ -33,10 +33,11 @@ import sys
 import threading
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections import deque
 
 import sentry_sdk
-from sentry_sdk._compat import PY33, PY311
+from sentry_sdk._compat import PY311
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
@@ -161,8 +162,14 @@ def has_profiling_enabled(options):
         return True
 
     profiles_sample_rate = options["_experiments"].get("profiles_sample_rate")
-    if profiles_sample_rate is not None and profiles_sample_rate > 0:
-        return True
+    if profiles_sample_rate is not None:
+        logger.warning(
+            "_experiments['profiles_sample_rate'] is deprecated. "
+            "Please use the non-experimental profiles_sample_rate option "
+            "directly."
+        )
+        if profiles_sample_rate > 0:
+            return True
 
     return False
 
@@ -173,10 +180,6 @@ def setup_profiler(options):
 
     if _scheduler is not None:
         logger.debug("[Profiling] Profiler is already setup")
-        return False
-
-    if not PY33:
-        logger.warn("[Profiling] Profiler requires Python >= 3.3")
         return False
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
@@ -193,10 +196,13 @@ def setup_profiler(options):
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
     else:
-        profiler_mode = (
-            options.get("_experiments", {}).get("profiler_mode")
-            or default_profiler_mode
-        )
+        profiler_mode = options.get("_experiments", {}).get("profiler_mode")
+        if profiler_mode is not None:
+            logger.warning(
+                "_experiments['profiler_mode'] is deprecated. Please use the "
+                "non-experimental profiler_mode option directly."
+            )
+        profiler_mode = profiler_mode or default_profiler_mode
 
     if (
         profiler_mode == ThreadScheduler.mode
@@ -375,7 +381,7 @@ else:
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
-class Profile(object):
+class Profile:
     def __init__(
         self,
         transaction,  # type: sentry_sdk.tracing.Transaction
@@ -455,11 +461,8 @@ class Profile(object):
             self.sampled = False
             return
 
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-
-        # The client is None, so we can't get the sample rate.
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             self.sampled = False
             return
 
@@ -522,18 +525,15 @@ class Profile(object):
         assert self.scheduler, "No scheduler specified"
         logger.debug("[Profiling] Stopping profile")
         self.active = False
-        self.scheduler.stop_profiling(self)
         self.stop_ns = nanosecond_time()
 
     def __enter__(self):
         # type: () -> Profile
-        hub = self.hub or sentry_sdk.Hub.current
-
-        _, scope = hub._stack[-1]
+        scope = sentry_sdk.scope.Scope.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
-        self._context_manager_state = (hub, scope, old_profile)
+        self._context_manager_state = (scope, old_profile)
 
         self.start()
 
@@ -543,7 +543,7 @@ class Profile(object):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.stop()
 
-        _, scope, old_profile = self._context_manager_state
+        scope, old_profile = self._context_manager_state
         del self._context_manager_state
 
         scope.profile = old_profile
@@ -665,9 +665,8 @@ class Profile(object):
 
     def valid(self):
         # type: () -> bool
-        hub = self.hub or sentry_sdk.Hub.current
-        client = hub.client
-        if client is None:
+        client = sentry_sdk.Scope.get_client()
+        if not client.is_active():
             return False
 
         if not has_profiling_enabled(client.options):
@@ -691,7 +690,7 @@ class Profile(object):
         return True
 
 
-class Scheduler(object):
+class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
 
     def __init__(self, frequency):
@@ -713,26 +712,29 @@ class Scheduler(object):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self.teardown()
 
+    @abstractmethod
     def setup(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def teardown(self):
         # type: () -> None
-        raise NotImplementedError
+        pass
 
     def ensure_running(self):
         # type: () -> None
-        raise NotImplementedError
+        """
+        Ensure the scheduler is running. By default, this method is a no-op.
+        The method should be overridden by any implementation for which it is
+        relevant.
+        """
+        return None
 
     def start_profiling(self, profile):
         # type: (Profile) -> None
         self.ensure_running()
         self.new_profiles.append(profile)
-
-    def stop_profiling(self, profile):
-        # type: (Profile) -> None
-        pass
 
     def make_sampler(self):
         # type: () -> Callable[..., None]
@@ -817,7 +819,7 @@ class ThreadScheduler(Scheduler):
 
     def __init__(self, frequency):
         # type: (int) -> None
-        super(ThreadScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False
@@ -917,7 +919,7 @@ class GeventScheduler(Scheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventScheduler, self).__init__(frequency=frequency)
+        super().__init__(frequency=frequency)
 
         # used to signal to the thread that it should stop
         self.running = False

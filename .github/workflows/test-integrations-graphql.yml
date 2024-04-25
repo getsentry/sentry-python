@@ -32,13 +32,13 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -80,13 +80,13 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase

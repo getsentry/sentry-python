@@ -21,6 +21,6 @@ function replace() {
     grep "$2" $3  # verify that replacement was successful
 }
 
-replace "version=\"[0-9.]+\"" "version=\"$NEW_VERSION\"" ./setup.py
-replace "VERSION = \"[0-9.]+\"" "VERSION = \"$NEW_VERSION\"" ./sentry_sdk/consts.py
-replace "release = \"[0-9.]+\"" "release = \"$NEW_VERSION\"" ./docs/conf.py
+replace "version=\"$OLD_VERSION\"" "version=\"$NEW_VERSION\"" ./setup.py
+replace "VERSION = \"$OLD_VERSION\"" "VERSION = \"$NEW_VERSION\"" ./sentry_sdk/consts.py
+replace "release = \"$OLD_VERSION\"" "release = \"$NEW_VERSION\"" ./docs/conf.py

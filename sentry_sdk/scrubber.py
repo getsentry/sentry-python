@@ -1,14 +1,8 @@
-try:
-    from typing import cast
-except ImportError:
-    cast = lambda _, obj: obj
-
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     AnnotatedValue,
     iter_event_frames,
 )
-from sentry_sdk._compat import string_types
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -97,7 +91,7 @@ class EventScrubber(object):
         for k, v in d.items():
             # The cast is needed because mypy is not smart enough to figure out that k must be a
             # string after the isinstance check.
-            if isinstance(k, string_types) and cast(str, k).lower() in self.denylist:
+            if isinstance(k, str) and k.lower() in self.denylist:
                 d[k] = AnnotatedValue.substituted_because_contains_sensitive_data()
             elif self.recursive:
                 self.scrub_dict(v)  # no-op unless v is a dict

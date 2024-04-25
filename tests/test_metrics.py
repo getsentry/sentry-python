@@ -1,17 +1,13 @@
-# coding: utf-8
-import pytest
 import sys
 import time
 import linecache
+from unittest import mock
 
-from sentry_sdk import Hub, metrics, push_scope, start_transaction
+import pytest
+
+from sentry_sdk import Hub, Scope, metrics, start_transaction
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 try:
     import gevent
@@ -541,12 +537,12 @@ def test_transaction_name(
     ts = time.time()
     envelopes = capture_envelopes()
 
-    with push_scope() as scope:
-        scope.set_transaction_name("/user/{user_id}", source="route")
-        metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
+    scope = Scope.get_current_scope()
+    scope.set_transaction_name("/user/{user_id}", source="route")
+    metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
 
     Hub.current.flush()
 
@@ -692,9 +688,7 @@ def test_metric_summaries(
             "nano|\nsecond",
             "my.amaze.metric_I_guess@nanosecond",
         ),
-        # fmt: off
-        (u"métríc", u"nanöseconď", u"m_tr_c@nansecon"),
-        # fmt: on
+        ("métríc", "nanöseconď", "m_tr_c@nansecon"),
     ],
 )
 def test_metric_name_normalization(
@@ -733,9 +727,10 @@ def test_metric_name_normalization(
     [
         ({"f-oo|bar": "%$foo/"}, {"f-oobar": "%$foo/"}),
         ({"foo$.$.$bar": "blah{}"}, {"foo..bar": "blah{}"}),
-        # fmt: off
-        ({u"foö-bar": u"snöwmän"}, {u"fo-bar": u"snöwmän"},),
-        # fmt: on
+        (
+            {"foö-bar": "snöwmän"},
+            {"fo-bar": "snöwmän"},
+        ),
         ({"route": "GET /foo"}, {"route": "GET /foo"}),
         ({"__bar__": "this | or , that"}, {"__bar__": "this \\u{7c} or \\u{2c} that"}),
         ({"foo/": "hello!\n\r\t\\"}, {"foo/": "hello!\\n\\r\\t\\\\"}),

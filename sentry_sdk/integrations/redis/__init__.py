@@ -1,14 +1,12 @@
-from __future__ import absolute_import
-
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk._compat import text_type
 from sentry_sdk.hub import _should_send_default_pii
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
+    ensure_integration_enabled,
     logger,
 )
 
@@ -129,7 +127,7 @@ def _set_db_data_on_span(span, connection_params):
 
     db = connection_params.get("db")
     if db is not None:
-        span.set_data(SPANDATA.DB_NAME, text_type(db))
+        span.set_data(SPANDATA.DB_NAME, str(db))
 
     host = connection_params.get("host")
     if host is not None:
@@ -179,14 +177,10 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_d
     # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
     old_execute = pipeline_cls.execute
 
+    @ensure_integration_enabled(RedisIntegration, old_execute)
     def sentry_patched_execute(self, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
-        hub = Hub.current
-
-        if hub.get_integration(RedisIntegration) is None:
-            return old_execute(self, *args, **kwargs)
-
-        with hub.start_span(
+        with sentry_sdk.start_span(
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
             with capture_internal_exceptions():
@@ -212,14 +206,10 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
     """
     old_execute_command = cls.execute_command
 
+    @ensure_integration_enabled(RedisIntegration, old_execute_command)
     def sentry_patched_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
-        hub = Hub.current
-        integration = hub.get_integration(RedisIntegration)
-
-        if integration is None:
-            return old_execute_command(self, name, *args, **kwargs)
-
+        integration = sentry_sdk.get_client().get_integration(RedisIntegration)
         description = _get_span_description(name, *args)
 
         data_should_be_truncated = (
@@ -228,7 +218,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
         if data_should_be_truncated:
             description = description[: integration.max_data_size - len("...")] + "..."
 
-        with hub.start_span(op=OP.DB_REDIS, description=description) as span:
+        with sentry_sdk.start_span(op=OP.DB_REDIS, description=description) as span:
             set_db_data_fn(span, self)
             _set_client_data(span, is_cluster, name, *args)
 
