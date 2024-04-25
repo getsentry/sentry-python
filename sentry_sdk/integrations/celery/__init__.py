@@ -357,6 +357,8 @@ def _wrap_task_call(task, f):
             ) as span:
                 _set_messaging_destination_name(task, span)
                 with capture_internal_exceptions():
+                    span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
