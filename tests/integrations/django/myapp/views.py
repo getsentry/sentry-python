@@ -1,7 +1,7 @@
+import asyncio
 import json
 import threading
 
-from django import VERSION
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -89,14 +89,14 @@ def view_with_cached_template_fragment(request):
 # interesting property of this one is that csrf_exempt, as a class attribute,
 # is not in __dict__, so regular use of functools.wraps will not forward the
 # attribute.
-class SentryClassBasedView(object):
+class SentryClassBasedView:
     csrf_exempt = True
 
     def __call__(self, request):
         return HttpResponse("ok")
 
 
-class SentryClassBasedViewWithCsrf(object):
+class SentryClassBasedViewWithCsrf:
     def __call__(self, request):
         return HttpResponse("ok")
 
@@ -123,7 +123,7 @@ def mylogin(request):
 
 @csrf_exempt
 def handler500(request):
-    return HttpResponseServerError("Sentry error: %s" % sentry_sdk.last_event_id())
+    return HttpResponseServerError("Sentry error.")
 
 
 class ClassBasedView(ListView):
@@ -131,7 +131,7 @@ class ClassBasedView(ListView):
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
-        return super(ClassBasedView, self).dispatch(request, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
     def head(self, *args, **kwargs):
         sentry_sdk.capture_message("hi")
@@ -182,10 +182,17 @@ def template_test2(request, *args, **kwargs):
 
 @csrf_exempt
 def template_test3(request, *args, **kwargs):
-    from sentry_sdk import Hub
+    from sentry_sdk import Scope
 
-    hub = Hub.current
-    capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+    traceparent = Scope.get_current_scope().get_traceparent()
+    if traceparent is None:
+        traceparent = Scope.get_isolation_scope().get_traceparent()
+
+    baggage = Scope.get_current_scope().get_baggage()
+    if baggage is None:
+        baggage = Scope.get_isolation_scope().get_baggage()
+
+    capture_message(traceparent + "\n" + baggage.serialize())
     return render(request, "trace_meta.html", {})
 
 
@@ -223,41 +230,32 @@ def thread_ids_sync(*args, **kwargs):
     return HttpResponse(response)
 
 
-if VERSION >= (3, 1):
-    # Use exec to produce valid Python 2
-    exec(
-        """async def async_message(request):
+async def async_message(request):
     sentry_sdk.capture_message("hi")
-    return HttpResponse("ok")"""
-    )
+    return HttpResponse("ok")
 
-    exec(
-        """async def my_async_view(request):
-    import asyncio
+
+async def my_async_view(request):
     await asyncio.sleep(1)
-    return HttpResponse('Hello World')"""
-    )
+    return HttpResponse("Hello World")
 
-    exec(
-        """async def thread_ids_async(request):
-    response = json.dumps({
-        "main": threading.main_thread().ident,
-        "active": threading.current_thread().ident,
-    })
-    return HttpResponse(response)"""
-    )
 
-    exec(
-        """async def post_echo_async(request):
+async def thread_ids_async(request):
+    response = json.dumps(
+        {
+            "main": threading.main_thread().ident,
+            "active": threading.current_thread().ident,
+        }
+    )
+    return HttpResponse(response)
+
+
+async def post_echo_async(request):
     sentry_sdk.capture_message("hi")
     return HttpResponse(request.body)
-post_echo_async.csrf_exempt = True"""
-    )
-else:
-    async_message = None
-    my_async_view = None
-    thread_ids_async = None
-    post_echo_async = None
+
+
+post_echo_async.csrf_exempt = True
 
 
 @csrf_exempt

@@ -1,4 +1,4 @@
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
@@ -27,8 +27,7 @@ class DedupeIntegration(Integration):
             if hint is None:
                 return event
 
-            integration = Hub.current.get_integration(DedupeIntegration)
-
+            integration = sentry_sdk.get_client().get_integration(DedupeIntegration)
             if integration is None:
                 return event
 

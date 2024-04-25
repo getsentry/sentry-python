@@ -1,8 +1,10 @@
+import pytest
 from sentry_sdk import start_span
 
 from sentry_sdk.tracing import Span
 
 
+@pytest.mark.skip(reason="This deprecated feature has been removed in SDK 2.0.")
 def test_start_span_to_start_transaction(sentry_init, capture_events):
     # XXX: this only exists for backwards compatibility with code before
     # Transaction / start_transaction were introduced.

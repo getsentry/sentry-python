@@ -1,10 +1,9 @@
-from __future__ import absolute_import
-
 import os
+
 import pytest
 from datetime import datetime
+from unittest import mock
 
-from sentry_sdk._compat import PY2
 from django import VERSION as DJANGO_VERSION
 from django.db import connections
 
@@ -22,11 +21,6 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 @pytest.fixture
@@ -210,10 +204,8 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
 
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
-
-            if not PY2:
-                assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
-                assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
+            assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+            assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path

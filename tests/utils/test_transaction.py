@@ -1,14 +1,6 @@
-import sys
-from functools import partial
-
-import pytest
+from functools import partial, partialmethod
 
 from sentry_sdk.utils import transaction_from_function
-
-try:
-    from functools import partialmethod
-except ImportError:
-    pass
 
 
 class MyClass:
@@ -48,7 +40,6 @@ def test_transaction_from_function():
     )
 
 
-@pytest.mark.skipif(sys.version_info < (3, 4), reason="Require python 3.4 or higher")
 def test_transaction_from_function_partialmethod():
     x = transaction_from_function
 

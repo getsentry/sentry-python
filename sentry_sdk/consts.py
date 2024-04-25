@@ -1,7 +1,20 @@
+from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
+
+
+# Also needs to be at the top to prevent circular import
+class EndpointType(Enum):
+    """
+    The type of an endpoint. This is an enum, rather than a constant, for historical reasons
+    (the old /store endpoint). The enum also preserve future compatibility, in case we ever
+    have a new endpoint.
+    """
+
+    ENVELOPE = "envelope"
+
 
 if TYPE_CHECKING:
     import sentry_sdk
@@ -42,9 +55,6 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            # TODO: Remove these 2 profiling related experiments
-            "profiles_sample_rate": Optional[float],
-            "profiler_mode": Optional[ProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
@@ -255,7 +265,7 @@ class OP:
 
 # This type exists to trick mypy and PyCharm into thinking `init` and `Client`
 # take these arguments (even though they take opaque **kwargs)
-class ClientConstructor(object):
+class ClientConstructor:
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
@@ -335,4 +345,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "1.45.0"
+VERSION = "2.0.0"

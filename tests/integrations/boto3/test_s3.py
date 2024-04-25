@@ -1,17 +1,13 @@
-import pytest
+from unittest import mock
 
 import boto3
+import pytest
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from tests.conftest import ApproxDict
-from tests.integrations.boto3.aws_mock import MockResponse
 from tests.integrations.boto3 import read_fixture
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from tests.integrations.boto3.aws_mock import MockResponse
 
 
 session = boto3.Session(
@@ -25,7 +21,7 @@ def test_basic(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with Hub.current.start_transaction() as transaction, MockResponse(
+    with sentry_sdk.start_transaction() as transaction, MockResponse(
         s3.meta.client, 200, {}, read_fixture("s3_list.xml")
     ):
         bucket = s3.Bucket("bucket")
@@ -48,7 +44,7 @@ def test_streaming(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with Hub.current.start_transaction() as transaction, MockResponse(
+    with sentry_sdk.start_transaction() as transaction, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         obj = s3.Bucket("bucket").Object("foo.pdf")
@@ -86,7 +82,7 @@ def test_streaming_close(sentry_init, capture_events):
     events = capture_events()
 
     s3 = session.resource("s3")
-    with Hub.current.start_transaction() as transaction, MockResponse(
+    with sentry_sdk.start_transaction() as transaction, MockResponse(
         s3.meta.client, 200, {}, b"hello"
     ):
         obj = s3.Bucket("bucket").Object("foo.pdf")
@@ -115,7 +111,7 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
         "sentry_sdk.integrations.boto3.parse_url",
         side_effect=ValueError,
     ):
-        with Hub.current.start_transaction() as transaction, MockResponse(
+        with sentry_sdk.start_transaction() as transaction, MockResponse(
             s3.meta.client, 200, {}, read_fixture("s3_list.xml")
         ):
             bucket = s3.Bucket("bucket")

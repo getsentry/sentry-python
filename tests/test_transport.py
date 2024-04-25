@@ -1,26 +1,21 @@
-# coding: utf-8
 import logging
 import pickle
 import gzip
 import io
 import socket
 from collections import namedtuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
 from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
-from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.envelope import Envelope, Item, parse_json
-from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
@@ -122,7 +117,9 @@ def test_transport_works(
     Hub.current.bind_client(client)
     request.addfinalizer(lambda: Hub.current.bind_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
     capture_message("löl")
 
     getattr(client, client_flush_method)()
@@ -132,7 +129,7 @@ def test_transport_works(
     assert capturing_server.captured
     assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
-    assert any("Sending event" in record.msg for record in caplog.records) == debug
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.parametrize(
@@ -233,6 +230,13 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
         # Make sure we cannot create events from our own logging
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
     )
+
+    # I am not sure why, but "werkzeug" logger makes an INFO log on sending
+    # the message "hi" and does creates an infinite look.
+    # Ignoring this for breaking the infinite loop and still we can test
+    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
+    # to an infinite loop
+    ignore_logger("werkzeug")
 
     with Hub(client):
         capture_message("hi")
@@ -350,7 +354,7 @@ def test_data_category_limits(
     client.flush()
 
     assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/store/"
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
@@ -429,7 +433,8 @@ def test_data_category_limits_reporting(
 
     assert len(capturing_server.captured) == 2
 
-    event = capturing_server.captured[0].event
+    assert len(capturing_server.captured[0].envelope.items) == 1
+    event = capturing_server.captured[0].envelope.items[0].get_event()
     assert event["type"] == "error"
     assert event["release"] == "foo"
 

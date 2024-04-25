@@ -1,3 +1,5 @@
+from functools import wraps
+
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -6,10 +8,14 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
-from sentry_sdk._functools import wraps
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import logger, capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    logger,
+    capture_internal_exceptions,
+    event_from_exception,
+    ensure_integration_enabled,
+)
 
 try:
     from openai.resources.chat.completions import Completions
@@ -61,16 +67,14 @@ class OpenAIIntegration(Integration):
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
 
 
-def _capture_exception(hub, exc):
-    # type: (Hub, Any) -> None
-
-    if hub.client is not None:
-        event, hint = event_from_exception(
-            exc,
-            client_options=hub.client.options,
-            mechanism={"type": "openai", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+def _capture_exception(exc):
+    # type: (Any) -> None
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "openai", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _normalize_data(data):
@@ -144,16 +148,9 @@ def _calculate_chat_completion_usage(
 def _wrap_chat_completion_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     @wraps(f)
+    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        hub = Hub.current
-        if not hub:
-            return f(*args, **kwargs)
-
-        integration = hub.get_integration(OpenAIIntegration)  # type: OpenAIIntegration
-        if not integration:
-            return f(*args, **kwargs)
-
         if "messages" not in kwargs:
             # invalid call (in all versions of openai), let it return error
             return f(*args, **kwargs)
@@ -176,19 +173,21 @@ def _wrap_chat_completion_create(f):
         try:
             res = f(*args, **kwargs)
         except Exception as e:
-            _capture_exception(Hub.current, e)
+            _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
 
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+
         with capture_internal_exceptions():
-            if _should_send_default_pii() and integration.include_prompts:
+            if should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, "ai.input_messages", messages)
 
             set_data_normalized(span, "ai.model_id", model)
             set_data_normalized(span, "ai.streaming", streaming)
 
             if hasattr(res, "choices"):
-                if _should_send_default_pii() and integration.include_prompts:
+                if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
                         "ai.responses",
@@ -222,7 +221,7 @@ def _wrap_chat_completion_create(f):
                                 map(lambda chunk: "".join(chunk), data_buf)
                             )
                             if (
-                                _should_send_default_pii()
+                                should_send_default_pii()
                                 and integration.include_prompts
                             ):
                                 set_data_normalized(span, "ai.responses", all_responses)
@@ -244,23 +243,16 @@ def _wrap_embeddings_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
     @wraps(f)
+    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_embeddings_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-
-        hub = Hub.current
-        if not hub:
-            return f(*args, **kwargs)
-
-        integration = hub.get_integration(OpenAIIntegration)  # type: OpenAIIntegration
-        if not integration:
-            return f(*args, **kwargs)
-
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
             description="OpenAI Embedding Creation",
         ) as span:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
             if "input" in kwargs and (
-                _should_send_default_pii() and integration.include_prompts
+                should_send_default_pii() and integration.include_prompts
             ):
                 if isinstance(kwargs["input"], str):
                     set_data_normalized(span, "ai.input_messages", [kwargs["input"]])
@@ -275,7 +267,7 @@ def _wrap_embeddings_create(f):
             try:
                 response = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(Hub.current, e)
+                _capture_exception(e)
                 raise e from None
 
             prompt_tokens = 0

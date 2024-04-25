@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 import inspect
 import sys
 import threading
 import weakref
 from importlib import import_module
 
-from sentry_sdk._compat import string_types, text_type
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
-from sentry_sdk.hub import Hub, _should_send_default_pii
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import Scope, add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -23,6 +19,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     logger,
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     transaction_from_function,
     walk_exception_chain,
@@ -86,7 +83,6 @@ if TYPE_CHECKING:
     from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.tracing import Span
-    from sentry_sdk.scope import Scope
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk._types import Event, Hint, EventProcessor, NotImplementedType
 
@@ -154,11 +150,9 @@ class DjangoIntegration(Integration):
 
         old_app = WSGIHandler.__call__
 
+        @ensure_integration_enabled(DjangoIntegration, old_app)
         def sentry_patched_wsgi_handler(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-            if Hub.current.get_integration(DjangoIntegration) is None:
-                return old_app(self, environ, start_response)
-
             bound_old_app = old_app.__get__(self, WSGIHandler)
 
             from django.conf import settings
@@ -236,11 +230,6 @@ class DjangoIntegration(Integration):
 
             if not isinstance(value, QuerySet) or value._result_cache:
                 return NotImplemented
-
-            # Do not call Hub.get_integration here. It is intentional that
-            # running under a new hub does not suddenly start executing
-            # querysets. This might be surprising to the user but it's likely
-            # less annoying.
 
             return "<%s from %s at 0x%x>" % (
                 value.__class__.__name__,
@@ -396,7 +385,7 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         # So we don't check here what style is configured
         if hasattr(urlconf, "handler404"):
             handler = urlconf.handler404
-            if isinstance(handler, string_types):
+            if isinstance(handler, str):
                 scope.transaction = handler
             else:
                 scope.transaction = transaction_from_function(
@@ -406,22 +395,20 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
+@ensure_integration_enabled(DjangoIntegration)
 def _before_get_response(request):
     # type: (WSGIRequest) -> None
-    hub = Hub.current
-    integration = hub.get_integration(DjangoIntegration)
-    if integration is None:
-        return
+    integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
 
     _patch_drf()
 
-    with hub.configure_scope() as scope:
-        # Rely on WSGI middleware to start a trace
-        _set_transaction_name_and_source(scope, integration.transaction_style, request)
+    scope = Scope.get_current_scope()
+    # Rely on WSGI middleware to start a trace
+    _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
-        scope.add_event_processor(
-            _make_wsgi_request_event_processor(weakref.ref(request), integration)
-        )
+    scope.add_event_processor(
+        _make_wsgi_request_event_processor(weakref.ref(request), integration)
+    )
 
 
 def _attempt_resolve_again(request, scope, transaction_style):
@@ -437,15 +424,15 @@ def _attempt_resolve_again(request, scope, transaction_style):
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
+@ensure_integration_enabled(DjangoIntegration)
 def _after_get_response(request):
     # type: (WSGIRequest) -> None
-    hub = Hub.current
-    integration = hub.get_integration(DjangoIntegration)
-    if integration is None or integration.transaction_style != "url":
+    integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+    if integration.transaction_style != "url":
         return
 
-    with hub.configure_scope() as scope:
-        _attempt_resolve_again(request, scope, integration.transaction_style)
+    scope = Scope.get_current_scope()
+    _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
 def _patch_get_response():
@@ -498,7 +485,7 @@ def _make_wsgi_request_event_processor(weak_request, integration):
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if _should_send_default_pii():
+        if should_send_default_pii():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
@@ -507,24 +494,22 @@ def _make_wsgi_request_event_processor(weak_request, integration):
     return wsgi_request_event_processor
 
 
+@ensure_integration_enabled(DjangoIntegration)
 def _got_request_exception(request=None, **kwargs):
     # type: (WSGIRequest, **Any) -> None
-    hub = Hub.current
-    integration = hub.get_integration(DjangoIntegration)
-    if integration is not None:
-        if request is not None and integration.transaction_style == "url":
-            with hub.configure_scope() as scope:
-                _attempt_resolve_again(request, scope, integration.transaction_style)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(DjangoIntegration)
 
-        # If an integration is there, a client has to be there.
-        client = hub.client  # type: Any
+    if request is not None and integration.transaction_style == "url":
+        scope = Scope.get_current_scope()
+        _attempt_resolve_again(request, scope, integration.transaction_style)
 
-        event, hint = event_from_exception(
-            sys.exc_info(),
-            client_options=client.options,
-            mechanism={"type": "django", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+    event, hint = event_from_exception(
+        sys.exc_info(),
+        client_options=client.options,
+        mechanism={"type": "django", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -620,62 +605,56 @@ def install_sql_hook():
         # This won't work on Django versions < 1.6
         return
 
+    @ensure_integration_enabled(DjangoIntegration, real_execute)
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
-        hub = Hub.current
-        if hub.get_integration(DjangoIntegration) is None:
-            return real_execute(self, sql, params)
-
         with record_sql_queries(
-            hub, self.cursor, sql, params, paramstyle="format", executemany=False
+            self.cursor, sql, params, paramstyle="format", executemany=False
         ) as span:
             _set_db_data(span, self)
-            if hub.client:
-                options = hub.client.options["_experiments"].get("attach_explain_plans")
-                if options is not None:
-                    attach_explain_plan_to_span(
-                        span,
-                        self.cursor.connection,
-                        sql,
-                        params,
-                        self.mogrify,
-                        options,
-                    )
+            options = (
+                sentry_sdk.get_client()
+                .options["_experiments"]
+                .get("attach_explain_plans")
+            )
+            if options is not None:
+                attach_explain_plan_to_span(
+                    span,
+                    self.cursor.connection,
+                    sql,
+                    params,
+                    self.mogrify,
+                    options,
+                )
             result = real_execute(self, sql, params)
 
         with capture_internal_exceptions():
-            add_query_source(hub, span)
+            add_query_source(span)
 
         return result
 
+    @ensure_integration_enabled(DjangoIntegration, real_executemany)
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
-        hub = Hub.current
-        if hub.get_integration(DjangoIntegration) is None:
-            return real_executemany(self, sql, param_list)
-
         with record_sql_queries(
-            hub, self.cursor, sql, param_list, paramstyle="format", executemany=True
+            self.cursor, sql, param_list, paramstyle="format", executemany=True
         ) as span:
             _set_db_data(span, self)
 
             result = real_executemany(self, sql, param_list)
 
         with capture_internal_exceptions():
-            add_query_source(hub, span)
+            add_query_source(span)
 
         return result
 
+    @ensure_integration_enabled(DjangoIntegration, real_connect)
     def connect(self):
         # type: (BaseDatabaseWrapper) -> None
-        hub = Hub.current
-        if hub.get_integration(DjangoIntegration) is None:
-            return real_connect(self)
-
         with capture_internal_exceptions():
-            hub.add_breadcrumb(message="connect", category="query")
+            sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        with hub.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
             _set_db_data(span, self)
             return real_connect(self)
 
@@ -687,7 +666,6 @@ def install_sql_hook():
 
 def _set_db_data(span, cursor_or_db):
     # type: (Span, Any) -> None
-
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
     span.set_data(SPANDATA.DB_SYSTEM, vendor)
@@ -726,7 +704,7 @@ def _set_db_data(span, cursor_or_db):
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, text_type(server_port))
+        span.set_data(SPANDATA.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:

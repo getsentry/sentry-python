@@ -1,15 +1,11 @@
 import random
+from unittest import mock
 
 import pytest
 
-from sentry_sdk import Hub, start_span, start_transaction, capture_exception
+from sentry_sdk import Hub, Scope, start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
@@ -59,7 +55,7 @@ def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
     with start_transaction(name="/", sampled=sampling_decision):
         with start_span(op="child-span"):
             with start_span(op="child-child-span"):
-                scope = Hub.current.scope
+                scope = Scope.get_current_scope()
                 assert scope.span.op == "child-child-span"
                 assert scope.transaction.name == "/"
 

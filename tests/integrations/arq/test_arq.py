@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-from sentry_sdk import start_transaction, Hub
+from sentry_sdk import get_client, start_transaction
 from sentry_sdk.integrations.arq import ArqIntegration
 
 import arq.worker
@@ -60,7 +60,6 @@ def init_arq(sentry_init):
             integrations=[ArqIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            debug=True,
         )
 
         server = FakeRedis()
@@ -245,7 +244,7 @@ async def test_execute_job_without_integration(init_arq):
 
     pool, worker = init_arq([dummy_job])
     # remove the integration to trigger the edge case
-    Hub.current.client.integrations.pop("arq")
+    get_client().integrations.pop("arq")
 
     job = await pool.enqueue_job("dummy_job")
 
