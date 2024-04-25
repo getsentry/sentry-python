@@ -399,7 +399,9 @@ class ProfileBuffer(object):
         #
         # Subtracting the start_monotonic_time here to find a fixed starting position
         # for relative monotonic timestamps for each sample.
-        self.start_timestamp = datetime.now(timezone.utc).timestamp() - self.start_monotonic_time
+        self.start_timestamp = (
+            datetime.now(timezone.utc).timestamp() - self.start_monotonic_time
+        )
 
     def write(self, monotonic_time, sample):
         # type: (float, ExtractedSample) -> None
