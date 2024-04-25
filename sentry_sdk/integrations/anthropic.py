@@ -1,5 +1,6 @@
+from functools import wraps
+
 from sentry_sdk.consts import OP
-from sentry_sdk._functools import wraps
 from sentry_sdk.integrations import DidNotEnable, Integration
 import sentry_sdk
 from sentry_sdk.utils import (
