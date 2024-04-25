@@ -30,7 +30,7 @@ format: .venv
 .PHONY: format
 
 test: .venv
-	@$(VENV_PATH)/bin/tox -e py3.9
+	@$(VENV_PATH)/bin/tox -e py3.12
 .PHONY: test
 
 test-all: .venv

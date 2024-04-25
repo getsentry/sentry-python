@@ -2,10 +2,11 @@
 Create spans from Django middleware invocations
 """
 
+from functools import wraps
+
 from django import VERSION as DJANGO_VERSION
 
-from sentry_sdk import Hub
-from sentry_sdk._functools import wraps
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
@@ -28,12 +29,6 @@ _import_string_should_wrap_middleware = ContextVar(
     "import_string_should_wrap_middleware"
 )
 
-if DJANGO_VERSION < (1, 7):
-    import_string_name = "import_by_path"
-else:
-    import_string_name = "import_string"
-
-
 if DJANGO_VERSION < (3, 1):
     _asgi_middleware_mixin_factory = lambda _: object
 else:
@@ -44,7 +39,7 @@ def patch_django_middlewares():
     # type: () -> None
     from django.core.handlers import base
 
-    old_import_string = getattr(base, import_string_name)
+    old_import_string = base.import_string
 
     def sentry_patched_import_string(dotted_path):
         # type: (str) -> Any
@@ -55,7 +50,7 @@ def patch_django_middlewares():
 
         return rv
 
-    setattr(base, import_string_name, sentry_patched_import_string)
+    base.import_string = sentry_patched_import_string
 
     old_load_middleware = base.BaseHandler.load_middleware
 
@@ -76,8 +71,7 @@ def _wrap_middleware(middleware, middleware_name):
 
     def _check_middleware_span(old_method):
         # type: (Callable[..., Any]) -> Optional[Span]
-        hub = Hub.current
-        integration = hub.get_integration(DjangoIntegration)
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None
 
@@ -88,7 +82,7 @@ def _wrap_middleware(middleware, middleware_name):
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        middleware_span = hub.start_span(
+        middleware_span = sentry_sdk.start_span(
             op=OP.MIDDLEWARE_DJANGO, description=description
         )
         middleware_span.set_tag("django.function_name", function_name)
@@ -137,7 +131,7 @@ def _wrap_middleware(middleware, middleware_name):
             self.get_response = get_response
             self._call_method = None
             if self.async_capable:
-                super(SentryWrappingMiddleware, self).__init__(get_response)
+                super().__init__(get_response)
 
         # We need correct behavior for `hasattr()`, which we can only determine
         # when we have an instance of the middleware we're wrapping.

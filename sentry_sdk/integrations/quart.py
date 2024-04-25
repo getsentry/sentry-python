@@ -1,21 +1,20 @@
-from __future__ import absolute_import
-
 import asyncio
 import inspect
 import threading
+from functools import wraps
 
-from sentry_sdk.hub import _should_send_default_pii, Hub
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
     event_from_exception,
 )
-
-from sentry_sdk._functools import wraps
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -89,11 +88,9 @@ def patch_asgi_app():
     # type: () -> None
     old_app = Quart.__call__
 
+    @ensure_integration_enabled(QuartIntegration, old_app)
     async def sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
-        if Hub.current.get_integration(QuartIntegration) is None:
-            return await old_app(self, scope, receive, send)
-
         middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
@@ -117,20 +114,16 @@ def patch_scaffold_route():
             ):
 
                 @wraps(old_func)
+                @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args, **kwargs):
                     # type: (*Any, **Any) -> Any
-                    hub = Hub.current
-                    integration = hub.get_integration(QuartIntegration)
-                    if integration is None:
-                        return old_func(*args, **kwargs)
+                    scope = Scope.get_isolation_scope()
+                    if scope.profile is not None:
+                        scope.profile.active_thread_id = (
+                            threading.current_thread().ident
+                        )
 
-                    with hub.configure_scope() as sentry_scope:
-                        if sentry_scope.profile is not None:
-                            sentry_scope.profile.active_thread_id = (
-                                threading.current_thread().ident
-                            )
-
-                        return old_func(*args, **kwargs)
+                    return old_func(*args, **kwargs)
 
                 return old_decorator(_sentry_func)
 
@@ -157,29 +150,25 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
+@ensure_integration_enabled_async(QuartIntegration)
 async def _request_websocket_started(app, **kwargs):
     # type: (Quart, **Any) -> None
-    hub = Hub.current
-    integration = hub.get_integration(QuartIntegration)
-    if integration is None:
-        return
+    integration = sentry_sdk.get_client().get_integration(QuartIntegration)
 
-    with hub.configure_scope() as scope:
-        if has_request_context():
-            request_websocket = request._get_current_object()
-        if has_websocket_context():
-            request_websocket = websocket._get_current_object()
+    if has_request_context():
+        request_websocket = request._get_current_object()
+    if has_websocket_context():
+        request_websocket = websocket._get_current_object()
 
-        # Set the transaction name here, but rely on ASGI middleware
-        # to actually start the transaction
-        _set_transaction_name_and_source(
-            scope, integration.transaction_style, request_websocket
-        )
+    # Set the transaction name here, but rely on ASGI middleware
+    # to actually start the transaction
+    _set_transaction_name_and_source(
+        Scope.get_current_scope(), integration.transaction_style, request_websocket
+    )
 
-        evt_processor = _make_request_event_processor(
-            app, request_websocket, integration
-        )
-        scope.add_event_processor(evt_processor)
+    scope = Scope.get_isolation_scope()
+    evt_processor = _make_request_event_processor(app, request_websocket, integration)
+    scope.add_event_processor(evt_processor)
 
 
 def _make_request_event_processor(app, request, integration):
@@ -202,7 +191,7 @@ def _make_request_event_processor(app, request, integration):
             request_info["method"] = request.method
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-            if _should_send_default_pii():
+            if should_send_default_pii():
                 request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
                 _add_user_to_event(event)
 
@@ -211,22 +200,16 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
+@ensure_integration_enabled_async(QuartIntegration)
 async def _capture_exception(sender, exception, **kwargs):
     # type: (Quart, Union[ValueError, BaseException], **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(QuartIntegration) is None:
-        return
-
-    # If an integration is there, a client has to be there.
-    client = hub.client  # type: Any
-
     event, hint = event_from_exception(
         exception,
-        client_options=client.options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": "quart", "handled": False},
     )
 
-    hub.capture_event(event, hint=hint)
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _add_user_to_event(event):

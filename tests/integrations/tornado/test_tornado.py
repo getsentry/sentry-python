@@ -2,8 +2,9 @@ import json
 
 import pytest
 
-from sentry_sdk import configure_scope, start_transaction, capture_message
+from sentry_sdk import start_transaction, capture_message
 from sentry_sdk.integrations.tornado import TornadoIntegration
+from sentry_sdk.scope import Scope
 
 from tornado.web import RequestHandler, Application, HTTPError
 from tornado.testing import AsyncHTTPTestCase
@@ -36,13 +37,11 @@ def tornado_testcase(request):
 
 class CrashingHandler(RequestHandler):
     def get(self):
-        with configure_scope() as scope:
-            scope.set_tag("foo", "42")
+        Scope.get_isolation_scope().set_tag("foo", "42")
         1 / 0
 
     def post(self):
-        with configure_scope() as scope:
-            scope.set_tag("foo", "43")
+        Scope.get_isolation_scope().set_tag("foo", "43")
         1 / 0
 
 
@@ -54,14 +53,12 @@ class CrashingWithMessageHandler(RequestHandler):
 
 class HelloHandler(RequestHandler):
     async def get(self):
-        with configure_scope() as scope:
-            scope.set_tag("foo", "42")
+        Scope.get_isolation_scope().set_tag("foo", "42")
 
         return b"hello"
 
     async def post(self):
-        with configure_scope() as scope:
-            scope.set_tag("foo", "43")
+        Scope.get_isolation_scope().set_tag("foo", "43")
 
         return b"hello"
 
@@ -104,8 +101,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     )
     assert event["transaction_info"] == {"source": "component"}
 
-    with configure_scope() as scope:
-        assert not scope._tags
+    assert not Scope.get_isolation_scope()._tags
 
 
 @pytest.mark.parametrize(
@@ -116,7 +112,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     ],
 )
 def test_transactions(tornado_testcase, sentry_init, capture_events, handler, code):
-    sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0, debug=True)
+    sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0)
     events = capture_events()
     client = tornado_testcase(Application([(r"/hi", handler)]))
 

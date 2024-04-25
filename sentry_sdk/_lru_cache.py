@@ -72,7 +72,7 @@ KEY = 2
 VALUE = 3
 
 
-class LRUCache(object):
+class LRUCache:
     def __init__(self, max_size):
         assert max_size > 0
 

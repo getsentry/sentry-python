@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.8","3.11","3.12"]
+        python-version: ["3.6","3.8","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -73,7 +73,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -86,7 +86,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase

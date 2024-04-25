@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 MAX_DOWNSAMPLE_FACTOR = 10
 
 
-class Monitor(object):
+class Monitor:
     """
     Performs health checks in a separate thread once every interval seconds
     and updates the internal state. Other parts of the SDK only read this state

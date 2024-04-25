@@ -53,7 +53,6 @@ jobs:
   test-aws_lambda-pinned:
     name: AWS Lambda (pinned)
     timeout-minutes: 30
-    needs: check-permissions
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -64,6 +63,7 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+    needs: check-permissions
     steps:
       - uses: actions/checkout@v4.1.1
         with:
@@ -73,7 +73,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase

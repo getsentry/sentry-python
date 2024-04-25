@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -93,7 +93,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.5","3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -106,7 +106,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -154,75 +154,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-web_frameworks_2-py27:
-    name: Web Frameworks 2 (py27)
-    timeout-minutes: 30
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4.1.1
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test aiohttp py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-aiohttp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test asgi py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-asgi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test bottle py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-bottle" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test falcon py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-falcon" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test pyramid py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-pyramid" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test quart py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-quart" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test sanic py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-sanic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test starlite py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-starlite" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test tornado py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-tornado" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Generate coverage XML
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-      - uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   check_required_tests:
     name: All Web Frameworks 2 tests passed
-    needs: [test-web_frameworks_2-pinned, test-web_frameworks_2-py27]
+    needs: test-web_frameworks_2-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test-web_frameworks_2-pinned.result, 'failure') || contains(needs.test-web_frameworks_2-pinned.result, 'skipped')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-      - name: Check for 2.7 failures
-        if: contains(needs.test-web_frameworks_2-py27.result, 'failure') || contains(needs.test-web_frameworks_2-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -86,7 +86,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -114,55 +114,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-networking-py27:
-    name: Networking (py27)
-    timeout-minutes: 30
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4.1.1
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test gevent py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-gevent" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test grpc py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-grpc" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test httpx py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-httpx" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test requests py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-requests" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Generate coverage XML
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-      - uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   check_required_tests:
     name: All Networking tests passed
-    needs: [test-networking-pinned, test-networking-py27]
+    needs: test-networking-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test-networking-pinned.result, 'failure') || contains(needs.test-networking-pinned.result, 'skipped')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-      - name: Check for 2.7 failures
-        if: contains(needs.test-networking-py27.result, 'failure') || contains(needs.test-networking-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

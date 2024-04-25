@@ -1,14 +1,11 @@
-import pytest
 import uuid
+from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk import Hub, configure_scope, set_level
 from sentry_sdk.crons import capture_checkin
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")
@@ -29,6 +26,34 @@ def _hello_world_contextmanager(name):
 
 def _break_world_contextmanager(name):
     with sentry_sdk.monitor(monitor_slug="def456"):
+        1 / 0
+        return "Hello, {}".format(name)
+
+
+@sentry_sdk.monitor(monitor_slug="abc123")
+async def _hello_world_async(name):
+    return "Hello, {}".format(name)
+
+
+@sentry_sdk.monitor(monitor_slug="def456")
+async def _break_world_async(name):
+    1 / 0
+    return "Hello, {}".format(name)
+
+
+async def my_coroutine():
+    return
+
+
+async def _hello_world_contextmanager_async(name):
+    with sentry_sdk.monitor(monitor_slug="abc123"):
+        await my_coroutine()
+        return "Hello, {}".format(name)
+
+
+async def _break_world_contextmanager_async(name):
+    with sentry_sdk.monitor(monitor_slug="def456"):
+        await my_coroutine()
         1 / 0
         return "Hello, {}".format(name)
 
@@ -341,3 +366,111 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         assert len(invalid_keys) == 0, "Unexpected keys found in checkin: {}".format(
             invalid_keys
         )
+
+
+@pytest.mark.asyncio
+async def test_decorator_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        result = await _hello_world_async("Grace")
+        assert result == "Hello, Grace"
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checkin.call_args[1]["status"] == "ok"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.asyncio
+async def test_decorator_error_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        with pytest.raises(ZeroDivisionError):
+            result = await _break_world_async("Grace")
+
+        assert "result" not in locals()
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checkin.call_args[1]["status"] == "error"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.asyncio
+async def test_contextmanager_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        result = await _hello_world_contextmanager_async("Grace")
+        assert result == "Hello, Grace"
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checkin.call_args[1]["status"] == "ok"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.asyncio
+async def test_contextmanager_error_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        with pytest.raises(ZeroDivisionError):
+            result = await _break_world_contextmanager_async("Grace")
+
+        assert "result" not in locals()
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checkin.call_args[1]["status"] == "error"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]

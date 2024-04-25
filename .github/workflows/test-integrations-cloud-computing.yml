@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -86,7 +86,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -114,55 +114,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-cloud_computing-py27:
-    name: Cloud Computing (py27)
-    timeout-minutes: 30
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    steps:
-      - uses: actions/checkout@v4.1.1
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test boto3 py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-boto3" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test chalice py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-chalice" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test cloud_resource_context py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-cloud_resource_context" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test gcp py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-gcp" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Generate coverage XML
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-      - uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   check_required_tests:
     name: All Cloud Computing tests passed
-    needs: [test-cloud_computing-pinned, test-cloud_computing-py27]
+    needs: test-cloud_computing-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test-cloud_computing-pinned.result, 'failure') || contains(needs.test-cloud_computing-pinned.result, 'skipped')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-      - name: Check for 2.7 failures
-        if: contains(needs.test-cloud_computing-py27.result, 'failure') || contains(needs.test-cloud_computing-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

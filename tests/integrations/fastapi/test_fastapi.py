@@ -1,21 +1,17 @@
 import json
 import logging
 import threading
+from unittest import mock
 
 import pytest
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
 def fastapi_app_factory():
@@ -63,7 +59,6 @@ async def test_response(sentry_init, capture_events):
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -200,7 +195,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = FastAPI()
@@ -358,7 +352,6 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -388,7 +381,6 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
             FastApiIntegration(),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -442,7 +434,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -486,7 +477,6 @@ def test_transaction_name_in_middleware(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
