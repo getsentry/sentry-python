@@ -1,38 +1,29 @@
 from functools import wraps
 
+import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
-import sentry_sdk
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
-    package_version,
-    event_from_exception,
     capture_internal_exceptions,
+    ensure_integration_enabled,
+    event_from_exception,
+    package_version,
 )
-from sentry_sdk.hub import Hub, _should_send_default_pii
-from typing import TYPE_CHECKING
 
 from anthropic.resources import Messages
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Iterator
     from anthropic.types import MessageStreamEvent
     from sentry_sdk.tracing import Span
 
+
 COMPLETION_TOKENS_USED = "ai.completion_tоkens.used"
 PROMPT_TOKENS_USED = "ai.prompt_tоkens.used"
 TOTAL_TOKENS_USED = "ai.total_tоkens.used"
-
-
-def _capture_exception(hub, exc):
-    # type: (Hub, Any) -> None
-
-    if hub.client is not None:
-        event, hint = event_from_exception(
-            exc,
-            client_options=hub.client.options,
-            mechanism={"type": "anthropic", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
 
 
 class AnthropicIntegration(Integration):
@@ -54,6 +45,16 @@ class AnthropicIntegration(Integration):
             raise DidNotEnable("anthropic 0.16 or newer required.")
 
         Messages.create = _wrap_message_create(Messages.create)
+
+
+def _capture_exception(exc):
+    # type: (Any) -> None
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "anthropic", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _calculate_token_usage(result, span):
@@ -80,18 +81,9 @@ def _calculate_token_usage(result, span):
 def _wrap_message_create(f):
     # type: (Any) -> Any
     @wraps(f)
+    @ensure_integration_enabled(AnthropicIntegration, f)
     def _sentry_patched_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        hub = Hub.current
-        if not hub:
-            return f(*args, **kwargs)
-
-        integration = hub.get_integration(
-            AnthropicIntegration
-        )  # type: AnthropicIntegration
-        if not integration:
-            return f(*args, **kwargs)
-
         if "messages" not in kwargs:
             return f(*args, **kwargs)
 
@@ -110,17 +102,19 @@ def _wrap_message_create(f):
         try:
             result = f(*args, **kwargs)
         except Exception as exc:
-            _capture_exception(hub, exc)
+            _capture_exception(exc)
             span.finish()
             raise exc from None
+
+        integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
         with capture_internal_exceptions():
             span.set_data("ai.model_id", model)
             span.set_data("ai.streaming", False)
-            if _should_send_default_pii() and integration.include_prompts:
+            if should_send_default_pii() and integration.include_prompts:
                 span.set_data("ai.input_messages", messages)
             if hasattr(result, "content"):
-                if _should_send_default_pii() and integration.include_prompts:
+                if should_send_default_pii() and integration.include_prompts:
                     span.set_data(
                         "ai.responses",
                         list(
@@ -162,7 +156,7 @@ def _wrap_message_create(f):
                                     continue
                             yield event
 
-                        if _should_send_default_pii() and integration.include_prompts:
+                        if should_send_default_pii() and integration.include_prompts:
                             complete_message = "".join(content_blocks)
                             span.set_data(
                                 "ai.responses",
