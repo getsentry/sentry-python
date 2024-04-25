@@ -77,8 +77,10 @@ def _calculate_token_usage(result, span):
 
 
 def _wrap_message_create(f):
+    # type: (Any) -> Any
     @wraps(f)
     def _sentry_patched_create(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
         hub = Hub.current
         if not hub:
             return f(*args, **kwargs)
