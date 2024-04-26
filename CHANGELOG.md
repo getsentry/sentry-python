@@ -4,17 +4,17 @@
 
 ### Various fixes & improvements
 
-- fix(integrations): Do not use convenience decorator (#3022) by @sentrivana
-- Add Lambda function that deletes test Lambda functions (#2960) by @antonpirker
+- Fix: Do not use convenience decorator (#3022) by @sentrivana
 - Refactoring propagation context (#2970) by @antonpirker
 - Use `pid` for test database name in Django tests (#2998) by @antonpirker
-- test(tracing): Add tests for discarded transaction debug messages (#3002) by @szokeasaurusrex
-- fix(tracing): Correct discarded transaction debug message (#3002) by @szokeasaurusrex
-- docs(tracing): Delete inaccurate comment (#3002) by @szokeasaurusrex
-- build(deps): bump checkouts/data-schemas from `1e17eb5` to `4aa14a7` (#2997) by @dependabot
-- ref(metrics): Fix comment typo (#2992) by @szokeasaurusrex
+- Remove outdated RC mention in docs (#3018) by @sentrivana
+- Delete inaccurate comment from docs (#3002) by @szokeasaurusrex
+- Add Lambda function that deletes test Lambda functions (#2960) by @antonpirker
+- Correct discarded transaction debug message (#3002) by @szokeasaurusrex
+- Add tests for discarded transaction debug messages (#3002) by @szokeasaurusrex
+- Fix comment typo in metrics (#2992) by @szokeasaurusrex
 - build(deps): bump actions/checkout from 4.1.1 to 4.1.4 (#3011) by @dependabot
-- docs: Remove outdated RC mention (#3018) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `1e17eb5` to `4aa14a7` (#2997) by @dependabot
 
 ## 2.0.0
 
