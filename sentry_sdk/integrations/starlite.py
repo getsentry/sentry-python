@@ -8,7 +8,6 @@ from sentry_sdk.scope import Scope as SentryScope, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     transaction_from_function,
 )
@@ -179,10 +178,11 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 def patch_http_route_handle() -> None:
     old_handle = HTTPRoute.handle
 
-    @ensure_integration_enabled_async(StarliteIntegration, old_handle)
     async def handle_wrapper(
         self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send"
     ) -> None:
+        if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+            return await old_handle(self, scope, receive, send)
 
         sentry_scope = SentryScope.get_isolation_scope()
         request: "Request[Any, Any]" = scope["app"].request_class(
