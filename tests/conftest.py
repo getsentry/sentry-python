@@ -643,7 +643,7 @@ if uvicorn is not None:
         app = request.param()
 
         config = uvicorn.Config(
-            app, host="127.0.0.1", port=5000, log_level="info", loop=None
+            app, host="127.0.0.1", port=5000, log_level="info", loop="none"
         )
         server = UvicornServer(config=config)
 
