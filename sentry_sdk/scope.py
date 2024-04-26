@@ -10,7 +10,7 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.continuous_profiler import start_profiler
+from sentry_sdk.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
@@ -986,10 +986,7 @@ class Scope(object):
 
             transaction._profile = profile
 
-        # TODO: This should not start again if the user stops it.
-        # try to ensure that the profiler is always running
-        # when there is a transaction
-        start_profiler()
+        try_autostart_continuous_profiler()
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction

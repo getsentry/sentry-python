@@ -103,6 +103,26 @@ def setup_continuous_profiler(options, capture_func):
     return True
 
 
+def try_autostart_continuous_profiler():
+    # type: () -> None
+    if _scheduler is None:
+        return
+
+    # Ensure that the scheduler only autostarts once per process.
+    # This is necessary because many web servers use forks to spawn
+    # additional processes. And the profiler is only spawned on the
+    # master process, then it often only profiles the main process
+    # and not the ones where the requests are being handled.
+    #
+    # Additionally, we only want this autostart behaviour once per
+    # process. If the user explicitly calls `stop_profiler`, it should
+    # be respected and not start the profiler again.
+    if not _scheduler.should_autostart():
+        return
+
+    _scheduler.ensure_running()
+
+
 def start_profiler():
     # type: () -> None
     if _scheduler is None:
@@ -152,6 +172,10 @@ class ContinuousScheduler(object):
         self.capture_func = capture_func
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
+
+    def should_autostart(self):
+        # type: () -> bool
+        raise NotImplementedError
 
     def ensure_running(self):
         # type: () -> None
@@ -221,14 +245,16 @@ class ThreadContinuousScheduler(ContinuousScheduler):
 
     def __init__(self, frequency, options, capture_func):
         # type: (int, Dict[str, Any], Callable[[Envelope], None]) -> None
-        super(ThreadContinuousScheduler, self).__init__(
-            frequency, options, capture_func
-        )
+        super().__init__(frequency, options, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
         self.running = False
         self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
+
+    def should_autostart(self):
+        # type: () -> bool
+        return self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
@@ -318,14 +344,16 @@ class GeventContinuousScheduler(ContinuousScheduler):
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
 
-        super(GeventContinuousScheduler, self).__init__(
-            frequency, options, capture_func
-        )
+        super().__init__(frequency, options, capture_func)
 
         self.thread = None  # type: Optional[ThreadPool]
         self.running = False
         self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
+
+    def should_autostart(self):
+        # type: () -> bool
+        return self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
