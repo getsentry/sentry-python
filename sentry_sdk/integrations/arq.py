@@ -10,7 +10,6 @@ from sentry_sdk.tracing import Transaction, TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     SENSITIVE_DATA_SUBSTITUTE,
     parse_version,
@@ -71,9 +70,12 @@ def patch_enqueue_job():
     # type: () -> None
     old_enqueue_job = ArqRedis.enqueue_job
 
-    @ensure_integration_enabled_async(ArqIntegration, old_enqueue_job)
     async def _sentry_enqueue_job(self, function, *args, **kwargs):
         # type: (ArqRedis, str, *Any, **Any) -> Optional[Job]
+        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
+        if integration is None:
+            return await old_enqueue_job(self, function, *args, **kwargs)
+
         with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_ARQ, description=function):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
@@ -84,9 +86,12 @@ def patch_run_job():
     # type: () -> None
     old_run_job = Worker.run_job
 
-    @ensure_integration_enabled_async(ArqIntegration, old_run_job)
     async def _sentry_run_job(self, job_id, score):
         # type: (Worker, str, int) -> None
+        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
+        if integration is None:
+            return await old_run_job(self, job_id, score)
+
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
@@ -157,9 +162,12 @@ def _make_event_processor(ctx, *args, **kwargs):
 def _wrap_coroutine(name, coroutine):
     # type: (str, WorkerCoroutine) -> WorkerCoroutine
 
-    @ensure_integration_enabled_async(ArqIntegration, coroutine)
     async def _sentry_coroutine(ctx, *args, **kwargs):
         # type: (Dict[Any, Any], *Any, **Any) -> Any
+        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
+        if integration is None:
+            return await coroutine(ctx, *args, **kwargs)
+
         Scope.get_isolation_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
         )
