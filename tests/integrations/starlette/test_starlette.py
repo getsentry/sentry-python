@@ -1085,6 +1085,7 @@ def test_transaction_name_in_middleware(
     )
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize("uvicorn_server", [starlette_app_factory], indirect=True)
 def test_with_uvicorn(sentry_init, capture_envelopes, uvicorn_server):
     # Sanity check that the app works with uvicorn which does its own ASGI 2/3
