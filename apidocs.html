@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>API Docs - sentry-python 2.0.0 documentation</title>
+      <title>API Docs - sentry-python 2.0.1 documentation</title>
     <link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" />
 
   <script>
@@ -905,10 +905,9 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.generate_propagation_context">
 <span class="sig-name descname"><span class="pre">generate_propagation_context</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">incoming_data</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.generate_propagation_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.generate_propagation_context" title="Link to this definition">¶</a></dt>
-<dd><p>Makes sure the propagation context (<cite>_propagation_context</cite>) is set.
-The propagation context only lives on the current scope.
-If there is <cite>incoming_data</cite> overwrite existing <cite>_propagation_context</cite>.
-if there is no <cite>incoming_data</cite> create new <cite>_propagation_context</cite>, but do NOT overwrite if already existing.</p>
+<dd><p>Makes sure the propagation context is set on the scope.
+If there is <cite>incoming_data</cite> overwrite existing propagation context.
+If there is no <cite>incoming_data</cite> create new propagation context, but do NOT overwrite if already existing.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
@@ -2074,7 +2073,7 @@ each envelope may have at most one Item with type “event” or “transaction�
     </div>
   </div>
 </footer></div>
-      <script src="_static/documentation_options.js?v=51b770b3"></script>
+      <script src="_static/documentation_options.js?v=f5cff4aa"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=9aab5f5b"></script>
