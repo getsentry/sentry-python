@@ -642,7 +642,9 @@ if uvicorn is not None:
     def uvicorn_server(request):
         app = request.param()
 
-        config = uvicorn.Config(app, host="127.0.0.1", port=5000, log_level="info")
+        config = uvicorn.Config(
+            app, host="127.0.0.1", port=5000, log_level="info", loop=None
+        )
         server = UvicornServer(config=config)
 
         with server.run_in_thread():
