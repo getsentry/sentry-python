@@ -623,28 +623,29 @@ class ApproxDict(dict):
         return not self.__eq__(other)
 
 
-class UvicornServer(uvicorn.Server):
-    @contextlib.contextmanager
-    def run_in_thread(self):
-        thread = Thread(target=self.run)
-        thread.start()
-        try:
-            while not self.started:
-                time.sleep(1e-3)
+if uvicorn is not None:
+
+    class UvicornServer(uvicorn.Server):
+        @contextlib.contextmanager
+        def run_in_thread(self):
+            thread = Thread(target=self.run)
+            thread.start()
+            try:
+                while not self.started:
+                    time.sleep(1e-3)
+                yield
+            finally:
+                self.should_exit = True
+                thread.join()
+
+    @pytest.fixture(scope="session")
+    def uvicorn_server(request):
+        app = request.param()
+
+        config = uvicorn.Config(
+            app, host="127.0.0.1", port=5000, log_level="info", loop="asyncio"
+        )
+        server = UvicornServer(config=config)
+
+        with server.run_in_thread():
             yield
-        finally:
-            self.should_exit = True
-            thread.join()
-
-
-@pytest.fixture(scope="session")
-def uvicorn_server(request):
-    app = request.param()
-
-    config = uvicorn.Config(
-        app, host="127.0.0.1", port=5000, log_level="info", loop="asyncio"
-    )
-    server = UvicornServer(config=config)
-
-    with server.run_in_thread():
-        yield
