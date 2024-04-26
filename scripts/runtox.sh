@@ -40,4 +40,4 @@ if [ -z "${ENV}" ]; then
     exit 0
 fi
 
-exec $TOXPATH -po -e "$ENV" -- "${@:2}"
+exec $TOXPATH -p all -o -e "$ENV" -- "${@:2}"
