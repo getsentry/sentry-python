@@ -103,14 +103,27 @@ def setup_continuous_profiler(options, capture_func):
     return True
 
 
+def start_profiler():
+    # type: () -> None
+    if _scheduler is None:
+        return
+
+    _scheduler.ensure_running()
+
+
+def stop_profiler():
+    # type: () -> None
+    if _scheduler is None:
+        return
+
+    _scheduler.teardown()
+
+
 def teardown_continuous_profiler():
     # type: () -> None
+    stop_profiler()
 
     global _scheduler
-
-    if _scheduler is not None:
-        _scheduler.teardown()
-
     _scheduler = None
 
 
@@ -119,14 +132,6 @@ def get_profiler_id():
     if _scheduler is None:
         return None
     return _scheduler.profiler_id
-
-
-def try_ensure_continuous_profiler_running():
-    # type: () -> None
-    if _scheduler is None:
-        return
-
-    _scheduler.ensure_running()
 
 
 def has_continous_profiling_enabled(options):
@@ -153,6 +158,10 @@ class ContinuousScheduler(object):
         raise NotImplementedError
 
     def teardown(self):
+        # type: () -> None
+        raise NotImplementedError
+
+    def pause(self):
         # type: () -> None
         raise NotImplementedError
 
@@ -281,8 +290,10 @@ class ThreadContinuousScheduler(ContinuousScheduler):
         # type: () -> None
         if self.running:
             self.running = False
-            if self.thread is not None:
-                self.thread.join()
+
+        if self.thread is not None:
+            self.thread.join()
+            self.thread = None
 
 
 class GeventContinuousScheduler(ContinuousScheduler):
@@ -373,8 +384,10 @@ class GeventContinuousScheduler(ContinuousScheduler):
         # type: () -> None
         if self.running:
             self.running = False
-            if self.thread is not None:
-                self.thread.join()
+
+        if self.thread is not None:
+            self.thread.join()
+            self.thread = None
 
 
 PROFILE_BUFFER_SECONDS = 10
