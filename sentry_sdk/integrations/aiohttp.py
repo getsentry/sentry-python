@@ -21,7 +21,6 @@ from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     logger,
     parse_url,
@@ -98,9 +97,11 @@ class AioHttpIntegration(Integration):
 
         old_handle = Application._handle
 
-        @ensure_integration_enabled_async(AioHttpIntegration, old_handle)
         async def sentry_app_handle(self, request, *args, **kwargs):
             # type: (Any, Request, *Any, **Any) -> Any
+            if sentry_sdk.get_client().get_integration(AioHttpIntegration) is None:
+                return await old_handle(self, request, *args, **kwargs)
+
             weak_request = weakref.ref(request)
 
             with sentry_sdk.isolation_scope() as scope:
@@ -190,9 +191,11 @@ class AioHttpIntegration(Integration):
 def create_trace_config():
     # type: () -> TraceConfig
 
-    @ensure_integration_enabled_async(AioHttpIntegration)
     async def on_request_start(session, trace_config_ctx, params):
         # type: (ClientSession, SimpleNamespace, TraceRequestStartParams) -> None
+        if sentry_sdk.get_client().get_integration(AioHttpIntegration) is None:
+            return
+
         method = params.method.upper()
 
         parsed_url = None

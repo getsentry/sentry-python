@@ -9,7 +9,6 @@ from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     logger,
     package_version,
@@ -266,10 +265,12 @@ def _patch_execute():
     old_execute_async = strawberry_schema.execute
     old_execute_sync = strawberry_schema.execute_sync
 
-    @ensure_integration_enabled_async(StrawberryIntegration, old_execute_async)
     async def _sentry_patched_execute_async(*args, **kwargs):
         # type: (Any, Any) -> ExecutionResult
         result = await old_execute_async(*args, **kwargs)
+
+        if sentry_sdk.get_client().get_integration(StrawberryIntegration) is None:
+            return result
 
         if "execution_context" in kwargs and result.errors:
             scope = Scope.get_isolation_scope()

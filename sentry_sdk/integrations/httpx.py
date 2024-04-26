@@ -8,7 +8,6 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     logger,
     parse_url,
 )
@@ -98,9 +97,11 @@ def _install_httpx_async_client():
     # type: () -> None
     real_send = AsyncClient.send
 
-    @ensure_integration_enabled_async(HttpxIntegration, real_send)
     async def send(self, request, **kwargs):
         # type: (AsyncClient, Request, **Any) -> Response
+        if sentry_sdk.get_client().get_integration(HttpxIntegration) is None:
+            return await real_send(self, request, **kwargs)
+
         parsed_url = None
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
