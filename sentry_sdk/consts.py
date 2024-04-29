@@ -364,4 +364,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.0.0rc6"
+VERSION = "2.0.1"
