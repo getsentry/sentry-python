@@ -101,7 +101,6 @@ def _patch_cache_method(cache, method_name, address, port):
 def _patch_cache(cache, address=None, port=None):
     # type: (CacheHandler, Optional[str], Optional[str]) -> None
     if not hasattr(cache, "_sentry_patched"):
-        # TODO: Here we can also patch the set methods (see TODO above)
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name, address, port)
         cache._sentry_patched = True
