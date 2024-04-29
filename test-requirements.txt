@@ -1,5 +1,5 @@
 pip
-pytest
+pytest<8.2
 pytest-cov
 pytest-forked
 pytest-localserver
