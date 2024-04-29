@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox==4.14.2
+          pip install coverage 'tox<4.15.0'
       - name: Erase coverage
         run: |
           coverage erase
@@ -106,7 +106,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox==4.14.2
+          pip install coverage 'tox<4.15.0'
       - name: Erase coverage
         run: |
           coverage erase
