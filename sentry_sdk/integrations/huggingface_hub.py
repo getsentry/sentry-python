@@ -121,7 +121,7 @@ def _wrap_text_generation(f):
 
             if kwargs.get("details", False):
                 # res is Iterable[TextGenerationStreamOutput]
-                def new_iterator():
+                def new_details_iterator():
                     # type: () -> Iterable[ChatCompletionStreamOutput]
                     with capture_internal_exceptions():
                         tokens_used = 0
@@ -146,11 +146,12 @@ def _wrap_text_generation(f):
                             record_token_usage(span, total_tokens=tokens_used)
                     span.__exit__(None, None, None)
 
-                return new_iterator()
+                return new_details_iterator()
             else:
                 # res is Iterable[str]
 
                 def new_iterator():
+                    # type: () -> Iterable[str]
                     data_buf: list[str] = []
                     with capture_internal_exceptions():
                         for s in res:
