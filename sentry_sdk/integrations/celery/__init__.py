@@ -11,11 +11,12 @@ from sentry_sdk.integrations.celery.beat import (
     _patch_redbeat_maybe_due,
     _setup_celery_beat_signals,
 )
-from sentry_sdk.integrations.celery.utils import NoOpMgr, _now_seconds_since_epoch
+from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, TRANSACTION_SOURCE_TASK
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.scope import Scope
+from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import TypeVar
-    from typing import Union
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
     from sentry_sdk.tracing import Span
@@ -155,104 +155,99 @@ def _make_event_processor(task, uuid, args, kwargs, request=None):
     return event_processor
 
 
-def _wrap_apply_async(f):
-    # type: (F) -> F
+def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
+    # type: (dict[str, Any], Optional[Span], bool) -> dict[str, Any]
     """
-    Apply_async is always called to put a task in the queue. This is called by the
-    celery client (for example the Django project or the Celery Beat process)
+    Updates the headers of the Celery task with the tracing information
+    and eventually Sentry Crons monitoring information for beat tasks.
     """
+    updated_headers = original_headers.copy()
+    with capture_internal_exceptions():
+        headers = {}
+        if span is not None:
+            headers = dict(
+                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
+            )
 
-    @wraps(f)
-    @ensure_integration_enabled(CeleryIntegration, f)
-    def apply_async(*args, **kwargs):
-        # type: (*Any, **Any) -> Any
-        task = args[0]
+        if monitor_beat_tasks:
+            headers.update(
+                {
+                    "sentry-monitor-start-timestamp-s": "%.9f"
+                    % _now_seconds_since_epoch(),
+                }
+            )
 
-        # Do not create a span when the task is a Celery Beat task
-        # (Because we do not have a transaction in that case)
-        span_mgr = (
-            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
-            if not Scope.get_isolation_scope()._name == "celery-beat"
-            else NoOpMgr()
-        )  # type: Union[Span, NoOpMgr]
+        if headers:
+            existing_baggage = updated_headers.get(BAGGAGE_HEADER_NAME)
+            sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
 
-        with span_mgr as span:
-            incoming_headers = kwargs.get("headers") or {}
-            integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-
-            # If Sentry Crons monitoring for Celery Beat tasks is enabled
-            # add start timestamp of task,
-            if integration is not None and integration.monitor_beat_tasks:
-                incoming_headers.update(
-                    {
-                        "sentry-monitor-start-timestamp-s": "%.9f"
-                        % _now_seconds_since_epoch(),
-                    }
+            combined_baggage = sentry_baggage or existing_baggage
+            if sentry_baggage and existing_baggage:
+                # Merge incoming and sentry baggage, where the sentry trace information
+                # in the incoming baggage takes precedence and the third-party items
+                # are concatenated.
+                incoming = Baggage.from_incoming_header(existing_baggage)
+                combined = Baggage.from_incoming_header(sentry_baggage)
+                combined.sentry_items.update(incoming.sentry_items)
+                combined.third_party_items = ",".join(
+                    [
+                        x
+                        for x in [
+                            combined.third_party_items,
+                            incoming.third_party_items,
+                        ]
+                        if x is not None and x != ""
+                    ]
                 )
+                combined_baggage = combined.serialize(include_third_party=True)
 
-            # Propagate Sentry trace information into the Celery task if desired
-            default_propagate_traces = (
-                integration.propagate_traces if integration is not None else True
-            )
-            propagate_traces = incoming_headers.pop(
-                "sentry-propagate-traces", default_propagate_traces
-            )
+            updated_headers.update(headers)
+            if combined_baggage:
+                updated_headers[BAGGAGE_HEADER_NAME] = combined_baggage
 
-            if propagate_traces:
-                with capture_internal_exceptions():
-                    sentry_trace_headers = dict(
-                        Scope.get_current_scope().iter_trace_propagation_headers(
-                            span=span
-                        )
-                    )
-                    # Set Sentry trace data in the headers of the Celery task
-                    if sentry_trace_headers:
-                        # Make sure we don't overwrite existing baggage
-                        incoming_baggage = incoming_headers.get(BAGGAGE_HEADER_NAME)
-                        sentry_baggage = sentry_trace_headers.get(BAGGAGE_HEADER_NAME)
-
-                        combined_baggage = sentry_baggage or incoming_baggage
-                        if sentry_baggage and incoming_baggage:
-                            combined_baggage = "{},{}".format(
-                                incoming_baggage,
-                                sentry_baggage,
-                            )
-
-                        # Set Sentry trace data to the headers of the Celery task
-                        incoming_headers.update(sentry_trace_headers)
-
-                        if combined_baggage:
-                            incoming_headers[BAGGAGE_HEADER_NAME] = combined_baggage
-
-                        # Set sentry trace data also to the inner headers of the Celery task
-                        # https://github.com/celery/celery/issues/4875
-                        #
-                        # Need to setdefault the inner headers too since other
-                        # tracing tools (dd-trace-py) also employ this exact
-                        # workaround and we don't want to break them.
-                        incoming_headers.setdefault("headers", {}).update(
-                            sentry_trace_headers
-                        )
-                        if combined_baggage:
-                            incoming_headers["headers"][
-                                BAGGAGE_HEADER_NAME
-                            ] = combined_baggage
-
-            # Add the Sentry options potentially added in `sentry_sdk.integrations.beat.sentry_apply_entry`
-            # to the inner headers (done when auto-instrumenting Celery Beat tasks)
             # https://github.com/celery/celery/issues/4875
             #
             # Need to setdefault the inner headers too since other
             # tracing tools (dd-trace-py) also employ this exact
             # workaround and we don't want to break them.
-            incoming_headers.setdefault("headers", {})
-            for key, value in incoming_headers.items():
+            updated_headers.setdefault("headers", {}).update(headers)
+            if combined_baggage:
+                updated_headers["headers"][BAGGAGE_HEADER_NAME] = combined_baggage
+
+            # Add the Sentry options potentially added in `sentry_apply_entry`
+            # to the headers (done when auto-instrumenting Celery Beat tasks)
+            for key, value in updated_headers.items():
                 if key.startswith("sentry-"):
-                    incoming_headers["headers"][key] = value
+                    updated_headers["headers"][key] = value
 
-            # Run the task (with updated headers in kwargs)
-            kwargs["headers"] = incoming_headers
+    return updated_headers
 
+
+def _wrap_apply_async(f):
+    # type: (F) -> F
+    @wraps(f)
+    @ensure_integration_enabled(CeleryIntegration, f)
+    def apply_async(*args, **kwargs):
+        # type: (*Any, **Any) -> Any
+        # Note: kwargs can contain headers=None, so no setdefault!
+        # Unsure which backend though.
+        kwarg_headers = kwargs.get("headers") or {}
+        integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
+        propagate_traces = kwarg_headers.pop(
+            "sentry-propagate-traces", integration.propagate_traces
+        )
+
+        if not propagate_traces:
+            return f(*args, **kwargs)
+
+        task = args[0]
+
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_SUBMIT_CELERY, description=task.name
+        ) as span:
+            kwargs["headers"] = _update_celery_task_headers(
+                kwarg_headers, span, integration.monitor_beat_tasks
+            )
             return f(*args, **kwargs)
 
     return apply_async  # type: ignore

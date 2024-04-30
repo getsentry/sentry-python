@@ -362,3 +362,42 @@ def test_start_transaction_updates_scope_name_source(sentry_init):
     with start_transaction(name="foobar", source="route"):
         assert scope._transaction == "foobar"
         assert scope._transaction_info == {"source": "route"}
+
+
+@pytest.mark.parametrize("sampled", (True, None))
+def test_transaction_dropped_debug_not_started(sentry_init, sampled):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction(sampled=sampled)
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with tx:
+            pass
+
+    mock_logger.debug.assert_any_call(
+        "Discarding transaction because it was not started with sentry_sdk.start_transaction"
+    )
+
+    with pytest.raises(AssertionError):
+        # We should NOT see the "sampled = False" message here
+        mock_logger.debug.assert_any_call(
+            "Discarding transaction because sampled = False"
+        )
+
+
+def test_transaction_dropeed_sampled_false(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction(sampled=False)
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with sentry_sdk.start_transaction(tx):
+            pass
+
+    mock_logger.debug.assert_any_call("Discarding transaction because sampled = False")
+
+    with pytest.raises(AssertionError):
+        # We should not see the "not started" message here
+        mock_logger.debug.assert_any_call(
+            "Discarding transaction because it was not started with sentry_sdk.start_transaction"
+        )

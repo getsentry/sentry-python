@@ -1,11 +1,11 @@
 # Sentry SDK 2.0 Migration Guide
 
-Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed.
+Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of what's changed. Looking for a more digestable summary? See the [guide in the docs](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common migration patterns.
 
 ## New Features
 
 - Additional integrations will now be activated automatically if the SDK detects the respective package is installed: Ariadne, ARQ, asyncpg, Chalice, clickhouse-driver, GQL, Graphene, huey, Loguru, PyMongo, Quart, Starlite, Strawberry.
-- Added new API for custom instrumentation: `new_scope`, `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
+- While refactoring the [inner workings](https://docs.sentry.io/platforms/python/enriching-events/scopes/) of the SDK we added new top-level APIs for custom instrumentation called `new_scope` and `isolation_scope`. See the [Deprecated](#deprecated) section to see how they map to the existing APIs.
 
 ## Changed
 
@@ -14,6 +14,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - The `BackgroundWorker` thread used to process events was renamed from `raven-sentry.BackgroundWorker` to `sentry-sdk.BackgroundWorker`.
 - The `reraise` function was moved from `sentry_sdk._compat` to `sentry_sdk.utils`.
 - The `_ScopeManager` was moved from `sentry_sdk.hub` to `sentry_sdk.scope`.
+- The signature for the metrics callback function set with `before_emit_metric` has changed from `before_emit_metric(key, tags)` to `before_emit_metric(key, value, unit, tags)`
 - Moved the contents of `tracing_utils_py3.py` to `tracing_utils.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 - The actual implementation of `get_current_span` was moved to `sentry_sdk.tracing_utils`. `sentry_sdk.get_current_span` is still accessible as part of the top-level API.
 - `sentry_sdk.tracing_utils.add_query_source()`: Removed the `hub` parameter. It is not necessary anymore.
@@ -22,7 +23,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - `sentry_sdk.tracing_utils.should_propagate_trace()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils.is_sentry_url()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.
-- If you create a transaction manually and later mutate the transaction in a `configure_scope` block this does not work anymore. Here is a recipe on how to change your code to make it work:
+- You no longer have to use `configure_scope` to mutate a transaction. Instead, you simply get the current scope to mutate the transaction. Here is a recipe on how to change your code to make it work:
     Your existing implementation:
     ```python
     transaction = sentry_sdk.transaction(...)
@@ -76,6 +77,8 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - `sentry_sdk.utils.Auth.get_api_url`'s now accepts a `sentry_sdk.consts.EndpointType` enum instead of a string as its only parameter. We recommend omitting this argument when calling the function, since the parameter's default value is the only possible `sentry_sdk.consts.EndpointType` value. The parameter exists for future compatibility.
 - Removed `tracing_utils_py2.py`. The `start_child_span_decorator` is now in `sentry_sdk.tracing_utils`.
 - Removed the `sentry_sdk.profiler.Scheduler.stop_profiling` method. Any calls to this method can simply be removed, since this was a no-op method.
+- Removed the experimental `metrics_summary_sample_rate` config option.
+- Removed the experimental `should_summarize_metric` config option.
 
 ## Deprecated
 
@@ -115,7 +118,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
       # do something with the forked scope
   ```
 
-- `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
+- `configure_scope` is deprecated. Modify the current or isolation scope directly instead.
 
   Before:
 
@@ -129,11 +132,22 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   ```python
   from sentry_sdk.scope import Scope
 
+  scope = Scope.get_current_scope()
+  # do something with `scope`
+  ```
+
+  Or:
+
+  ```python
+  from sentry_sdk.scope import Scope
+
   scope = Scope.get_isolation_scope()
   # do something with `scope`
   ```
 
-- `push_scope` is deprecated. Use the new `new_scope` context manager to fork the necessary scopes.
+  When to use `get_current_scope()` and `get_isolation_scope()` depends on how long the change to the scope should be in effect. If you want the changed scope to affect the whole request-response cycle or the whole execution of task, use the isolation scope. If it's more localized, use the current scope.
+
+- `push_scope` is deprecated. Fork the current or the isolation scope instead.
 
   Before:
 
@@ -150,6 +164,17 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   with sentry_sdk.new_scope() as scope:
       # do something with `scope`
   ```
+
+  Or:
+
+  ```python
+  import sentry_sdk
+
+  with sentry_sdk.isolation_scope() as scope:
+      # do something with `scope`
+  ```
+
+  `new_scope()` will fork the current scope, while `isolation_scope()` will fork the isolation scope. The lifecycle of a single isolation scope roughly translates to the lifecycle of a transaction in most cases, so if you're looking to create a new separated scope for a whole request-response cycle or task execution, go for `isolation_scope()`. If you want to wrap a smaller unit code, fork the current scope instead with `new_scope()`.
 
 - Accessing the client via the hub has been deprecated. Use the top-level `sentry_sdk.get_client()` to get the current client.
 - `profiler_mode` and `profiles_sample_rate` have been deprecated as `_experiments` options. Use them as top level options instead:
