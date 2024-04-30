@@ -59,6 +59,7 @@ setup(
         "grpcio": ["grpcio>=1.21.1"],
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
+        "langchain": ["langchain>=0.0.210"],
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
