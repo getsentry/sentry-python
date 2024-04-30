@@ -59,6 +59,7 @@ setup(
         "grpcio": ["grpcio>=1.21.1"],
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
+        "huggingface_hub": ["huggingface_hub>=0.22"],
         "langchain": ["langchain>=0.0.210"],
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
