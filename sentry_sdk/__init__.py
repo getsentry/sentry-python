@@ -40,6 +40,7 @@ __all__ = [  # noqa
     "set_level",
     "set_measurement",
     "set_tag",
+    "set_tags",
     "set_user",
     "start_span",
     "start_transaction",
