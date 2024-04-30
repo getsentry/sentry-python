@@ -174,9 +174,6 @@ if TYPE_CHECKING:
         str,
         int,
         float,
-        None,
-        List[Union[int, str, float, None]],
-        Tuple[Union[int, str, float, None], ...],
     ]
     MetricTags = Mapping[str, MetricTagValue]
 
