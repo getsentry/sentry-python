@@ -1,7 +1,8 @@
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
@@ -19,11 +20,6 @@ if TYPE_CHECKING:
     from typing import Any, Iterator
     from anthropic.types import MessageStreamEvent
     from sentry_sdk.tracing import Span
-
-
-COMPLETION_TOKENS_USED = "ai.completion_tоkens.used"
-PROMPT_TOKENS_USED = "ai.prompt_tоkens.used"
-TOTAL_TOKENS_USED = "ai.total_tоkens.used"
 
 
 class AnthropicIntegration(Integration):
@@ -69,13 +65,7 @@ def _calculate_token_usage(result, span):
             output_tokens = usage.output_tokens
 
     total_tokens = input_tokens + output_tokens
-
-    if total_tokens != 0:
-        span.set_data(TOTAL_TOKENS_USED, total_tokens)
-    if input_tokens != 0:
-        span.set_data(PROMPT_TOKENS_USED, input_tokens)
-    if output_tokens != 0:
-        span.set_data(COMPLETION_TOKENS_USED, output_tokens)
+    record_token_usage(span, input_tokens, output_tokens, total_tokens)
 
 
 def _wrap_message_create(f):
@@ -110,14 +100,14 @@ def _wrap_message_create(f):
         integration = sentry_sdk.get_client().get_integration(AnthropicIntegration)
 
         with capture_internal_exceptions():
-            span.set_data("ai.model_id", model)
-            span.set_data("ai.streaming", False)
+            span.set_data(SPANDATA.AI_MODEL_ID, model)
+            span.set_data(SPANDATA.AI_STREAMING, False)
             if should_send_default_pii() and integration.include_prompts:
-                span.set_data("ai.input_messages", messages)
+                span.set_data(SPANDATA.AI_INPUT_MESSAGES, messages)
             if hasattr(result, "content"):
                 if should_send_default_pii() and integration.include_prompts:
                     span.set_data(
-                        "ai.responses",
+                        SPANDATA.AI_RESPONSES,
                         list(
                             map(
                                 lambda message: {
@@ -160,13 +150,14 @@ def _wrap_message_create(f):
                         if should_send_default_pii() and integration.include_prompts:
                             complete_message = "".join(content_blocks)
                             span.set_data(
-                                "ai.responses",
+                                SPANDATA.AI_RESPONSES,
                                 [{"type": "text", "text": complete_message}],
                             )
-                        span.set_data(TOTAL_TOKENS_USED, input_tokens + output_tokens)
-                        span.set_data(PROMPT_TOKENS_USED, input_tokens)
-                        span.set_data(COMPLETION_TOKENS_USED, output_tokens)
-                        span.set_data("ai.streaming", True)
+                        total_tokens = input_tokens + output_tokens
+                        record_token_usage(
+                            span, input_tokens, output_tokens, total_tokens
+                        )
+                        span.set_data(SPANDATA.AI_STREAMING, True)
                     span.__exit__(None, None, None)
 
                 result._iterator = new_iterator()

@@ -10,13 +10,8 @@ from anthropic.types.content_block_stop_event import ContentBlockStopEvent
 from anthropic.types.message_delta_event import MessageDeltaEvent, Delta
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import OP
-from sentry_sdk.integrations.anthropic import (
-    AnthropicIntegration,
-    TOTAL_TOKENS_USED,
-    PROMPT_TOKENS_USED,
-    COMPLETION_TOKENS_USED,
-)
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.anthropic import AnthropicIntegration
 
 
 EXAMPLE_MESSAGE = Message(
@@ -79,20 +74,20 @@ def test_nonstreaming_create_message(
 
     assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
     assert span["description"] == "Anthropic messages create"
-    assert span["data"]["ai.model_id"] == "model"
+    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"]["ai.input_messages"] == messages
-        assert span["data"]["ai.responses"] == [
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
+        assert span["data"][SPANDATA.AI_RESPONSES] == [
             {"type": "text", "text": "Hi, I'm Claude."}
         ]
     else:
-        assert "ai.input_messages" not in span["data"]
-        assert "ai.responses" not in span["data"]
+        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
+        assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"][PROMPT_TOKENS_USED] == 10
-    assert span["data"][COMPLETION_TOKENS_USED] == 20
-    assert span["data"][TOTAL_TOKENS_USED] == 30
+    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
+    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 20
+    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
     assert span["data"]["ai.streaming"] is False
 
 
@@ -178,21 +173,21 @@ def test_streaming_create_message(
 
     assert span["op"] == OP.ANTHROPIC_MESSAGES_CREATE
     assert span["description"] == "Anthropic messages create"
-    assert span["data"]["ai.model_id"] == "model"
+    assert span["data"][SPANDATA.AI_MODEL_ID] == "model"
 
     if send_default_pii and include_prompts:
-        assert span["data"]["ai.input_messages"] == messages
-        assert span["data"]["ai.responses"] == [
+        assert span["data"][SPANDATA.AI_INPUT_MESSAGES] == messages
+        assert span["data"][SPANDATA.AI_RESPONSES] == [
             {"type": "text", "text": "Hi! I'm Claude!"}
         ]
 
     else:
-        assert "ai.input_messages" not in span["data"]
-        assert "ai.responses" not in span["data"]
+        assert SPANDATA.AI_INPUT_MESSAGES not in span["data"]
+        assert SPANDATA.AI_RESPONSES not in span["data"]
 
-    assert span["data"][PROMPT_TOKENS_USED] == 10
-    assert span["data"][COMPLETION_TOKENS_USED] == 30
-    assert span["data"][TOTAL_TOKENS_USED] == 40
+    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
+    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 30
+    assert span["measurements"]["ai_total_tokens_used"]["value"] == 40
     assert span["data"]["ai.streaming"] is True
 
 
