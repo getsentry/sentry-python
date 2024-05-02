@@ -44,6 +44,7 @@ setup(
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],
+        "anthropic": ["anthropic>=0.16"],
         "arq": ["arq>=0.23"],
         "asyncpg": ["asyncpg>=0.23"],
         "beam": ["apache-beam>=2.12"],
