@@ -11,7 +11,9 @@ from trytond.exceptions import LoginException
 from trytond.wsgi import app as trytond_app
 
 from werkzeug.test import Client
+
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
+from tests.conftest import unpack_werkzeug_response
 
 
 @pytest.fixture(scope="function")
@@ -118,8 +120,8 @@ def test_rpc_error_page(sentry_init, app, get_client):
         "/rpcerror", content_type="application/json", data=json.dumps(_data)
     )
 
-    (content, status, headers) = response
-    data = json.loads(next(content))
+    (content, status, headers) = unpack_werkzeug_response(response)
+    data = json.loads(content)
     assert status == "200 OK"
     assert headers.get("Content-Type") == "application/json"
     assert data == dict(id=42, error=["UserError", ["Sentry error.", "foo", None]])
