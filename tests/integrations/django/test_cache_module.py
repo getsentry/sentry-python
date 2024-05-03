@@ -157,7 +157,7 @@ def test_cache_spans_middleware(
 
     (first_event, second_event) = events
     # first_event - cache.get
-    assert first_event["spans"][0]["op"] == "cache.get"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
@@ -168,7 +168,7 @@ def test_cache_spans_middleware(
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
     # first_event - cache.set
-    assert first_event["spans"][1]["op"] == "cache.set"
+    assert first_event["spans"][1]["op"] == "cache.set_item"
     assert first_event["spans"][1]["description"].startswith(
         "set views.decorators.cache.cache_header."
     )
@@ -179,7 +179,7 @@ def test_cache_spans_middleware(
     assert "cache.hit" not in first_event["spans"][1]["data"]
     assert "cache.item_size" not in first_event["spans"][1]["data"]
     # second_event - cache.get
-    assert second_event["spans"][0]["op"] == "cache.get"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
@@ -190,7 +190,7 @@ def test_cache_spans_middleware(
     assert not second_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in second_event["spans"][0]["data"]
     # second_event - cache.get 2
-    assert second_event["spans"][1]["op"] == "cache.get"
+    assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
@@ -223,7 +223,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
 
     (first_event, second_event) = events
     # first_event - cache.get
-    assert first_event["spans"][0]["op"] == "cache.get"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get views.decorators.cache.cache_header."
     )
@@ -234,7 +234,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
     # first_event - cache.set
-    assert first_event["spans"][1]["op"] == "cache.set"
+    assert first_event["spans"][1]["op"] == "cache.set_item"
     assert first_event["spans"][1]["description"].startswith(
         "set views.decorators.cache.cache_header."
     )
@@ -245,7 +245,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     assert "cache.hit" not in first_event["spans"][1]["data"]
     assert "cache.item_size" not in first_event["spans"][1]["data"]
     # second_event - cache.get
-    assert second_event["spans"][1]["op"] == "cache.get"
+    assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
         "get views.decorators.cache.cache_page."
     )
@@ -281,7 +281,7 @@ def test_cache_spans_templatetag(
     (first_event, second_event) = events
     assert len(first_event["spans"]) == 2
     # first_event - cache.get
-    assert first_event["spans"][0]["op"] == "cache.get"
+    assert first_event["spans"][0]["op"] == "cache.get_item"
     assert first_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
@@ -292,7 +292,7 @@ def test_cache_spans_templatetag(
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
     # first_event - cache.set
-    assert first_event["spans"][1]["op"] == "cache.set"
+    assert first_event["spans"][1]["op"] == "cache.set_item"
     assert first_event["spans"][1]["description"].startswith(
         "set template.cache.some_identifier."
     )
@@ -303,7 +303,7 @@ def test_cache_spans_templatetag(
     assert "cache.hit" not in first_event["spans"][1]["data"]
     assert "cache.item_size" not in first_event["spans"][1]["data"]
     # second_event - cache.get
-    assert second_event["spans"][0]["op"] == "cache.get"
+    assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
         "get template.cache.some_identifier."
     )
