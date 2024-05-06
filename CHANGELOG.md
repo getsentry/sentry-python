@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1
+
+### Various fixes & improvements
+
+- Fix DSC in celery tasks started by Celery Beat. (#3047) by @antonpirker
+
 ## 2.1.0
 
 ### Various fixes & improvements
