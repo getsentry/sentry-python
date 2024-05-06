@@ -433,4 +433,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.1.0"
+VERSION = "2.1.1"
