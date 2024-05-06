@@ -63,7 +63,7 @@ DATA_FIELDS = {
 
 # To avoid double collecting tokens, we do *not* measure
 # token counts for models for which we have an explicit integration
-NO_COLLECT_TOKEN_MODELS = ["openai-chat"]
+NO_COLLECT_TOKEN_MODELS = ["openai-chat"]  # TODO add huggingface and anthropic
 
 
 class LangchainIntegration(Integration):

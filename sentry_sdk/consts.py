@@ -296,6 +296,7 @@ class SPANDATA:
 
 
 class OP:
+    ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET_ITEM = "cache.get_item"
     DB = "db"
     DB_REDIS = "db.redis"
@@ -324,6 +325,9 @@ class OP:
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
     OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
     OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
+    HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
+        "ai.chat_completions.create.huggingface_hub"
+    )
     LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
     LANGCHAIN_RUN = "ai.run.langchain"
     LANGCHAIN_TOOL = "ai.tool.langchain"
@@ -429,4 +433,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.0.1"
+VERSION = "2.1.1"
