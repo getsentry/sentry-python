@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import TypeVar
+    from typing import Union
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
     from sentry_sdk.tracing import Span
@@ -223,6 +224,16 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     return updated_headers
 
 
+class NoOpMgr:
+    def __enter__(self):
+        # type: () -> None
+        return None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
+        return None
+
+
 def _wrap_apply_async(f):
     # type: (F) -> F
     @wraps(f)
@@ -242,9 +253,17 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_CELERY, description=task.name
-        ) as span:
+        task_started_from_beat = (
+            sentry_sdk.Scope.get_isolation_scope()._name == "celery-beat"
+        )
+
+        span_mgr = (
+            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            if not task_started_from_beat
+            else NoOpMgr()
+        )  # type: Union[Span, NoOpMgr]
+
+        with span_mgr as span:
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
