@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.0
+
+### Various fixes & improvements
+
+- fix(quart): Fix Quart integration (#3043) by @szokeasaurusrex
+- Reduce API cross-section for huggingface in test (#3042) by @colin-sentry
+- Huggingface Hub integration (#3033) by @colin-sentry
+- feat(integrations): Add Anthropic Integration (#2831) by @czyber
+- meta(license): Bump copyright year (#3029) by @szokeasaurusrex
+- feat(ai): Langchain integration (#2911) by @colin-sentry
+- fix(django): fix Django ASGI integration on Python 3.12 (#3027) by @bellini666
+- feat(tests): Parallelize tox (#3025) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `4aa14a7` to `4381a97` (#3028) by @dependabot
+- feat(perf): Add ability to put measurements directly on spans. (#2967) by @colin-sentry
+- fix(tests): Fix trytond tests (#3031) by @sentrivana
+- fix(tests): Update `pytest-asyncio` to fix CI (#3030) by @sentrivana
+- fix(docs): Link to respective migration guides directly (#3020) by @sentrivana
+- docs(scope): Add docstring to `Scope.set_tags` (#2978) by @szokeasaurusrex
+- test(scope): Fix typos in assert error message (#2978) by @szokeasaurusrex
+- test: Add unit test for top-level API `set_tags` (#2978) by @szokeasaurusrex
+- test(scope): Add unit test for `Scope.set_tags` (#2978) by @szokeasaurusrex
+- feat: Add `set_tags` to top-level API (#2978) by @szokeasaurusrex
+- feat(scope): New `set_tags` function (#2978) by @szokeasaurusrex
+
 ## 2.0.1
 
 ### Various fixes & improvements
