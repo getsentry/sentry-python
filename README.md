@@ -78,13 +78,13 @@ See [the documentation](https://docs.sentry.io/platforms/python/integrations/) f
 
 ### Migrating From `1.x` to `2.x`
 
-If you're on SDK version 1.x, we highly recommend updating to the 2.x major. To make the process easier we've prepared a [migration guide](https://docs.sentry.io/platforms/python/migration/) with the most common changes as well as a [detailed changelog](MIGRATION_GUIDE.md).
+If you're on SDK version 1.x, we highly recommend updating to the 2.x major. To make the process easier we've prepared a [migration guide](https://docs.sentry.io/platforms/python/migration/1.x-to-2.x) with the most common changes as well as a [detailed changelog](MIGRATION_GUIDE.md).
 
 ### Migrating From `raven-python`
 
 The old `raven-python` client has entered maintenance mode and was moved [here](https://github.com/getsentry/raven-python).
 
-If you're using `raven-python`, we recommend you to migrate to this new SDK. You can find the benefits of migrating and how to do it in our [migration guide](https://docs.sentry.io/platforms/python/migration/).
+If you're using `raven-python`, we recommend you to migrate to this new SDK. You can find the benefits of migrating and how to do it in our [migration guide](https://docs.sentry.io/platforms/python/migration/raven-to-sentry-sdk/).
 
 ## Contributing to the SDK
 

@@ -13,7 +13,6 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 
-
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
     from typing import Any
@@ -33,7 +32,12 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+    from sentry_sdk._types import (
+        Event,
+        MeasurementUnit,
+        SamplingContext,
+        MeasurementValue,
+    )
 
     class SpanKwargs(TypedDict, total=False):
         trace_id: str
@@ -190,6 +194,7 @@ class Span:
         "sampled",
         "op",
         "description",
+        "_measurements",
         "start_timestamp",
         "_start_timestamp_monotonic_ns",
         "status",
@@ -230,6 +235,7 @@ class Span:
         self.status = status
         self.hub = hub
         self.scope = scope
+        self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
@@ -490,6 +496,10 @@ class Span:
         # type: (str) -> None
         self.status = value
 
+    def set_measurement(self, name, value, unit=""):
+        # type: (str, float, MeasurementUnit) -> None
+        self._measurements[name] = {"value": value, "unit": unit}
+
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
 
@@ -605,6 +615,9 @@ class Span:
             if metrics_summary:
                 rv["_metrics_summary"] = metrics_summary
 
+        if len(self._measurements) > 0:
+            rv["measurements"] = self._measurements
+
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -681,7 +694,7 @@ class Transaction(Span):
         self.source = source
         self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
-        self._measurements = {}  # type: Dict[str, Any]
+        self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage

@@ -66,11 +66,14 @@ GROUPS = {
         "gcp",
     ],
     "Data Processing": [
+        "anthropic",
         "arq",
         "beam",
         "celery",
         "huey",
+        "langchain",
         "openai",
+        "huggingface_hub",
         "rq",
     ],
     "Databases": [

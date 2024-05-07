@@ -4,7 +4,6 @@ from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     package_version,
 )
@@ -69,9 +68,11 @@ def _patch_graphql():
 
         return result
 
-    @ensure_integration_enabled_async(GrapheneIntegration, old_graphql_async)
     async def _sentry_patched_graphql_async(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
+        if sentry_sdk.get_client().get_integration(GrapheneIntegration) is None:
+            return await old_graphql_async(schema, source, *args, **kwargs)
+
         scope = Scope.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 

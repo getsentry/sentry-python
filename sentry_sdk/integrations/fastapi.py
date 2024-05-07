@@ -10,7 +10,6 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     transaction_from_function,
     logger,
-    ensure_integration_enabled_async,
 )
 
 if TYPE_CHECKING:
@@ -97,9 +96,11 @@ def patch_get_request_handler():
 
         old_app = old_get_request_handler(*args, **kwargs)
 
-        @ensure_integration_enabled_async(FastApiIntegration, old_app)
         async def _sentry_app(*args, **kwargs):
             # type: (*Any, **Any) -> Any
+            if sentry_sdk.get_client().get_integration(FastApiIntegration) is None:
+                return await old_app(*args, **kwargs)
+
             integration = sentry_sdk.get_client().get_integration(FastApiIntegration)
             request = args[0]
 

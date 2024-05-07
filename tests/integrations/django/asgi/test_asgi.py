@@ -1,5 +1,8 @@
 import base64
+import sys
 import json
+import inspect
+import asyncio
 import os
 from unittest import mock
 
@@ -8,6 +11,7 @@ import pytest
 from channels.testing import HttpCommunicator
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
 
 try:
@@ -526,3 +530,65 @@ async def test_asgi_request_body(
         assert event["request"]["data"] == expected_data
     else:
         assert "data" not in event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    sys.version_info >= (3, 12),
+    reason=(
+        "asyncio.iscoroutinefunction has been replaced in 3.12 by inspect.iscoroutinefunction"
+    ),
+)
+async def test_asgi_mixin_iscoroutinefunction_before_3_12():
+    sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
+
+    async def get_response(): ...
+
+    instance = sentry_asgi_mixin(get_response)
+    assert asyncio.iscoroutinefunction(instance)
+
+
+@pytest.mark.skipif(
+    sys.version_info >= (3, 12),
+    reason=(
+        "asyncio.iscoroutinefunction has been replaced in 3.12 by inspect.iscoroutinefunction"
+    ),
+)
+def test_asgi_mixin_iscoroutinefunction_when_not_async_before_3_12():
+    sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
+
+    def get_response(): ...
+
+    instance = sentry_asgi_mixin(get_response)
+    assert not asyncio.iscoroutinefunction(instance)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason=(
+        "asyncio.iscoroutinefunction has been replaced in 3.12 by inspect.iscoroutinefunction"
+    ),
+)
+async def test_asgi_mixin_iscoroutinefunction_after_3_12():
+    sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
+
+    async def get_response(): ...
+
+    instance = sentry_asgi_mixin(get_response)
+    assert inspect.iscoroutinefunction(instance)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason=(
+        "asyncio.iscoroutinefunction has been replaced in 3.12 by inspect.iscoroutinefunction"
+    ),
+)
+def test_asgi_mixin_iscoroutinefunction_when_not_async_after_3_12():
+    sentry_asgi_mixin = _asgi_middleware_mixin_factory(lambda: None)
+
+    def get_response(): ...
+
+    instance = sentry_asgi_mixin(get_response)
+    assert not inspect.iscoroutinefunction(instance)

@@ -8,6 +8,7 @@ Since this file contains `async def` it is conditionally imported in
 
 import asyncio
 import functools
+import inspect
 
 from django.core.handlers.wsgi import WSGIRequest
 
@@ -21,18 +22,34 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
 )
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from typing import Any, Union
+    from typing import Any, Callable, Union, TypeVar
 
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse
 
     from sentry_sdk._types import Event, EventProcessor
+
+    _F = TypeVar("_F", bound=Callable[..., Any])
+
+
+# Python 3.12 deprecates asyncio.iscoroutinefunction() as an alias for
+# inspect.iscoroutinefunction(), whilst also removing the _is_coroutine marker.
+# The latter is replaced with the inspect.markcoroutinefunction decorator.
+# Until 3.12 is the minimum supported Python version, provide a shim.
+# This was copied from https://github.com/django/asgiref/blob/main/asgiref/sync.py
+if hasattr(inspect, "markcoroutinefunction"):
+    iscoroutinefunction = inspect.iscoroutinefunction
+    markcoroutinefunction = inspect.markcoroutinefunction
+else:
+    iscoroutinefunction = asyncio.iscoroutinefunction  # type: ignore[assignment]
+
+    def markcoroutinefunction(func: "_F") -> "_F":
+        func._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
+        return func
 
 
 def _make_asgi_request_event_processor(request):
@@ -72,9 +89,11 @@ def patch_django_asgi_handler_impl(cls):
 
     old_app = cls.__call__
 
-    @ensure_integration_enabled_async(DjangoIntegration, old_app)
     async def sentry_patched_asgi_handler(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
+        if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls), unsafe_context_data=True
         )._run_asgi3
@@ -120,9 +139,11 @@ def patch_channels_asgi_handler_impl(cls):
     if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
-        @ensure_integration_enabled_async(DjangoIntegration, old_app)
         async def sentry_patched_asgi_handler(self, receive, send):
             # type: (Any, Any, Any) -> Any
+            if sentry_sdk.get_client().get_integration(DjangoIntegration) is None:
+                return await old_app(self, receive, send)
+
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls), unsafe_context_data=True
             )
@@ -178,8 +199,8 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             a thread is not consumed during a whole request.
             Taken from django.utils.deprecation::MiddlewareMixin._async_check
             """
-            if asyncio.iscoroutinefunction(self.get_response):
-                self._is_coroutine = asyncio.coroutines._is_coroutine  # type: ignore
+            if iscoroutinefunction(self.get_response):
+                markcoroutinefunction(self)
 
         def async_route_check(self):
             # type: () -> bool
@@ -187,7 +208,7 @@ def _asgi_middleware_mixin_factory(_check_middleware_span):
             Function that checks if we are in async mode,
             and if we are forwards the handling of requests to __acall__
             """
-            return asyncio.iscoroutinefunction(self.get_response)
+            return iscoroutinefunction(self.get_response)
 
         async def __acall__(self, *args, **kwargs):
             # type: (*Any, **Any) -> Any
