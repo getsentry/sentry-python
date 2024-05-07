@@ -148,7 +148,7 @@ def patch_caching():
 
                 from django.conf import settings
 
-                cache_settings = settings.CACHES[alias]
+                cache_settings = settings.CACHES[alias or "default"]
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
@@ -170,7 +170,7 @@ def patch_caching():
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
-                    address, port = _get_address_port(self.settings)
+                    address, port = _get_address_port(self.settings[alias or "default"])
                     _patch_cache(cache, address, port)
 
                 return cache
