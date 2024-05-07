@@ -142,8 +142,10 @@ def test_bad_chat(sentry_init, capture_events):
     events = capture_events()
 
     client = Client(api_key="z")
-    HTTPXClient.request = mock.Mock(side_effect=Exception("API rate limit reached"))
-    with pytest.raises(Exception):
+    HTTPXClient.request = mock.Mock(
+        side_effect=httpx.HTTPError("API rate limit reached")
+    )
+    with pytest.raises(httpx.HTTPError):
         client.chat(model="some-model", message="hello")
 
     (event,) = events
