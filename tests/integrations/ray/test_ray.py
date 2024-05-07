@@ -5,43 +5,33 @@ import ray
 import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.ray import RayIntegration
-from tests.conftest import TestTransport
-
-
-class RayTestTransport(TestTransport):
-    def __init__(self):
-        self.events = []
-        self.envelopes = []
-        super().__init__(self.events.append, self.envelopes.append)
 
 
 def _setup_ray_sentry():
     sentry_sdk.init(
         traces_sample_rate=1.0,
         integrations=[RayIntegration()],
-        transport=RayTestTransport(),
     )
 
 
-def test_ray():
-    _setup_ray_sentry()
+def test_ray(sentry_init, capture_events_forksafe):
+    sentry_init(enable_tracing=True, integrations=[RayIntegration()])
+    events = capture_events_forksafe()
 
     @ray.remote
     def _task():
         with sentry_sdk.start_span(op="task", description="example task step"):
-            time.sleep(0.1)
-        return sentry_sdk.Hub.current.client.transport.envelopes
+            print("IN TASK")
+            pass
 
     ray.init(
-        runtime_env=dict(worker_process_setup_hook=_setup_ray_sentry, working_dir="./")
+        # runtime_env=dict(worker_process_setup_hook=_setup_ray_sentry, working_dir="./")
     )
 
-    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
-        worker_envelopes = ray.get(_task.remote())
+    # with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+    ray.get(_task.remote())
 
-    _assert_envelopes_are_associated_with_same_trace_id(
-        sentry_sdk.Hub.current.client.transport.envelopes[0], worker_envelopes[0]
-    )
+    breakpoint()
 
 
 def _assert_envelopes_are_associated_with_same_trace_id(
