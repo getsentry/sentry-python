@@ -63,7 +63,12 @@ DATA_FIELDS = {
 
 # To avoid double collecting tokens, we do *not* measure
 # token counts for models for which we have an explicit integration
-NO_COLLECT_TOKEN_MODELS = ["openai-chat"]  # TODO add huggingface and anthropic
+NO_COLLECT_TOKEN_MODELS = [
+    "openai-chat",
+    "anthropic-chat",
+    "cohere-chat",
+    "huggingface_endpoint",
+]
 
 
 class LangchainIntegration(Integration):
@@ -216,6 +221,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span.no_collect_tokens = any(
                 x in all_params.get("_type", "") for x in NO_COLLECT_TOKEN_MODELS
             )
+            print(all_params.get("_type"))
+
             if not model and "anthropic" in all_params.get("_type"):
                 model = "claude-2"
             if model:
