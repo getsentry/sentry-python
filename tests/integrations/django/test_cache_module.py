@@ -458,6 +458,3 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     assert event["spans"][2]["op"] == "cache.set_item"
     assert "cache.hit" not in event["spans"][2]["data"]
     assert event["spans"][2]["data"]["cache.item_size"] == 58
-    import pdb
-
-    pdb.set_trace()
