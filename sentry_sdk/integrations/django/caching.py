@@ -64,11 +64,14 @@ def _patch_cache_method(cache, method_name, address, port):
 
             with capture_internal_exceptions():
                 if address is not None:
-                    parsed_url = urlparse(address)
-                    # Strip eventually contained username and password
-                    address = "{}://{}{}".format(
-                        parsed_url.scheme or "", parsed_url.netloc or "", parsed_url.path or ""
-                    )
+                    # Strip eventually contained username and password in url style location
+                    if "://" in address:
+                        parsed_url = urlparse(address)
+                        address = "{}://{}{}".format(
+                            parsed_url.scheme or "",
+                            parsed_url.netloc or "",
+                            parsed_url.path or "",
+                        )
 
                     span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
 

@@ -70,9 +70,9 @@ def use_django_caching_with_cluster(settings):
         "default": {
             "BACKEND": "django.core.cache.backends.dummy.DummyCache",
             "LOCATION": [
-                "redis://127.0.0.1:6379",  
-                "redis://127.0.0.2:6378",  
-                "redis://127.0.0.3:6377",  
+                "redis://127.0.0.1:6379",
+                "redis://127.0.0.2:6378",
+                "redis://127.0.0.3:6377",
             ],
         }
     }
@@ -374,7 +374,9 @@ def test_cache_spans_get_span_description(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-def test_cache_spans_location_with_port(sentry_init, client, capture_events, use_django_caching_with_port):
+def test_cache_spans_location_with_port(
+    sentry_init, client, capture_events, use_django_caching_with_port
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -392,13 +394,17 @@ def test_cache_spans_location_with_port(sentry_init, client, capture_events, use
 
     for event in events:
         for span in event["spans"]:
-            assert span["data"]["network.peer.address"] == "redis://127.0.0.1"  # Note: the username/password are not included in the address
+            assert (
+                span["data"]["network.peer.address"] == "redis://127.0.0.1"
+            )  # Note: the username/password are not included in the address
             assert span["data"]["network.peer.port"] == 6379
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-def test_cache_spans_location_with_cluster(sentry_init, client, capture_events, use_django_caching_with_cluster):
+def test_cache_spans_location_with_cluster(
+    sentry_init, client, capture_events, use_django_caching_with_cluster
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -420,3 +426,38 @@ def test_cache_spans_location_with_cluster(sentry_init, client, capture_events, 
             assert "network.peer.address" not in span["data"].keys()
             assert "network.peer.port" not in span["data"].keys()
 
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_caching):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+                cache_spans_add_item_size=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("cached_view"))
+
+    (event,) = events
+    assert len(event["spans"]) == 3
+    assert event["spans"][0]["op"] == "cache.get_item"
+    assert not event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" not in event["spans"][0]["data"]
+
+    assert event["spans"][1]["op"] == "cache.set_item"
+    assert "cache.hit" not in event["spans"][1]["data"]
+    assert event["spans"][1]["data"]["cache.item_size"] == 2
+
+    assert event["spans"][2]["op"] == "cache.set_item"
+    assert "cache.hit" not in event["spans"][2]["data"]
+    assert event["spans"][2]["data"]["cache.item_size"] == 58
+    import pdb
+
+    pdb.set_trace()
