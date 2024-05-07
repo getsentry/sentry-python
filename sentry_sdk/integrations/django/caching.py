@@ -13,6 +13,7 @@ from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_ena
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from typing import Tuple
     from typing import Optional
 
 
@@ -118,6 +119,7 @@ def _patch_cache(cache, address=None, port=None):
 
 
 def _get_address_port(settings):
+    # type: (dict[str, Any]) -> Tuple[Optional[str], Optional[str]]
     address, port = None, None
     location = settings.get("LOCATION")
     # TODO: location can also be an array of locations
@@ -145,6 +147,7 @@ def patch_caching():
                 cache = original_get_item(self, alias)
 
                 from django.conf import settings
+
                 cache_settings = settings.CACHES[alias]
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
