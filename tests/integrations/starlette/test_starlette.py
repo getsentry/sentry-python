@@ -640,15 +640,17 @@ def test_middleware_spans(sentry_init, capture_events):
         "ServerErrorMiddleware",
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
+        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
+        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
     ]
 
-    # there are four additional spans that we are not interested in (because they are not middleware spans)
-    assert len(transaction_event["spans"]) == len(expected_middleware_spans) + 4
+    assert len(transaction_event["spans"]) == len(expected_middleware_spans)
 
     idx = 0
     for span in transaction_event["spans"]:
-        if span["op"] == "middleware.starlette":
-            assert span["description"] == expected_middleware_spans[idx]
+        if span["op"].startswith("middleware.starlette"):
             assert span["tags"]["starlette.middleware_name"] == expected_middleware_spans[idx]
             idx += 1
 
