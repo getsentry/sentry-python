@@ -427,7 +427,7 @@ def test_cache_spans_location_with_cluster(
             assert "network.peer.port" not in span["data"].keys()
 
 
-@pytest.mark.forked
+# @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
@@ -444,17 +444,27 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     events = capture_events()
 
     client.get(reverse("cached_view"))
+    client.get(reverse("cached_view"))
 
-    (event,) = events
-    assert len(event["spans"]) == 3
-    assert event["spans"][0]["op"] == "cache.get_item"
-    assert not event["spans"][0]["data"]["cache.hit"]
-    assert "cache.item_size" not in event["spans"][0]["data"]
+    (first_event, second_event) = events
+    assert len(first_event["spans"]) == 3
+    assert first_event["spans"][0]["op"] == "cache.get_item"
+    assert not first_event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" not in first_event["spans"][0]["data"]
 
-    assert event["spans"][1]["op"] == "cache.set_item"
-    assert "cache.hit" not in event["spans"][1]["data"]
-    assert event["spans"][1]["data"]["cache.item_size"] == 2
+    assert first_event["spans"][1]["op"] == "cache.set_item"
+    assert "cache.hit" not in first_event["spans"][1]["data"]
+    assert first_event["spans"][1]["data"]["cache.item_size"] == 2
 
-    assert event["spans"][2]["op"] == "cache.set_item"
-    assert "cache.hit" not in event["spans"][2]["data"]
-    assert event["spans"][2]["data"]["cache.item_size"] == 58
+    assert first_event["spans"][2]["op"] == "cache.set_item"
+    assert "cache.hit" not in first_event["spans"][2]["data"]
+    assert first_event["spans"][2]["data"]["cache.item_size"] == 58
+
+    assert len(second_event["spans"]) == 2
+    assert second_event["spans"][0]["op"] == "cache.get_item"
+    assert not second_event["spans"][0]["data"]["cache.hit"]
+    assert "cache.item_size" not in second_event["spans"][0]["data"]
+
+    assert second_event["spans"][1]["op"] == "cache.get_item"
+    assert second_event["spans"][1]["data"]["cache.hit"]
+    assert second_event["spans"][1]["data"]["cache.item_size"] == 58
