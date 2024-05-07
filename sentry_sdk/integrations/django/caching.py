@@ -117,6 +117,20 @@ def _patch_cache(cache, address=None, port=None):
         cache._sentry_patched = True
 
 
+def _get_address_port(settings):
+    address, port = None, None
+    location = settings.get("LOCATION")
+    # TODO: location can also be an array of locations
+    # see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
+    if isinstance(location, str):
+        if ":" in location:
+            address, port = location.rsplit(":", 1)
+        else:
+            address, port = location, None
+
+    return address, port
+
+
 def patch_caching():
     # type: () -> None
     from sentry_sdk.integrations.django import DjangoIntegration
@@ -130,9 +144,13 @@ def patch_caching():
                 # type: (CacheHandler, str) -> Any
                 cache = original_get_item(self, alias)
 
+                from django.conf import settings
+                cache_settings = settings.CACHES[alias]
+
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
-                    _patch_cache(cache)
+                    address, port = _get_address_port(cache_settings)
+                    _patch_cache(cache, address, port)
 
                 return cache
 
@@ -149,17 +167,7 @@ def patch_caching():
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
-                    settings = self.settings[alias or "default"]
-                    address, port = None, None
-                    location = settings.get("LOCATION")
-                    # TODO: location can also be an array of locations
-                    # see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
-                    if isinstance(location, str):
-                        if ":" in location:
-                            address, port = location.rsplit(":", 1)
-                        else:
-                            address, port = location, None
-
+                    address, port = _get_address_port(self.settings)
                     _patch_cache(cache, address, port)
 
                 return cache
