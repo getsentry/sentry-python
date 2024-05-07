@@ -165,12 +165,12 @@ def _wrap_chat(f, streaming):
                     + [{"role": "user", "content": message}],
                 )
                 for k, v in COLLECTED_PII_CHAT_PARAMS.items():
-                    if hasattr(kwargs, k):
-                        set_data_normalized(span, v, getattr(kwargs, k))
+                    if k in kwargs:
+                        set_data_normalized(span, v, kwargs[k])
 
             for k, v in COLLECTED_CHAT_PARAMS.items():
-                if hasattr(kwargs, k):
-                    set_data_normalized(span, v, getattr(kwargs, k))
+                if k in kwargs:
+                    set_data_normalized(span, v, kwargs[k])
             set_data_normalized(span, SPANDATA.AI_STREAMING, False)
 
             if streaming:
