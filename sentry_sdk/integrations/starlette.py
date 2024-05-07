@@ -71,14 +71,15 @@ class StarletteIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="url"):
-        # type: (str) -> None
+    def __init__(self, transaction_style="url", middleware_spans=True):
+        # type: (str, bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.middleware_spans = middleware_spans
 
     @staticmethod
     def setup_once():
@@ -105,7 +106,7 @@ def _enable_span_for_middleware(middleware_class):
     async def _create_span_call(app, scope, receive, send, **kwargs):
         # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
-        if integration is None:
+        if integration is None or not integration.middleware_spans:
             return await old_call(app, scope, receive, send, **kwargs)
 
         middleware_name = app.__class__.__name__
