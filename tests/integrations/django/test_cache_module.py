@@ -427,7 +427,7 @@ def test_cache_spans_location_with_cluster(
             assert "network.peer.port" not in span["data"].keys()
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
