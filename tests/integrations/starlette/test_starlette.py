@@ -636,18 +636,44 @@ def test_middleware_spans(sentry_init, capture_events):
 
     (_, transaction_event) = events
 
-    expected = [
+    expected_middleware_spans = [
         "ServerErrorMiddleware",
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
     ]
 
+    # there are four additional spans that we are not interested in (because they are not middleware spans)
+    assert len(transaction_event["spans"]) == len(expected_middleware_spans) + 4
+
     idx = 0
     for span in transaction_event["spans"]:
         if span["op"] == "middleware.starlette":
-            assert span["description"] == expected[idx]
-            assert span["tags"]["starlette.middleware_name"] == expected[idx]
+            assert span["description"] == expected_middleware_spans[idx]
+            assert span["tags"]["starlette.middleware_name"] == expected_middleware_spans[idx]
             idx += 1
+
+
+def test_middleware_spans_disabled(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration(middleware_spans=False)],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    expected_middleware_spans = []
+
+    assert len(transaction_event["spans"]) == len(expected_middleware_spans)
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
