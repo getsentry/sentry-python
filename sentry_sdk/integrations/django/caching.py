@@ -1,12 +1,13 @@
 import functools
 from typing import TYPE_CHECKING
+from urllib3.util import parse_url as urlparse
 
 from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.utils import ensure_integration_enabled
+from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
 
 
 if TYPE_CHECKING:
@@ -61,30 +62,37 @@ def _patch_cache_method(cache, method_name, address, port):
         with sentry_sdk.start_span(op=op, description=description) as span:
             value = original_method(*args, **kwargs)
 
-            if address is not None:
-                span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+            with capture_internal_exceptions():
+                if address is not None:
+                    parsed_url = urlparse(address)
+                    # Strip eventually contained username and password
+                    address = "{}://{}{}".format(
+                        parsed_url.scheme or "", parsed_url.netloc or "", parsed_url.path or ""
+                    )
 
-            if port is not None:
-                span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+                    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
-            key = _get_key(args, kwargs)
-            if key != "":
-                span.set_data(SPANDATA.CACHE_KEY, key)
+                if port is not None:
+                    span.set_data(SPANDATA.NETWORK_PEER_PORT, int(port))
 
-            item_size = None
-            if is_get_operation:
-                if value:
-                    if integration.cache_spans_add_item_size:
-                        item_size = len(str(value))
-                    span.set_data(SPANDATA.CACHE_HIT, True)
+                key = _get_key(args, kwargs)
+                if key != "":
+                    span.set_data(SPANDATA.CACHE_KEY, key)
+
+                item_size = None
+                if is_get_operation:
+                    if value:
+                        if integration.cache_spans_add_item_size:
+                            item_size = len(str(value))
+                        span.set_data(SPANDATA.CACHE_HIT, True)
+                    else:
+                        span.set_data(SPANDATA.CACHE_HIT, False)
                 else:
-                    span.set_data(SPANDATA.CACHE_HIT, False)
-            else:
-                if integration.cache_spans_add_item_size:
-                    item_size = len(str(args[1]))
+                    if integration.cache_spans_add_item_size:
+                        item_size = len(str(args[1]))
 
-            if item_size is not None:
-                span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
+                if item_size is not None:
+                    span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
 
             return value
 
@@ -139,9 +147,10 @@ def patch_caching():
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
                     settings = self.settings[alias or "default"]
+                    address, port = None, None
+                    location = settings.get("LOCATION")
                     # TODO: location can also be an array of locations
                     # see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
-                    location = settings.get("LOCATION")
                     if isinstance(location, str):
                         if ":" in location:
                             address, port = location.rsplit(":", 1)

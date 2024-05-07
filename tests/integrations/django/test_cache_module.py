@@ -54,6 +54,30 @@ def use_django_caching_with_middlewares(settings):
         middleware.append("django.middleware.cache.FetchFromCacheMiddleware")
 
 
+@pytest.fixture
+def use_django_caching_with_port(settings):
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+            "LOCATION": "redis://username:password@127.0.0.1:6379",
+        }
+    }
+
+
+@pytest.fixture
+def use_django_caching_with_cluster(settings):
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+            "LOCATION": [
+                "redis://127.0.0.1:6379",  
+                "redis://127.0.0.2:6378",  
+                "redis://127.0.0.3:6377",  
+            ],
+        }
+    }
+
+
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
@@ -346,3 +370,53 @@ def test_cache_spans_get_span_description(
     method_name, args, kwargs, expected_description
 ):
     assert _get_span_description(method_name, args, kwargs) == expected_description
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_location_with_port(sentry_init, client, capture_events, use_django_caching_with_port):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("cached_view"))
+    client.get(reverse("cached_view"))
+
+    for event in events:
+        for span in event["spans"]:
+            assert span["data"]["network.peer.address"] == "redis://127.0.0.1"  # Note: the username/password are not included in the address
+            assert span["data"]["network.peer.port"] == 6379
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_location_with_cluster(sentry_init, client, capture_events, use_django_caching_with_cluster):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("cached_view"))
+    client.get(reverse("cached_view"))
+
+    for event in events:
+        for span in event["spans"]:
+            # because it is a cluster we do not know what host is actually accessed, so we omit the data
+            assert "network.peer.address" not in span["data"].keys()
+            assert "network.peer.port" not in span["data"].keys()
+
