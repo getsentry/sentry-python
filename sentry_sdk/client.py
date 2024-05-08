@@ -205,6 +205,16 @@ class BaseClient:
         # type: (*Any, **Any) -> None
         return None
 
+    def last_event_id(self):
+        # type: () -> Optional[str]
+        """
+        .. versionadded:: 2.1.2
+
+        Returns the most recently captured error event's ID. If this client has
+        not captured an error event yet, returns `None`.
+        """
+        return None
+
     def __enter__(self):
         # type: () -> BaseClient
         return self
@@ -378,6 +388,8 @@ class _Client(BaseClient):
                     setup_profiler(self.options)
                 except Exception as e:
                     logger.debug("Can not set up profiler. (%s)", e)
+
+            self._last_event_id = None  # type: Optional[str]
 
         finally:
             _client_init_debug.set(old_debug)
@@ -709,6 +721,7 @@ class _Client(BaseClient):
 
         is_transaction = event_opt.get("type") == "transaction"
         is_checkin = event_opt.get("type") == "check_in"
+        is_error = not is_transaction and not is_checkin
 
         if (
             not is_transaction
@@ -749,6 +762,9 @@ class _Client(BaseClient):
 
         if self.transport is None:
             return None
+
+        if is_error:
+            self._last_event_id = event_id
 
         self.transport.capture_envelope(envelope)
 
@@ -819,6 +835,10 @@ class _Client(BaseClient):
             if self.metrics_aggregator is not None:
                 self.metrics_aggregator.flush()
             self.transport.flush(timeout=timeout, callback=callback)
+
+    def last_event_id(self):
+        # type: () -> Optional[str]
+        return self._last_event_id
 
     def __enter__(self):
         # type: () -> _Client
