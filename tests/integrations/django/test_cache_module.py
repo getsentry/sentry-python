@@ -561,9 +561,6 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
         cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
         cache.get(f"S{id}")
 
-    import ipdb
-
-    ipdb.set_trace()
     (transaction,) = events
     assert len(transaction["spans"]) == 4
 
