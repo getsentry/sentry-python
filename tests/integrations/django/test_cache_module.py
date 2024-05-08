@@ -506,15 +506,11 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][1]["op"] == "cache.get_item"
     assert transaction["spans"][1]["description"] == f"get S{id}"
-    assert transaction["spans"][1]["data"][
-        "cache.hit"
-    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+    assert not transaction["spans"][1]["data"]["cache.hit"]
 
     assert transaction["spans"][2]["op"] == "cache.get_item"
     assert transaction["spans"][2]["description"] == f"get S{id+1}"
-    assert transaction["spans"][2]["data"][
-        "cache.hit"
-    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+    assert not transaction["spans"][2]["data"]["cache.hit"]
 
     assert transaction["spans"][3]["op"] == "cache.set_item"
     assert transaction["spans"][3]["description"] == f"set S{id}"
@@ -526,15 +522,11 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][5]["op"] == "cache.get_item"
     assert transaction["spans"][5]["description"] == f"get S{id}"
-    assert transaction["spans"][5]["data"][
-        "cache.hit"
-    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+    assert not transaction["spans"][5]["data"]["cache.hit"]
 
     assert transaction["spans"][6]["op"] == "cache.get_item"
     assert transaction["spans"][6]["description"] == f"get S{id+1}"
-    assert transaction["spans"][6]["data"][
-        "cache.hit"
-    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+    assert not transaction["spans"][6]["data"]["cache.hit"]
 
 
 @pytest.mark.forked
