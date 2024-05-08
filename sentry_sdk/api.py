@@ -60,6 +60,7 @@ __all__ = [
     "is_initialized",
     "isolation_scope",
     "new_scope",
+    "last_event_id",
     "push_scope",
     "set_context",
     "set_extra",
@@ -375,3 +376,9 @@ def continue_trace(environ_or_headers, op=None, name=None, source=None):
     return Scope.get_isolation_scope().continue_trace(
         environ_or_headers, op, name, source
     )
+
+
+@clientmethod
+def last_event_id():
+    # type: () -> Optional[str]
+    return get_client().last_event_id()
