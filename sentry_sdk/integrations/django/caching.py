@@ -7,13 +7,16 @@ from django.core.cache import CacheHandler
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+)
 
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
-    from typing import tuple
     from typing import Optional
 
 
@@ -136,7 +139,7 @@ def _get_address_port(settings):
 
     # If address is a URL (could also be a string identifier or path to a Unix socket)
     # remove the username and password from URL to not leak sensitive data.
-    if "://" in address:
+    if address is not None and "://" in address:
         parsed_url = urlparse(address)
         address = "{}://{}{}".format(
             parsed_url.scheme or "",
