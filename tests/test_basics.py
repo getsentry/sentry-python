@@ -778,3 +778,47 @@ def test_classmethod_tracing(sentry_init):
         with patch_start_tracing_child() as fake_start_child:
             assert instance_or_class.class_(1) == (TracingTestClass, 1)
             assert fake_start_child.call_count == 1
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
+def test_notes(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+    try:
+        e = ValueError("aha!")
+        e.add_note("Test 123")
+        raise e
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["value"] == "aha!\nTest 123"
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="add_note() not supported")
+def test_notes_safe_str(sentry_init, capture_events):
+    class Note2:
+        def __repr__(self):
+            raise TypeError
+
+        def __str__(self):
+            raise TypeError
+
+    sentry_init()
+    events = capture_events()
+    try:
+        e = ValueError("aha!")
+        e.add_note("note 1")
+        e.__notes__.append(Note2())  # type: ignore
+        e.add_note("note 3")
+        raise e
+    except Exception:
+        capture_exception()
+
+    (event,) = events
+
+    assert (
+        event["exception"]["values"][0]["value"]
+        == "aha!\nnote 1\n<broken repr>\nnote 3"
+    )
