@@ -535,3 +535,48 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][6]["data"][
         "cache.hit"
     ]  # LocMemCache always returns True (but that is ok, because it is not production)
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+                cache_spans_add_item_size=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    id = os.getpid()
+
+    from django.core.cache import cache
+
+    with sentry_sdk.start_transaction():
+        cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
+        cache.get(f"S{id}")
+        
+    import ipdb; ipdb.set_trace()
+    (transaction,) = events
+    assert len(transaction["spans"]) == 4
+
+    assert transaction["spans"][0]["op"] == "cache.set_item"
+    assert transaction["spans"][0]["description"] == f"set_many {{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
+    assert "cache.hit" not in transaction["spans"][0]["data"]
+
+    assert transaction["spans"][1]["op"] == "cache.set_item"
+    assert transaction["spans"][1]["description"] == f"set S{id}"
+    assert "cache.hit" not in transaction["spans"][1]["data"]
+
+    assert transaction["spans"][2]["op"] == "cache.set_item"
+    assert transaction["spans"][2]["description"] == f"set S{id+1}"
+    assert "cache.hit" not in transaction["spans"][2]["data"]
+
+    assert transaction["spans"][3]["op"] == "cache.get_item"
+    assert transaction["spans"][3]["description"] == f"get S{id}"
+    assert transaction["spans"][3]["data"]["cache.hit"]
