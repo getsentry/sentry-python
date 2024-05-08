@@ -51,7 +51,7 @@ def _get_span_description(method_name, args, kwargs):
 
 
 def _patch_cache_method(cache, method_name, address, port):
-    # type: (CacheHandler, str, Optional[str], Optional[str]) -> None
+    # type: (CacheHandler, str, Optional[str], Optional[int]) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
 
     original_method = getattr(cache, method_name)
@@ -60,7 +60,7 @@ def _patch_cache_method(cache, method_name, address, port):
     def _instrument_call(
         cache, method_name, original_method, args, kwargs, address, port
     ):
-        # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[str]) -> Any
+        # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[int]) -> Any
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         is_set_operation = method_name.startswith("set")
         is_get_operation = not is_set_operation
@@ -76,7 +76,7 @@ def _patch_cache_method(cache, method_name, address, port):
                     span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
                 if port is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_PORT, int(port))
+                    span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
                 key = _get_key(args, kwargs)
                 if key != "":
@@ -115,7 +115,7 @@ def _patch_cache_method(cache, method_name, address, port):
 
 
 def _patch_cache(cache, address=None, port=None):
-    # type: (CacheHandler, Optional[str], Optional[str]) -> None
+    # type: (CacheHandler, Optional[str], Optional[int]) -> None
     if not hasattr(cache, "_sentry_patched"):
         for method_name in METHODS_TO_INSTRUMENT:
             _patch_cache_method(cache, method_name, address, port)
@@ -123,7 +123,7 @@ def _patch_cache(cache, address=None, port=None):
 
 
 def _get_address_port(settings):
-    # type: (dict[str, Any]) -> tuple[Optional[str], Optional[str]]
+    # type: (dict[str, Any]) -> tuple[Optional[str], Optional[int]]
     address, port = None, None
     location = settings.get("LOCATION")
     # TODO: location can also be an array of locations
@@ -144,7 +144,7 @@ def _get_address_port(settings):
             parsed_url.path or "",
         )
 
-    return address, port
+    return address, int(port) if port is not None else None
 
 
 def patch_caching():
