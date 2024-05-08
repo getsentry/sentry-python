@@ -70,16 +70,6 @@ def _patch_cache_method(cache, method_name, address, port):
 
             with capture_internal_exceptions():
                 if address is not None:
-                    # If address is a URL (could also be a string identifier or path to a Unix socket)
-                    # remove the username and password from URL to not leak sensitive data.
-                    if "://" in address:
-                        parsed_url = urlparse(address)
-                        address = "{}://{}{}".format(
-                            parsed_url.scheme or "",
-                            parsed_url.netloc or "",
-                            parsed_url.path or "",
-                        )
-
                     span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
                 if port is not None:
@@ -140,6 +130,16 @@ def _get_address_port(settings):
             address, port = location.rsplit(":", 1)
         else:
             address, port = location, None
+
+    # If address is a URL (could also be a string identifier or path to a Unix socket)
+    # remove the username and password from URL to not leak sensitive data.
+    if "://" in address:
+        parsed_url = urlparse(address)
+        address = "{}://{}{}".format(
+            parsed_url.scheme or "",
+            parsed_url.netloc or "",
+            parsed_url.path or "",
+        )
 
     return address, port
 
