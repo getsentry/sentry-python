@@ -18,7 +18,9 @@ from sentry_sdk import (
     capture_exception,
     capture_event,
     set_tag,
+    get_client,
 )
+from sentry_sdk.client import NonRecordingClient
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -1205,3 +1207,66 @@ def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
                 assert flag in str(record.message)
         else:
             assert not recwarn
+
+
+def test_last_event_id_non_recording():
+    client = NonRecordingClient()
+
+    assert client.last_event_id() is None
+
+
+def test_last_event_id_nothing_sent(sentry_init):
+    sentry_init()
+    client = get_client()
+
+    assert client.last_event_id() is None
+
+
+def test_last_event_id_manually_set(sentry_init):
+    sentry_init()
+    client = get_client()
+
+    client.capture_event({"event_id": "42"})
+
+    assert client.last_event_id() == "42"
+
+
+def test_last_event_id_auto_generated(sentry_init):
+    sentry_init()
+    client = get_client()
+
+    client.capture_event({})
+
+    # We can't predict the event ID, but it should be set
+    assert client.last_event_id() is not None
+
+
+def test_last_event_id_no_transport(sentry_init):
+    sentry_init()
+    client = get_client()
+    client.transport = None
+
+    client.capture_event({"event_id": "42"})
+
+    assert client.last_event_id() is None
+
+
+@pytest.mark.parametrize("type", ("check_in", "transaction"))
+def test_last_event_id_not_error(type, sentry_init):
+    sentry_init()
+    client = get_client()
+
+    client.capture_event({"type": type, "event_id": "42"})
+
+    assert client.last_event_id() is None
+
+
+@pytest.mark.parametrize("type", ("check_in", "transaction"))
+def test_last_event_id_not_error_after_error(type, sentry_init):
+    sentry_init()
+    client = get_client()
+
+    client.capture_event({"event_id": "error_id"})
+    client.capture_event({"type": type, "event_id": "not_error_id"})
+
+    assert client.last_event_id() == "error_id"
