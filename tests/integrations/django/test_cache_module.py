@@ -560,13 +560,18 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     with sentry_sdk.start_transaction():
         cache.set_many({f"S{id}": "Sensitive1", f"S{id+1}": "Sensitive2"})
         cache.get(f"S{id}")
-        
-    import ipdb; ipdb.set_trace()
+
+    import ipdb
+
+    ipdb.set_trace()
     (transaction,) = events
     assert len(transaction["spans"]) == 4
 
     assert transaction["spans"][0]["op"] == "cache.set_item"
-    assert transaction["spans"][0]["description"] == f"set_many {{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
+    assert (
+        transaction["spans"][0]["description"]
+        == f"set_many {{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
+    )
     assert "cache.hit" not in transaction["spans"][0]["data"]
 
     assert transaction["spans"][1]["op"] == "cache.set_item"
