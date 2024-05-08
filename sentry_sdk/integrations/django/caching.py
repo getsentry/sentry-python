@@ -24,7 +24,7 @@ METHODS_TO_INSTRUMENT = [
 
 
 def _get_key(args, kwargs):
-    # type: (Any, Any) -> str
+    # type: (list[Any], dict[str, Any]) -> str
     if args is not None and len(args) >= 1:
         return str(args[0])
     elif kwargs is not None and "key" in kwargs:
@@ -91,9 +91,8 @@ def _patch_cache_method(cache, method_name, address, port):
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
                         span.set_data(SPANDATA.CACHE_HIT, False)
-                else:
-                    if integration.cache_spans_add_item_size:
-                        item_size = len(str(args[1]))
+                elif integration.cache_spans_add_item_size:
+                    item_size = len(str(args[1]))
 
                 if item_size is not None:
                     span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
