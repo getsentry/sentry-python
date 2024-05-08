@@ -1,4 +1,5 @@
 import pytest
+import os
 import random
 
 from django import VERSION as DJANGO_VERSION
@@ -10,6 +11,7 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.caching import _get_span_description
 from tests.integrations.django.myapp.wsgi import application
@@ -468,3 +470,68 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["data"]["cache.hit"]
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+                cache_spans_add_item_size=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    id = os.getpid()
+
+    from django.core.cache import cache
+
+    with sentry_sdk.start_transaction():
+        cache.get_many([f"S{id}", f"S{id+1}"])
+        cache.set(f"S{id}", "Sensitive1")
+        cache.get_many([f"S{id}", f"S{id+1}"])
+
+    (transaction,) = events
+    assert len(transaction["spans"]) == 7
+
+    assert transaction["spans"][0]["op"] == "cache.get_item"
+    assert transaction["spans"][0]["description"] == f"get_many ['S{id}', 'S{id+1}']"
+    assert not transaction["spans"][0]["data"]["cache.hit"]
+
+    assert transaction["spans"][1]["op"] == "cache.get_item"
+    assert transaction["spans"][1]["description"] == f"get S{id}"
+    assert transaction["spans"][1]["data"][
+        "cache.hit"
+    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+
+    assert transaction["spans"][2]["op"] == "cache.get_item"
+    assert transaction["spans"][2]["description"] == f"get S{id+1}"
+    assert transaction["spans"][2]["data"][
+        "cache.hit"
+    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+
+    assert transaction["spans"][3]["op"] == "cache.set_item"
+    assert transaction["spans"][3]["description"] == f"set S{id}"
+    assert "cache.hit" not in transaction["spans"][3]["data"]
+
+    assert transaction["spans"][4]["op"] == "cache.get_item"
+    assert transaction["spans"][4]["description"] == f"get_many ['S{id}', 'S{id+1}']"
+    assert transaction["spans"][4]["data"]["cache.hit"]
+
+    assert transaction["spans"][5]["op"] == "cache.get_item"
+    assert transaction["spans"][5]["description"] == f"get S{id}"
+    assert transaction["spans"][5]["data"][
+        "cache.hit"
+    ]  # LocMemCache always returns True (but that is ok, because it is not production)
+
+    assert transaction["spans"][6]["op"] == "cache.get_item"
+    assert transaction["spans"][6]["description"] == f"get S{id+1}"
+    assert transaction["spans"][6]["data"][
+        "cache.hit"
+    ]  # LocMemCache always returns True (but that is ok, because it is not production)
