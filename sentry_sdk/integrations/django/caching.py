@@ -7,7 +7,7 @@ from django.core.cache import CacheHandler
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, capture_internal_exceptions, ensure_integration_enabled
 
 
 if TYPE_CHECKING:
@@ -19,14 +19,19 @@ if TYPE_CHECKING:
 
 METHODS_TO_INSTRUMENT = [
     "set",
+    "set_many",
     "get",
+    "get_many",
 ]
 
 
 def _get_key(args, kwargs):
     # type: (list[Any], dict[str, Any]) -> str
     if args is not None and len(args) >= 1:
-        return str(args[0])
+        key = args[0]
+        if isinstance(key, dict):
+            key = {x: SENSITIVE_DATA_SUBSTITUTE for x in key}
+        return str(key)
     elif kwargs is not None and "key" in kwargs:
         return str(kwargs["key"])
 
@@ -92,8 +97,14 @@ def _patch_cache_method(cache, method_name, address, port):
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
                         span.set_data(SPANDATA.CACHE_HIT, False)
-                elif integration.cache_spans_add_item_size:
-                    item_size = len(str(args[1]))
+                else:
+                    if integration.cache_spans_add_item_size:
+                        try:
+                            # 'set' command
+                            item_size = len(str(args[1]))
+                        except IndexError:
+                            # 'set_many' command
+                            item_size = len(str(args[0]))
 
                 if item_size is not None:
                     span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
