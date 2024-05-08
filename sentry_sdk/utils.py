@@ -713,11 +713,15 @@ def get_errno(exc_value):
 
 def get_error_message(exc_value):
     # type: (Optional[BaseException]) -> str
-    return (
+    value = (
         getattr(exc_value, "message", "")
         or getattr(exc_value, "detail", "")
         or safe_str(exc_value)
     )
+    notes = getattr(exc_value, "__notes__", [])
+    if notes:
+        value = "\n".join([value] + [safe_str(note) for note in notes])
+    return value
 
 
 def single_exception_from_error_tuple(
