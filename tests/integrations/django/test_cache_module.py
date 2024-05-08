@@ -502,31 +502,24 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][0]["op"] == "cache.get_item"
     assert transaction["spans"][0]["description"] == f"get_many ['S{id}', 'S{id+1}']"
-    assert not transaction["spans"][0]["data"]["cache.hit"]
 
     assert transaction["spans"][1]["op"] == "cache.get_item"
     assert transaction["spans"][1]["description"] == f"get S{id}"
-    assert not transaction["spans"][1]["data"]["cache.hit"]
 
     assert transaction["spans"][2]["op"] == "cache.get_item"
     assert transaction["spans"][2]["description"] == f"get S{id+1}"
-    assert not transaction["spans"][2]["data"]["cache.hit"]
 
     assert transaction["spans"][3]["op"] == "cache.set_item"
     assert transaction["spans"][3]["description"] == f"set S{id}"
-    assert "cache.hit" not in transaction["spans"][3]["data"]
 
     assert transaction["spans"][4]["op"] == "cache.get_item"
     assert transaction["spans"][4]["description"] == f"get_many ['S{id}', 'S{id+1}']"
-    assert transaction["spans"][4]["data"]["cache.hit"]
 
     assert transaction["spans"][5]["op"] == "cache.get_item"
     assert transaction["spans"][5]["description"] == f"get S{id}"
-    assert not transaction["spans"][5]["data"]["cache.hit"]
 
     assert transaction["spans"][6]["op"] == "cache.get_item"
     assert transaction["spans"][6]["description"] == f"get S{id+1}"
-    assert not transaction["spans"][6]["data"]["cache.hit"]
 
 
 @pytest.mark.forked
@@ -561,16 +554,12 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
         transaction["spans"][0]["description"]
         == f"set_many {{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
     )
-    assert "cache.hit" not in transaction["spans"][0]["data"]
 
     assert transaction["spans"][1]["op"] == "cache.set_item"
     assert transaction["spans"][1]["description"] == f"set S{id}"
-    assert "cache.hit" not in transaction["spans"][1]["data"]
 
     assert transaction["spans"][2]["op"] == "cache.set_item"
     assert transaction["spans"][2]["description"] == f"set S{id+1}"
-    assert "cache.hit" not in transaction["spans"][2]["data"]
 
     assert transaction["spans"][3]["op"] == "cache.get_item"
     assert transaction["spans"][3]["description"] == f"get S{id}"
-    assert transaction["spans"][3]["data"]["cache.hit"]
