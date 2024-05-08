@@ -18,6 +18,7 @@ from sentry_sdk import (
     add_breadcrumb,
     Hub,
     Scope,
+    last_event_id,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -778,3 +779,24 @@ def test_classmethod_tracing(sentry_init):
         with patch_start_tracing_child() as fake_start_child:
             assert instance_or_class.class_(1) == (TracingTestClass, 1)
             assert fake_start_child.call_count == 1
+
+
+def test_last_event_id(sentry_init):
+    sentry_init()
+
+    assert last_event_id() is None
+
+    capture_exception(ValueError("foo"))
+
+    assert last_event_id() is not None
+
+
+def test_last_event_id_transaction(sentry_init):
+    sentry_init()
+
+    assert last_event_id() is None
+
+    with start_transaction():
+        pass
+
+    assert last_event_id() is None
