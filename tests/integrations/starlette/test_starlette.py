@@ -676,9 +676,7 @@ def test_middleware_spans_disabled(sentry_init, capture_events):
 
     (_, transaction_event) = events
 
-    expected_middleware_spans = []
-
-    assert len(transaction_event["spans"]) == len(expected_middleware_spans)
+    assert len(transaction_event["spans"]) == 0
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
