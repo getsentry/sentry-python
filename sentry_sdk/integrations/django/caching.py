@@ -65,7 +65,8 @@ def _patch_cache_method(cache, method_name, address, port):
 
             with capture_internal_exceptions():
                 if address is not None:
-                    # Strip eventually contained username and password in url style location
+                    # If address is a URL (could also be a string identifier or path to a Unix socket)
+                    # remove the username and password from URL to not leak sensitive data.
                     if "://" in address:
                         parsed_url = urlparse(address)
                         address = "{}://{}{}".format(
