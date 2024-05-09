@@ -79,7 +79,7 @@ if TYPE_CHECKING:
 
     from django.core.handlers.wsgi import WSGIRequest
     from django.http.response import HttpResponse
-    from django.http.request import QueryDict
+    from django.http.request import QueryDict, RawPostDataException
     from django.utils.datastructures import MultiValueDict
 
     from sentry_sdk.tracing import Span
@@ -554,7 +554,10 @@ class DjangoRequestExtractor(RequestExtractor):
         try:
             return self.request.data
         except AttributeError:
-            return RequestExtractor.parsed_body(self)
+            try:
+                return RequestExtractor.parsed_body(self)
+            except RawPostDataException:
+                return None  # something has already read the POST data
 
 
 def _set_user_info(request, event):
