@@ -127,23 +127,21 @@ def _get_address_port(settings):
     address, port = None, None
     location = settings.get("LOCATION")
     # TODO: location can also be an array of locations
-    # see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
-    # GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
+    #       see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
+    #       GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
     if isinstance(location, str):
-        if ":" in location:
-            address, port = location.rsplit(":", 1)
+        if "://" in location:
+            parsed_url = urlparse(address)
+            # remove the username and password from URL to not leak sensitive data.
+            address = "{}://{}{}".format(
+                parsed_url.scheme or "",
+                parsed_url.netloc or "",
+                parsed_url.path or "",
+            )
+            port = parsed_url.port
         else:
-            address, port = location, None
-
-    # If address is a URL (could also be a string identifier or path to a Unix socket)
-    # remove the username and password from URL to not leak sensitive data.
-    if address is not None and "://" in address:
-        parsed_url = urlparse(address)
-        address = "{}://{}{}".format(
-            parsed_url.scheme or "",
-            parsed_url.netloc or "",
-            parsed_url.path or "",
-        )
+            address = location
+            port = None
 
     return address, int(port) if port is not None else None
 
