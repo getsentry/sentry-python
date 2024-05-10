@@ -131,7 +131,7 @@ def _get_address_port(settings):
     #       GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
     if isinstance(location, str):
         if "://" in location:
-            parsed_url = urlparse(address)
+            parsed_url = urlparse(location)
             # remove the username and password from URL to not leak sensitive data.
             address = "{}://{}{}".format(
                 parsed_url.scheme or "",

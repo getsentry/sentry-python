@@ -67,6 +67,16 @@ def use_django_caching_with_port(settings):
 
 
 @pytest.fixture
+def use_django_caching_without_port(settings):
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+            "LOCATION": "redis://example.com",
+        }
+    }
+
+
+@pytest.fixture
 def use_django_caching_with_cluster(settings):
     settings.CACHES = {
         "default": {
@@ -400,6 +410,32 @@ def test_cache_spans_location_with_port(
                 span["data"]["network.peer.address"] == "redis://127.0.0.1"
             )  # Note: the username/password are not included in the address
             assert span["data"]["network.peer.port"] == 6379
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_cache_spans_location_without_port(
+    sentry_init, client, capture_events, use_django_caching_without_port
+):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("cached_view"))
+    client.get(reverse("cached_view"))
+
+    for event in events:
+        for span in event["spans"]:
+            assert span["data"]["network.peer.address"] == "redis://example.com"
+            assert "network.peer.port" not in span["data"]
 
 
 @pytest.mark.forked
