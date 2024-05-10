@@ -126,24 +126,26 @@ def _patch_cache(cache, address=None, port=None):
 
 def _get_address_port(settings):
     # type: (dict[str, Any]) -> tuple[Optional[str], Optional[int]]
-    address, port = None, None
     location = settings.get("LOCATION")
+
     # TODO: location can also be an array of locations
     #       see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
     #       GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
-    if isinstance(location, str):
-        if "://" in location:
-            parsed_url = urlparse(location)
-            # remove the username and password from URL to not leak sensitive data.
-            address = "{}://{}{}".format(
-                parsed_url.scheme or "",
-                parsed_url.hostname or "",
-                parsed_url.path or "",
-            )
-            port = parsed_url.port
-        else:
-            address = location
-            port = None
+    if not isinstance(location, str):
+        return None, None
+
+    if "://" in location:
+        parsed_url = urlparse(location)
+        # remove the username and password from URL to not leak sensitive data.
+        address = "{}://{}{}".format(
+            parsed_url.scheme or "",
+            parsed_url.hostname or "",
+            parsed_url.path or "",
+        )
+        port = parsed_url.port
+    else:
+        address = location
+        port = None
 
     return address, int(port) if port is not None else None
 
