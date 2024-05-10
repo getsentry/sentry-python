@@ -185,6 +185,7 @@ class Scope(object):
         "_propagation_context",
         "client",
         "_type",
+        "_last_event_id",
     )
 
     def __init__(self, ty=None, client=None):
@@ -206,6 +207,9 @@ class Scope(object):
 
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
+
+        # self._last_event_id is only applicable to isolation scopes
+        self._last_event_id = None  # type: Optional[str]
 
     def __copy__(self):
         # type: () -> Scope
@@ -307,6 +311,23 @@ class Scope(object):
             _global_scope = Scope(ty=ScopeType.GLOBAL)
 
         return _global_scope
+
+    @classmethod
+    def last_event_id(cls):
+        # type: () -> Optional[str]
+        """
+        .. versionadded:: 2.2.0
+
+        Returns event ID of the event most recently captured by the isolation scope, or None if no event
+        has been captured. We do not consider events that are dropped, e.g. by a before_send hook.
+        Transactions also are not considered events in this context.
+
+        The event corresponding to the returned event ID is NOT guaranteed to actually be sent to Sentry;
+        whether the event is sent depends on the transport. The event could be sent later or not at all.
+        Even a sent event could fail to arrive in Sentry due to network issues, exhausted quotas, or
+        various other reasons.
+        """
+        return cls.get_isolation_scope()._last_event_id
 
     def _merge_scopes(self, additional_scope=None, additional_scope_kwargs=None):
         # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
@@ -1089,7 +1110,12 @@ class Scope(object):
         """
         scope = self._merge_scopes(scope, scope_kwargs)
 
-        return Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
+        event_id = Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
+
+        if event_id is not None and event.get("type") != "transaction":
+            self.get_isolation_scope()._last_event_id = event_id
+
+        return event_id
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
