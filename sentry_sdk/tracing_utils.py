@@ -421,6 +421,16 @@ class PropagationContext:
             except AttributeError:
                 pass
 
+    def __repr__(self):
+        # type: (...) -> str
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} dynamic_sampling_context={}>".format(
+            self._trace_id,
+            self._span_id,
+            self.parent_span_id,
+            self.parent_sampled,
+            self.dynamic_sampling_context,
+        )
+
 
 class Baggage:
     """

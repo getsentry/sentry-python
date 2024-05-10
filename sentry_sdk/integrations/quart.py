@@ -87,9 +87,11 @@ def patch_asgi_app():
     # type: () -> None
     old_app = Quart.__call__
 
-    @ensure_integration_enabled(QuartIntegration, old_app)
     async def sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
+        if sentry_sdk.get_client().get_integration(QuartIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
         middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
