@@ -45,7 +45,7 @@ def _get_key(args, kwargs):
 
 
 def _get_span_description(method_name, args, kwargs):
-    # type: (str, Any, Any) -> str
+    # type: (str, list[Any], dict[str, Any]) -> str
     description = "{} {}".format(
         method_name,
         _get_key(args, kwargs),
@@ -63,7 +63,7 @@ def _patch_cache_method(cache, method_name, address, port):
     def _instrument_call(
         cache, method_name, original_method, args, kwargs, address, port
     ):
-        # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[int]) -> Any
+        # type: (CacheHandler, str, Callable[..., Any], list[Any], dict[str, Any], Optional[str], Optional[int]) -> Any
         is_set_operation = method_name.startswith("set")
         is_get_operation = not is_set_operation
 
