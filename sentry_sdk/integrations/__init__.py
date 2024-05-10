@@ -78,6 +78,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.celery.CeleryIntegration",
     "sentry_sdk.integrations.chalice.ChaliceIntegration",
     "sentry_sdk.integrations.clickhouse_driver.ClickhouseDriverIntegration",
+    "sentry_sdk.integrations.cohere.CohereIntegration",
     "sentry_sdk.integrations.django.DjangoIntegration",
     "sentry_sdk.integrations.falcon.FalconIntegration",
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
