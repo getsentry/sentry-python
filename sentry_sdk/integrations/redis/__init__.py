@@ -365,6 +365,7 @@ class RedisIntegration(Integration):
         # type: (int) -> None
         self.max_data_size = max_data_size
         # TODO: add some prefix that users can set to specify a cache key
+        # GitHub issue: https://github.com/getsentry/sentry-python/issues/2965
 
     @staticmethod
     def setup_once():
