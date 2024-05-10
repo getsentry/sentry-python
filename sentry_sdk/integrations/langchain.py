@@ -221,7 +221,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             watched_span.no_collect_tokens = any(
                 x in all_params.get("_type", "") for x in NO_COLLECT_TOKEN_MODELS
             )
-            print(all_params.get("_type"))
 
             if not model and "anthropic" in all_params.get("_type"):
                 model = "claude-2"
