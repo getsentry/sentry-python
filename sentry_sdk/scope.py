@@ -1640,3 +1640,6 @@ def should_send_default_pii():
 
 # Circular imports
 from sentry_sdk.client import NonRecordingClient
+
+if TYPE_CHECKING:
+    import sentry_sdk.client
