@@ -137,7 +137,7 @@ def _get_address_port(settings):
             # remove the username and password from URL to not leak sensitive data.
             address = "{}://{}{}".format(
                 parsed_url.scheme or "",
-                parsed_url.netloc or "",
+                parsed_url.hostname or "",
                 parsed_url.path or "",
             )
             port = parsed_url.port
