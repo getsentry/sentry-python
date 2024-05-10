@@ -438,7 +438,6 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
                 cache_spans=True,
                 middleware_spans=False,
                 signals_spans=False,
-                cache_spans_add_item_size=True,
             )
         ],
         traces_sample_rate=1.0,
@@ -481,7 +480,6 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
                 cache_spans=True,
                 middleware_spans=False,
                 signals_spans=False,
-                cache_spans_add_item_size=True,
             )
         ],
         traces_sample_rate=1.0,
@@ -531,7 +529,6 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
                 cache_spans=True,
                 middleware_spans=False,
                 signals_spans=False,
-                cache_spans_add_item_size=True,
             )
         ],
         traces_sample_rate=1.0,

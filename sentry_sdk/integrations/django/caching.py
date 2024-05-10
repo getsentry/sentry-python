@@ -88,19 +88,17 @@ def _patch_cache_method(cache, method_name, address, port):
                 item_size = None
                 if is_get_operation:
                     if value:
-                        if integration.cache_spans_add_item_size:
-                            item_size = len(str(value))
+                        item_size = len(str(value))
                         span.set_data(SPANDATA.CACHE_HIT, True)
                     else:
                         span.set_data(SPANDATA.CACHE_HIT, False)
                 else:
-                    if integration.cache_spans_add_item_size:
-                        try:
-                            # 'set' command
-                            item_size = len(str(args[1]))
-                        except IndexError:
-                            # 'set_many' command
-                            item_size = len(str(args[0]))
+                    try:
+                        # 'set' command
+                        item_size = len(str(args[1]))
+                    except IndexError:
+                        # 'set_many' command
+                        item_size = len(str(args[0]))
 
                 if item_size is not None:
                     span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)

@@ -112,7 +112,6 @@ class DjangoIntegration(Integration):
     :param signals_spans: Whether to create spans for signals. Defaults to `True`.
     :param signals_denylist: A list of signals to ignore when creating spans.
     :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
-    :param cache_spans_add_item_size: Whether to add the size of the cache item to the span data. Only applicable when `cache_spans` is set to `True`. Defaults to `False`.
     """
 
     identifier = "django"
@@ -130,7 +129,6 @@ class DjangoIntegration(Integration):
         signals_spans=True,
         cache_spans=False,
         signals_denylist=None,
-        cache_spans_add_item_size=False,
     ):
         # type: (str, bool, bool, bool, Optional[list[signals.Signal]], bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
@@ -145,7 +143,6 @@ class DjangoIntegration(Integration):
         self.signals_denylist = signals_denylist or []
 
         self.cache_spans = cache_spans
-        self.cache_spans_add_item_size = cache_spans_add_item_size
 
     @staticmethod
     def setup_once():
