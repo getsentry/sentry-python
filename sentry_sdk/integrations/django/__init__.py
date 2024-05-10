@@ -130,7 +130,7 @@ class DjangoIntegration(Integration):
         cache_spans=False,
         signals_denylist=None,
     ):
-        # type: (str, bool, bool, bool, Optional[list[signals.Signal]], bool) -> None
+        # type: (str, bool, bool, bool, Optional[list[signals.Signal]]) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
