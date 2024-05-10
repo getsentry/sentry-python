@@ -28,7 +28,7 @@ def init_celery(sentry_init, request):
     def inner(propagate_traces=True, backend="always_eager", **kwargs):
         sentry_init(
             integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
-            **kwargs
+            **kwargs,
         )
         celery = Celery(__name__)
 
@@ -704,3 +704,21 @@ def test_retry_count_nonzero(mock_request, init_celery, capture_events):
     (event,) = events
     (span,) = event["spans"]
     assert span["data"]["messaging.message.retry.count"] == 3
+
+
+@pytest.mark.parametrize("system", ("redis", "amqp"))
+def test_messaging_system(system, init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    events = capture_events()
+
+    # Does not need to be a real URL, since we use always eager
+    celery.conf.broker_url = f"{system}://example.com"  # noqa: E231
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.system"] == system

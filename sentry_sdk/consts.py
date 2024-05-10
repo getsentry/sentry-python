@@ -280,6 +280,11 @@ class SPANDATA:
     Number of retries/attempts to process a message.
     """
 
+    MESSAGING_SYSTEM = "messaging.system"
+    """
+    The messaging system's name, e.g. `kafka`, `aws_sqs`
+    """
+
     SERVER_ADDRESS = "server.address"
     """
     Name of the database host.

@@ -362,6 +362,11 @@ def _wrap_task_call(task, f):
                     span.set_data(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
+                with capture_internal_exceptions():
+                    span.set_data(
+                        SPANDATA.MESSAGING_SYSTEM,
+                        task.app.connection().transport.driver_type,
+                    )
 
                 return f(*args, **kwargs)
         except Exception:
