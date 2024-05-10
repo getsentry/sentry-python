@@ -64,7 +64,6 @@ def _patch_cache_method(cache, method_name, address, port):
         cache, method_name, original_method, args, kwargs, address, port
     ):
         # type: (CacheHandler, str, Callable[..., Any], Any, Any, Optional[str], Optional[int]) -> Any
-        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         is_set_operation = method_name.startswith("set")
         is_get_operation = not is_set_operation
 
