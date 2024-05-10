@@ -128,6 +128,7 @@ def _get_address_port(settings):
     location = settings.get("LOCATION")
     # TODO: location can also be an array of locations
     # see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
+    # GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
     if isinstance(location, str):
         if ":" in location:
             address, port = location.rsplit(":", 1)
