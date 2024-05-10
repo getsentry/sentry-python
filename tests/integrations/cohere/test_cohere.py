@@ -109,7 +109,7 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
         )
     )
 
-    with start_transaction(name="openai tx"):
+    with start_transaction(name="cohere tx"):
         responses = list(
             client.chat_stream(
                 model="some-model",
@@ -184,7 +184,7 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
         )
     )
 
-    with start_transaction(name="openai tx"):
+    with start_transaction(name="cohere tx"):
         response = client.embed(texts=["hello"], model="text-embedding-3-large")
 
     assert len(response.embeddings[0]) == 3
