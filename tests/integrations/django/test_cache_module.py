@@ -203,7 +203,7 @@ def test_cache_spans_middleware(
         "views.decorators.cache.cache_header."
     )
     assert "cache.hit" not in first_event["spans"][1]["data"]
-    assert "cache.item_size" not in first_event["spans"][1]["data"]
+    assert first_event["spans"][1]["data"]["cache.item_size"] == 2 
     # second_event - cache.get
     assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
@@ -225,7 +225,7 @@ def test_cache_spans_middleware(
         "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][1]["data"]
+    assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
 @pytest.mark.forked
@@ -269,7 +269,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
         "views.decorators.cache.cache_header."
     )
     assert "cache.hit" not in first_event["spans"][1]["data"]
-    assert "cache.item_size" not in first_event["spans"][1]["data"]
+    assert first_event["spans"][1]["data"]["cache.item_size"] == 2 
     # second_event - cache.get
     assert second_event["spans"][1]["op"] == "cache.get_item"
     assert second_event["spans"][1]["description"].startswith(
@@ -280,7 +280,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
         "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][0]["data"]
+    assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
 @pytest.mark.forked
@@ -327,7 +327,7 @@ def test_cache_spans_templatetag(
         "template.cache.some_identifier."
     )
     assert "cache.hit" not in first_event["spans"][1]["data"]
-    assert "cache.item_size" not in first_event["spans"][1]["data"]
+    assert first_event["spans"][1]["data"]["cache.item_size"] == 51
     # second_event - cache.get
     assert second_event["spans"][0]["op"] == "cache.get_item"
     assert second_event["spans"][0]["description"].startswith(
@@ -338,7 +338,7 @@ def test_cache_spans_templatetag(
         "template.cache.some_identifier."
     )
     assert second_event["spans"][0]["data"]["cache.hit"]
-    assert "cache.item_size" not in second_event["spans"][0]["data"]
+    assert second_event["spans"][0]["data"]["cache.item_size"] == 51
 
 
 @pytest.mark.parametrize(
