@@ -70,6 +70,7 @@ GROUPS = {
         "arq",
         "beam",
         "celery",
+        "cohere",
         "huey",
         "langchain",
         "openai",

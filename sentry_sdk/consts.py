@@ -91,6 +91,18 @@ class SPANDATA:
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
+    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_PRESENCE_PENALTY = "ai.presence_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
     AI_INPUT_MESSAGES = "ai.input_messages"
     """
     The input messages to an LLM call.
@@ -164,10 +176,29 @@ class SPANDATA:
     For an AI model call, the logit bias
     """
 
+    AI_PREAMBLE = "ai.preamble"
+    """
+    For an AI model call, the preamble parameter.
+    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
+    Example: "You are now a clown."
+    """
+
+    AI_RAW_PROMPTING = "ai.raw_prompting"
+    """
+    Minimize pre-processing done to the prompt sent to the LLM.
+    Example: true
+    """
+
     AI_RESPONSES = "ai.responses"
     """
     The responses to an AI model call. Always as a list.
     Example: ["hello", "world"]
+    """
+
+    AI_SEED = "ai.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: 123.45
     """
 
     DB_NAME = "db.name"
@@ -298,6 +329,8 @@ class SPANDATA:
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET_ITEM = "cache.get_item"
+    COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
+    COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"

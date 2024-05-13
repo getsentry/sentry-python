@@ -12,13 +12,19 @@ from sentry_sdk.utils import (
     package_version,
 )
 
-from anthropic.resources import Messages
-
 from typing import TYPE_CHECKING
+
+try:
+    from anthropic.resources import Messages
+
+    if TYPE_CHECKING:
+        from anthropic.types import MessageStreamEvent
+except ImportError:
+    raise DidNotEnable("Anthropic not installed")
+
 
 if TYPE_CHECKING:
     from typing import Any, Iterator
-    from anthropic.types import MessageStreamEvent
     from sentry_sdk.tracing import Span
 
 
