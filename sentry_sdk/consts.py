@@ -264,6 +264,27 @@ class SPANDATA:
     Example: 418
     """
 
+    MESSAGING_DESTINATION_NAME = "messaging.destination.name"
+    """
+    The destination name where the message is being consumed from,
+    e.g. the queue name or topic.
+    """
+
+    MESSAGING_MESSAGE_ID = "messaging.message.id"
+    """
+    The message's identifier.
+    """
+
+    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
+    """
+    Number of retries/attempts to process a message.
+    """
+
+    MESSAGING_SYSTEM = "messaging.system"
+    """
+    The messaging system's name, e.g. `kafka`, `aws_sqs`
+    """
+
     SERVER_ADDRESS = "server.address"
     """
     Name of the database host.
@@ -366,6 +387,7 @@ class OP:
     LANGCHAIN_TOOL = "ai.tool.langchain"
     LANGCHAIN_AGENT = "ai.agent.langchain"
     LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
+    QUEUE_PROCESS = "queue.process"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
