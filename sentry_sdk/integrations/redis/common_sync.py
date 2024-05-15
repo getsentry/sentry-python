@@ -1,17 +1,55 @@
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import (
     _get_span_description,
     _set_client_data,
     _set_pipeline_data,
 )
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, capture_internal_exceptions
 import sentry_sdk
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
+    from typing import Any, Optional
+
+
+def _get_cache_span_description(method_name, args, kwargs):
+    # type: (str, list[Any], dict[str, Any]) -> str
+    description = "{} {}".format(
+        method_name,
+        _get_key(method_name, args, kwargs),
+    )
+    return description
+
+
+def _get_key(name, args, kwargs):
+    # type: (str, list[Any], dict[str, Any]) -> str
+    key = ""
+
+    if args is not None and len(args) >= 1:
+        key = args[0]
+    elif kwargs is not None and "key" in kwargs:
+        key = kwargs["key"]
+
+    if isinstance(key, dict):
+        # Do not leak sensitive data
+        # `set_many()` has a dict {"key1": "value1", "key2": "value2"} as first argument.
+        # Those values could include sensitive data so we replace them with a placeholder
+        key = {x: SENSITIVE_DATA_SUBSTITUTE for x in key}
+
+    return str(key)
+
+
+def _get_op(name):
+    # type: (str) -> Optional[str]
+    op = None
+    if name.lower().startswith("get"):
+        op = OP.CACHE_GET_ITEM
+    elif name.lower().startswith("set"):
+        op = OP.CACHE_SET_ITEM
+
+    return op
 
 
 def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn):
@@ -81,7 +119,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
         if is_cache_key and op is not None:
             cache_span = sentry_sdk.start_span(op=op, description=description)
             cache_span.__enter__()
-            
+
         db_span = sentry_sdk.start_span(op=OP.DB_REDIS, description=description)
         db_span.__enter__()
 
