@@ -1,11 +1,10 @@
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.redis.modules.caches import _get_cache_span_description
-from sentry_sdk.integrations.redis.modules.queries import _get_db_span_description
+from sentry_sdk.integrations.redis.modules.caches import _compile_cache_span_properties
+from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
     _set_client_data,
     _set_pipeline_data,
-    _get_safe_key,
 )
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
@@ -13,57 +12,7 @@ import sentry_sdk
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from sentry_sdk.integrations.redis import RedisIntegration
-    from typing import Any, Optional
-
-
-def _get_op(name):
-    # type: (str) -> Optional[str]
-    op = None
-    if name.lower().startswith("get"):
-        op = OP.CACHE_GET_ITEM
-    elif name.lower().startswith("set"):
-        op = OP.CACHE_SET_ITEM
-
-    return op
-
-
-def _compile_db_span_properties(integration, redis_command, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any], dict[str, Any]) -> dict[str, Any]
-    key = _get_safe_key(redis_command, args, kwargs)
-    description = _get_db_span_description(integration, redis_command, *args)
-
-    properties = {
-        "op": OP.DB_REDIS,
-        "description": description,
-        "redis_command": redis_command,
-        "key": key,
-    }
-
-    return properties
-
-
-def _compile_cache_span_properties(integration, redis_command, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any], dict[str, Any]) -> dict[str, Any]
-    key = _get_safe_key(redis_command, args, kwargs)
-
-    is_cache_key = False
-    for prefix in integration.cache_prefixes:
-        if key.startswith(prefix):
-            is_cache_key = True
-            break
-
-    properties = {
-        "op": _get_op(redis_command),
-        "description": _get_cache_span_description(
-            integration, redis_command, args, kwargs
-        ),
-        "key": key,
-        "redis_command": redis_command,
-        "is_cache_key": is_cache_key,
-    }
-
-    return properties
+    from typing import Any
 
 
 def patch_redis_pipeline(
