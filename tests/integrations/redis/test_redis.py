@@ -85,7 +85,8 @@ def test_redis_pipeline(
 def test_sensitive_data(sentry_init, capture_events):
     # fakeredis does not support the AUTH command, so we need to mock it
     with mock.patch(
-        "sentry_sdk.integrations.redis.utils._COMMANDS_INCLUDING_SENSITIVE_DATA", ["get"]
+        "sentry_sdk.integrations.redis.utils._COMMANDS_INCLUDING_SENSITIVE_DATA",
+        ["get"],
     ):
         sentry_init(
             integrations=[RedisIntegration()],
