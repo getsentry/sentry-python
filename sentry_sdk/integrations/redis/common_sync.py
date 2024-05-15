@@ -6,7 +6,7 @@ from sentry_sdk.integrations.redis.utils import (
     _set_pipeline_data,
 )
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
+from sentry_sdk.utils import capture_internal_exceptions
 import sentry_sdk
 
 if TYPE_CHECKING:
@@ -19,10 +19,12 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_d
     old_execute = pipeline_cls.execute
 
     from sentry_sdk.integrations.redis import RedisIntegration
-    
-    @ensure_integration_enabled(RedisIntegration, old_execute)
+
     def sentry_patched_execute(self, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
+        if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
+            return old_execute(self, *args, **kwargs)
+
         with sentry_sdk.start_span(
             op=OP.DB_REDIS, description="redis.pipeline.execute"
         ) as span:
@@ -49,10 +51,14 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
     """
     old_execute_command = cls.execute_command
 
-    @ensure_integration_enabled(RedisIntegration, old_execute_command)
+    from sentry_sdk.integrations.redis import RedisIntegration
+
     def sentry_patched_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
         integration = sentry_sdk.get_client().get_integration(RedisIntegration)
+        if integration is None:
+            return old_execute_command(self, name, *args, **kwargs)
+
         description = _get_span_description(name, *args)
 
         data_should_be_truncated = (

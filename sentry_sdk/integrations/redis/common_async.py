@@ -52,6 +52,8 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
     # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
     old_execute_command = cls.execute_command
 
+    from sentry_sdk.integrations.redis import RedisIntegration
+
     async def _sentry_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
         if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
