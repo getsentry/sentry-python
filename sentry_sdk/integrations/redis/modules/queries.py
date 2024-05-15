@@ -4,12 +4,31 @@ Code used for the Queries modules in Sentry
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations.redis.utils import _get_safe_command
+from sentry_sdk.utils import capture_internal_exceptions
 
 
 if TYPE_CHECKING:
     from redis import Redis
+    from sentry_sdk.integrations.redis import RedisIntegration
     from sentry_sdk.tracing import Span
     from typing import Any
+
+
+def _get_db_span_description(integration, command_name, *args):
+    # type: (RedisIntegration, str, *Any) -> str
+    description = command_name
+
+    with capture_internal_exceptions():
+        description = _get_safe_command(command_name, args)
+
+    data_should_be_truncated = (
+        integration.max_data_size and len(description) > integration.max_data_size
+    )
+    if data_should_be_truncated:
+        description = description[: integration.max_data_size - len("...")] + "..."
+
+    return description
 
 
 def _set_db_data_on_span(span, connection_params):

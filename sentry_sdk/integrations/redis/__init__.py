@@ -1,3 +1,4 @@
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb
@@ -6,15 +7,17 @@ from sentry_sdk.integrations.redis.redis_cluster import _patch_redis_cluster
 from sentry_sdk.integrations.redis.rediscluster import _patch_rediscluster
 from sentry_sdk.utils import logger
 
+if TYPE_CHECKING:
+    from typing import Optional
+
 
 class RedisIntegration(Integration):
     identifier = "redis"
 
-    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE):
-        # type: (int) -> None
+    def __init__(self, max_data_size=_DEFAULT_MAX_DATA_SIZE, cache_prefixes=None):
+        # type: (int, Optional[list[str]]) -> None
         self.max_data_size = max_data_size
-        # TODO: add some prefix that users can set to specify a cache key
-        # GitHub issue: https://github.com/getsentry/sentry-python/issues/2965
+        self.cache_prefixes = cache_prefixes if cache_prefixes is not None else []
 
     @staticmethod
     def setup_once():

@@ -1,7 +1,7 @@
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations.redis.modules.queries import _get_db_span_description
 from sentry_sdk.integrations.redis.utils import (
-    _get_span_description,
     _set_client_data,
     _set_pipeline_data,
 )
@@ -48,18 +48,19 @@ def patch_redis_async_pipeline(
     pipeline_cls.execute = _sentry_execute  # type: ignore
 
 
-def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
-    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
+def patch_redis_async_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
+    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None], Callable[[Span, Any], None]) -> None
     old_execute_command = cls.execute_command
 
     from sentry_sdk.integrations.redis import RedisIntegration
 
     async def _sentry_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
-        if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
+        integration = sentry_sdk.get_client().get_integration(RedisIntegration)
+        if integration is None:
             return await old_execute_command(self, name, *args, **kwargs)
 
-        description = _get_span_description(name, *args)
+        description = _get_db_span_description(integration, name, *args)
 
         # TODO: Here we could also create the caching spans.
         #       Questions:

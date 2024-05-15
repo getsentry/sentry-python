@@ -8,7 +8,7 @@ from sentry_sdk.integrations.redis.consts import (
     _SINGLE_KEY_COMMANDS,
 )
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, capture_internal_exceptions
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 if TYPE_CHECKING:
@@ -44,19 +44,27 @@ def _get_safe_command(name, args):
     return command
 
 
+def _get_safe_key(name, args, kwargs):
+    # type: (str, tuple[Any], dict[str, Any]) -> str
+    key = ""
+
+    if args is not None and len(args) >= 1:
+        key = args[0]
+    elif kwargs is not None and "key" in kwargs:
+        key = kwargs["key"]
+
+    if isinstance(key, dict):
+        # Do not leak sensitive data
+        # `set_many()` has a dict {"key1": "value1", "key2": "value2"} as first argument.
+        # Those values could include sensitive data so we replace them with a placeholder
+        key = {x: SENSITIVE_DATA_SUBSTITUTE for x in key}
+
+    return str(key)
+
+
 def _parse_rediscluster_command(command):
     # type: (Any) -> Sequence[Any]
     return command.args
-
-
-def _get_span_description(name, *args):
-    # type: (str, *Any) -> str
-    description = name
-
-    with capture_internal_exceptions():
-        description = _get_safe_command(name, args)
-
-    return description
 
 
 def _set_pipeline_data(
