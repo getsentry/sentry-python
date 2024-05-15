@@ -12,7 +12,7 @@ from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, capture_internal_excepti
 
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Sequence
+    from typing import Any, Sequence
     from sentry_sdk.tracing import Span
 
 
@@ -42,23 +42,6 @@ def _get_safe_command(name, args):
 
     command = " ".join(command_parts)
     return command
-
-
-def _set_db_data_on_span(span, connection_params):
-    # type: (Span, Dict[str, Any]) -> None
-    span.set_data(SPANDATA.DB_SYSTEM, "redis")
-
-    db = connection_params.get("db")
-    if db is not None:
-        span.set_data(SPANDATA.DB_NAME, str(db))
-
-    host = connection_params.get("host")
-    if host is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, host)
-
-    port = connection_params.get("port")
-    if port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, port)
 
 
 def _parse_rediscluster_command(command):

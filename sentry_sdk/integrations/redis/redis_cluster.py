@@ -9,10 +9,9 @@ from sentry_sdk.integrations.redis.common_sync import (
     patch_redis_client,
     patch_redis_pipeline,
 )
-from sentry_sdk.integrations.redis.utils import (
-    _parse_rediscluster_command,
-    _set_db_data_on_span,
-)
+from sentry_sdk.integrations.redis.modules.queries import _set_db_data_on_span
+from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
+
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
