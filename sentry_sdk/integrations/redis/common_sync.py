@@ -1,6 +1,5 @@
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.redis.utils import (
     _get_span_description,
     _set_client_data,
@@ -19,6 +18,8 @@ def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_d
     # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
     old_execute = pipeline_cls.execute
 
+    from sentry_sdk.integrations.redis import RedisIntegration
+    
     @ensure_integration_enabled(RedisIntegration, old_execute)
     def sentry_patched_execute(self, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
