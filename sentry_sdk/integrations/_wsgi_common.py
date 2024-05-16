@@ -215,3 +215,5 @@ def _in_http_status_code_range(code, code_ranges):
                 return True
         except TypeError:
             logger.warning("TODO")
+
+    return False
