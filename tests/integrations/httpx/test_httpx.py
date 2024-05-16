@@ -5,6 +5,7 @@ import httpx
 import pytest
 import responses
 
+import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
@@ -258,10 +259,11 @@ def test_option_trace_propagation_targets(
         integrations=[HttpxIntegration()],
     )
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.start_transaction():  # Must be in a transaction to propagate headers
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     request_headers = httpx_mock.get_request().headers
 
@@ -269,6 +271,22 @@ def test_option_trace_propagation_targets(
         assert "sentry-trace" in request_headers
     else:
         assert "sentry-trace" not in request_headers
+
+
+def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
+    httpx_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_propagation_targets=[MATCH_ALL],
+        integrations=[HttpxIntegration()],
+    )
+
+    httpx_client = httpx.Client()
+    httpx_client.get("http://example.com/")
+
+    request_headers = httpx_mock.get_request().headers
+    assert "sentry-trace" not in request_headers
 
 
 @pytest.mark.tests_internal_exceptions
