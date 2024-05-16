@@ -73,7 +73,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
             cache_span = sentry_sdk.start_span(
                 op=cache_properties["op"],
-                description=cache_properties["op"],
+                description=cache_properties["description"],
             )
             cache_span.__enter__()
 
@@ -93,7 +93,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
         db_span.__exit__(None, None, None)
 
         if cache_span:
-            set_cache_data_fn(cache_span, cache_properties)
+            set_cache_data_fn(cache_span, self, cache_properties, value)
             cache_span.__exit__(None, None, None)
 
         return value

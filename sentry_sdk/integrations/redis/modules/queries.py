@@ -23,7 +23,7 @@ def _compile_db_span_properties(integration, redis_command, args, kwargs):
     properties = {
         "op": OP.DB_REDIS,
         "description": description,
-        "redis_command": redis_command,
+        "redis_command": redis_command.lower(),
         "key": key,
     }
 

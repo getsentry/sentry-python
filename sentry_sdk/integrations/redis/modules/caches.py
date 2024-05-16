@@ -6,6 +6,8 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_key
 
+GET_COMMANDS = ("get", "mget")
+SET_COMMANDS = ("set", "setex")
 
 if TYPE_CHECKING:
     from sentry_sdk.integrations.redis import RedisIntegration
@@ -34,14 +36,19 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
             is_cache_key = True
             break
 
+    value = None
+    if redis_command.lower() in SET_COMMANDS:
+        value = args[1]
+
     properties = {
         "op": _get_op(redis_command),
         "description": _get_cache_span_description(
             integration, redis_command, args, kwargs
         ),
         "key": key,
-        "redis_command": redis_command,
+        "redis_command": redis_command.lower(),
         "is_cache_key": is_cache_key,
+        "value": value,
     }
 
     return properties
@@ -49,10 +56,7 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
 
 def _get_cache_span_description(integration, command_name, args, kwargs):
     # type: (RedisIntegration, str, tuple[Any], dict[str, Any]) -> str
-    description = "{} {}".format(
-        command_name,
-        _get_safe_key(command_name, args, kwargs),
-    )
+    description = _get_safe_key(command_name, args, kwargs)
 
     data_should_be_truncated = (
         integration.max_data_size and len(description) > integration.max_data_size
@@ -63,12 +67,29 @@ def _get_cache_span_description(integration, command_name, args, kwargs):
     return description
 
 
-def _set_cache_data(span, properties):
+def _set_cache_data(span, redis_client, properties, return_value):
     # type: (Span, dict[str, Any]) -> None
     # .. add len(value) as cache.item_size to outer span
     # .. add more data to cache key from https://develop.sentry.dev/sdk/performance/modules/caches/
-    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, "TODO!!!! localhost")
-    span.set_data(SPANDATA.NETWORK_PEER_PORT, 0000)
     span.set_data(SPANDATA.CACHE_KEY, properties["key"])
-    span.set_data(SPANDATA.CACHE_HIT, True)
-    span.set_data(SPANDATA.CACHE_ITEM_SIZE, 000)
+
+    if properties["redis_command"] in GET_COMMANDS:
+        if return_value is not None:
+            span.set_data(SPANDATA.CACHE_HIT, True)
+            size = len(return_value.encode("utf-8")) if not isinstance(return_value, bytes) else len(return_value)
+            span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+        else:
+            span.set_data(SPANDATA.CACHE_HIT, False)
+
+    elif properties["redis_command"] in SET_COMMANDS:
+        if properties["value"] is not None:
+            size = len(properties["value"].encode("utf-8")) if not isinstance(properties["value"], bytes) else len(properties["value"])
+            span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+
+    host = redis_client.connection_pool.connection_kwargs.get("host")
+    if host is not None:
+        span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, host)
+
+    port = redis_client.connection_pool.connection_kwargs.get("port")
+    if port is not None:
+        span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
