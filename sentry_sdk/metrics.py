@@ -926,7 +926,7 @@ def distribution(
 
 def set(
     key,  # type: str
-    value,  # type: MetricValue
+    value,  # type: Union[int, str]
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]

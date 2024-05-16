@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import List
     from typing import Mapping
+    from typing import NotRequired
     from typing import Optional
     from typing import Tuple
     from typing import Type
@@ -63,7 +64,7 @@ if TYPE_CHECKING:
         "MeasurementValue",
         {
             "value": float,
-            "unit": Optional[MeasurementUnit],
+            "unit": NotRequired[Optional[MeasurementUnit]],
         },
     )
 
