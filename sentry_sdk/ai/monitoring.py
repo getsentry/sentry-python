@@ -31,7 +31,12 @@ def ai_track(description, **span_kwargs):
             # type: (Any, Any) -> Any
             curr_pipeline = _ai_pipeline_name.get()
             op = span_kwargs.get("op", "ai.run" if curr_pipeline else "ai.pipeline")
+
             with start_span(description=description, op=op, **span_kwargs) as span:
+                for k, v in kwargs.pop("sentry_tags", {}).items():
+                    span.set_tag(k, v)
+                for k, v in kwargs.pop("sentry_data", {}).items():
+                    span.set_data(k, v)
                 if curr_pipeline:
                     span.set_data("ai.pipeline.name", curr_pipeline)
                     return f(*args, **kwargs)
