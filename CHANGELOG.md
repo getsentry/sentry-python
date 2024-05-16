@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.2.0
+
+### New features
+
+- Celery integration now sends additional data to Sentry to enable new features to guage the health of your queues
+- Added a new integration for Cohere
+- Reintroduced the `last_event_id` function, which had been removed in 2.0.0
+
+### Other fixes & improvements
+
+- Add tags + data passing functionality to @ai_track (#3071) by @colin-sentry
+- fix(tracing): Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
+- ref(metrics): Improve type hints for set metrics (#3048) by @elramen
+- ref(scope): Fix `get_client` typing (#3063) by @szokeasaurusrex
+- Auto-enable Anthropic integration + gate imports (#3054) by @colin-sentry
+- Made MeasurementValue.unit NotRequired (#3051) by @antonpirker
+
 ## 2.1.1
 
 - Fix trace propagation in Celery tasks started by Celery Beat. (#3047) by @antonpirker
