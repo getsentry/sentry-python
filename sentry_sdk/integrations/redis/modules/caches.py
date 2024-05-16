@@ -38,7 +38,7 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
 
     value = None
     if redis_command.lower() in SET_COMMANDS:
-        value = args[1]
+        value = args[-1]
 
     properties = {
         "op": _get_op(redis_command),
