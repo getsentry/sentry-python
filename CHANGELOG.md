@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.2.0
+
+### Various fixes & improvements
+
+- Add tags + data passing functionality to @ai_track (#3071) by @colin-sentry
+- feat: Add `last_event_id` to top-level api (#3064) by @szokeasaurusrex
+- feat(scope): Add last_event_id to Scope (#3064) by @szokeasaurusrex
+- fix(tracing): Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
+- feat(celery): Set "messaging.system" on span (#3024) by @szokeasaurusrex
+- feat(celery): Set task ID on span (#3015) by @szokeasaurusrex
+- feat: Send Celery retry count (#2971) by @szokeasaurusrex
+- feat(celery): Send queue name to Sentry (#2984) by @szokeasaurusrex
+- ref(metrics): Improve type hints for set metrics (#3048) by @elramen
+- feat(ai-monitoring): Cohere integration (#3055) by @colin-sentry
+- ref(scope): Fix `get_client` typing (#3063) by @szokeasaurusrex
+- Auto-enable Anthropic integration + gate imports (#3054) by @colin-sentry
+- Made MeasurementValue.unit NotRequired (#3051) by @antonpirker
+
 ## 2.1.1
 
 - Fix trace propagation in Celery tasks started by Celery Beat. (#3047) by @antonpirker
