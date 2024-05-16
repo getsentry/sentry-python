@@ -8,6 +8,8 @@ from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from typing import Any
     from typing import Dict
     from typing import Generator
@@ -57,6 +59,7 @@ __all__ = [
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
+    "last_event_id",
     "new_scope",
     "push_scope",
     "set_context",
@@ -64,6 +67,7 @@ __all__ = [
     "set_level",
     "set_measurement",
     "set_tag",
+    "set_tags",
     "set_user",
     "start_span",
     "start_transaction",
@@ -240,6 +244,12 @@ def set_tag(key, value):
 
 
 @scopemethod
+def set_tags(tags):
+    # type: (Mapping[str, object]) -> None
+    Scope.get_isolation_scope().set_tags(tags)
+
+
+@scopemethod
 def set_context(key, value):
     # type: (str, Dict[str, Any]) -> None
     return Scope.get_isolation_scope().set_context(key, value)
@@ -321,6 +331,16 @@ def start_transaction(
     return Scope.get_current_scope().start_transaction(
         transaction, instrumenter, custom_sampling_context, **kwargs
     )
+
+
+@scopemethod
+def last_event_id():
+    # type: () -> Optional[str]
+    """
+    See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
+    this method's limitations.
+    """
+    return Scope.last_event_id()
 
 
 def set_measurement(name, value, unit=""):

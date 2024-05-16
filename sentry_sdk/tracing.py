@@ -12,7 +12,6 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 
-
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, MutableMapping
     from typing import Any
@@ -32,7 +31,12 @@ if TYPE_CHECKING:
     R = TypeVar("R")
 
     import sentry_sdk.profiler
-    from sentry_sdk._types import Event, MeasurementUnit, SamplingContext
+    from sentry_sdk._types import (
+        Event,
+        MeasurementUnit,
+        SamplingContext,
+        MeasurementValue,
+    )
 
     class SpanKwargs(TypedDict, total=False):
         trace_id: str
@@ -189,6 +193,7 @@ class Span:
         "sampled",
         "op",
         "description",
+        "_measurements",
         "start_timestamp",
         "_start_timestamp_monotonic_ns",
         "status",
@@ -229,6 +234,7 @@ class Span:
         self.status = status
         self.hub = hub
         self.scope = scope
+        self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
@@ -420,12 +426,18 @@ class Span:
         If the span's containing transaction doesn't yet have a ``baggage`` value,
         this will cause one to be generated and stored.
         """
+        if not self.containing_transaction:
+            # Do not propagate headers if there is no containing transaction. Otherwise, this
+            # span ends up being the root span of a new trace, and since it does not get sent
+            # to Sentry, the trace will be missing a root transaction. The dynamic sampling
+            # context will also be missing, breaking dynamic sampling & traces.
+            return
+
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
 
-        if self.containing_transaction:
-            baggage = self.containing_transaction.get_baggage().serialize()
-            if baggage:
-                yield BAGGAGE_HEADER_NAME, baggage
+        baggage = self.containing_transaction.get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
 
     @classmethod
     def from_traceparent(
@@ -487,6 +499,10 @@ class Span:
     def set_status(self, value):
         # type: (str) -> None
         self.status = value
+
+    def set_measurement(self, name, value, unit=""):
+        # type: (str, float, MeasurementUnit) -> None
+        self._measurements[name] = {"value": value, "unit": unit}
 
     def set_thread(self, thread_id, thread_name):
         # type: (Optional[int], Optional[str]) -> None
@@ -598,6 +614,9 @@ class Span:
             if metrics_summary:
                 rv["_metrics_summary"] = metrics_summary
 
+        if len(self._measurements) > 0:
+            rv["measurements"] = self._measurements
+
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -674,7 +693,7 @@ class Transaction(Span):
         self.source = source
         self.sample_rate = None  # type: Optional[float]
         self.parent_sampled = parent_sampled
-        self._measurements = {}  # type: Dict[str, Any]
+        self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
         self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
         self._baggage = baggage
@@ -747,9 +766,14 @@ class Transaction(Span):
             # We have no active client and therefore nowhere to send this transaction.
             return None
 
-        # This is a de facto proxy for checking if sampled = False
         if self._span_recorder is None:
-            logger.debug("Discarding transaction because sampled = False")
+            # Explicit check against False needed because self.sampled might be None
+            if self.sampled is False:
+                logger.debug("Discarding transaction because sampled = False")
+            else:
+                logger.debug(
+                    "Discarding transaction because it was not started with sentry_sdk.start_transaction"
+                )
 
             # This is not entirely accurate because discards here are not
             # exclusively based on sample rate but also traces sampler, but

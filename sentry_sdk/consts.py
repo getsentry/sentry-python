@@ -91,6 +91,116 @@ class SPANDATA:
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
     """
 
+    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_PRESENCE_PENALTY = "ai.presence_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_INPUT_MESSAGES = "ai.input_messages"
+    """
+    The input messages to an LLM call.
+    Example: [{"role": "user", "message": "hello"}]
+    """
+
+    AI_MODEL_ID = "ai.model_id"
+    """
+    The unique descriptor of the model being execugted
+    Example: gpt-4
+    """
+
+    AI_METADATA = "ai.metadata"
+    """
+    Extra metadata passed to an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
+    AI_TAGS = "ai.tags"
+    """
+    Tags that describe an AI pipeline step.
+    Example: {"executed_function": "add_integers"}
+    """
+
+    AI_STREAMING = "ai.streaming"
+    """
+    Whether or not the AI model call's repsonse was streamed back asynchronously
+    Example: true
+    """
+
+    AI_TEMPERATURE = "ai.temperature"
+    """
+    For an AI model call, the temperature parameter. Temperature essentially means how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TOP_P = "ai.top_p"
+    """
+    For an AI model call, the top_p parameter. Top_p essentially controls how random the output will be.
+    Example: 0.5
+    """
+
+    AI_TOP_K = "ai.top_k"
+    """
+    For an AI model call, the top_k parameter. Top_k essentially controls how random the output will be.
+    Example: 35
+    """
+
+    AI_FUNCTION_CALL = "ai.function_call"
+    """
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_TOOL_CALLS = "ai.tool_calls"
+    """
+    For an AI model call, the function that was called. This is deprecated for OpenAI, and replaced by tool_calls
+    """
+
+    AI_TOOLS = "ai.tools"
+    """
+    For an AI model call, the functions that are available
+    """
+
+    AI_RESPONSE_FORMAT = "ai.response_format"
+    """
+    For an AI model call, the format of the response
+    """
+
+    AI_LOGIT_BIAS = "ai.response_format"
+    """
+    For an AI model call, the logit bias
+    """
+
+    AI_PREAMBLE = "ai.preamble"
+    """
+    For an AI model call, the preamble parameter.
+    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
+    Example: "You are now a clown."
+    """
+
+    AI_RAW_PROMPTING = "ai.raw_prompting"
+    """
+    Minimize pre-processing done to the prompt sent to the LLM.
+    Example: true
+    """
+
+    AI_RESPONSES = "ai.responses"
+    """
+    The responses to an AI model call. Always as a list.
+    Example: ["hello", "world"]
+    """
+
+    AI_SEED = "ai.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: 123.45
+    """
+
     DB_NAME = "db.name"
     """
     The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
@@ -152,6 +262,27 @@ class SPANDATA:
     """
     The HTTP status code as an integer.
     Example: 418
+    """
+
+    MESSAGING_DESTINATION_NAME = "messaging.destination.name"
+    """
+    The destination name where the message is being consumed from,
+    e.g. the queue name or topic.
+    """
+
+    MESSAGING_MESSAGE_ID = "messaging.message.id"
+    """
+    The message's identifier.
+    """
+
+    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
+    """
+    Number of retries/attempts to process a message.
+    """
+
+    MESSAGING_SYSTEM = "messaging.system"
+    """
+    The messaging system's name, e.g. `kafka`, `aws_sqs`
     """
 
     SERVER_ADDRESS = "server.address"
@@ -217,7 +348,10 @@ class SPANDATA:
 
 
 class OP:
+    ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET_ITEM = "cache.get_item"
+    COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
+    COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
@@ -245,6 +379,15 @@ class OP:
     MIDDLEWARE_STARLITE_SEND = "middleware.starlite.send"
     OPENAI_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.openai"
     OPENAI_EMBEDDINGS_CREATE = "ai.embeddings.create.openai"
+    HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE = (
+        "ai.chat_completions.create.huggingface_hub"
+    )
+    LANGCHAIN_PIPELINE = "ai.pipeline.langchain"
+    LANGCHAIN_RUN = "ai.run.langchain"
+    LANGCHAIN_TOOL = "ai.tool.langchain"
+    LANGCHAIN_AGENT = "ai.agent.langchain"
+    LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
+    QUEUE_PROCESS = "queue.process"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -345,4 +488,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.0.0rc6"
+VERSION = "2.2.0"

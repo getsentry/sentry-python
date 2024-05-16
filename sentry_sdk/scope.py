@@ -1,6 +1,5 @@
 import os
 import sys
-import uuid
 from copy import copy
 from collections import deque
 from contextlib import contextmanager
@@ -15,9 +14,9 @@ from sentry_sdk.profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
-    extract_sentrytrace_data,
     has_tracing_enabled,
     normalize_incoming_data,
+    PropagationContext,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -36,7 +35,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Mapping, MutableMapping
 
     from typing import Any
     from typing import Callable
@@ -186,6 +185,7 @@ class Scope(object):
         "_propagation_context",
         "client",
         "_type",
+        "_last_event_id",
     )
 
     def __init__(self, ty=None, client=None):
@@ -196,7 +196,7 @@ class Scope(object):
         self._error_processors = []  # type: List[ErrorProcessor]
 
         self._name = None  # type: Optional[str]
-        self._propagation_context = None  # type: Optional[Dict[str, Any]]
+        self._propagation_context = None  # type: Optional[PropagationContext]
 
         self.client = NonRecordingClient()  # type: sentry_sdk.client.BaseClient
 
@@ -207,6 +207,9 @@ class Scope(object):
 
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
+
+        # self._last_event_id is only applicable to isolation scopes
+        self._last_event_id = None  # type: Optional[str]
 
     def __copy__(self):
         # type: () -> Scope
@@ -308,6 +311,23 @@ class Scope(object):
             _global_scope = Scope(ty=ScopeType.GLOBAL)
 
         return _global_scope
+
+    @classmethod
+    def last_event_id(cls):
+        # type: () -> Optional[str]
+        """
+        .. versionadded:: 2.2.0
+
+        Returns event ID of the event most recently captured by the isolation scope, or None if no event
+        has been captured. We do not consider events that are dropped, e.g. by a before_send hook.
+        Transactions also are not considered events in this context.
+
+        The event corresponding to the returned event ID is NOT guaranteed to actually be sent to Sentry;
+        whether the event is sent depends on the transport. The event could be sent later or not at all.
+        Even a sent event could fail to arrive in Sentry due to network issues, exhausted quotas, or
+        various other reasons.
+        """
+        return cls.get_isolation_scope()._last_event_id
 
     def _merge_scopes(self, additional_scope=None, additional_scope_kwargs=None):
         # type: (Optional[Scope], Optional[Dict[str, Any]]) -> Scope
@@ -431,77 +451,28 @@ class Scope(object):
 
         return incoming_trace_information or None
 
-    def _extract_propagation_context(self, data):
-        # type: (Dict[str, Any]) -> Optional[Dict[str, Any]]
-        context = {}  # type: Dict[str, Any]
-        normalized_data = normalize_incoming_data(data)
-
-        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
-        if baggage_header:
-            context["dynamic_sampling_context"] = Baggage.from_incoming_header(
-                baggage_header
-            ).dynamic_sampling_context()
-
-        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
-        if sentry_trace_header:
-            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
-            if sentrytrace_data is not None:
-                context.update(sentrytrace_data)
-
-        only_baggage_no_sentry_trace = (
-            "dynamic_sampling_context" in context and "trace_id" not in context
-        )
-        if only_baggage_no_sentry_trace:
-            context.update(self._create_new_propagation_context())
-
-        if context:
-            if not context.get("span_id"):
-                context["span_id"] = uuid.uuid4().hex[16:]
-
-            return context
-
-        return None
-
-    def _create_new_propagation_context(self):
-        # type: () -> Dict[str, Any]
-        return {
-            "trace_id": uuid.uuid4().hex,
-            "span_id": uuid.uuid4().hex[16:],
-            "parent_span_id": None,
-            "dynamic_sampling_context": None,
-        }
-
     def set_new_propagation_context(self):
         # type: () -> None
         """
         Creates a new propagation context and sets it as `_propagation_context`. Overwriting existing one.
         """
-        self._propagation_context = self._create_new_propagation_context()
-        logger.debug(
-            "[Tracing] Create new propagation context: %s",
-            self._propagation_context,
-        )
+        self._propagation_context = PropagationContext()
 
     def generate_propagation_context(self, incoming_data=None):
         # type: (Optional[Dict[str, str]]) -> None
         """
-        Makes sure the propagation context (`_propagation_context`) is set.
-        The propagation context only lives on the current scope.
-        If there is `incoming_data` overwrite existing `_propagation_context`.
-        if there is no `incoming_data` create new `_propagation_context`, but do NOT overwrite if already existing.
+        Makes sure the propagation context is set on the scope.
+        If there is `incoming_data` overwrite existing propagation context.
+        If there is no `incoming_data` create new propagation context, but do NOT overwrite if already existing.
         """
         if incoming_data:
-            context = self._extract_propagation_context(incoming_data)
+            propagation_context = PropagationContext.from_incoming_data(incoming_data)
+            if propagation_context is not None:
+                self._propagation_context = propagation_context
 
-            if context is not None:
-                self._propagation_context = context
-                logger.debug(
-                    "[Tracing] Extracted propagation context from incoming data: %s",
-                    self._propagation_context,
-                )
-
-        if self._propagation_context is None and self._type != ScopeType.CURRENT:
-            self.set_new_propagation_context()
+        if self._type != ScopeType.CURRENT:
+            if self._propagation_context is None:
+                self.set_new_propagation_context()
 
     def get_dynamic_sampling_context(self):
         # type: () -> Optional[Dict[str, str]]
@@ -514,11 +485,11 @@ class Scope(object):
 
         baggage = self.get_baggage()
         if baggage is not None:
-            self._propagation_context["dynamic_sampling_context"] = (
+            self._propagation_context.dynamic_sampling_context = (
                 baggage.dynamic_sampling_context()
             )
 
-        return self._propagation_context["dynamic_sampling_context"]
+        return self._propagation_context.dynamic_sampling_context
 
     def get_traceparent(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[str]
@@ -535,8 +506,8 @@ class Scope(object):
         # If this scope has a propagation context, return traceparent from there
         if self._propagation_context is not None:
             traceparent = "%s-%s" % (
-                self._propagation_context["trace_id"],
-                self._propagation_context["span_id"],
+                self._propagation_context.trace_id,
+                self._propagation_context.span_id,
             )
             return traceparent
 
@@ -557,8 +528,8 @@ class Scope(object):
 
         # If this scope has a propagation context, return baggage from there
         if self._propagation_context is not None:
-            dynamic_sampling_context = self._propagation_context.get(
-                "dynamic_sampling_context"
+            dynamic_sampling_context = (
+                self._propagation_context.dynamic_sampling_context
             )
             if dynamic_sampling_context is None:
                 return Baggage.from_options(self)
@@ -577,9 +548,9 @@ class Scope(object):
             return None
 
         trace_context = {
-            "trace_id": self._propagation_context["trace_id"],
-            "span_id": self._propagation_context["span_id"],
-            "parent_span_id": self._propagation_context["parent_span_id"],
+            "trace_id": self._propagation_context.trace_id,
+            "span_id": self._propagation_context.span_id,
+            "parent_span_id": self._propagation_context.parent_span_id,
             "dynamic_sampling_context": self.get_dynamic_sampling_context(),
         }  # type: Dict[str, Any]
 
@@ -667,7 +638,7 @@ class Scope(object):
                             yield header
 
     def get_active_propagation_context(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> Optional[PropagationContext]
         if self._propagation_context is not None:
             return self._propagation_context
 
@@ -679,7 +650,7 @@ class Scope(object):
         if isolation_scope._propagation_context is not None:
             return isolation_scope._propagation_context
 
-        return {}
+        return None
 
     def clear(self):
         # type: () -> None
@@ -848,6 +819,25 @@ class Scope(object):
         :param value: Value of the tag to set.
         """
         self._tags[key] = value
+
+    def set_tags(self, tags):
+        # type: (Mapping[str, object]) -> None
+        """Sets multiple tags at once.
+
+        This method updates multiple tags at once. The tags are passed as a dictionary
+        or other mapping type.
+
+        Calling this method is equivalent to calling `set_tag` on each key-value pair
+        in the mapping. If a tag key already exists in the scope, its value will be
+        updated. If the tag key does not exist in the scope, the key-value pair will
+        be added to the scope.
+
+        This method only modifies tag keys in the `tags` mapping passed to the method.
+        `scope.set_tags({})` is, therefore, a no-op.
+
+        :param tags: A mapping of tag keys to tag values to set.
+        """
+        self._tags.update(tags)
 
     def remove_tag(self, key):
         # type: (str) -> None
@@ -1069,12 +1059,11 @@ class Scope(object):
             span = self.span or Scope.get_isolation_scope().span
 
             if span is None:
-                # New spans get the `trace_id`` from the scope
+                # New spans get the `trace_id` from the scope
                 if "trace_id" not in kwargs:
-
-                    trace_id = self.get_active_propagation_context().get("trace_id")
-                    if trace_id is not None:
-                        kwargs["trace_id"] = trace_id
+                    propagation_context = self.get_active_propagation_context()
+                    if propagation_context is not None:
+                        kwargs["trace_id"] = propagation_context.trace_id
 
                 span = Span(**kwargs)
             else:
@@ -1121,7 +1110,12 @@ class Scope(object):
         """
         scope = self._merge_scopes(scope, scope_kwargs)
 
-        return Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
+        event_id = Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
+
+        if event_id is not None and event.get("type") != "transaction":
+            self.get_isolation_scope()._last_event_id = event_id
+
+        return event_id
 
     def capture_message(self, message, level=None, scope=None, **scope_kwargs):
         # type: (str, Optional[LogLevelStr], Optional[Scope], Any) -> Optional[str]
@@ -1672,3 +1666,6 @@ def should_send_default_pii():
 
 # Circular imports
 from sentry_sdk.client import NonRecordingClient
+
+if TYPE_CHECKING:
+    import sentry_sdk.client

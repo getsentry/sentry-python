@@ -12,7 +12,6 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
 )
 from sentry_sdk._types import TYPE_CHECKING
@@ -88,9 +87,11 @@ def patch_asgi_app():
     # type: () -> None
     old_app = Quart.__call__
 
-    @ensure_integration_enabled(QuartIntegration, old_app)
     async def sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Any, Any, Any, Any) -> Any
+        if sentry_sdk.get_client().get_integration(QuartIntegration) is None:
+            return await old_app(self, scope, receive, send)
+
         middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
@@ -150,10 +151,11 @@ def _set_transaction_name_and_source(scope, transaction_style, request):
         pass
 
 
-@ensure_integration_enabled_async(QuartIntegration)
 async def _request_websocket_started(app, **kwargs):
     # type: (Quart, **Any) -> None
     integration = sentry_sdk.get_client().get_integration(QuartIntegration)
+    if integration is None:
+        return
 
     if has_request_context():
         request_websocket = request._get_current_object()
@@ -200,9 +202,12 @@ def _make_request_event_processor(app, request, integration):
     return inner
 
 
-@ensure_integration_enabled_async(QuartIntegration)
 async def _capture_exception(sender, exception, **kwargs):
     # type: (Quart, Union[ValueError, BaseException], **Any) -> None
+    integration = sentry_sdk.get_client().get_integration(QuartIntegration)
+    if integration is None:
+        return
+
     event, hint = event_from_exception(
         exception,
         client_options=sentry_sdk.get_client().options,

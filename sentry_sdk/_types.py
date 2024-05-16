@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import List
     from typing import Mapping
+    from typing import NotRequired
     from typing import Optional
     from typing import Tuple
     from typing import Type
@@ -27,6 +28,45 @@ if TYPE_CHECKING:
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
+
+    DurationUnit = Literal[
+        "nanosecond",
+        "microsecond",
+        "millisecond",
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+    ]
+
+    InformationUnit = Literal[
+        "bit",
+        "byte",
+        "kilobyte",
+        "kibibyte",
+        "megabyte",
+        "mebibyte",
+        "gigabyte",
+        "gibibyte",
+        "terabyte",
+        "tebibyte",
+        "petabyte",
+        "pebibyte",
+        "exabyte",
+        "exbibyte",
+    ]
+
+    FractionUnit = Literal["ratio", "percent"]
+    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
+
+    MeasurementValue = TypedDict(
+        "MeasurementValue",
+        {
+            "value": float,
+            "unit": NotRequired[Optional[MeasurementUnit]],
+        },
+    )
 
     Event = TypedDict(
         "Event",
@@ -49,7 +89,7 @@ if TYPE_CHECKING:
             "level": LogLevelStr,
             "logentry": Mapping[str, object],
             "logger": str,
-            "measurements": dict[str, object],
+            "measurements": dict[str, MeasurementValue],
             "message": str,
             "modules": dict[str, str],
             "monitor_config": Mapping[str, object],
@@ -117,37 +157,6 @@ if TYPE_CHECKING:
         "monitor",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
-
-    DurationUnit = Literal[
-        "nanosecond",
-        "microsecond",
-        "millisecond",
-        "second",
-        "minute",
-        "hour",
-        "day",
-        "week",
-    ]
-
-    InformationUnit = Literal[
-        "bit",
-        "byte",
-        "kilobyte",
-        "kibibyte",
-        "megabyte",
-        "mebibyte",
-        "gigabyte",
-        "gibibyte",
-        "terabyte",
-        "tebibyte",
-        "petabyte",
-        "pebibyte",
-        "exabyte",
-        "exbibyte",
-    ]
-
-    FractionUnit = Literal["ratio", "percent"]
-    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
 
     ProfilerMode = Literal["sleep", "thread", "gevent", "unknown"]
 

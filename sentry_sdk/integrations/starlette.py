@@ -22,7 +22,6 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    ensure_integration_enabled_async,
     event_from_exception,
     logger,
     parse_version,
@@ -348,10 +347,11 @@ def patch_asgi_app():
     """
     old_app = Starlette.__call__
 
-    @ensure_integration_enabled_async(StarletteIntegration, old_app)
     async def _sentry_patched_asgi_app(self, scope, receive, send):
         # type: (Starlette, StarletteScope, Receive, Send) -> None
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
+        if integration is None:
+            return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
@@ -388,12 +388,13 @@ def patch_request_response():
         is_coroutine = _is_async_callable(old_func)
         if is_coroutine:
 
-            @ensure_integration_enabled_async(StarletteIntegration, old_func)
             async def _sentry_async_func(*args, **kwargs):
                 # type: (*Any, **Any) -> Any
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
+                if integration is None:
+                    return await old_func(*args, **kwargs)
 
                 request = args[0]
 

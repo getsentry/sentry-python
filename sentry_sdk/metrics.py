@@ -284,7 +284,7 @@ def _encode_metrics(flushable_buckets):
     out = io.BytesIO()
     _write = out.write
 
-    # Note on sanetization: we intentionally sanetize in emission (serialization)
+    # Note on sanitization: we intentionally sanitize in emission (serialization)
     # and not during aggregation for performance reasons.  This means that the
     # envelope can in fact have duplicate buckets stored.  This is acceptable for
     # relay side emission and should not happen commonly.
@@ -926,7 +926,7 @@ def distribution(
 
 def set(
     key,  # type: str
-    value,  # type: MetricValue
+    value,  # type: Union[int, str]
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]

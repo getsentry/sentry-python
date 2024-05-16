@@ -69,6 +69,7 @@ _DEFAULT_INTEGRATIONS = [
 
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
+    "sentry_sdk.integrations.anthropic.AnthropicIntegration",
     "sentry_sdk.integrations.ariadne.AriadneIntegration",
     "sentry_sdk.integrations.arq.ArqIntegration",
     "sentry_sdk.integrations.asyncpg.AsyncPGIntegration",
@@ -77,6 +78,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.celery.CeleryIntegration",
     "sentry_sdk.integrations.chalice.ChaliceIntegration",
     "sentry_sdk.integrations.clickhouse_driver.ClickhouseDriverIntegration",
+    "sentry_sdk.integrations.cohere.CohereIntegration",
     "sentry_sdk.integrations.django.DjangoIntegration",
     "sentry_sdk.integrations.falcon.FalconIntegration",
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
@@ -85,6 +87,8 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.graphene.GrapheneIntegration",
     "sentry_sdk.integrations.httpx.HttpxIntegration",
     "sentry_sdk.integrations.huey.HueyIntegration",
+    "sentry_sdk.integrations.huggingface_hub.HuggingfaceHubIntegration",
+    "sentry_sdk.integrations.langchain.LangchainIntegration",
     "sentry_sdk.integrations.loguru.LoguruIntegration",
     "sentry_sdk.integrations.openai.OpenAIIntegration",
     "sentry_sdk.integrations.pymongo.PyMongoIntegration",

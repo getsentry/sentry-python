@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from datetime import timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
+import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -318,6 +319,119 @@ def _format_sql(cursor, sql):
     return real_sql or to_string(sql)
 
 
+class PropagationContext:
+    """
+    The PropagationContext represents the data of a trace in Sentry.
+    """
+
+    __slots__ = (
+        "_trace_id",
+        "_span_id",
+        "parent_span_id",
+        "parent_sampled",
+        "dynamic_sampling_context",
+    )
+
+    def __init__(
+        self,
+        trace_id=None,  # type: Optional[str]
+        span_id=None,  # type: Optional[str]
+        parent_span_id=None,  # type: Optional[str]
+        parent_sampled=None,  # type: Optional[bool]
+        dynamic_sampling_context=None,  # type: Optional[Dict[str, str]]
+    ):
+        # type: (...) -> None
+        self._trace_id = trace_id
+        """The trace id of the Sentry trace."""
+
+        self._span_id = span_id
+        """The span id of the currently executing span."""
+
+        self.parent_span_id = parent_span_id
+        """The id of the parent span that started this span.
+        The parent span could also be a span in an upstream service."""
+
+        self.parent_sampled = parent_sampled
+        """Boolean indicator if the parent span was sampled.
+        Important when the parent span originated in an upstream service,
+        because we watn to sample the whole trace, or nothing from the trace."""
+
+        self.dynamic_sampling_context = dynamic_sampling_context
+        """Data that is used for dynamic sampling decisions."""
+
+    @classmethod
+    def from_incoming_data(cls, incoming_data):
+        # type: (Dict[str, Any]) -> Optional[PropagationContext]
+        propagation_context = None
+
+        normalized_data = normalize_incoming_data(incoming_data)
+        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
+        if baggage_header:
+            propagation_context = PropagationContext()
+            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
+                baggage_header
+            ).dynamic_sampling_context()
+
+        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        if sentry_trace_header:
+            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
+            if sentrytrace_data is not None:
+                if propagation_context is None:
+                    propagation_context = PropagationContext()
+                propagation_context.update(sentrytrace_data)
+
+        return propagation_context
+
+    @property
+    def trace_id(self):
+        # type: () -> str
+        """The trace id of the Sentry trace."""
+        if not self._trace_id:
+            self._trace_id = uuid.uuid4().hex
+
+        return self._trace_id
+
+    @trace_id.setter
+    def trace_id(self, value):
+        # type: (str) -> None
+        self._trace_id = value
+
+    @property
+    def span_id(self):
+        # type: () -> str
+        """The span id of the currently executed span."""
+        if not self._span_id:
+            self._span_id = uuid.uuid4().hex[16:]
+
+        return self._span_id
+
+    @span_id.setter
+    def span_id(self, value):
+        # type: (str) -> None
+        self._span_id = value
+
+    def update(self, other_dict):
+        # type: (Dict[str, Any]) -> None
+        """
+        Updates the PropagationContext with data from the given dictionary.
+        """
+        for key, value in other_dict.items():
+            try:
+                setattr(self, key, value)
+            except AttributeError:
+                pass
+
+    def __repr__(self):
+        # type: (...) -> str
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} dynamic_sampling_context={}>".format(
+            self._trace_id,
+            self._span_id,
+            self.parent_span_id,
+            self.parent_sampled,
+            self.dynamic_sampling_context,
+        )
+
+
 class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
@@ -381,8 +495,8 @@ class Baggage:
         options = client.options
         propagation_context = scope._propagation_context
 
-        if propagation_context is not None and "trace_id" in propagation_context:
-            sentry_items["trace_id"] = propagation_context["trace_id"]
+        if propagation_context is not None:
+            sentry_items["trace_id"] = propagation_context.trace_id
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -568,7 +682,11 @@ def get_current_span(scope=None):
 
 
 # Circular imports
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    LOW_QUALITY_TRANSACTION_SOURCES,
+    SENTRY_TRACE_HEADER_NAME,
+)
 
 if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
