@@ -4,7 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import TypeVar
+    from typing import Union
 
     from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
     from sentry_sdk.tracing import Span
@@ -223,6 +224,16 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     return updated_headers
 
 
+class NoOpMgr:
+    def __enter__(self):
+        # type: () -> None
+        return None
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # type: (Any, Any, Any) -> None
+        return None
+
+
 def _wrap_apply_async(f):
     # type: (F) -> F
     @wraps(f)
@@ -242,9 +253,17 @@ def _wrap_apply_async(f):
 
         task = args[0]
 
-        with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_CELERY, description=task.name
-        ) as span:
+        task_started_from_beat = (
+            sentry_sdk.Scope.get_isolation_scope()._name == "celery-beat"
+        )
+
+        span_mgr = (
+            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            if not task_started_from_beat
+            else NoOpMgr()
+        )  # type: Union[Span, NoOpMgr]
+
+        with span_mgr as span:
             kwargs["headers"] = _update_celery_task_headers(
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
@@ -306,6 +325,18 @@ def _wrap_tracer(task, f):
     return _inner  # type: ignore
 
 
+def _set_messaging_destination_name(task, span):
+    # type: (Any, Span) -> None
+    """Set "messaging.destination.name" tag for span"""
+    with capture_internal_exceptions():
+        delivery_info = task.request.delivery_info
+        routing_key = delivery_info.get("routing_key")
+        if delivery_info.get("exchange") == "" and routing_key is not None:
+            # Empty exchange indicates the default exchange, meaning the tasks
+            # are sent to the queue with the same name as the routing key.
+            span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+
+
 def _wrap_task_call(task, f):
     # type: (Any, F) -> F
 
@@ -313,13 +344,31 @@ def _wrap_task_call(task, f):
     # see it. Also celery's reported stacktrace is untrustworthy.
 
     # functools.wraps is important here because celery-once looks at this
-    # method's name.
+    # method's name. @ensure_integration_enabled internally calls functools.wraps,
+    # but if we ever remove the @ensure_integration_enabled decorator, we need
+    # to add @functools.wraps(f) here.
     # https://github.com/getsentry/sentry-python/issues/421
-    @wraps(f)
+    @ensure_integration_enabled(CeleryIntegration, f)
     def _inner(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         try:
-            return f(*args, **kwargs)
+            with sentry_sdk.start_span(
+                op=OP.QUEUE_PROCESS, description=task.name
+            ) as span:
+                _set_messaging_destination_name(task, span)
+                with capture_internal_exceptions():
+                    span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                with capture_internal_exceptions():
+                    span.set_data(
+                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
+                    )
+                with capture_internal_exceptions():
+                    span.set_data(
+                        SPANDATA.MESSAGING_SYSTEM,
+                        task.app.connection().transport.driver_type,
+                    )
+
+                return f(*args, **kwargs)
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():

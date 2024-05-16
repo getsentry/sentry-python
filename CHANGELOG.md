@@ -1,5 +1,102 @@
 # Changelog
 
+## 2.2.0
+
+### New features
+
+- Celery integration now sends additional data to Sentry to enable new features to guage the health of your queues
+- Added a new integration for Cohere
+- Reintroduced the `last_event_id` function, which had been removed in 2.0.0
+
+### Other fixes & improvements
+
+- Add tags + data passing functionality to @ai_track (#3071) by @colin-sentry
+- fix(tracing): Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
+- ref(metrics): Improve type hints for set metrics (#3048) by @elramen
+- ref(scope): Fix `get_client` typing (#3063) by @szokeasaurusrex
+- Auto-enable Anthropic integration + gate imports (#3054) by @colin-sentry
+- Made MeasurementValue.unit NotRequired (#3051) by @antonpirker
+
+## 2.1.1
+
+- Fix trace propagation in Celery tasks started by Celery Beat. (#3047) by @antonpirker
+
+## 2.1.0
+
+- fix(quart): Fix Quart integration (#3043) by @szokeasaurusrex
+
+- **New integration:** [Langchain](https://docs.sentry.io/platforms/python/integrations/langchain/) (#2911) by @colin-sentry
+
+  Usage: (Langchain is auto enabling, so you do not need to do anything special)
+  ```python
+  from langchain_openai import ChatOpenAI
+  import sentry_sdk
+
+  sentry_sdk.init(
+      dsn="...",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+  )
+
+  llm = ChatOpenAI(model="gpt-3.5-turbo-0125", temperature=0)
+  ```
+
+  Check out [the LangChain docs](https://docs.sentry.io/platforms/python/integrations/langchain/) for details.
+
+- **New integration:** [Anthropic](https://docs.sentry.io/platforms/python/integrations/anthropic/) (#2831) by @czyber
+
+  Usage: (add the AnthropicIntegration to your `sentry_sdk.init()` call)
+  ```python
+  from anthropic import Anthropic
+
+  import sentry_sdk
+
+  sentry_sdk.init(
+      dsn="...",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+      integrations=[AnthropicIntegration()],
+  )
+
+  client = Anthropic()  
+  ```
+  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details. 
+
+- **New integration:** [Huggingface Hub](https://docs.sentry.io/platforms/python/integrations/huggingface/) (#3033) by @colin-sentry
+
+  Usage: (Huggingface Hub is auto enabling, so you do not need to do anything special)
+
+  ```python
+  import sentry_sdk
+  from huggingface_hub import InferenceClient
+
+  sentry_sdk.init(
+      dsn="...",
+      enable_tracing=True,
+      traces_sample_rate=1.0,
+  )
+
+  client = InferenceClient("some-model")
+  ```
+
+  Check out [the Huggingface docs](https://docs.sentry.io/platforms/python/integrations/huggingface/) for details. (comming soon!)
+
+- fix(huggingface): Reduce API cross-section for huggingface in test (#3042) by @colin-sentry
+- fix(django): Fix Django ASGI integration on Python 3.12 (#3027) by @bellini666
+- feat(perf): Add ability to put measurements directly on spans. (#2967) by @colin-sentry
+- fix(tests): Fix trytond tests (#3031) by @sentrivana
+- fix(tests): Update `pytest-asyncio` to fix CI (#3030) by @sentrivana
+- fix(docs): Link to respective migration guides directly (#3020) by @sentrivana
+- docs(scope): Add docstring to `Scope.set_tags` (#2978) by @szokeasaurusrex
+- test(scope): Fix typos in assert error message (#2978) by @szokeasaurusrex
+- feat(scope): New `set_tags` function (#2978) by @szokeasaurusrex
+- test(scope): Add unit test for `Scope.set_tags` (#2978) by @szokeasaurusrex
+- feat(scope): Add `set_tags` to top-level API (#2978) by @szokeasaurusrex
+- test(scope): Add unit test for top-level API `set_tags` (#2978) by @szokeasaurusrex
+- feat(tests): Parallelize tox (#3025) by @sentrivana
+- build(deps): Bump checkouts/data-schemas from `4aa14a7` to `4381a97` (#3028) by @dependabot
+- meta(license): Bump copyright year (#3029) by @szokeasaurusrex
+
 ## 2.0.1
 
 ### Various fixes & improvements

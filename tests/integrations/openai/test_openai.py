@@ -7,12 +7,7 @@ from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as Delta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
 from sentry_sdk import start_transaction
-from sentry_sdk.integrations.openai import (
-    OpenAIIntegration,
-    COMPLETION_TOKENS_USED,
-    PROMPT_TOKENS_USED,
-    TOTAL_TOKENS_USED,
-)
+from sentry_sdk.integrations.openai import OpenAIIntegration
 
 from unittest import mock  # python 3.3 and above
 
@@ -72,15 +67,15 @@ def test_nonstreaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"][0]["content"]
-        assert "the model response" in span["data"]["ai.responses"][0]["content"]
+        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert "the model response" in span["data"]["ai.responses"]["content"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
 
-    assert span["data"][COMPLETION_TOKENS_USED] == 10
-    assert span["data"][PROMPT_TOKENS_USED] == 20
-    assert span["data"][TOTAL_TOKENS_USED] == 30
+    assert span["measurements"]["ai_completion_tokens_used"]["value"] == 10
+    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
+    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
 
 
 # noinspection PyTypeChecker
@@ -151,8 +146,8 @@ def test_streaming_chat_completion(
     assert span["op"] == "ai.chat_completions.create.openai"
 
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"][0]["content"]
-        assert "hello world" in span["data"]["ai.responses"][0]
+        assert "hello" in span["data"]["ai.input_messages"]["content"]
+        assert "hello world" in span["data"]["ai.responses"]
     else:
         assert "ai.input_messages" not in span["data"]
         assert "ai.responses" not in span["data"]
@@ -160,9 +155,9 @@ def test_streaming_chat_completion(
     try:
         import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["data"][COMPLETION_TOKENS_USED] == 2
-        assert span["data"][PROMPT_TOKENS_USED] == 1
-        assert span["data"][TOTAL_TOKENS_USED] == 3
+        assert span["measurements"]["ai_completion_tokens_used"]["value"] == 2
+        assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 1
+        assert span["measurements"]["ai_total_tokens_used"]["value"] == 3
     except ImportError:
         pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
@@ -223,9 +218,9 @@ def test_embeddings_create(
     span = tx["spans"][0]
     assert span["op"] == "ai.embeddings.create.openai"
     if send_default_pii and include_prompts:
-        assert "hello" in span["data"]["ai.input_messages"][0]
+        assert "hello" in span["data"]["ai.input_messages"]
     else:
         assert "ai.input_messages" not in span["data"]
 
-    assert span["data"][PROMPT_TOKENS_USED] == 20
-    assert span["data"][TOTAL_TOKENS_USED] == 30
+    assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
+    assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
