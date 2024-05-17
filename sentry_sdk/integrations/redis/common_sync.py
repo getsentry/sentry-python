@@ -1,6 +1,9 @@
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.redis.modules.caches import _compile_cache_span_properties
+from sentry_sdk.integrations.redis.modules.caches import (
+    _compile_cache_span_properties,
+    _set_cache_data,
+)
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
     _set_client_data,
@@ -12,7 +15,7 @@ import sentry_sdk
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any, Optional
+    from typing import Any
 
 
 def patch_redis_pipeline(
@@ -49,8 +52,8 @@ def patch_redis_pipeline(
     pipeline_cls.execute = sentry_patched_execute
 
 
-def patch_redis_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None], Callable[[Span, Any, dict[str, Any], Optional[Any]], None]) -> None
+def patch_redis_client(cls, is_cluster, set_db_data_fn):
+    # type: (Any, bool, Callable[[Span, Any], None]) -> None
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
@@ -93,7 +96,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
         db_span.__exit__(None, None, None)
 
         if cache_span:
-            set_cache_data_fn(cache_span, self, cache_properties, value)
+            _set_cache_data(cache_span, self, cache_properties, value)
             cache_span.__exit__(None, None, None)
 
         return value

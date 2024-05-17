@@ -1,5 +1,6 @@
 """
 Instrumentation for RedisCluster
+This is part of the main redis-py client.
 
 https://github.com/redis/redis-py/blob/master/redis/cluster.py
 """
@@ -15,7 +16,7 @@ from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
     from redis import RedisCluster
     from redis.asyncio.cluster import (
         RedisCluster as AsyncRedisCluster,
@@ -45,15 +46,13 @@ def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_insta
 def _set_cluster_db_data(span, redis_cluster_instance):
     # type: (Span, RedisCluster[Any]) -> None
     default_node = redis_cluster_instance.get_default_node()
+
     if default_node is not None:
-        _set_db_data_on_span(
-            span, {"host": default_node.host, "port": default_node.port}
-        )
-
-
-def _set_cluster_cache_data(span, redis_client, properties, return_value):
-    # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
-    raise NotImplementedError("Cache data is not supported for Redis Cluster")
+        connection_params = {
+            "host": default_node.host,
+            "port": default_node.port,
+        }
+        _set_db_data_on_span(span, connection_params)
 
 
 def _patch_redis_cluster():
@@ -68,7 +67,6 @@ def _patch_redis_cluster():
             RedisCluster,
             is_cluster=True,
             set_db_data_fn=_set_cluster_db_data,
-            set_cache_data_fn=_set_cluster_cache_data,
         )
         patch_redis_pipeline(
             cluster.ClusterPipeline,
@@ -91,7 +89,6 @@ def _patch_redis_cluster():
             async_cluster.RedisCluster,
             is_cluster=True,
             set_db_data_fn=_set_async_cluster_db_data,
-            set_cache_data_fn=_set_cluster_cache_data,
         )
         patch_redis_async_pipeline(
             async_cluster.ClusterPipeline,

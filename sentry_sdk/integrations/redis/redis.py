@@ -9,7 +9,6 @@ from sentry_sdk.integrations.redis.common_sync import (
     patch_redis_client,
     patch_redis_pipeline,
 )
-from sentry_sdk.integrations.redis.modules.caches import _set_cache_data
 from sentry_sdk.integrations.redis.modules.queries import _set_db_data
 
 
@@ -28,7 +27,6 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
         StrictRedis,
         is_cluster=False,
         set_db_data_fn=_set_db_data,
-        set_cache_data_fn=_set_cache_data,
     )
     patch_redis_pipeline(
         client.Pipeline,
@@ -62,7 +60,6 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
             redis.asyncio.client.StrictRedis,
             is_cluster=False,
             set_db_data_fn=_set_db_data,
-            set_cache_data_fn=_set_cache_data,
         )
         patch_redis_async_pipeline(
             redis.asyncio.client.Pipeline,

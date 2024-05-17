@@ -5,6 +5,7 @@ Code used for the Caches module in Sentry
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_key
+from sentry_sdk.utils import capture_internal_exceptions
 
 GET_COMMANDS = ("get", "mget")
 SET_COMMANDS = ("set", "setex")
@@ -69,33 +70,45 @@ def _get_cache_span_description(integration, command_name, args, kwargs):
 
 def _set_cache_data(span, redis_client, properties, return_value):
     # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
-    span.set_data(SPANDATA.CACHE_KEY, properties["key"])
+    with capture_internal_exceptions():
+        span.set_data(SPANDATA.CACHE_KEY, properties["key"])
 
-    if properties["redis_command"] in GET_COMMANDS:
-        if return_value is not None:
-            span.set_data(SPANDATA.CACHE_HIT, True)
-            size = (
-                len(return_value.encode("utf-8"))
-                if not isinstance(return_value, bytes)
-                else len(return_value)
-            )
-            span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
-        else:
-            span.set_data(SPANDATA.CACHE_HIT, False)
+        if properties["redis_command"] in GET_COMMANDS:
+            if return_value is not None:
+                span.set_data(SPANDATA.CACHE_HIT, True)
+                size = (
+                    len(return_value.encode("utf-8"))
+                    if not isinstance(return_value, bytes)
+                    else len(return_value)
+                )
+                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+            else:
+                span.set_data(SPANDATA.CACHE_HIT, False)
 
-    elif properties["redis_command"] in SET_COMMANDS:
-        if properties["value"] is not None:
-            size = (
-                len(properties["value"].encode("utf-8"))
-                if not isinstance(properties["value"], bytes)
-                else len(properties["value"])
-            )
-            span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+        elif properties["redis_command"] in SET_COMMANDS:
+            if properties["value"] is not None:
+                size = (
+                    len(properties["value"].encode("utf-8"))
+                    if not isinstance(properties["value"], bytes)
+                    else len(properties["value"])
+                )
+                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
 
-    host = redis_client.connection_pool.connection_kwargs.get("host")
-    if host is not None:
-        span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, host)
+        try:
+            connection_params = redis_client.connection_pool.connection_kwargs
+        except AttributeError:
+            # If it is a cluster, there is no connection_pool attribute so we
+            # need to get the default node from the cluster instance
+            default_node = redis_client.get_default_node()
+            connection_params = {
+                "host": default_node.host,
+                "port": default_node.port,
+            }
 
-    port = redis_client.connection_pool.connection_kwargs.get("port")
-    if port is not None:
-        span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+        host = connection_params.get("host")
+        if host is not None:
+            span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, host)
+
+        port = connection_params.get("port")
+        if port is not None:
+            span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
