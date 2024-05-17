@@ -1,7 +1,13 @@
-import fakeredis
-from fakeredis.aioredis import FakeRedis as FakeRedisAsync
-
 import pytest
+
+try:
+    import fakeredis
+    from fakeredis.aioredis import FakeRedis as FakeRedisAsync
+except ModuleNotFoundError:
+    FakeRedisAsync = None
+
+if FakeRedisAsync is None:
+    pytest.skip("Skipping tests because fakeredis.aioredis not available", allow_module_level=True)
 
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.utils import parse_version
