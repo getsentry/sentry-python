@@ -170,7 +170,7 @@ class ContinuousScheduler(object):
         experiments = self.options.get("_experiments")
         if not experiments:
             return False
-        return experiments.get("auto_start_continuous_profiling")
+        return experiments.get("continuous_profiling_auto_start")
 
     def ensure_running(self):
         # type: () -> None

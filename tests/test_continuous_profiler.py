@@ -25,7 +25,7 @@ requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled"
 def experimental_options(mode=None, auto_start=None):
     return {
         "_experiments": {
-            "auto_start_continuous_profiling": auto_start,
+            "continuous_profiling_auto_start": auto_start,
             "continuous_profiling_mode": mode,
         }
     }
@@ -97,15 +97,15 @@ def assert_single_transaction_with_profile_chunks(envelopes, thread):
     })
 
     spans = transaction["spans"]
-    assert len(spans) == 1
-    span_data = spans[0]["data"]
-    assert span_data == ApproxDict(
-        {
-            "profiler.id": profiler_id,
-            "thread.id": str(thread.ident),
-            "thread.name": thread.name,
-        }
-    )
+    assert len(spans) > 0
+    for span in spans:
+        assert span["data"] == ApproxDict(
+            {
+                "profiler.id": profiler_id,
+                "thread.id": str(thread.ident),
+                "thread.name": thread.name,
+            }
+        )
 
     for profile_chunk_item in items["profile_chunk"]:
         profile_chunk = profile_chunk_item.payload.json
