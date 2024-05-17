@@ -15,7 +15,7 @@ from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
     from redis import RedisCluster
     from redis.asyncio.cluster import (
         RedisCluster as AsyncRedisCluster,
@@ -51,9 +51,9 @@ def _set_cluster_db_data(span, redis_cluster_instance):
         )
 
 
-def _set_cluster_cache_data(span, something):
-    # type: (Span, Any) -> None
-    pass
+def _set_cluster_cache_data(span, redis_client, properties, return_value):
+    # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
+    raise NotImplementedError("Cache data is not supported for Redis Cluster")
 
 
 def _patch_redis_cluster():

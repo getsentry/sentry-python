@@ -12,7 +12,7 @@ import sentry_sdk
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any, Union
+    from typing import Any, Optional, Union
     from redis.asyncio.client import Pipeline, StrictRedis
     from redis.asyncio.cluster import ClusterPipeline, RedisCluster
 
@@ -49,7 +49,7 @@ def patch_redis_async_pipeline(
 
 
 def patch_redis_async_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
-    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None], Callable[[Span, Any], None]) -> None
+    # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None], Callable[[Span, Any, dict[str, Any], Optional[Any]], None]) -> None
     old_execute_command = cls.execute_command
 
     from sentry_sdk.integrations.redis import RedisIntegration

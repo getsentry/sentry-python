@@ -68,22 +68,28 @@ def _get_cache_span_description(integration, command_name, args, kwargs):
 
 
 def _set_cache_data(span, redis_client, properties, return_value):
-    # type: (Span, dict[str, Any]) -> None
-    # .. add len(value) as cache.item_size to outer span
-    # .. add more data to cache key from https://develop.sentry.dev/sdk/performance/modules/caches/
+    # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
     span.set_data(SPANDATA.CACHE_KEY, properties["key"])
 
     if properties["redis_command"] in GET_COMMANDS:
         if return_value is not None:
             span.set_data(SPANDATA.CACHE_HIT, True)
-            size = len(return_value.encode("utf-8")) if not isinstance(return_value, bytes) else len(return_value)
+            size = (
+                len(return_value.encode("utf-8"))
+                if not isinstance(return_value, bytes)
+                else len(return_value)
+            )
             span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
         else:
             span.set_data(SPANDATA.CACHE_HIT, False)
 
     elif properties["redis_command"] in SET_COMMANDS:
         if properties["value"] is not None:
-            size = len(properties["value"].encode("utf-8")) if not isinstance(properties["value"], bytes) else len(properties["value"])
+            size = (
+                len(properties["value"].encode("utf-8"))
+                if not isinstance(properties["value"], bytes)
+                else len(properties["value"])
+            )
             span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
 
     host = redis_client.connection_pool.connection_kwargs.get("host")

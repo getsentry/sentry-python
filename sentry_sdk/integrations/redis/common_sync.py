@@ -12,7 +12,7 @@ import sentry_sdk
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
+    from typing import Any, Optional
 
 
 def patch_redis_pipeline(
@@ -50,7 +50,7 @@ def patch_redis_pipeline(
 
 
 def patch_redis_client(cls, is_cluster, set_db_data_fn, set_cache_data_fn):
-    # type: (Any, bool, Callable[[Span, Any], None], Callable[[Span, Any], None]) -> None
+    # type: (Any, bool, Callable[[Span, Any], None], Callable[[Span, Any, dict[str, Any], Optional[Any]], None]) -> None
     """
     This function can be used to instrument custom redis client classes or
     subclasses.
