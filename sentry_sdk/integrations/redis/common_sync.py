@@ -14,7 +14,12 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def patch_redis_pipeline(pipeline_cls, is_cluster, get_command_args_fn, set_db_data_fn):
+def patch_redis_pipeline(
+    pipeline_cls,
+    is_cluster,
+    get_command_args_fn,
+    set_db_data_fn,
+):
     # type: (Any, bool, Any, Callable[[Span, Any], None]) -> None
     old_execute = pipeline_cls.execute
 
