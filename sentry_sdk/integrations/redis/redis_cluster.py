@@ -92,7 +92,7 @@ def _patch_redis_cluster():
         )
         patch_redis_async_pipeline(
             async_cluster.ClusterPipeline,
-            True,
-            _parse_rediscluster_command,
-            set_db_data_fn=_set_async_cluster_pipeline_db_data,
+            is_cluster=True,
+            get_command_args_fn=_parse_rediscluster_command,
+            set_db_data_fn=_set_cluster_db_data,
         )
