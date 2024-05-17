@@ -59,6 +59,7 @@ __all__ = [
     "get_traceparent",
     "is_initialized",
     "isolation_scope",
+    "last_event_id",
     "new_scope",
     "push_scope",
     "set_context",
@@ -330,6 +331,16 @@ def start_transaction(
     return Scope.get_current_scope().start_transaction(
         transaction, instrumenter, custom_sampling_context, **kwargs
     )
+
+
+@scopemethod
+def last_event_id():
+    # type: () -> Optional[str]
+    """
+    See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
+    this method's limitations.
+    """
+    return Scope.last_event_id()
 
 
 def set_measurement(name, value, unit=""):

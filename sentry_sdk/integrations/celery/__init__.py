@@ -1,10 +1,11 @@
 import sys
+from collections.abc import Mapping
 from functools import wraps
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -47,6 +48,7 @@ try:
         Retry,
         SoftTimeLimitExceeded,
     )
+    from kombu import Producer  # type: ignore
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
@@ -82,6 +84,7 @@ class CeleryIntegration(Integration):
         _patch_build_tracer()
         _patch_task_apply_async()
         _patch_worker_exit()
+        _patch_producer_publish()
 
         # This logger logs every status of every task that ran on the worker.
         # Meaning that every task's breadcrumbs are full of stuff like "Task
@@ -325,6 +328,18 @@ def _wrap_tracer(task, f):
     return _inner  # type: ignore
 
 
+def _set_messaging_destination_name(task, span):
+    # type: (Any, Span) -> None
+    """Set "messaging.destination.name" tag for span"""
+    with capture_internal_exceptions():
+        delivery_info = task.request.delivery_info
+        routing_key = delivery_info.get("routing_key")
+        if delivery_info.get("exchange") == "" and routing_key is not None:
+            # Empty exchange indicates the default exchange, meaning the tasks
+            # are sent to the queue with the same name as the routing key.
+            span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+
+
 def _wrap_task_call(task, f):
     # type: (Any, F) -> F
 
@@ -332,13 +347,31 @@ def _wrap_task_call(task, f):
     # see it. Also celery's reported stacktrace is untrustworthy.
 
     # functools.wraps is important here because celery-once looks at this
-    # method's name.
+    # method's name. @ensure_integration_enabled internally calls functools.wraps,
+    # but if we ever remove the @ensure_integration_enabled decorator, we need
+    # to add @functools.wraps(f) here.
     # https://github.com/getsentry/sentry-python/issues/421
-    @wraps(f)
+    @ensure_integration_enabled(CeleryIntegration, f)
     def _inner(*args, **kwargs):
         # type: (*Any, **Any) -> Any
         try:
-            return f(*args, **kwargs)
+            with sentry_sdk.start_span(
+                op=OP.QUEUE_PROCESS, description=task.name
+            ) as span:
+                _set_messaging_destination_name(task, span)
+                with capture_internal_exceptions():
+                    span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                with capture_internal_exceptions():
+                    span.set_data(
+                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
+                    )
+                with capture_internal_exceptions():
+                    span.set_data(
+                        SPANDATA.MESSAGING_SYSTEM,
+                        task.app.connection().transport.driver_type,
+                    )
+
+                return f(*args, **kwargs)
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
@@ -403,3 +436,48 @@ def _patch_worker_exit():
                     sentry_sdk.flush()
 
     Worker.workloop = sentry_workloop
+
+
+def _patch_producer_publish():
+    # type: () -> None
+    original_publish = Producer.publish
+
+    @ensure_integration_enabled(CeleryIntegration, original_publish)
+    def sentry_publish(self, *args, **kwargs):
+        # type: (Producer, *Any, **Any) -> Any
+        kwargs_headers = kwargs.get("headers", {})
+        if not isinstance(kwargs_headers, Mapping):
+            # Ensure kwargs_headers is a Mapping, so we can safely call get().
+            # We don't expect this to happen, but it's better to be safe. Even
+            # if it does happen, only our instrumentation breaks. This line
+            # does not overwrite kwargs["headers"], so the original publish
+            # method will still work.
+            kwargs_headers = {}
+
+        task_name = kwargs_headers.get("task")
+        task_id = kwargs_headers.get("id")
+        retries = kwargs_headers.get("retries")
+
+        routing_key = kwargs.get("routing_key")
+        exchange = kwargs.get("exchange")
+
+        with sentry_sdk.start_span(op=OP.QUEUE_PUBLISH, description=task_name) as span:
+            if task_id is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+
+            if exchange == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning messages are
+                # routed to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+
+            if retries is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+
+            with capture_internal_exceptions():
+                span.set_data(
+                    SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
+                )
+
+            return original_publish(self, *args, **kwargs)
+
+    Producer.publish = sentry_publish
