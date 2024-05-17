@@ -2,7 +2,11 @@ import fakeredis
 from fakeredis import FakeStrictRedis
 
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.utils import parse_version
 import sentry_sdk
+
+
+FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 
 
 def test_no_cache_basic(sentry_init, capture_events):
@@ -111,12 +115,13 @@ def test_cache_data(sentry_init, capture_events):
     assert spans[0]["data"]["cache.key"] == "mycachekey"
     assert spans[0]["data"]["cache.hit"] == False  # noqa: E712
     assert "cache.item_size" not in spans[0]["data"]
-    assert spans[0]["data"]["network.peer.address"] == "mycacheserver.io"
     # very old fakeredis can not handle port.
     # only used with redis v3
-    if fakeredis.__version__ == "2.7.1":
+    if FAKEREDIS_VERSION < (2, 7, 1):
+        assert "network.peer.address" not in spans[0]["data"]
         assert "network.peer.port" not in spans[0]["data"]
     else:
+        assert spans[0]["data"]["network.peer.address"] == "mycacheserver.io"
         assert spans[0]["data"]["network.peer.port"] == 6378
 
     assert spans[1]["op"] == "db.redis"  # we ignore db spans in this test.
@@ -126,12 +131,13 @@ def test_cache_data(sentry_init, capture_events):
     assert spans[2]["data"]["cache.key"] == "mycachekey"
     assert "cache.hit" not in spans[1]["data"]
     assert spans[2]["data"]["cache.item_size"] == 18
-    assert spans[2]["data"]["network.peer.address"] == "mycacheserver.io"
     # very old fakeredis can not handle port.
     # only used with redis v3
-    if fakeredis.__version__ == "2.7.1":
+    if FAKEREDIS_VERSION < (2, 7, 1):
+        assert "network.peer.address" not in spans[2]["data"]
         assert "network.peer.port" not in spans[2]["data"]
     else:
+        assert spans[2]["data"]["network.peer.address"] == "mycacheserver.io"
         assert spans[2]["data"]["network.peer.port"] == 6378
 
     assert spans[3]["op"] == "db.redis"  # we ignore db spans in this test.
@@ -141,12 +147,13 @@ def test_cache_data(sentry_init, capture_events):
     assert spans[4]["data"]["cache.key"] == "mycachekey"
     assert spans[4]["data"]["cache.hit"] == True  # noqa: E712
     assert spans[4]["data"]["cache.item_size"] == 18
-    assert spans[4]["data"]["network.peer.address"] == "mycacheserver.io"
     # very old fakeredis can not handle port.
     # only used with redis v3
-    if fakeredis.__version__ == "2.7.1":
+    if FAKEREDIS_VERSION < (2, 7, 1):
+        assert "network.peer.address" not in spans[4]["data"]
         assert "network.peer.port" not in spans[4]["data"]
     else:
+        assert spans[4]["data"]["network.peer.address"] == "mycacheserver.io"
         assert spans[4]["data"]["network.peer.port"] == 6378
 
     assert spans[5]["op"] == "db.redis"  # we ignore db spans in this test.
