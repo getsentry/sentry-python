@@ -53,9 +53,6 @@ def _set_cluster_db_data(span, redis_cluster_instance):
 
 def _set_cluster_cache_data(span, redis_client, properties, return_value):
     # type: (Span, Any, dict[str, Any], Optional[Any]) -> None
-    import ipdb
-
-    ipdb.set_trace()
     raise NotImplementedError("Cache data is not supported for Redis Cluster")
 
 
