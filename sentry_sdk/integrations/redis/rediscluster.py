@@ -1,7 +1,8 @@
 """
-Instrumentation for rediscluster
+Instrumentation for redis-py-cluster
+The project redis-py-cluster is EOL and was integrated into redis-py starting from version 4.1.0 (Dec 26, 2021).
 
-https://github.com/salimane/rediscluster-py
+https://github.com/grokzen/redis-py-cluster
 """
 
 from sentry_sdk.integrations.redis.common_sync import (
@@ -20,7 +21,9 @@ def _patch_rediscluster():
         return
 
     patch_redis_client(
-        rediscluster.RedisCluster, is_cluster=True, set_db_data_fn=_set_db_data
+        rediscluster.RedisCluster,
+        is_cluster=True,
+        set_db_data_fn=_set_db_data,
     )
 
     # up to v1.3.6, __version__ attribute is a tuple
@@ -40,5 +43,8 @@ def _patch_rediscluster():
         pipeline_cls = rediscluster.pipeline.ClusterPipeline
 
     patch_redis_pipeline(
-        pipeline_cls, True, _parse_rediscluster_command, set_db_data_fn=_set_db_data
+        pipeline_cls,
+        is_cluster=True,
+        get_command_args_fn=_parse_rediscluster_command,
+        set_db_data_fn=_set_db_data,
     )

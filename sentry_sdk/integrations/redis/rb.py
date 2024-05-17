@@ -16,11 +16,17 @@ def _patch_rb():
         pass
     else:
         patch_redis_client(
-            rb.clients.FanoutClient, is_cluster=False, set_db_data_fn=_set_db_data
+            rb.clients.FanoutClient,
+            is_cluster=False,
+            set_db_data_fn=_set_db_data,
         )
         patch_redis_client(
-            rb.clients.MappingClient, is_cluster=False, set_db_data_fn=_set_db_data
+            rb.clients.MappingClient,
+            is_cluster=False,
+            set_db_data_fn=_set_db_data,
         )
         patch_redis_client(
-            rb.clients.RoutingClient, is_cluster=False, set_db_data_fn=_set_db_data
+            rb.clients.RoutingClient,
+            is_cluster=False,
+            set_db_data_fn=_set_db_data,
         )

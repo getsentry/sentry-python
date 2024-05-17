@@ -1,5 +1,5 @@
 """
-Code used for the Queries modules in Sentry
+Code used for the Queries module in Sentry
 """
 
 from sentry_sdk._types import TYPE_CHECKING

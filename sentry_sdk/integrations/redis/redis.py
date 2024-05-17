@@ -23,15 +23,27 @@ def _get_redis_command_args(command):
 
 def _patch_redis(StrictRedis, client):  # noqa: N803
     # type: (Any, Any) -> None
-    patch_redis_client(StrictRedis, is_cluster=False, set_db_data_fn=_set_db_data)
-    patch_redis_pipeline(client.Pipeline, False, _get_redis_command_args, _set_db_data)
+    patch_redis_client(
+        StrictRedis,
+        is_cluster=False,
+        set_db_data_fn=_set_db_data,
+    )
+    patch_redis_pipeline(
+        client.Pipeline,
+        is_cluster=False,
+        get_command_args_fn=_get_redis_command_args,
+        set_db_data_fn=_set_db_data,
+    )
     try:
         strict_pipeline = client.StrictPipeline
     except AttributeError:
         pass
     else:
         patch_redis_pipeline(
-            strict_pipeline, False, _get_redis_command_args, _set_db_data
+            strict_pipeline,
+            is_cluster=False,
+            get_command_args_fn=_get_redis_command_args,
+            set_db_data_fn=_set_db_data,
         )
 
     try:

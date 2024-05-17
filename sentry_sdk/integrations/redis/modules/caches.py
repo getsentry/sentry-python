@@ -1,3 +1,3 @@
 """
-Code used for the Queries modules in Sentry
+Code used for the Caches module in Sentry
 """
