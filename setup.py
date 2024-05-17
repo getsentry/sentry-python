@@ -57,7 +57,7 @@ setup(
         "falcon": ["falcon>=1.4"],
         "fastapi": ["fastapi>=0.79.0"],
         "flask": ["flask>=0.11", "blinker>=1.1", "markupsafe"],
-        "grpcio": ["grpcio>=1.21.1"],
+        "grpcio": ["grpcio>=1.21.1", "protobuf>=3.8.0"],
         "httpx": ["httpx>=0.16.0"],
         "huey": ["huey>=2"],
         "huggingface_hub": ["huggingface_hub>=0.22"],
