@@ -447,7 +447,11 @@ def _patch_producer_publish():
         # type: (Producer, *Any, **Any) -> Any
         kwargs_headers = kwargs.get("headers", {})
         if not isinstance(kwargs_headers, Mapping):
-            # Ensure kwargs_headers is a Mapping, so we can safely call get()
+            # Ensure kwargs_headers is a Mapping, so we can safely call get().
+            # We don't expect this to happen, but it's better to be safe. Even
+            # if it does happen, only our instrumentation breaks. This line
+            # does not overwrite kwargs["headers"], so the original publish
+            # method will still work.
             kwargs_headers = {}
 
         task_name = kwargs_headers.get("task")
