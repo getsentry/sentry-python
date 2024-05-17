@@ -107,7 +107,7 @@ if TYPE_CHECKING:
 
     ProfileContext = TypedDict(
         "ProfileContext",
-        {"profile_id": str},
+        {"profiler_id": str},
     )
 
     FrameId = Tuple[

@@ -56,7 +56,7 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
-            "enable_continuous_profiling": Optional[bool],
+            "auto_start_continuous_profiling": Optional[bool],
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],

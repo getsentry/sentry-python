@@ -653,6 +653,26 @@ class Span:
 
         return rv
 
+    def get_profile_context(self):
+        # type: () -> Any
+        profiler_id = self._data.get(SPANDATA.PROFILER_ID)
+        if profiler_id is None:
+            return None
+
+        rv = {
+            SPANDATA.PROFILER_ID: profiler_id,
+        }
+
+        thread_id = self._data.get(SPANDATA.THREAD_ID)
+        if thread_id is not None:
+            rv[SPANDATA.THREAD_ID] = thread_id
+
+        thread_name = self._data.get(SPANDATA.THREAD_NAME)
+        if thread_name is not None:
+            rv[SPANDATA.THREAD_NAME] = thread_name
+
+        return rv
+
 
 class Transaction(Span):
     """The Transaction is the root element that holds all the spans
@@ -826,6 +846,9 @@ class Transaction(Span):
         contexts = {}
         contexts.update(self._contexts)
         contexts.update({"trace": self.get_trace_context()})
+        profile_context = self.get_profile_context()
+        if profile_context is not None:
+            contexts.update({"profile": profile_context})
 
         event = {
             "type": "transaction",
@@ -1060,6 +1083,10 @@ class NoOpSpan(Span):
         return {}
 
     def get_trace_context(self):
+        # type: () -> Any
+        return {}
+
+    def get_profile_context(self):
         # type: () -> Any
         return {}
 

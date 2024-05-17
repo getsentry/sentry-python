@@ -7,10 +7,7 @@ from datetime import datetime, timezone
 from importlib import import_module
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
-from sentry_sdk.continuous_profiler import (
-    has_continous_profiling_enabled,
-    setup_continuous_profiler,
-)
+from sentry_sdk.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -377,19 +374,12 @@ class _Client(BaseClient):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
-            transaction_based_profiling_enabled = has_profiling_enabled(self.options)
-            continuous_profiling_enabled = has_continous_profiling_enabled(self.options)
-
-            if transaction_based_profiling_enabled and continuous_profiling_enabled:
-                raise ValueError(
-                    "Cannot run with continuous profiling mode along side the regular profiler."
-                )
-            elif transaction_based_profiling_enabled:
+            if has_profiling_enabled(self.options):
                 try:
                     setup_profiler(self.options)
                 except Exception as e:
                     logger.debug("Can not set up profiler. (%s)", e)
-            elif continuous_profiling_enabled:
+            else:
                 try:
                     setup_continuous_profiler(
                         self.options,

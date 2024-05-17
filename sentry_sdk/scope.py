@@ -999,6 +999,8 @@ class Scope(object):
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
+        try_autostart_continuous_profiler()
+
         custom_sampling_context = custom_sampling_context or {}
 
         # kwargs at this point has type TransactionKwargs, since we have removed
@@ -1025,8 +1027,6 @@ class Scope(object):
             profile._set_initial_sampling_decision(sampling_context=sampling_context)
 
             transaction._profile = profile
-
-        try_autostart_continuous_profiler()
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction

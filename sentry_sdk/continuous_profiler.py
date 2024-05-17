@@ -154,14 +154,6 @@ def get_profiler_id():
     return _scheduler.profiler_id
 
 
-def has_continous_profiling_enabled(options):
-    # type: (Dict[str, Any]) -> bool
-    experiments = options.get("_experiments", {})
-    if experiments.get("enable_continuous_profiling"):
-        return True
-    return False
-
-
 class ContinuousScheduler(object):
     mode = "unknown"  # type: ContinuousProfilerMode
 
@@ -175,7 +167,10 @@ class ContinuousScheduler(object):
 
     def should_autostart(self):
         # type: () -> bool
-        raise NotImplementedError
+        experiments = self.options.get("_experiments")
+        if not experiments:
+            return False
+        return experiments.get("auto_start_continuous_profiling")
 
     def ensure_running(self):
         # type: () -> None
@@ -254,7 +249,7 @@ class ThreadContinuousScheduler(ContinuousScheduler):
 
     def should_autostart(self):
         # type: () -> bool
-        return self.pid != os.getpid()
+        return super().should_autostart() and self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
@@ -321,6 +316,8 @@ class ThreadContinuousScheduler(ContinuousScheduler):
             self.thread.join()
             self.thread = None
 
+        self.buffer = None
+
 
 class GeventContinuousScheduler(ContinuousScheduler):
     """
@@ -353,7 +350,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
     def should_autostart(self):
         # type: () -> bool
-        return self.pid != os.getpid()
+        return super().should_autostart() and self.pid != os.getpid()
 
     def ensure_running(self):
         # type: () -> None
@@ -416,6 +413,8 @@ class GeventContinuousScheduler(ContinuousScheduler):
         if self.thread is not None:
             self.thread.join()
             self.thread = None
+
+        self.buffer = None
 
 
 PROFILE_BUFFER_SECONDS = 10
