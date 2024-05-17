@@ -7,7 +7,10 @@ except ModuleNotFoundError:
     FakeRedisAsync = None
 
 if FakeRedisAsync is None:
-    pytest.skip("Skipping tests because fakeredis.aioredis not available", allow_module_level=True)
+    pytest.skip(
+        "Skipping tests because fakeredis.aioredis not available",
+        allow_module_level=True,
+    )
 
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.utils import parse_version
@@ -56,7 +59,7 @@ async def test_cache_basic(sentry_init, capture_events):
     (event,) = events
     spans = event["spans"]
     assert len(spans) == 2
-    
+
     assert spans[0]["op"] == "cache.get_item"
     assert spans[1]["op"] == "db.redis"
 
