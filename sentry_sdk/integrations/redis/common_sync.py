@@ -13,6 +13,7 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 import sentry_sdk
 
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any
