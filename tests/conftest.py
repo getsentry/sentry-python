@@ -539,7 +539,13 @@ def object_described_by_matcher():
 
 @pytest.fixture
 def teardown_profiling():
+    # Make sure that a previous test didn't leave the profiler running
+    teardown_profiler()
+    teardown_continuous_profiler()
+
     yield
+
+    # Make sure that to shut down the profiler after the test
     teardown_profiler()
     teardown_continuous_profiler()
 
