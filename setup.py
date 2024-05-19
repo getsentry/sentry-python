@@ -29,7 +29,7 @@ setup(
         "Documentation": "https://docs.sentry.io/platforms/python/",
         "Changelog": "https://github.com/getsentry/sentry-python/blob/master/CHANGELOG.md",
     },
-    description="Python client for Sentry (https://sentry.io)",
+    description="Python client for Sentry (https://sentry.io).",
     long_description=get_file_text("README.md"),
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=("tests", "tests.*")),
