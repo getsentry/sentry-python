@@ -61,7 +61,7 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
 
         # TODO: Here we could also create the caching spans.
         #       Questions:
-        #       -) We should probablby have the OP.DB_REDIS span and a separate OP.CACHE_GET_ITEM (or set_item) span, right?
+        #       -) We should probablby have the OP.DB_REDIS span and a separate OP.CACHE_GET (or set) span, right?
         #       -) We probably need to research what redis commands are used by caching libs.
         # GitHub issue: https://github.com/getsentry/sentry-python/issues/2965
         with sentry_sdk.start_span(op=OP.DB_REDIS, description=description) as span:
