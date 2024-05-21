@@ -195,7 +195,7 @@ def test_cache_spans_middleware(
     # first_event - cache.get
     assert first_event["spans"][0]["op"] == "cache.get"
     assert first_event["spans"][0]["description"].startswith(
-        "get views.decorators.cache.cache_header."
+        "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"]["network.peer.address"] is not None
     assert first_event["spans"][0]["data"]["cache.key"].startswith(
@@ -206,7 +206,7 @@ def test_cache_spans_middleware(
     # first_event - cache.set
     assert first_event["spans"][1]["op"] == "cache.set"
     assert first_event["spans"][1]["description"].startswith(
-        "set views.decorators.cache.cache_header."
+        "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][1]["data"]["network.peer.address"] is not None
     assert first_event["spans"][1]["data"]["cache.key"].startswith(
@@ -217,7 +217,7 @@ def test_cache_spans_middleware(
     # second_event - cache.get
     assert second_event["spans"][0]["op"] == "cache.get"
     assert second_event["spans"][0]["description"].startswith(
-        "get views.decorators.cache.cache_header."
+        "views.decorators.cache.cache_header."
     )
     assert second_event["spans"][0]["data"]["network.peer.address"] is not None
     assert second_event["spans"][0]["data"]["cache.key"].startswith(
@@ -228,7 +228,7 @@ def test_cache_spans_middleware(
     # second_event - cache.get 2
     assert second_event["spans"][1]["op"] == "cache.get"
     assert second_event["spans"][1]["description"].startswith(
-        "get views.decorators.cache.cache_page."
+        "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["network.peer.address"] is not None
     assert second_event["spans"][1]["data"]["cache.key"].startswith(
@@ -261,7 +261,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     # first_event - cache.get
     assert first_event["spans"][0]["op"] == "cache.get"
     assert first_event["spans"][0]["description"].startswith(
-        "get views.decorators.cache.cache_header."
+        "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"]["network.peer.address"] is not None
     assert first_event["spans"][0]["data"]["cache.key"].startswith(
@@ -272,7 +272,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     # first_event - cache.set
     assert first_event["spans"][1]["op"] == "cache.set"
     assert first_event["spans"][1]["description"].startswith(
-        "set views.decorators.cache.cache_header."
+        "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][1]["data"]["network.peer.address"] is not None
     assert first_event["spans"][1]["data"]["cache.key"].startswith(
@@ -283,7 +283,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     # second_event - cache.get
     assert second_event["spans"][1]["op"] == "cache.get"
     assert second_event["spans"][1]["description"].startswith(
-        "get views.decorators.cache.cache_page."
+        "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["network.peer.address"] is not None
     assert second_event["spans"][1]["data"]["cache.key"].startswith(
@@ -535,25 +535,25 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert len(transaction["spans"]) == 7
 
     assert transaction["spans"][0]["op"] == "cache.get"
-    assert transaction["spans"][0]["description"] == f"get_many ['S{id}', 'S{id+1}']"
+    assert transaction["spans"][0]["description"] == f"['S{id}', 'S{id+1}']"
 
     assert transaction["spans"][1]["op"] == "cache.get"
-    assert transaction["spans"][1]["description"] == f"get S{id}"
+    assert transaction["spans"][1]["description"] == f"S{id}"
 
     assert transaction["spans"][2]["op"] == "cache.get"
-    assert transaction["spans"][2]["description"] == f"get S{id+1}"
+    assert transaction["spans"][2]["description"] == f"S{id+1}"
 
     assert transaction["spans"][3]["op"] == "cache.set"
-    assert transaction["spans"][3]["description"] == f"set S{id}"
+    assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
-    assert transaction["spans"][4]["description"] == f"get_many ['S{id}', 'S{id+1}']"
+    assert transaction["spans"][4]["description"] == f"['S{id}', 'S{id+1}']"
 
     assert transaction["spans"][5]["op"] == "cache.get"
-    assert transaction["spans"][5]["description"] == f"get S{id}"
+    assert transaction["spans"][5]["description"] == f"S{id}"
 
     assert transaction["spans"][6]["op"] == "cache.get"
-    assert transaction["spans"][6]["description"] == f"get S{id+1}"
+    assert transaction["spans"][6]["description"] == f"S{id+1}"
 
 
 @pytest.mark.forked
@@ -585,14 +585,14 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][0]["op"] == "cache.set"
     assert (
         transaction["spans"][0]["description"]
-        == f"set_many {{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
+        == f"{{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
     )
 
     assert transaction["spans"][1]["op"] == "cache.set"
-    assert transaction["spans"][1]["description"] == f"set S{id}"
+    assert transaction["spans"][1]["description"] == f"S{id}"
 
     assert transaction["spans"][2]["op"] == "cache.set"
-    assert transaction["spans"][2]["description"] == f"set S{id+1}"
+    assert transaction["spans"][2]["description"] == f"S{id+1}"
 
     assert transaction["spans"][3]["op"] == "cache.get"
-    assert transaction["spans"][3]["description"] == f"get S{id}"
+    assert transaction["spans"][3]["description"] == f"S{id}"
