@@ -288,7 +288,7 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
     aiohttp_client,
     DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,
+    ObjectDescribedBy,  # noqa: N803
 ):
     traces_sampler = mock.Mock()
     sentry_init(
@@ -404,13 +404,17 @@ async def test_trace_from_headers_if_performance_enabled(
     # The aiohttp_client is instrumented so will generate the sentry-trace header and add request.
     # Get the sentry-trace header from the request so we can later compare with transaction events.
     client = await aiohttp_client(app)
-    resp = await client.get("/")
+    with start_transaction():
+        # Headers are only added to the span if there is an active transaction
+        resp = await client.get("/")
+
     sentry_trace_header = resp.request_info.headers.get("sentry-trace")
     trace_id = sentry_trace_header.split("-")[0]
 
     assert resp.status == 500
 
-    msg_event, error_event, transaction_event = events
+    # Last item is the custom transaction event wrapping `client.get("/")`
+    msg_event, error_event, transaction_event, _ = events
 
     assert msg_event["contexts"]["trace"]
     assert "trace_id" in msg_event["contexts"]["trace"]
