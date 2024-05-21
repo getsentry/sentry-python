@@ -60,7 +60,7 @@ async def test_cache_basic(sentry_init, capture_events):
     spans = event["spans"]
     assert len(spans) == 2
 
-    assert spans[0]["op"] == "cache.get_item"
+    assert spans[0]["op"] == "cache.get"
     assert spans[1]["op"] == "db.redis"
 
 
@@ -89,12 +89,12 @@ async def test_cache_keys(sentry_init, capture_events):
     assert spans[0]["op"] == "db.redis"
     assert spans[0]["description"] == "GET 'asomethingelse'"
 
-    assert spans[1]["op"] == "cache.get_item"
+    assert spans[1]["op"] == "cache.get"
     assert spans[1]["description"] == "ablub"
     assert spans[2]["op"] == "db.redis"
     assert spans[2]["description"] == "GET 'ablub'"
 
-    assert spans[3]["op"] == "cache.get_item"
+    assert spans[3]["op"] == "cache.get"
     assert spans[3]["description"] == "ablubkeything"
     assert spans[4]["op"] == "db.redis"
     assert spans[4]["description"] == "GET 'ablubkeything'"
@@ -126,7 +126,7 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert len(spans) == 6
 
-    assert spans[0]["op"] == "cache.get_item"
+    assert spans[0]["op"] == "cache.get"
     assert spans[0]["description"] == "myasynccachekey"
     assert spans[0]["data"]["cache.key"] == "myasynccachekey"
     assert spans[0]["data"]["cache.hit"] == False  # noqa: E712
@@ -144,7 +144,7 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert spans[1]["op"] == "db.redis"  # we ignore db spans in this test.
 
-    assert spans[2]["op"] == "cache.set_item"
+    assert spans[2]["op"] == "cache.set"
     assert spans[2]["description"] == "myasynccachekey"
     assert spans[2]["data"]["cache.key"] == "myasynccachekey"
     assert "cache.hit" not in spans[1]["data"]
@@ -162,7 +162,7 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert spans[3]["op"] == "db.redis"  # we ignore db spans in this test.
 
-    assert spans[4]["op"] == "cache.get_item"
+    assert spans[4]["op"] == "cache.get"
     assert spans[4]["description"] == "myasynccachekey"
     assert spans[4]["data"]["cache.key"] == "myasynccachekey"
     assert spans[4]["data"]["cache.hit"] == True  # noqa: E712
