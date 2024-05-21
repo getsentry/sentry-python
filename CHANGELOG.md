@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.2.1
+
+### Various fixes & improvements
+
+- Add conditional check for delivery_info's existence (#3083) by @cmanallen
+- Updated deps for latest langchain version (#3092) by @antonpirker
+- Fixed grpcio extras to work as described in the docs (#3081) by @antonpirker
+- ref(celery): Add comment about kwargs_headers (#3079) by @szokeasaurusrex
+- feat(celery): Queues module producer implementation (#3079) by @szokeasaurusrex
+- ref: Fix N803 flake8 failures (#3082) by @szokeasaurusrex
+- Use pythons venv instead of virtualenv to create virtual envs (#3077) by @antonpirker
+
 ## 2.2.0
 
 ### New features
