@@ -2,7 +2,7 @@ from typing import List, Optional, Any, Iterator
 from unittest.mock import Mock
 
 import pytest
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
