@@ -5,7 +5,7 @@ The project redis-py-cluster is EOL and was integrated into redis-py starting fr
 https://github.com/grokzen/redis-py-cluster
 """
 
-from sentry_sdk.integrations.redis.common_sync import (
+from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
 )

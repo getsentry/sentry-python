@@ -426,12 +426,18 @@ class Span:
         If the span's containing transaction doesn't yet have a ``baggage`` value,
         this will cause one to be generated and stored.
         """
+        if not self.containing_transaction:
+            # Do not propagate headers if there is no containing transaction. Otherwise, this
+            # span ends up being the root span of a new trace, and since it does not get sent
+            # to Sentry, the trace will be missing a root transaction. The dynamic sampling
+            # context will also be missing, breaking dynamic sampling & traces.
+            return
+
         yield SENTRY_TRACE_HEADER_NAME, self.to_traceparent()
 
-        if self.containing_transaction:
-            baggage = self.containing_transaction.get_baggage().serialize()
-            if baggage:
-                yield BAGGAGE_HEADER_NAME, baggage
+        baggage = self.containing_transaction.get_baggage().serialize()
+        if baggage:
+            yield BAGGAGE_HEADER_NAME, baggage
 
     @classmethod
     def from_traceparent(

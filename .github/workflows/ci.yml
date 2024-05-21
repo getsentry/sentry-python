@@ -67,7 +67,6 @@ jobs:
       - name: Build Packages
         run: |
           echo "Creating directory containing Python SDK Lambda Layer"
-          pip install virtualenv
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
       - name: Upload Python Packages
@@ -89,7 +88,6 @@ jobs:
           python-version: 3.12
 
       - run: |
-          pip install virtualenv
           make apidocs
           cd docs/_build && zip -r gh-pages ./
 

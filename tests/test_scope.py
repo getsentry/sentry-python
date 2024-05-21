@@ -822,3 +822,24 @@ def test_set_tags():
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
+
+
+def test_last_event_id(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert Scope.last_event_id() is None
+
+    sentry_sdk.capture_exception(Exception("test"))
+
+    assert Scope.last_event_id() is not None
+
+
+def test_last_event_id_transaction(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert Scope.last_event_id() is None
+
+    with sentry_sdk.start_transaction(name="test"):
+        pass
+
+    assert Scope.last_event_id() is None, "Transaction should not set last_event_id"

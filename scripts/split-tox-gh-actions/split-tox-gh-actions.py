@@ -70,6 +70,7 @@ GROUPS = {
         "arq",
         "beam",
         "celery",
+        "cohere",
         "huey",
         "langchain",
         "openai",
@@ -81,7 +82,7 @@ GROUPS = {
         "clickhouse_driver",
         "pymongo",
         "redis",
-        "rediscluster",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "GraphQL": [

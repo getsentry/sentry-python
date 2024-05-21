@@ -15,6 +15,7 @@ from sentry_sdk import (
     capture_exception,
     capture_message,
     start_transaction,
+    last_event_id,
     add_breadcrumb,
     Hub,
     Scope,
@@ -778,3 +779,24 @@ def test_classmethod_tracing(sentry_init):
         with patch_start_tracing_child() as fake_start_child:
             assert instance_or_class.class_(1) == (TracingTestClass, 1)
             assert fake_start_child.call_count == 1
+
+
+def test_last_event_id(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert last_event_id() is None
+
+    capture_exception(Exception("test"))
+
+    assert last_event_id() is not None
+
+
+def test_last_event_id_transaction(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert last_event_id() is None
+
+    with start_transaction(name="test"):
+        pass
+
+    assert last_event_id() is None, "Transaction should not set last_event_id"
