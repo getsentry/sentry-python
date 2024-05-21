@@ -5,7 +5,7 @@ https://github.com/redis/redis-py
 """
 
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.integrations.redis.common_sync import (
+from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
 )
@@ -51,7 +51,7 @@ def _patch_redis(StrictRedis, client):  # noqa: N803
     except ImportError:
         pass
     else:
-        from sentry_sdk.integrations.redis.common_async import (
+        from sentry_sdk.integrations.redis._async_common import (
             patch_redis_async_client,
             patch_redis_async_pipeline,
         )
