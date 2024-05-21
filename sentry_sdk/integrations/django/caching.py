@@ -69,7 +69,7 @@ def _patch_cache_method(cache, method_name, address, port):
         is_set_operation = method_name.startswith("set")
         is_get_operation = not is_set_operation
 
-        op = OP.CACHE_SET_ITEM if is_set_operation else OP.CACHE_GET_ITEM
+        op = OP.CACHE_SET if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
         with sentry_sdk.start_span(op=op, description=description) as span:

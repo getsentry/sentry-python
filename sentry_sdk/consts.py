@@ -315,8 +315,8 @@ class SPANDATA:
 
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
-    CACHE_GET_ITEM = "cache.get"
-    CACHE_SET_ITEM = "cache.set"
+    CACHE_GET = "cache.get"
+    CACHE_SET = "cache.set"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"

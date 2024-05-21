@@ -20,9 +20,9 @@ def _get_op(name):
     # type: (str) -> Optional[str]
     op = None
     if name.lower().startswith("get"):
-        op = OP.CACHE_GET_ITEM
+        op = OP.CACHE_GET
     elif name.lower().startswith("set"):
-        op = OP.CACHE_SET_ITEM
+        op = OP.CACHE_SET
 
     return op
 
