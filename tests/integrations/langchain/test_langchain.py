@@ -2,7 +2,8 @@ from typing import List, Optional, Any, Iterator
 from unittest.mock import Mock
 
 import pytest
-try: 
+
+try:
     # Langchain >= 0.2
     from langchain_openai import ChatOpenAI
 except ImportError:
