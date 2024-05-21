@@ -319,7 +319,7 @@ def test_cache_spans_templatetag(
     # first_event - cache.get
     assert first_event["spans"][0]["op"] == "cache.get"
     assert first_event["spans"][0]["description"].startswith(
-        "get template.cache.some_identifier."
+        "template.cache.some_identifier."
     )
     assert first_event["spans"][0]["data"]["network.peer.address"] is not None
     assert first_event["spans"][0]["data"]["cache.key"].startswith(
@@ -330,7 +330,7 @@ def test_cache_spans_templatetag(
     # first_event - cache.set
     assert first_event["spans"][1]["op"] == "cache.set"
     assert first_event["spans"][1]["description"].startswith(
-        "set template.cache.some_identifier."
+        "template.cache.some_identifier."
     )
     assert first_event["spans"][1]["data"]["network.peer.address"] is not None
     assert first_event["spans"][1]["data"]["cache.key"].startswith(
@@ -341,7 +341,7 @@ def test_cache_spans_templatetag(
     # second_event - cache.get
     assert second_event["spans"][0]["op"] == "cache.get"
     assert second_event["spans"][0]["description"].startswith(
-        "get template.cache.some_identifier."
+        "template.cache.some_identifier."
     )
     assert second_event["spans"][0]["data"]["network.peer.address"] is not None
     assert second_event["spans"][0]["data"]["cache.key"].startswith(
@@ -354,27 +354,27 @@ def test_cache_spans_templatetag(
 @pytest.mark.parametrize(
     "method_name, args, kwargs, expected_description",
     [
-        ("get", None, None, "get "),
-        ("get", [], {}, "get "),
-        ("get", ["bla", "blub", "foo"], {}, "get bla"),
+        ("get", None, None, ""),
+        ("get", [], {}, ""),
+        ("get", ["bla", "blub", "foo"], {}, "bla"),
         (
             "get_many",
             [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
             {},
-            "get_many ['bla 1', 'bla 2', 'bla 3']",
+            "['bla 1', 'bla 2', 'bla 3']",
         ),
         (
             "get_many",
             [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
             {"key": "bar"},
-            "get_many ['bla 1', 'bla 2', 'bla 3']",
+            "['bla 1', 'bla 2', 'bla 3']",
         ),
-        ("get", [], {"key": "bar"}, "get bar"),
+        ("get", [], {"key": "bar"}, "bar"),
         (
             "get",
             "something",
             {},
-            "get s",
+            "s",
         ),  # this should never happen, just making sure that we are not raising an exception in that case.
     ],
 )
