@@ -48,11 +48,7 @@ def _get_key(args, kwargs):
 
 def _get_span_description(method_name, args, kwargs):
     # type: (str, list[Any], dict[str, Any]) -> str
-    description = "{} {}".format(
-        method_name,
-        _get_key(args, kwargs),
-    )
-    return description
+    return _get_key(args, kwargs)
 
 
 def _patch_cache_method(cache, method_name, address, port):
