@@ -535,7 +535,7 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert len(transaction["spans"]) == 7
 
     assert transaction["spans"][0]["op"] == "cache.get"
-    assert transaction["spans"][0]["description"] == f"['S{id}', 'S{id+1}']"
+    assert transaction["spans"][0]["description"] == f"'S{id}', 'S{id+1}'"
 
     assert transaction["spans"][1]["op"] == "cache.get"
     assert transaction["spans"][1]["description"] == f"S{id}"
@@ -547,7 +547,7 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
-    assert transaction["spans"][4]["description"] == f"['S{id}', 'S{id+1}']"
+    assert transaction["spans"][4]["description"] == f"'S{id}', 'S{id+1}'"
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
@@ -583,7 +583,7 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     assert len(transaction["spans"]) == 4
 
     assert transaction["spans"][0]["op"] == "cache.set"
-    assert transaction["spans"][0]["description"] == f"['S{id}', 'S{id+1}']"
+    assert transaction["spans"][0]["description"] == f"'S{id}', 'S{id+1}'"
 
     assert transaction["spans"][1]["op"] == "cache.set"
     assert transaction["spans"][1]["description"] == f"S{id}"

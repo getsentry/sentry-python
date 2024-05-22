@@ -52,13 +52,12 @@ def _get_safe_key(method_name, args, kwargs):
     """
     key = ""
 
-    if args is not None:
-        if method_name.lower() in _MULTI_KEY_COMMANDS:
-            # for example redis "mget"
-            key = ", ".join(args)
-        elif len(args) >= 1:
-            # for example django "set_many or redis "get"
-            key = args[0]
+    if args is not None and method_name.lower() in _MULTI_KEY_COMMANDS:
+        # for example redis "mget"
+        key = ", ".join(args)
+    elif args is not None and len(args) >= 1:
+        # for example django "set_many or redis "get"
+        key = args[0]
     elif kwargs is not None and "key" in kwargs:
         key = kwargs["key"]
 
