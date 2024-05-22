@@ -54,7 +54,7 @@ def test_cache_basic(sentry_init, capture_events):
     # no cache support for hget command
     assert spans[0]["op"] == "db.redis"
     assert spans[0]["tags"]["redis.command"] == "HGET"
-    
+
     assert spans[1]["op"] == "cache.get"
     assert spans[2]["op"] == "db.redis"
     assert spans[2]["tags"]["redis.command"] == "GET"
