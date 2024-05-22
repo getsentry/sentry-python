@@ -41,13 +41,35 @@ def test_cache_basic(sentry_init, capture_events):
 
     connection = FakeStrictRedis()
     with sentry_sdk.start_transaction():
+        connection.hget("mycachekey", "myfield")
         connection.get("mycachekey")
+        connection.set("mycachekey1", "bla")
+        connection.setex("mycachekey2", 10, "blub")
+        connection.mget("mycachekey1", "mycachekey2")
 
     (event,) = events
     spans = event["spans"]
-    assert len(spans) == 2
-    assert spans[0]["op"] == "cache.get"
-    assert spans[1]["op"] == "db.redis"
+    assert len(spans) == 9
+
+    # no cache support for hget command
+    assert spans[0]["op"] == "db.redis"
+    assert spans[0]["tags"]["redis.command"] == "HGET"
+    
+    assert spans[1]["op"] == "cache.get"
+    assert spans[2]["op"] == "db.redis"
+    assert spans[2]["tags"]["redis.command"] == "GET"
+
+    assert spans[3]["op"] == "cache.set"
+    assert spans[4]["op"] == "db.redis"
+    assert spans[4]["tags"]["redis.command"] == "SET"
+
+    assert spans[5]["op"] == "cache.set"
+    assert spans[6]["op"] == "db.redis"
+    assert spans[6]["tags"]["redis.command"] == "SETEX"
+
+    assert spans[7]["op"] == "cache.get"
+    assert spans[8]["op"] == "db.redis"
+    assert spans[8]["tags"]["redis.command"] == "MGET"
 
 
 def test_cache_keys(sentry_init, capture_events):

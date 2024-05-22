@@ -77,7 +77,7 @@ def _set_cache_data(span, redis_client, properties, return_value):
             if return_value is not None:
                 span.set_data(SPANDATA.CACHE_HIT, True)
                 size = (
-                    len(return_value.encode("utf-8"))
+                    len(str(return_value).encode("utf-8"))
                     if not isinstance(return_value, bytes)
                     else len(return_value)
                 )
