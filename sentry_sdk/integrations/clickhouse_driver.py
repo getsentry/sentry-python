@@ -107,7 +107,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
         res = f(*args, **kwargs)
         instance = args[0]
-        span = getattr(instance.connection, "_sentry_span", None)
+        span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
 
         if span is not None:
             if res is not None and should_send_default_pii():
