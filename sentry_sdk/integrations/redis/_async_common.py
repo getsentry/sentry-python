@@ -76,7 +76,7 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
             )
             cache_span.__enter__()
 
-        db_properties = _compile_db_span_properties(integration, name, args, kwargs)
+        db_properties = _compile_db_span_properties(integration, name, args)
 
         db_span = sentry_sdk.start_span(
             op=db_properties["op"],

@@ -4,7 +4,7 @@ Code used for the Queries module in Sentry
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.redis.utils import _get_safe_command, _get_safe_key
+from sentry_sdk.integrations.redis.utils import _get_safe_command
 from sentry_sdk.utils import capture_internal_exceptions
 
 
@@ -15,23 +15,20 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-def _compile_db_span_properties(integration, redis_command, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any], dict[str, Any]) -> dict[str, Any]
-    key = _get_safe_key(redis_command, args, kwargs)
-    description = _get_db_span_description(integration, redis_command, *args)
+def _compile_db_span_properties(integration, redis_command, args):
+    # type: (RedisIntegration, str, tuple[Any, ...]) -> dict[str, Any]
+    description = _get_db_span_description(integration, redis_command, args)
 
     properties = {
         "op": OP.DB_REDIS,
         "description": description,
-        "redis_command": redis_command.lower(),
-        "key": key,
     }
 
     return properties
 
 
-def _get_db_span_description(integration, command_name, *args):
-    # type: (RedisIntegration, str, *Any) -> str
+def _get_db_span_description(integration, command_name, args):
+    # type: (RedisIntegration, str, tuple[Any, ...]) -> str
     description = command_name
 
     with capture_internal_exceptions():

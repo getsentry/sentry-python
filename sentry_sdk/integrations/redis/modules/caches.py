@@ -28,8 +28,8 @@ def _get_op(name):
 
 
 def _compile_cache_span_properties(integration, redis_command, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any], dict[str, Any]) -> dict[str, Any]
-    key = _get_safe_key(redis_command, args, kwargs)
+    # type: (RedisIntegration, str, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
+    key = _get_safe_key(args, kwargs)
 
     is_cache_key = False
     for prefix in integration.cache_prefixes:
@@ -56,8 +56,8 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
 
 
 def _get_cache_span_description(integration, command_name, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any], dict[str, Any]) -> str
-    description = _get_safe_key(command_name, args, kwargs)
+    # type: (RedisIntegration, str, tuple[Any, ...], dict[str, Any]) -> str
+    description = _get_safe_key(args, kwargs)
 
     data_should_be_truncated = (
         integration.max_data_size and len(description) > integration.max_data_size

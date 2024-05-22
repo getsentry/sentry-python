@@ -44,8 +44,8 @@ def _get_safe_command(name, args):
     return command
 
 
-def _get_safe_key(name, args, kwargs):
-    # type: (str, tuple[Any], dict[str, Any]) -> str
+def _get_safe_key(args, kwargs):
+    # type: (tuple[Any, ...], dict[str, Any]) -> str
     key = ""
 
     if args is not None and len(args) >= 1:
