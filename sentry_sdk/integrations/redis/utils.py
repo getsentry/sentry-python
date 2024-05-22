@@ -54,6 +54,8 @@ def _get_safe_key(args, kwargs):
         key = kwargs["key"]
 
     if isinstance(key, dict):
+        # Django caching set_many() has a dictionary {"key": "data", "key2": "data2"}
+        # as argument. In this case only return the keys of the dictionary (to not leak data)
         key = list(key.keys())
 
     return str(key)

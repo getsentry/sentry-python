@@ -43,9 +43,7 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
 
     properties = {
         "op": _get_op(redis_command),
-        "description": _get_cache_span_description(
-            integration, redis_command, args, kwargs
-        ),
+        "description": _get_cache_span_description(integration, args, kwargs),
         "key": key,
         "redis_command": redis_command.lower(),
         "is_cache_key": is_cache_key,
@@ -55,8 +53,8 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
     return properties
 
 
-def _get_cache_span_description(integration, command_name, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any, ...], dict[str, Any]) -> str
+def _get_cache_span_description(integration, args, kwargs):
+    # type: (RedisIntegration, tuple[Any, ...], dict[str, Any]) -> str
     description = _get_safe_key(args, kwargs)
 
     data_should_be_truncated = (
