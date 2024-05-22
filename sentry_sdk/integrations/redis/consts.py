@@ -2,7 +2,12 @@ _SINGLE_KEY_COMMANDS = frozenset(
     ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"],
 )
 _MULTI_KEY_COMMANDS = frozenset(
-    ["del", "touch", "unlink"],
+    [
+        "del",
+        "touch",
+        "unlink",
+        "mget",
+    ],
 )
 _COMMANDS_INCLUDING_SENSITIVE_DATA = [
     "auth",

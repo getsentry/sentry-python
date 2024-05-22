@@ -65,7 +65,10 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
             return await old_execute_command(self, name, *args, **kwargs)
 
         cache_properties = _compile_cache_span_properties(
-            integration, name, args, kwargs
+            name,
+            args,
+            kwargs,
+            integration,
         )
 
         cache_span = None

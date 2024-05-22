@@ -27,9 +27,9 @@ def _get_op(name):
     return op
 
 
-def _compile_cache_span_properties(integration, redis_command, args, kwargs):
-    # type: (RedisIntegration, str, tuple[Any, ...], dict[str, Any]) -> dict[str, Any]
-    key = _get_safe_key(args, kwargs)
+def _compile_cache_span_properties(redis_command, args, kwargs, integration):
+    # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> dict[str, Any]
+    key = _get_safe_key(redis_command, args, kwargs)
 
     is_cache_key = False
     for prefix in integration.cache_prefixes:
@@ -43,7 +43,9 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
 
     properties = {
         "op": _get_op(redis_command),
-        "description": _get_cache_span_description(integration, args, kwargs),
+        "description": _get_cache_span_description(
+            redis_command, args, kwargs, integration
+        ),
         "key": key,
         "redis_command": redis_command.lower(),
         "is_cache_key": is_cache_key,
@@ -53,9 +55,9 @@ def _compile_cache_span_properties(integration, redis_command, args, kwargs):
     return properties
 
 
-def _get_cache_span_description(integration, args, kwargs):
-    # type: (RedisIntegration, tuple[Any, ...], dict[str, Any]) -> str
-    description = _get_safe_key(args, kwargs)
+def _get_cache_span_description(redis_command, args, kwargs, integration):
+    # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> str
+    description = _get_safe_key(redis_command, args, kwargs)
 
     data_should_be_truncated = (
         integration.max_data_size and len(description) > integration.max_data_size
