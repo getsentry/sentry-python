@@ -19,9 +19,9 @@ if TYPE_CHECKING:
 def _get_op(name):
     # type: (str) -> Optional[str]
     op = None
-    if name.lower().startswith("get"):
+    if name.lower() in GET_COMMANDS:
         op = OP.CACHE_GET
-    elif name.lower().startswith("set"):
+    elif name.lower() in SET_COMMANDS:
         op = OP.CACHE_SET
 
     return op
