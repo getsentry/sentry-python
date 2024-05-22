@@ -12,7 +12,7 @@ from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 if TYPE_CHECKING:
-    from typing import Any, Sequence
+    from typing import Any, Optional, Sequence
     from sentry_sdk.tracing import Span
 
 
@@ -45,7 +45,7 @@ def _get_safe_command(name, args):
 
 
 def _get_safe_key(args, kwargs):
-    # type: (tuple[Any, ...], dict[str, Any]) -> str
+    # type: (Optional[tuple[Any, ...]], Optional[dict[str, Any]]) -> str
     key = ""
 
     if args is not None and len(args) >= 1:
