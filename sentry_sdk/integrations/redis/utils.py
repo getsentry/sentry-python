@@ -54,10 +54,7 @@ def _get_safe_key(args, kwargs):
         key = kwargs["key"]
 
     if isinstance(key, dict):
-        # Do not leak sensitive data
-        # `set_many()` has a dict {"key1": "value1", "key2": "value2"} as first argument.
-        # Those values could include sensitive data so we replace them with a placeholder
-        key = {x: SENSITIVE_DATA_SUBSTITUTE for x in key}
+        key = list(key.keys())
 
     return str(key)
 

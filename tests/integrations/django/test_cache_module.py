@@ -585,7 +585,7 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][0]["op"] == "cache.set"
     assert (
         transaction["spans"][0]["description"]
-        == f"{{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
+        == f"['S{id}', 'S{id+1}']"
     )
 
     assert transaction["spans"][1]["op"] == "cache.set"
