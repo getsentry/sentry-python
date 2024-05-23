@@ -46,10 +46,13 @@ def _set_async_cluster_pipeline_db_data(span, async_redis_cluster_pipeline_insta
 def _set_cluster_db_data(span, redis_cluster_instance):
     # type: (Span, RedisCluster[Any]) -> None
     default_node = redis_cluster_instance.get_default_node()
+
     if default_node is not None:
-        _set_db_data_on_span(
-            span, {"host": default_node.host, "port": default_node.port}
-        )
+        connection_params = {
+            "host": default_node.host,
+            "port": default_node.port,
+        }
+        _set_db_data_on_span(span, connection_params)
 
 
 def _patch_redis_cluster():

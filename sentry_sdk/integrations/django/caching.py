@@ -1,5 +1,6 @@
 import functools
 from typing import TYPE_CHECKING
+from sentry_sdk.integrations.redis.utils import _get_safe_key
 from urllib3.util import parse_url as urlparse
 
 from django import VERSION as DJANGO_VERSION
@@ -8,7 +9,6 @@ from django.core.cache import CacheHandler
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
-    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
 )
@@ -28,27 +28,9 @@ METHODS_TO_INSTRUMENT = [
 ]
 
 
-def _get_key(args, kwargs):
-    # type: (list[Any], dict[str, Any]) -> str
-    key = ""
-
-    if args is not None and len(args) >= 1:
-        key = args[0]
-    elif kwargs is not None and "key" in kwargs:
-        key = kwargs["key"]
-
-    if isinstance(key, dict):
-        # Do not leak sensitive data
-        # `set_many()` has a dict {"key1": "value1", "key2": "value2"} as first argument.
-        # Those values could include sensitive data so we replace them with a placeholder
-        key = {x: SENSITIVE_DATA_SUBSTITUTE for x in key}
-
-    return str(key)
-
-
 def _get_span_description(method_name, args, kwargs):
-    # type: (str, list[Any], dict[str, Any]) -> str
-    return _get_key(args, kwargs)
+    # type: (str, tuple[Any], dict[str, Any]) -> str
+    return _get_safe_key(method_name, args, kwargs)
 
 
 def _patch_cache_method(cache, method_name, address, port):
@@ -61,11 +43,11 @@ def _patch_cache_method(cache, method_name, address, port):
     def _instrument_call(
         cache, method_name, original_method, args, kwargs, address, port
     ):
-        # type: (CacheHandler, str, Callable[..., Any], list[Any], dict[str, Any], Optional[str], Optional[int]) -> Any
+        # type: (CacheHandler, str, Callable[..., Any], tuple[Any, ...], dict[str, Any], Optional[str], Optional[int]) -> Any
         is_set_operation = method_name.startswith("set")
         is_get_operation = not is_set_operation
 
-        op = OP.CACHE_SET if is_set_operation else OP.CACHE_GET
+        op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
         with sentry_sdk.start_span(op=op, description=description) as span:
@@ -78,7 +60,7 @@ def _patch_cache_method(cache, method_name, address, port):
                 if port is not None:
                     span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
-                key = _get_key(args, kwargs)
+                key = _get_safe_key(method_name, args, kwargs)
                 if key != "":
                     span.set_data(SPANDATA.CACHE_KEY, key)
 

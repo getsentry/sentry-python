@@ -1,13 +1,18 @@
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations.redis.modules.caches import (
+    _compile_cache_span_properties,
+    _set_cache_data,
+)
+from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
-    _get_span_description,
     _set_client_data,
     _set_pipeline_data,
 )
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions
 import sentry_sdk
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -64,18 +69,40 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)
 
-        description = _get_span_description(name, *args)
-
-        data_should_be_truncated = (
-            integration.max_data_size and len(description) > integration.max_data_size
+        cache_properties = _compile_cache_span_properties(
+            name,
+            args,
+            kwargs,
+            integration,
         )
-        if data_should_be_truncated:
-            description = description[: integration.max_data_size - len("...")] + "..."
 
-        with sentry_sdk.start_span(op=OP.DB_REDIS, description=description) as span:
-            set_db_data_fn(span, self)
-            _set_client_data(span, is_cluster, name, *args)
+        cache_span = None
+        if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
+            cache_span = sentry_sdk.start_span(
+                op=cache_properties["op"],
+                description=cache_properties["description"],
+            )
+            cache_span.__enter__()
 
-            return old_execute_command(self, name, *args, **kwargs)
+        db_properties = _compile_db_span_properties(integration, name, args)
+
+        db_span = sentry_sdk.start_span(
+            op=db_properties["op"],
+            description=db_properties["description"],
+        )
+        db_span.__enter__()
+
+        set_db_data_fn(db_span, self)
+        _set_client_data(db_span, is_cluster, name, *args)
+
+        value = old_execute_command(self, name, *args, **kwargs)
+
+        db_span.__exit__(None, None, None)
+
+        if cache_span:
+            _set_cache_data(cache_span, self, cache_properties, value)
+            cache_span.__exit__(None, None, None)
+
+        return value
 
     cls.execute_command = sentry_patched_execute_command

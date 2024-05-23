@@ -203,8 +203,8 @@ def test_cache_spans_middleware(
     )
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
-    # first_event - cache.set
-    assert first_event["spans"][1]["op"] == "cache.set"
+    # first_event - cache.put
+    assert first_event["spans"][1]["op"] == "cache.put"
     assert first_event["spans"][1]["description"].startswith(
         "views.decorators.cache.cache_header."
     )
@@ -269,8 +269,8 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
     )
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
-    # first_event - cache.set
-    assert first_event["spans"][1]["op"] == "cache.set"
+    # first_event - cache.put
+    assert first_event["spans"][1]["op"] == "cache.put"
     assert first_event["spans"][1]["description"].startswith(
         "views.decorators.cache.cache_header."
     )
@@ -327,8 +327,8 @@ def test_cache_spans_templatetag(
     )
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
-    # first_event - cache.set
-    assert first_event["spans"][1]["op"] == "cache.set"
+    # first_event - cache.put
+    assert first_event["spans"][1]["op"] == "cache.put"
     assert first_event["spans"][1]["description"].startswith(
         "template.cache.some_identifier."
     )
@@ -354,20 +354,21 @@ def test_cache_spans_templatetag(
 @pytest.mark.parametrize(
     "method_name, args, kwargs, expected_description",
     [
+        (None, None, None, ""),
         ("get", None, None, ""),
         ("get", [], {}, ""),
         ("get", ["bla", "blub", "foo"], {}, "bla"),
         (
             "get_many",
-            [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
+            [["bla1", "bla2", "bla3"], "blub", "foo"],
             {},
-            "['bla 1', 'bla 2', 'bla 3']",
+            "bla1, bla2, bla3",
         ),
         (
             "get_many",
-            [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
+            [["bla:1", "bla:2", "bla:3"], "blub", "foo"],
             {"key": "bar"},
-            "['bla 1', 'bla 2', 'bla 3']",
+            "bla:1, bla:2, bla:3",
         ),
         ("get", [], {"key": "bar"}, "bar"),
         (
@@ -375,7 +376,7 @@ def test_cache_spans_templatetag(
             "something",
             {},
             "s",
-        ),  # this should never happen, just making sure that we are not raising an exception in that case.
+        ),  # this case should never happen, just making sure that we are not raising an exception in that case.
     ],
 )
 def test_cache_spans_get_span_description(
@@ -489,11 +490,11 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     assert not first_event["spans"][0]["data"]["cache.hit"]
     assert "cache.item_size" not in first_event["spans"][0]["data"]
 
-    assert first_event["spans"][1]["op"] == "cache.set"
+    assert first_event["spans"][1]["op"] == "cache.put"
     assert "cache.hit" not in first_event["spans"][1]["data"]
     assert first_event["spans"][1]["data"]["cache.item_size"] == 2
 
-    assert first_event["spans"][2]["op"] == "cache.set"
+    assert first_event["spans"][2]["op"] == "cache.put"
     assert "cache.hit" not in first_event["spans"][2]["data"]
     assert first_event["spans"][2]["data"]["cache.item_size"] == 58
 
@@ -535,7 +536,7 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert len(transaction["spans"]) == 7
 
     assert transaction["spans"][0]["op"] == "cache.get"
-    assert transaction["spans"][0]["description"] == f"['S{id}', 'S{id+1}']"
+    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
 
     assert transaction["spans"][1]["op"] == "cache.get"
     assert transaction["spans"][1]["description"] == f"S{id}"
@@ -543,11 +544,11 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][2]["op"] == "cache.get"
     assert transaction["spans"][2]["description"] == f"S{id+1}"
 
-    assert transaction["spans"][3]["op"] == "cache.set"
+    assert transaction["spans"][3]["op"] == "cache.put"
     assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
-    assert transaction["spans"][4]["description"] == f"['S{id}', 'S{id+1}']"
+    assert transaction["spans"][4]["description"] == f"S{id}, S{id+1}"
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
@@ -582,16 +583,13 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     (transaction,) = events
     assert len(transaction["spans"]) == 4
 
-    assert transaction["spans"][0]["op"] == "cache.set"
-    assert (
-        transaction["spans"][0]["description"]
-        == f"{{'S{id}': '[Filtered]', 'S{id+1}': '[Filtered]'}}"
-    )
+    assert transaction["spans"][0]["op"] == "cache.put"
+    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
 
-    assert transaction["spans"][1]["op"] == "cache.set"
+    assert transaction["spans"][1]["op"] == "cache.put"
     assert transaction["spans"][1]["description"] == f"S{id}"
 
-    assert transaction["spans"][2]["op"] == "cache.set"
+    assert transaction["spans"][2]["op"] == "cache.put"
     assert transaction["spans"][2]["description"] == f"S{id+1}"
 
     assert transaction["spans"][3]["op"] == "cache.get"
