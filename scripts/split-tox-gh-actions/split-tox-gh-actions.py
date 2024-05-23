@@ -82,7 +82,7 @@ GROUPS = {
         "clickhouse_driver",
         "pymongo",
         "redis",
-        "rediscluster",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "GraphQL": [

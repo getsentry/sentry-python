@@ -368,7 +368,7 @@ class SPANDATA:
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET = "cache.get"
-    CACHE_SET = "cache.set"
+    CACHE_PUT = "cache.put"
     COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
     COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
