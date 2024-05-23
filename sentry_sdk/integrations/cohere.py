@@ -22,7 +22,7 @@ from sentry_sdk.utils import (
 try:
     from cohere.client import Client
     from cohere.base_client import BaseCohere
-    from cohere import ChatStreamEndEvent, NonStreamedChatResponse
+    from cohere import ChatStreamEndEvent, NonStreamedChatResponse, StreamedChatResponse_StreamEnd
 
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
@@ -181,7 +181,7 @@ def _wrap_chat(f, streaming):
 
                     with capture_internal_exceptions():
                         for x in old_iterator:
-                            if isinstance(x, ChatStreamEndEvent):
+                            if isinstance(x, ChatStreamEndEvent) or isinstance(x, StreamedChatResponse_StreamEnd):
                                 collect_chat_response_fields(
                                     span,
                                     x.response,
