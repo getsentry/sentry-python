@@ -4,8 +4,8 @@
 
 ### Various fixes & improvements
 
-- Redis cache module (#3073) by @antonpirker
-- Django caching instrumentation update (#3009) by @antonpirker
+- NEW: Redis integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3073) by @antonpirker
+- NEW: Django integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3009) by @antonpirker
 - Fix `cohere` testsuite for new release of `cohere` (#3098) by @antonpirker
 - Fix ClickHouse integration where `_sentry_span` might be missing (#3096) by @sentrivana
 
