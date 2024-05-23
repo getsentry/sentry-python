@@ -354,20 +354,21 @@ def test_cache_spans_templatetag(
 @pytest.mark.parametrize(
     "method_name, args, kwargs, expected_description",
     [
+        (None, None, None, ""),
         ("get", None, None, ""),
         ("get", [], {}, ""),
         ("get", ["bla", "blub", "foo"], {}, "bla"),
         (
             "get_many",
-            [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
+            [["bla1", "bla2", "bla3"], "blub", "foo"],
             {},
-            "['bla 1', 'bla 2', 'bla 3']",
+            "bla1, bla2, bla3",
         ),
         (
             "get_many",
-            [["bla 1", "bla 2", "bla 3"], "blub", "foo"],
+            [["bla:1", "bla:2", "bla:3"], "blub", "foo"],
             {"key": "bar"},
-            "['bla 1', 'bla 2', 'bla 3']",
+            "bla:1, bla:2, bla:3",
         ),
         ("get", [], {"key": "bar"}, "bar"),
         (
@@ -375,7 +376,7 @@ def test_cache_spans_templatetag(
             "something",
             {},
             "s",
-        ),  # this should never happen, just making sure that we are not raising an exception in that case.
+        ),  # this case should never happen, just making sure that we are not raising an exception in that case.
     ],
 )
 def test_cache_spans_get_span_description(
@@ -507,7 +508,7 @@ def test_cache_spans_item_size(sentry_init, client, capture_events, use_django_c
     assert second_event["spans"][1]["data"]["cache.item_size"] == 58
 
 
-@pytest.mark.forked
+# @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     sentry_init(
@@ -535,7 +536,7 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert len(transaction["spans"]) == 7
 
     assert transaction["spans"][0]["op"] == "cache.get"
-    assert transaction["spans"][0]["description"] == f"'S{id}', 'S{id+1}'"
+    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
 
     assert transaction["spans"][1]["op"] == "cache.get"
     assert transaction["spans"][1]["description"] == f"S{id}"
@@ -547,7 +548,7 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][3]["description"] == f"S{id}"
 
     assert transaction["spans"][4]["op"] == "cache.get"
-    assert transaction["spans"][4]["description"] == f"'S{id}', 'S{id+1}'"
+    assert transaction["spans"][4]["description"] == f"S{id}, S{id+1}"
 
     assert transaction["spans"][5]["op"] == "cache.get"
     assert transaction["spans"][5]["description"] == f"S{id}"
@@ -583,7 +584,7 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     assert len(transaction["spans"]) == 4
 
     assert transaction["spans"][0]["op"] == "cache.set"
-    assert transaction["spans"][0]["description"] == f"'S{id}', 'S{id+1}'"
+    assert transaction["spans"][0]["description"] == f"S{id}, S{id+1}"
 
     assert transaction["spans"][1]["op"] == "cache.set"
     assert transaction["spans"][1]["description"] == f"S{id}"
