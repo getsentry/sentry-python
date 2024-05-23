@@ -736,7 +736,7 @@ class Scope(object):
         Deprecated: use set_transaction_name instead."""
 
         # XXX: the docstring above is misleading. The implementation of
-        # apply_to_event prefers an existing  of event.transaction over
+        # apply_to_event prefers an existing value of event.transaction over
         # anything set in the scope.
         # XXX: note that with the introduction of the Scope.transaction getter,
         # there is a semantic and type mismatch between getter and setter. The
