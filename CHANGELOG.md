@@ -4,7 +4,7 @@
 
 ### Various fixes & improvements
 
-- Handle also byte arras as strings (#3101) by @antonpirker
+- Handle also byte arras as strings in Redis caches (#3101) by @antonpirker
 - Do not crash exceptiongroup (by patching excepthook and keeping the name of the function) (#3099) by @antonpirker
 
 ## 2.3.0
