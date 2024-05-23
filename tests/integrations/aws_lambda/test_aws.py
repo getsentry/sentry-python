@@ -554,7 +554,7 @@ def test_non_dict_event(
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     run_lambda_function,
-    DictionaryContaining,  # noqa:N803
+    DictionaryContaining,  # noqa: N803
     ObjectDescribedBy,  # noqa: N803
     StringContaining,  # noqa: N803
 ):

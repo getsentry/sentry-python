@@ -240,6 +240,24 @@ class SPANDATA:
     Example: 58
     """
 
+    CACHE_KEY = "cache.key"
+    """
+    The key of the requested data.
+    Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
+    """
+
+    NETWORK_PEER_ADDRESS = "network.peer.address"
+    """
+    Peer address of the network connection - IP address or Unix domain socket name.
+    Example: 10.1.2.80, /tmp/my.sock, localhost
+    """
+
+    NETWORK_PEER_PORT = "network.peer.port"
+    """
+    Peer port number of the network connection.
+    Example: 6379
+    """
+
     HTTP_QUERY = "http.query"
     """
     The Query string present in the URL.
@@ -349,7 +367,8 @@ class SPANDATA:
 
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
-    CACHE_GET_ITEM = "cache.get_item"
+    CACHE_GET = "cache.get"
+    CACHE_SET = "cache.set"
     COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
     COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"

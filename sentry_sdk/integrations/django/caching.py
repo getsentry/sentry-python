@@ -1,78 +1,149 @@
 import functools
 from typing import TYPE_CHECKING
+from urllib3.util import parse_url as urlparse
 
 from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.utils import ensure_integration_enabled
+from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+)
 
 
 if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
+    from typing import Optional
 
 
 METHODS_TO_INSTRUMENT = [
+    "set",
+    "set_many",
     "get",
     "get_many",
 ]
 
 
-def _get_span_description(method_name, args, kwargs):
-    # type: (str, Any, Any) -> str
-    description = "{} ".format(method_name)
+def _get_key(args, kwargs):
+    # type: (list[Any], dict[str, Any]) -> str
+    key = ""
 
     if args is not None and len(args) >= 1:
-        description += str(args[0])
+        key = args[0]
     elif kwargs is not None and "key" in kwargs:
-        description += str(kwargs["key"])
+        key = kwargs["key"]
 
-    return description
+    if isinstance(key, dict):
+        # Do not leak sensitive data
+        # `set_many()` has a dict {"key1": "value1", "key2": "value2"} as first argument.
+        # Those values could include sensitive data so we replace them with a placeholder
+        key = {x: SENSITIVE_DATA_SUBSTITUTE for x in key}
+
+    return str(key)
 
 
-def _patch_cache_method(cache, method_name):
-    # type: (CacheHandler, str) -> None
+def _get_span_description(method_name, args, kwargs):
+    # type: (str, list[Any], dict[str, Any]) -> str
+    return _get_key(args, kwargs)
+
+
+def _patch_cache_method(cache, method_name, address, port):
+    # type: (CacheHandler, str, Optional[str], Optional[int]) -> None
     from sentry_sdk.integrations.django import DjangoIntegration
 
     original_method = getattr(cache, method_name)
 
     @ensure_integration_enabled(DjangoIntegration, original_method)
-    def _instrument_call(cache, method_name, original_method, args, kwargs):
-        # type: (CacheHandler, str, Callable[..., Any], Any, Any) -> Any
+    def _instrument_call(
+        cache, method_name, original_method, args, kwargs, address, port
+    ):
+        # type: (CacheHandler, str, Callable[..., Any], list[Any], dict[str, Any], Optional[str], Optional[int]) -> Any
+        is_set_operation = method_name.startswith("set")
+        is_get_operation = not is_set_operation
+
+        op = OP.CACHE_SET if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
-        with sentry_sdk.start_span(
-            op=OP.CACHE_GET_ITEM, description=description
-        ) as span:
+        with sentry_sdk.start_span(op=op, description=description) as span:
             value = original_method(*args, **kwargs)
 
-            if value:
-                span.set_data(SPANDATA.CACHE_HIT, True)
+            with capture_internal_exceptions():
+                if address is not None:
+                    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
-                size = len(str(value))
-                span.set_data(SPANDATA.CACHE_ITEM_SIZE, size)
+                if port is not None:
+                    span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
-            else:
-                span.set_data(SPANDATA.CACHE_HIT, False)
+                key = _get_key(args, kwargs)
+                if key != "":
+                    span.set_data(SPANDATA.CACHE_KEY, key)
+
+                item_size = None
+                if is_get_operation:
+                    if value:
+                        item_size = len(str(value))
+                        span.set_data(SPANDATA.CACHE_HIT, True)
+                    else:
+                        span.set_data(SPANDATA.CACHE_HIT, False)
+                else:
+                    try:
+                        # 'set' command
+                        item_size = len(str(args[1]))
+                    except IndexError:
+                        # 'set_many' command
+                        item_size = len(str(args[0]))
+
+                if item_size is not None:
+                    span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
 
             return value
 
     @functools.wraps(original_method)
     def sentry_method(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        return _instrument_call(cache, method_name, original_method, args, kwargs)
+        return _instrument_call(
+            cache, method_name, original_method, args, kwargs, address, port
+        )
 
     setattr(cache, method_name, sentry_method)
 
 
-def _patch_cache(cache):
-    # type: (CacheHandler) -> None
+def _patch_cache(cache, address=None, port=None):
+    # type: (CacheHandler, Optional[str], Optional[int]) -> None
     if not hasattr(cache, "_sentry_patched"):
         for method_name in METHODS_TO_INSTRUMENT:
-            _patch_cache_method(cache, method_name)
+            _patch_cache_method(cache, method_name, address, port)
         cache._sentry_patched = True
+
+
+def _get_address_port(settings):
+    # type: (dict[str, Any]) -> tuple[Optional[str], Optional[int]]
+    location = settings.get("LOCATION")
+
+    # TODO: location can also be an array of locations
+    #       see: https://docs.djangoproject.com/en/5.0/topics/cache/#redis
+    #       GitHub issue: https://github.com/getsentry/sentry-python/issues/3062
+    if not isinstance(location, str):
+        return None, None
+
+    if "://" in location:
+        parsed_url = urlparse(location)
+        # remove the username and password from URL to not leak sensitive data.
+        address = "{}://{}{}".format(
+            parsed_url.scheme or "",
+            parsed_url.hostname or "",
+            parsed_url.path or "",
+        )
+        port = parsed_url.port
+    else:
+        address = location
+        port = None
+
+    return address, int(port) if port is not None else None
 
 
 def patch_caching():
@@ -90,7 +161,13 @@ def patch_caching():
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
-                    _patch_cache(cache)
+                    from django.conf import settings
+
+                    address, port = _get_address_port(
+                        settings.CACHES[alias or "default"]
+                    )
+
+                    _patch_cache(cache, address, port)
 
                 return cache
 
@@ -107,7 +184,9 @@ def patch_caching():
 
                 integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
                 if integration is not None and integration.cache_spans:
-                    _patch_cache(cache)
+                    address, port = _get_address_port(self.settings[alias or "default"])
+
+                    _patch_cache(cache, address, port)
 
                 return cache
 
