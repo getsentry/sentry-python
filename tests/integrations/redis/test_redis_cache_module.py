@@ -59,11 +59,11 @@ def test_cache_basic(sentry_init, capture_events):
     assert spans[2]["op"] == "db.redis"
     assert spans[2]["tags"]["redis.command"] == "GET"
 
-    assert spans[3]["op"] == "cache.set"
+    assert spans[3]["op"] == "cache.put"
     assert spans[4]["op"] == "db.redis"
     assert spans[4]["tags"]["redis.command"] == "SET"
 
-    assert spans[5]["op"] == "cache.set"
+    assert spans[5]["op"] == "cache.put"
     assert spans[6]["op"] == "db.redis"
     assert spans[6]["tags"]["redis.command"] == "SETEX"
 
@@ -150,7 +150,7 @@ def test_cache_data(sentry_init, capture_events):
 
     assert spans[1]["op"] == "db.redis"  # we ignore db spans in this test.
 
-    assert spans[2]["op"] == "cache.set"
+    assert spans[2]["op"] == "cache.put"
     assert spans[2]["description"] == "mycachekey"
     assert spans[2]["data"]["cache.key"] == "mycachekey"
     assert "cache.hit" not in spans[1]["data"]

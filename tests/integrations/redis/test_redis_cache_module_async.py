@@ -144,7 +144,7 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert spans[1]["op"] == "db.redis"  # we ignore db spans in this test.
 
-    assert spans[2]["op"] == "cache.set"
+    assert spans[2]["op"] == "cache.put"
     assert spans[2]["description"] == "myasynccachekey"
     assert spans[2]["data"]["cache.key"] == "myasynccachekey"
     assert "cache.hit" not in spans[1]["data"]

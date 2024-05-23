@@ -22,7 +22,7 @@ def _get_op(name):
     if name.lower() in GET_COMMANDS:
         op = OP.CACHE_GET
     elif name.lower() in SET_COMMANDS:
-        op = OP.CACHE_SET
+        op = OP.CACHE_PUT
 
     return op
 
