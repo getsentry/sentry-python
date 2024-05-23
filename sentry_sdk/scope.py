@@ -848,6 +848,16 @@ class Scope(object):
         """
         self._tags.pop(key, None)
 
+    def get_tag(self, key):
+        # type: (str) -> Any
+        """
+        Retrieves the value of a specific tag.
+
+        :param key: Key of the tag to retrieve.
+        :return: Value of the tag, or None if the tag does not exist.
+        """
+        return self._tags.get(key, None)
+
     def set_context(
         self,
         key,  # type: str
@@ -866,6 +876,18 @@ class Scope(object):
         """Removes a context."""
         self._contexts.pop(key, None)
 
+    def get_context(
+        self, key  # type: str
+    ):
+        # type: (...) -> Any
+        """
+            Retrieves the value of a specific context.
+
+            :param key: Key of the context to retrieve.
+            :return: Value of the extra key, or None if the extra key does not exist.
+        """
+        return self._contexts.get(key, None)
+
     def set_extra(
         self,
         key,  # type: str
@@ -881,6 +903,19 @@ class Scope(object):
         # type: (...) -> None
         """Removes a specific extra key."""
         self._extras.pop(key, None)
+
+    def get_extra(
+        self, key  # type: str
+    ):
+        # type: (...) -> Any
+        """
+            Retrieves the value of a specific extra.
+
+           :param key: Key of the extra to retrieve.
+           :return: Value of the extra key, or None if the extra key does not exist.
+        """
+        return self._extras.get(key, None)
+
 
     def clear_breadcrumbs(self):
         # type: () -> None
