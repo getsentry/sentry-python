@@ -843,3 +843,25 @@ def test_last_event_id_transaction(sentry_init):
         pass
 
     assert Scope.last_event_id() is None, "Transaction should not set last_event_id"
+
+
+def test_get_tag():
+    scope = Scope()
+    scope.set_tags({"tag1": "value1", "tag2": "value2"})
+    assert scope.get_tag("tag1") == "value1"
+    assert scope.get_tag("tag2") == "value2"
+    assert scope.get_tag("missing") is None
+
+
+def test_get_context():
+    scope = Scope()
+    scope.set_context("device", {"a": "b"})
+    assert scope.get_context("device") == {"a": "b"}
+    assert scope.get_context("missing") is None
+
+
+def test_get_extra():
+    scope = Scope()
+    scope.set_extra("foo", "bar")
+    assert scope.get_extra("foo") == "bar"
+    assert scope.get_extra("missing") is None
