@@ -881,10 +881,10 @@ class Scope(object):
     ):
         # type: (...) -> Any
         """
-            Retrieves the value of a specific context.
+        Retrieves the value of a specific context.
 
-            :param key: Key of the context to retrieve.
-            :return: Value of the extra key, or None if the extra key does not exist.
+        :param key: Key of the context to retrieve.
+        :return: Value of the extra key, or None if the extra key does not exist.
         """
         return self._contexts.get(key, None)
 
@@ -909,13 +909,12 @@ class Scope(object):
     ):
         # type: (...) -> Any
         """
-            Retrieves the value of a specific extra.
+         Retrieves the value of a specific extra.
 
-           :param key: Key of the extra to retrieve.
-           :return: Value of the extra key, or None if the extra key does not exist.
+        :param key: Key of the extra to retrieve.
+        :return: Value of the extra key, or None if the extra key does not exist.
         """
         return self._extras.get(key, None)
-
 
     def clear_breadcrumbs(self):
         # type: () -> None
