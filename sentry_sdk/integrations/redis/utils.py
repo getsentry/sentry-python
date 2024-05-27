@@ -53,21 +53,27 @@ def _get_safe_key(method_name, args, kwargs):
     key = ""
     if args is not None and method_name.lower() in _MULTI_KEY_COMMANDS:
         # for example redis "mget"
-        key = ", ".join(args)
+        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in args)
+
     elif args is not None and len(args) >= 1:
         # for example django "set_many/get_many" or redis "get"
-        key = args[0]
+        key = args[0].decode() if isinstance(args[0], bytes) else args[0]
+
     elif kwargs is not None and "key" in kwargs:
         # this is a legacy case for older versions of django (I guess)
-        key = kwargs["key"]
+        key = (
+            kwargs["key"].decode()
+            if isinstance(kwargs["key"], bytes)
+            else kwargs["key"]
+        )
 
     if isinstance(key, dict):
         # Django caching set_many() has a dictionary {"key": "data", "key2": "data2"}
         # as argument. In this case only return the keys of the dictionary (to not leak data)
-        key = ", ".join(key.keys())
+        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key.keys())
 
     if isinstance(key, list):
-        key = ", ".join(key)
+        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key)
 
     return str(key)
 

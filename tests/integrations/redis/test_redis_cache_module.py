@@ -1,7 +1,10 @@
+import pytest
+
 import fakeredis
 from fakeredis import FakeStrictRedis
 
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.redis.utils import _get_safe_key
 from sentry_sdk.utils import parse_version
 import sentry_sdk
 
@@ -185,3 +188,22 @@ def test_cache_data(sentry_init, capture_events):
         assert spans[4]["data"]["network.peer.address"] == "mycacheserver.io"
 
     assert spans[5]["op"] == "db.redis"  # we ignore db spans in this test.
+
+
+@pytest.mark.parametrize(
+    "method_name,args,kwargs,expected_key",
+    [
+        (None, None, None, ""),
+        ("", None, None, ""),
+        ("set", ["bla", "valuebla"], None, "bla"),
+        ("setex", ["bla", 10, "valuebla"], None, "bla"),
+        ("get", ["bla"], None, "bla"),
+        ("mget", ["bla", "blub", "foo"], None, "bla, blub, foo"),
+        ("set", [b"bla", "valuebla"], None, "bla"),
+        ("setex", [b"bla", 10, "valuebla"], None, "bla"),
+        ("get", [b"bla"], None, "bla"),
+        ("mget", [b"bla", "blub", "foo"], None, "bla, blub, foo"),
+    ],
+)
+def test_get_safe_key(method_name, args, kwargs, expected_key):
+    assert _get_safe_key(method_name, args, kwargs) == expected_key
