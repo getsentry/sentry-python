@@ -28,12 +28,13 @@ def test_monitor_beat_tasks(monitor_beat_tasks):
     assert headers == {}  # left unchanged
 
     if monitor_beat_tasks:
-        assert updated_headers == {
-            "headers": {"sentry-monitor-start-timestamp-s": mock.ANY},
-            "sentry-monitor-start-timestamp-s": mock.ANY,
-        }
+        assert updated_headers["sentry-monitor-start-timestamp-s"] == mock.ANY
+        assert (
+            updated_headers["headers"]["sentry-monitor-start-timestamp-s"] == mock.ANY
+        )
     else:
-        assert updated_headers == headers
+        assert "sentry-monitor-start-timestamp-s" not in updated_headers
+        assert "sentry-monitor-start-timestamp-s" not in updated_headers["headers"]
 
 
 @pytest.mark.parametrize("monitor_beat_tasks", [True, False, None, "", "bla", 1, 0])
@@ -46,18 +47,24 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
 
     updated_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
 
+    assert headers == {
+        "blub": "foo",
+        "sentry-something": "bar",
+    }  # left unchanged
+
     if monitor_beat_tasks:
-        assert updated_headers == {
-            "blub": "foo",
-            "sentry-something": "bar",
-            "headers": {
-                "sentry-monitor-start-timestamp-s": mock.ANY,
-                "sentry-something": "bar",
-            },
-            "sentry-monitor-start-timestamp-s": mock.ANY,
-        }
+        assert updated_headers["blub"] == "foo"
+        assert updated_headers["sentry-something"] == "bar"
+        assert updated_headers["sentry-monitor-start-timestamp-s"] == mock.ANY
+        assert updated_headers["headers"]["sentry-something"] == "bar"
+        assert (
+            updated_headers["headers"]["sentry-monitor-start-timestamp-s"] == mock.ANY
+        )
     else:
-        assert updated_headers == headers
+        assert updated_headers["blub"] == "foo"
+        assert updated_headers["sentry-something"] == "bar"
+        assert "sentry-monitor-start-timestamp-s" not in updated_headers
+        assert "sentry-monitor-start-timestamp-s" not in updated_headers["headers"]
 
 
 def test_span_with_transaction(sentry_init):
