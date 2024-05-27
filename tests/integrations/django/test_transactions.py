@@ -120,7 +120,7 @@ def test_resolver_path_no_converter():
 
 
 def test_resolver_path_with_i18n():
-    url_conf = (path(pgettext_lazy("url", "pgettext"), lambda x: ""),)
+    url_conf = (re_path(pgettext_lazy("url", "pgettext"), lambda x: ""),)
     resolver = RavenResolver()
     result = resolver.resolve("/pgettext", url_conf)
     assert result == "/pgettext"
