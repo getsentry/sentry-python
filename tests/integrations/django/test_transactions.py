@@ -119,8 +119,12 @@ def test_resolver_path_no_converter():
     assert result == "/api/v4/{project_id}"
 
 
+@pytest.mark.skipif(
+    django.VERSION < (2, 0),
+    reason="Django>=2.0 required for path patterns",
+)
 def test_resolver_path_with_i18n():
-    url_conf = (re_path(pgettext_lazy("url", "pgettext"), lambda x: ""),)
+    url_conf = (path(pgettext_lazy("url", "pgettext"), lambda x: ""),)
     resolver = RavenResolver()
     result = resolver.resolve("/pgettext", url_conf)
     assert result == "/pgettext"
