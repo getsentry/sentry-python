@@ -333,11 +333,12 @@ def _set_messaging_destination_name(task, span):
     """Set "messaging.destination.name" tag for span"""
     with capture_internal_exceptions():
         delivery_info = task.request.delivery_info
-        routing_key = delivery_info.get("routing_key")
-        if delivery_info.get("exchange") == "" and routing_key is not None:
-            # Empty exchange indicates the default exchange, meaning the tasks
-            # are sent to the queue with the same name as the routing key.
-            span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+        if delivery_info:
+            routing_key = delivery_info.get("routing_key")
+            if delivery_info.get("exchange") == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning the tasks
+                # are sent to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
 
 def _wrap_task_call(task, f):
