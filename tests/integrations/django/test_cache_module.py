@@ -557,7 +557,7 @@ def test_cache_spans_get_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][6]["description"] == f"S{id+1}"
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     sentry_init(
