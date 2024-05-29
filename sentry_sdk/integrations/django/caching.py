@@ -1,6 +1,6 @@
 import functools
 from typing import TYPE_CHECKING
-from sentry_sdk.integrations.redis.utils import _get_safe_key
+from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from urllib3.util import parse_url as urlparse
 
 from django import VERSION as DJANGO_VERSION
@@ -30,7 +30,7 @@ METHODS_TO_INSTRUMENT = [
 
 def _get_span_description(method_name, args, kwargs):
     # type: (str, tuple[Any], dict[str, Any]) -> str
-    return _get_safe_key(method_name, args, kwargs)
+    return _key_as_string(_get_safe_key(method_name, args, kwargs))
 
 
 def _patch_cache_method(cache, method_name, address, port):
@@ -61,7 +61,7 @@ def _patch_cache_method(cache, method_name, address, port):
                     span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
 
                 key = _get_safe_key(method_name, args, kwargs)
-                if key != "":
+                if key is not None:
                     span.set_data(SPANDATA.CACHE_KEY, key)
 
                 item_size = None

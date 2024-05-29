@@ -4,7 +4,7 @@ import fakeredis
 from fakeredis import FakeStrictRedis
 
 from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.integrations.redis.utils import _get_safe_key
+from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import parse_version
 import sentry_sdk
 
@@ -137,7 +137,9 @@ def test_cache_data(sentry_init, capture_events):
 
     assert spans[0]["op"] == "cache.get"
     assert spans[0]["description"] == "mycachekey"
-    assert spans[0]["data"]["cache.key"] == "mycachekey"
+    assert spans[0]["data"]["cache.key"] == [
+        "mycachekey",
+    ]
     assert spans[0]["data"]["cache.hit"] == False  # noqa: E712
     assert "cache.item_size" not in spans[0]["data"]
     # very old fakeredis can not handle port and/or host.
@@ -155,7 +157,9 @@ def test_cache_data(sentry_init, capture_events):
 
     assert spans[2]["op"] == "cache.put"
     assert spans[2]["description"] == "mycachekey"
-    assert spans[2]["data"]["cache.key"] == "mycachekey"
+    assert spans[2]["data"]["cache.key"] == [
+        "mycachekey",
+    ]
     assert "cache.hit" not in spans[1]["data"]
     assert spans[2]["data"]["cache.item_size"] == 18
     # very old fakeredis can not handle port.
@@ -173,7 +177,9 @@ def test_cache_data(sentry_init, capture_events):
 
     assert spans[4]["op"] == "cache.get"
     assert spans[4]["description"] == "mycachekey"
-    assert spans[4]["data"]["cache.key"] == "mycachekey"
+    assert spans[4]["data"]["cache.key"] == [
+        "mycachekey",
+    ]
     assert spans[4]["data"]["cache.hit"] == True  # noqa: E712
     assert spans[4]["data"]["cache.item_size"] == 18
     # very old fakeredis can not handle port.
@@ -193,17 +199,59 @@ def test_cache_data(sentry_init, capture_events):
 @pytest.mark.parametrize(
     "method_name,args,kwargs,expected_key",
     [
-        (None, None, None, ""),
-        ("", None, None, ""),
-        ("set", ["bla", "valuebla"], None, "bla"),
-        ("setex", ["bla", 10, "valuebla"], None, "bla"),
-        ("get", ["bla"], None, "bla"),
-        ("mget", ["bla", "blub", "foo"], None, "bla, blub, foo"),
-        ("set", [b"bla", "valuebla"], None, "bla"),
-        ("setex", [b"bla", 10, "valuebla"], None, "bla"),
-        ("get", [b"bla"], None, "bla"),
-        ("mget", [b"bla", "blub", "foo"], None, "bla, blub, foo"),
+        (None, None, None, None),
+        ("", None, None, None),
+        ("set", ["bla", "valuebla"], None, ("bla",)),
+        ("setex", ["bla", 10, "valuebla"], None, ("bla",)),
+        ("get", ["bla"], None, ("bla",)),
+        ("mget", ["bla", "blub", "foo"], None, ("bla", "blub", "foo")),
+        ("set", [b"bla", "valuebla"], None, (b"bla",)),
+        ("setex", [b"bla", 10, "valuebla"], None, (b"bla",)),
+        ("get", [b"bla"], None, (b"bla",)),
+        ("mget", [b"bla", "blub", "foo"], None, (b"bla", "blub", "foo")),
+        ("not-important", None, {"something": "bla"}, None),
+        ("not-important", None, {"key": None}, None),
+        ("not-important", None, {"key": "bla"}, ("bla",)),
+        ("not-important", None, {"key": b"bla"}, (b"bla",)),
+        ("not-important", None, {"key": []}, None),
+        (
+            "not-important",
+            None,
+            {
+                "key": [
+                    "bla",
+                ]
+            },
+            ("bla",),
+        ),
+        (
+            "not-important",
+            None,
+            {"key": [b"bla", "blub", "foo"]},
+            (b"bla", "blub", "foo"),
+        ),
     ],
 )
 def test_get_safe_key(method_name, args, kwargs, expected_key):
     assert _get_safe_key(method_name, args, kwargs) == expected_key
+
+
+@pytest.mark.parametrize(
+    "key,expected_key",
+    [
+        (None, ""),
+        (("bla",), "bla"),
+        (("bla", "blub", "foo"), "bla, blub, foo"),
+        ((b"bla",), "bla"),
+        ((b"bla", "blub", "foo"), "bla, blub, foo"),
+        (
+            [
+                "bla",
+            ],
+            "bla",
+        ),
+        (["bla", "blub", "foo"], "bla, blub, foo"),
+    ],
+)
+def test_key_as_string(key, expected_key):
+    assert _key_as_string(key) == expected_key

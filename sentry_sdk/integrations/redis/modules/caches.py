@@ -4,7 +4,7 @@ Code used for the Caches module in Sentry
 
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.redis.utils import _get_safe_key
+from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import capture_internal_exceptions
 
 GET_COMMANDS = ("get", "mget")
@@ -30,10 +30,11 @@ def _get_op(name):
 def _compile_cache_span_properties(redis_command, args, kwargs, integration):
     # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> dict[str, Any]
     key = _get_safe_key(redis_command, args, kwargs)
+    key_as_string = _key_as_string(key)
 
     is_cache_key = False
     for prefix in integration.cache_prefixes:
-        if key.startswith(prefix):
+        if key_as_string.startswith(prefix):
             is_cache_key = True
             break
 
@@ -47,6 +48,7 @@ def _compile_cache_span_properties(redis_command, args, kwargs, integration):
             redis_command, args, kwargs, integration
         ),
         "key": key,
+        "key_as_string": key_as_string,
         "redis_command": redis_command.lower(),
         "is_cache_key": is_cache_key,
         "value": value,
@@ -57,7 +59,7 @@ def _compile_cache_span_properties(redis_command, args, kwargs, integration):
 
 def _get_cache_span_description(redis_command, args, kwargs, integration):
     # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> str
-    description = _get_safe_key(redis_command, args, kwargs)
+    description = _key_as_string(_get_safe_key(redis_command, args, kwargs))
 
     data_should_be_truncated = (
         integration.max_data_size and len(description) > integration.max_data_size
