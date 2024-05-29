@@ -647,6 +647,18 @@ def test_set_db_data_custom_backend():
         pytest.fail("A TypeError was raised")
 
 
+def test_connection_reconnect_does_not_error(sentry_init):
+    sentry_init(integrations=[DjangoIntegration()])
+
+    from django.db import connections
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    connections["postgres"].close()
+    connections["postgres"].connect()
+
+
 @pytest.mark.parametrize(
     "transaction_style,client_url,expected_transaction,expected_source,expected_response",
     [
