@@ -7,7 +7,7 @@ from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
-    from typing import Any
+    from typing import Any, Optional
 
 
 try:
@@ -26,11 +26,11 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         super().__init__()
 
     async def intercept_service(self, continuation, handler_call_details):
-        # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Awaitable[RpcMethodHandler]
+        # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Optional[Awaitable[RpcMethodHandler]]
         self._handler_call_details = handler_call_details
         handler = await continuation(handler_call_details)
         if handler is None:
-            return
+            return None
 
         if not handler.request_streaming and not handler.response_streaming:
             handler_factory = grpc.unary_unary_rpc_method_handler
