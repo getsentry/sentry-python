@@ -1,4 +1,5 @@
 from copy import copy
+import itertools
 import pytest
 
 from unittest import mock
@@ -122,7 +123,8 @@ def test_span_with_transaction_custom_headers(sentry_init):
             )
 
 
-def test_celery_trace_propagation_default(sentry_init):
+@pytest.mark.parametrize("monitor_beat_tasks", [True, False])
+def test_celery_trace_propagation_default(sentry_init, monitor_beat_tasks):
     """
     The celery integration does not check the traces_sample_rate.
     By default traces_sample_rate is None which means "do not propagate traces".
@@ -134,7 +136,6 @@ def test_celery_trace_propagation_default(sentry_init):
 
     headers = {}
     span = None
-    monitor_beat_tasks = False
 
     scope = sentry_sdk.Scope.get_isolation_scope()
 
@@ -145,9 +146,16 @@ def test_celery_trace_propagation_default(sentry_init):
     assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
     assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
 
+    if monitor_beat_tasks:
+        assert "sentry-monitor-start-timestamp-s" in outgoing_headers
+        assert "sentry-monitor-start-timestamp-s" in outgoing_headers["headers"]
+    else:
+        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers
+        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
 
-@pytest.mark.parametrize("traces_sample_rate", [None, 0, 0.0, 0.5, 1.0, 1, 2])
-def test_celery_trace_propagation_traces_sample_rate(sentry_init, traces_sample_rate):
+
+@pytest.mark.parametrize("traces_sample_rate,monitor_beat_tasks", list(itertools.product([None, 0, 0.0, 0.5, 1.0, 1, 2], [True, False])))
+def test_celery_trace_propagation_traces_sample_rate(sentry_init, traces_sample_rate, monitor_beat_tasks):
     """
     The celery integration does not check the traces_sample_rate.
     By default traces_sample_rate is None which means "do not propagate traces".
@@ -159,7 +167,6 @@ def test_celery_trace_propagation_traces_sample_rate(sentry_init, traces_sample_
 
     headers = {}
     span = None
-    monitor_beat_tasks = False
 
     scope = sentry_sdk.Scope.get_isolation_scope()
 
@@ -170,9 +177,16 @@ def test_celery_trace_propagation_traces_sample_rate(sentry_init, traces_sample_
     assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
     assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
 
+    if monitor_beat_tasks:
+        assert "sentry-monitor-start-timestamp-s" in outgoing_headers
+        assert "sentry-monitor-start-timestamp-s" in outgoing_headers["headers"]
+    else:
+        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers
+        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
 
-@pytest.mark.parametrize("enable_tracing", [None, True, False])
-def test_celery_trace_propagation_enable_tracing(sentry_init, enable_tracing):
+
+@pytest.mark.parametrize("enable_tracing,monitor_beat_tasks", list(itertools.product([None, True, False], [True, False])))
+def test_celery_trace_propagation_enable_tracing(sentry_init, enable_tracing, monitor_beat_tasks):
     """
     The celery integration does not check the traces_sample_rate.
     By default traces_sample_rate is None which means "do not propagate traces".
@@ -184,7 +198,6 @@ def test_celery_trace_propagation_enable_tracing(sentry_init, enable_tracing):
 
     headers = {}
     span = None
-    monitor_beat_tasks = False
 
     scope = sentry_sdk.Scope.get_isolation_scope()
 
@@ -194,3 +207,10 @@ def test_celery_trace_propagation_enable_tracing(sentry_init, enable_tracing):
     assert outgoing_headers["headers"]["sentry-trace"] == scope.get_traceparent()
     assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
     assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
+
+    if monitor_beat_tasks:
+        assert "sentry-monitor-start-timestamp-s" in outgoing_headers
+        assert "sentry-monitor-start-timestamp-s" in outgoing_headers["headers"]
+    else:
+        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers
+        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
