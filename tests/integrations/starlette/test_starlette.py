@@ -9,6 +9,7 @@ import threading
 from unittest import mock
 
 import pytest
+import requests
 
 from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -100,6 +101,9 @@ def starlette_app_factory(middleware=None, debug=True):
     )
     templates = Jinja2Templates(directory=template_dir)
 
+    async def _ok(request):
+        return starlette.responses.JSONResponse({"status": "ok"})
+
     async def _homepage(request):
         1 / 0
         return starlette.responses.JSONResponse({"status": "ok"})
@@ -143,6 +147,7 @@ def starlette_app_factory(middleware=None, debug=True):
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
+            starlette.routing.Route("/ok", _ok),
             starlette.routing.Route("/some_url", _homepage),
             starlette.routing.Route("/custom_error", _custom_error),
             starlette.routing.Route("/message", _message),
@@ -1078,3 +1083,20 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
+
+
+@pytest.mark.parametrize("uvicorn_server", [starlette_app_factory], indirect=True)
+def test_with_uvicorn(sentry_init, capture_envelopes, uvicorn_server):
+    # Sanity check that the app works with uvicorn which does its own ASGI 2/3
+    # discovery. If we wrap the ASGI app incorrectly, everything might seem ok
+    # until you try to run the app with uvicorn.
+
+    sentry_init(
+        integrations=[StarletteIntegration()],
+    )
+
+    envelopes = capture_envelopes()
+
+    requests.get("http://127.0.0.1:5000/ok")
+
+    assert not envelopes
