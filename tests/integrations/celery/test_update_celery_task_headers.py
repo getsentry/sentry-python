@@ -154,8 +154,13 @@ def test_celery_trace_propagation_default(sentry_init, monitor_beat_tasks):
         assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
 
 
-@pytest.mark.parametrize("traces_sample_rate,monitor_beat_tasks", list(itertools.product([None, 0, 0.0, 0.5, 1.0, 1, 2], [True, False])))
-def test_celery_trace_propagation_traces_sample_rate(sentry_init, traces_sample_rate, monitor_beat_tasks):
+@pytest.mark.parametrize(
+    "traces_sample_rate,monitor_beat_tasks",
+    list(itertools.product([None, 0, 0.0, 0.5, 1.0, 1, 2], [True, False])),
+)
+def test_celery_trace_propagation_traces_sample_rate(
+    sentry_init, traces_sample_rate, monitor_beat_tasks
+):
     """
     The celery integration does not check the traces_sample_rate.
     By default traces_sample_rate is None which means "do not propagate traces".
@@ -185,8 +190,13 @@ def test_celery_trace_propagation_traces_sample_rate(sentry_init, traces_sample_
         assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
 
 
-@pytest.mark.parametrize("enable_tracing,monitor_beat_tasks", list(itertools.product([None, True, False], [True, False])))
-def test_celery_trace_propagation_enable_tracing(sentry_init, enable_tracing, monitor_beat_tasks):
+@pytest.mark.parametrize(
+    "enable_tracing,monitor_beat_tasks",
+    list(itertools.product([None, True, False], [True, False])),
+)
+def test_celery_trace_propagation_enable_tracing(
+    sentry_init, enable_tracing, monitor_beat_tasks
+):
     """
     The celery integration does not check the traces_sample_rate.
     By default traces_sample_rate is None which means "do not propagate traces".
