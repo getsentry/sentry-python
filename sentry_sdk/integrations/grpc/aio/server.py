@@ -29,6 +29,8 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         # type: (ServerInterceptor, Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]], HandlerCallDetails) -> Awaitable[RpcMethodHandler]
         self._handler_call_details = handler_call_details
         handler = await continuation(handler_call_details)
+        if handler is None:
+            return
 
         if not handler.request_streaming and not handler.response_streaming:
             handler_factory = grpc.unary_unary_rpc_method_handler
