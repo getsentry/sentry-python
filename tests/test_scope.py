@@ -25,6 +25,10 @@ def test_copying():
     s1.set_tag("foo", "bar")
 
     s2 = copy.copy(s1)
+    # Check all attributes are copied
+    for name in set(Scope.__slots__) - {"client"}:
+        getattr(s2, name)
+
     assert "foo" in s2._tags
 
     s1.set_tag("bam", "baz")

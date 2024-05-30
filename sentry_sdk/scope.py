@@ -208,9 +208,6 @@ class Scope(object):
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
-        # self._last_event_id is only applicable to isolation scopes
-        self._last_event_id = None  # type: Optional[str]
-
     def __copy__(self):
         # type: () -> Scope
         """
@@ -243,6 +240,8 @@ class Scope(object):
         rv._attachments = list(self._attachments)
 
         rv._profile = self._profile
+
+        rv._last_event_id = self._last_event_id
 
         return rv
 
@@ -676,6 +675,9 @@ class Scope(object):
         self._profile = None  # type: Optional[Profile]
 
         self._propagation_context = None
+
+        # self._last_event_id is only applicable to isolation scopes
+        self._last_event_id = None  # type: Optional[str]
 
     @_attr_setter
     def level(self, value):

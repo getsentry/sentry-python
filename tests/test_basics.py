@@ -800,3 +800,11 @@ def test_last_event_id_transaction(sentry_init):
         pass
 
     assert last_event_id() is None, "Transaction should not set last_event_id"
+
+
+def test_last_event_id_scope(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    # Should not crash
+    with push_scope() as scope:
+        assert scope.last_event_id() is None
