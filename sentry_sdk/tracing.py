@@ -105,6 +105,16 @@ if TYPE_CHECKING:
         baggage: "Baggage"
         """The W3C baggage header value. (see https://www.w3.org/TR/baggage/)"""
 
+    ProfileContext = TypedDict(
+        "ProfileContext",
+        {
+            "profiler.id": str,
+            "thread.id": str,
+            "thread.name": str,
+        },
+        total=False,
+    )
+
 
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
@@ -654,22 +664,22 @@ class Span:
         return rv
 
     def get_profile_context(self):
-        # type: () -> Any
+        # type: () -> Optional[ProfileContext]
         profiler_id = self._data.get(SPANDATA.PROFILER_ID)
         if profiler_id is None:
             return None
 
         rv = {
-            SPANDATA.PROFILER_ID: profiler_id,
-        }
+            "profiler.id": profiler_id,
+        }  # type: ProfileContext
 
         thread_id = self._data.get(SPANDATA.THREAD_ID)
         if thread_id is not None:
-            rv[SPANDATA.THREAD_ID] = thread_id
+            rv["thread.id"] = thread_id
 
         thread_name = self._data.get(SPANDATA.THREAD_NAME)
         if thread_name is not None:
-            rv[SPANDATA.THREAD_NAME] = thread_name
+            rv["thread.name"] = thread_name
 
         return rv
 

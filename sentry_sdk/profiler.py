@@ -105,11 +105,6 @@ if TYPE_CHECKING:
         },
     )
 
-    ProfileContext = TypedDict(
-        "ProfileContext",
-        {"profiler_id": str},
-    )
-
     FrameId = Tuple[
         str,  # abs_path
         int,  # lineno

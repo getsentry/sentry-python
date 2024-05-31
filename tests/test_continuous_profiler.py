@@ -1,7 +1,7 @@
 import threading
 import time
 from collections import defaultdict
-from unittest import mock  # python 3.3 and above
+from unittest import mock
 
 import pytest
 

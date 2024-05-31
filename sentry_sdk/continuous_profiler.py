@@ -165,6 +165,8 @@ class ContinuousScheduler(object):
         self.sampler = self.make_sampler()
         self.buffer = None  # type: Optional[ProfileBuffer]
 
+        self.running = False
+
     def should_autostart(self):
         # type: () -> bool
         experiments = self.options.get("_experiments")
@@ -228,6 +230,27 @@ class ContinuousScheduler(object):
 
         return _sample_stack
 
+    def run(self):
+        # type: () -> None
+        last = time.perf_counter()
+
+        while self.running:
+            self.sampler()
+
+            # some time may have elapsed since the last time
+            # we sampled, so we need to account for that and
+            # not sleep for too long
+            elapsed = time.perf_counter() - last
+            if elapsed < self.interval:
+                thread_sleep(self.interval - elapsed)
+
+            # after sleeping, make sure to take the current
+            # timestamp so we can use it next iteration
+            last = time.perf_counter()
+
+        if self.buffer is not None:
+            self.buffer.flush()
+
 
 class ThreadContinuousScheduler(ContinuousScheduler):
     """
@@ -243,7 +266,6 @@ class ThreadContinuousScheduler(ContinuousScheduler):
         super().__init__(frequency, options, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
-        self.running = False
         self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
 
@@ -286,27 +308,6 @@ class ThreadContinuousScheduler(ContinuousScheduler):
                 self.running = False
                 self.thread = None
 
-    def run(self):
-        # type: () -> None
-        last = time.perf_counter()
-
-        while self.running:
-            self.sampler()
-
-            # some time may have elapsed since the last time
-            # we sampled, so we need to account for that and
-            # not sleep for too long
-            elapsed = time.perf_counter() - last
-            if elapsed < self.interval:
-                thread_sleep(self.interval - elapsed)
-
-            # after sleeping, make sure to take the current
-            # timestamp so we can use it next iteration
-            last = time.perf_counter()
-
-        if self.buffer is not None:
-            self.buffer.flush()
-
     def teardown(self):
         # type: () -> None
         if self.running:
@@ -344,7 +345,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
         super().__init__(frequency, options, capture_func)
 
         self.thread = None  # type: Optional[ThreadPool]
-        self.running = False
         self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
 
@@ -383,27 +383,6 @@ class GeventContinuousScheduler(ContinuousScheduler):
                 self.running = False
                 self.thread = None
                 return
-
-    def run(self):
-        # type: () -> None
-        last = time.perf_counter()
-
-        while self.running:
-            self.sampler()
-
-            # some time may have elapsed since the last time
-            # we sampled, so we need to account for that and
-            # not sleep for too long
-            elapsed = time.perf_counter() - last
-            if elapsed < self.interval:
-                thread_sleep(self.interval - elapsed)
-
-            # after sleeping, make sure to take the current
-            # timestamp so we can use it next iteration
-            last = time.perf_counter()
-
-        if self.buffer is not None:
-            self.buffer.flush()
 
     def teardown(self):
         # type: () -> None
