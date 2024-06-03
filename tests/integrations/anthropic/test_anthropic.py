@@ -1,13 +1,21 @@
 import pytest
 from unittest import mock
 from anthropic import Anthropic, Stream, AnthropicError
-from anthropic.types import Usage, ContentBlock, MessageDeltaUsage, TextDelta
+from anthropic.types import Usage, MessageDeltaUsage, TextDelta
 from anthropic.types.message import Message
+from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_stop_event import ContentBlockStopEvent
-from anthropic.types.message_delta_event import MessageDeltaEvent, Delta
+from anthropic.types.text_block import TextBlock
+
+try:
+    # 0.27+
+    from anthropic.types.raw_message_delta_event import Delta
+except ImportError:
+    # pre 0.27
+    from anthropic.types.message_delta_event import Delta
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
@@ -18,7 +26,7 @@ EXAMPLE_MESSAGE = Message(
     id="id",
     model="model",
     role="assistant",
-    content=[ContentBlock(type="text", text="Hi, I'm Claude.")],
+    content=[TextBlock(type="text", text="Hi, I'm Claude.")],
     type="message",
     usage=Usage(input_tokens=10, output_tokens=20),
 )
@@ -113,7 +121,7 @@ def test_streaming_create_message(
         ContentBlockStartEvent(
             type="content_block_start",
             index=0,
-            content_block=ContentBlock(type="text", text=""),
+            content_block=TextBlock(type="text", text=""),
         ),
         ContentBlockDeltaEvent(
             delta=TextDelta(text="Hi", type="text_delta"),
