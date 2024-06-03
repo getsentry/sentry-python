@@ -1,16 +1,18 @@
-import sentry_sdk
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations.redis import (
-    RedisIntegration,
-    _get_span_description,
+from sentry_sdk.integrations.redis.modules.caches import (
+    _compile_cache_span_properties,
+    _set_cache_data,
+)
+from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
+from sentry_sdk.integrations.redis.utils import (
     _set_client_data,
     _set_pipeline_data,
 )
-from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import (
-    capture_internal_exceptions,
-)
+from sentry_sdk.utils import capture_internal_exceptions
+import sentry_sdk
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -24,6 +26,8 @@ def patch_redis_async_pipeline(
 ):
     # type: (Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]], bool, Any, Callable[[Span, Any], None]) -> None
     old_execute = pipeline_cls.execute
+
+    from sentry_sdk.integrations.redis import RedisIntegration
 
     async def _sentry_execute(self, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
@@ -52,17 +56,48 @@ def patch_redis_async_client(cls, is_cluster, set_db_data_fn):
     # type: (Union[type[StrictRedis[Any]], type[RedisCluster[Any]]], bool, Callable[[Span, Any], None]) -> None
     old_execute_command = cls.execute_command
 
+    from sentry_sdk.integrations.redis import RedisIntegration
+
     async def _sentry_execute_command(self, name, *args, **kwargs):
         # type: (Any, str, *Any, **Any) -> Any
-        if sentry_sdk.get_client().get_integration(RedisIntegration) is None:
+        integration = sentry_sdk.get_client().get_integration(RedisIntegration)
+        if integration is None:
             return await old_execute_command(self, name, *args, **kwargs)
 
-        description = _get_span_description(name, *args)
+        cache_properties = _compile_cache_span_properties(
+            name,
+            args,
+            kwargs,
+            integration,
+        )
 
-        with sentry_sdk.start_span(op=OP.DB_REDIS, description=description) as span:
-            set_db_data_fn(span, self)
-            _set_client_data(span, is_cluster, name, *args)
+        cache_span = None
+        if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
+            cache_span = sentry_sdk.start_span(
+                op=cache_properties["op"],
+                description=cache_properties["description"],
+            )
+            cache_span.__enter__()
 
-            return await old_execute_command(self, name, *args, **kwargs)
+        db_properties = _compile_db_span_properties(integration, name, args)
+
+        db_span = sentry_sdk.start_span(
+            op=db_properties["op"],
+            description=db_properties["description"],
+        )
+        db_span.__enter__()
+
+        set_db_data_fn(db_span, self)
+        _set_client_data(db_span, is_cluster, name, *args)
+
+        value = await old_execute_command(self, name, *args, **kwargs)
+
+        db_span.__exit__(None, None, None)
+
+        if cache_span:
+            _set_cache_data(cache_span, self, cache_properties, value)
+            cache_span.__exit__(None, None, None)
+
+        return value
 
     cls.execute_command = _sentry_execute_command  # type: ignore

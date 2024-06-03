@@ -1,4 +1,5 @@
 import threading
+import kombu
 from unittest import mock
 
 import pytest
@@ -722,3 +723,34 @@ def test_messaging_system(system, init_celery, capture_events):
     (event,) = events
     (span,) = event["spans"]
     assert span["data"]["messaging.system"] == system
+
+
+@pytest.mark.parametrize("system", ("amqp", "redis"))
+def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
+    old_publish = kombu.messaging.Producer._publish
+
+    def publish(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    with start_transaction():
+        task.apply_async()
+
+    (event,) = events
+    span = next(span for span in event["spans"] if span["op"] == "queue.publish")
+
+    assert span["data"]["messaging.system"] == system
+
+    assert span["data"]["messaging.destination.name"] == "celery"
+    assert "messaging.message.id" in span["data"]
+    assert span["data"]["messaging.message.retry.count"] == 0
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)

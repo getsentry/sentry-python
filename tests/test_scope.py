@@ -19,6 +19,10 @@ from sentry_sdk.scope import (
 )
 
 
+SLOTS_NOT_COPIED = {"client"}
+"""__slots__ that are not copied when copying a Scope object."""
+
+
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -32,6 +36,15 @@ def test_copying():
     assert "bam" not in s2._tags
 
     assert s1._fingerprint is s2._fingerprint
+
+
+def test_all_slots_copied():
+    scope = Scope()
+    scope_copy = copy.copy(scope)
+
+    # Check all attributes are copied
+    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+        assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
 def test_merging(sentry_init, capture_events):

@@ -29,6 +29,29 @@ def event_loop(request):
     loop.close()
 
 
+@pytest.mark.asyncio
+async def test_noop_for_unimplemented_method(sentry_init, capture_events, event_loop):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    server = grpc.aio.server()
+    server.add_insecure_port("[::]:{}".format(AIO_PORT))
+
+    await event_loop.create_task(server.start())
+
+    events = capture_events()
+    try:
+        async with grpc.aio.insecure_channel(
+            "localhost:{}".format(AIO_PORT)
+        ) as channel:
+            stub = gRPCTestServiceStub(channel)
+            with pytest.raises(grpc.RpcError) as exc:
+                await stub.TestServe(gRPCTestMessage(text="test"))
+            assert exc.value.details() == "Method not found!"
+    finally:
+        await server.stop(None)
+
+    assert not events
+
+
 @pytest_asyncio.fixture(scope="function")
 async def grpc_server(sentry_init, event_loop):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
