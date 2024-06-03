@@ -30,8 +30,8 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Dict
     from typing import Optional
-    from webob.cookies import RequestCookies  # type: ignore
-    from webob.compat import cgi_FieldStorage  # type: ignore
+    from webob.cookies import RequestCookies
+    from webob.request import _FieldStorageWithFile
 
     from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import Event, EventProcessor
@@ -186,7 +186,7 @@ class PyramidRequestExtractor(RequestExtractor):
         }
 
     def files(self):
-        # type: () -> Dict[str, cgi_FieldStorage]
+        # type: () -> Dict[str, _FieldStorageWithFile]
         return {
             key: value
             for key, value in self.request.POST.items()
@@ -194,7 +194,7 @@ class PyramidRequestExtractor(RequestExtractor):
         }
 
     def size_of_file(self, postdata):
-        # type: (cgi_FieldStorage) -> int
+        # type: (_FieldStorageWithFile) -> int
         file = postdata.file
         try:
             return os.fstat(file.fileno()).st_size

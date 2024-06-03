@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Mapping
+    from typing import MutableMapping
     from typing import Optional
     from typing import Union
     from sentry_sdk._types import Event
@@ -114,7 +115,7 @@ class RequestExtractor:
             return 0
 
     def cookies(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> MutableMapping[str, Any]
         raise NotImplementedError()
 
     def raw_data(self):
