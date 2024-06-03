@@ -44,12 +44,23 @@ def _get_safe_command(name, args):
     return command
 
 
+def _safe_decode(key):
+    # type: (Any) -> str
+    if isinstance(key, bytes):
+        try:
+            return key.decode()
+        except UnicodeDecodeError:
+            return ""
+
+    return key
+
+
 def _key_as_string(key):
     # type: (Any) -> str
     if isinstance(key, (dict, list, tuple)):
-        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key)
+        key = ", ".join(_safe_decode(x) for x in key)
     elif isinstance(key, bytes):
-        key = key.decode()
+        key = _safe_decode(key)
     elif key is None:
         key = ""
     else:

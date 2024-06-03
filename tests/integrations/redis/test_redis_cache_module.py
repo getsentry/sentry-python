@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 import fakeredis
@@ -230,6 +232,18 @@ def test_cache_data(sentry_init, capture_events):
             {"key": [b"bla", "blub", "foo"]},
             (b"bla", "blub", "foo"),
         ),
+        (
+            "not-important",
+            None,
+            {"key": b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t"},
+            (b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t",),
+        ),
+        (
+            "get",
+            [b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t"],
+            None,
+            (b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t",),
+        ),
     ],
 )
 def test_get_safe_key(method_name, args, kwargs, expected_key):
@@ -251,6 +265,7 @@ def test_get_safe_key(method_name, args, kwargs, expected_key):
             "bla",
         ),
         (["bla", "blub", "foo"], "bla, blub, foo"),
+        ([uuid.uuid4().bytes], ""),
     ],
 )
 def test_key_as_string(key, expected_key):

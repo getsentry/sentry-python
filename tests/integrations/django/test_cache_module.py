@@ -1,9 +1,9 @@
-import pytest
 import os
 import random
+import uuid
 
+import pytest
 from django import VERSION as DJANGO_VERSION
-
 from werkzeug.test import Client
 
 try:
@@ -358,6 +358,7 @@ def test_cache_spans_templatetag(
         ("get", None, None, ""),
         ("get", [], {}, ""),
         ("get", ["bla", "blub", "foo"], {}, "bla"),
+        ("get", [uuid.uuid4().bytes], {}, ""),
         (
             "get_many",
             [["bla1", "bla2", "bla3"], "blub", "foo"],
