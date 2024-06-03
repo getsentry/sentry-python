@@ -244,6 +244,8 @@ class Scope(object):
 
         rv._profile = self._profile
 
+        rv._last_event_id = self._last_event_id
+
         return rv
 
     @classmethod
