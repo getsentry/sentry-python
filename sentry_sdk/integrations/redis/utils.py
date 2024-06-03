@@ -46,9 +46,7 @@ def _get_safe_command(name, args):
 
 def _key_as_string(key):
     # type: (Any) -> str
-    if isinstance(key, dict):
-        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key.keys())
-    elif isinstance(key, (list, tuple)):
+    if isinstance(key, (dict, list, tuple)):
         key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key)
     elif isinstance(key, bytes):
         key = key.decode()
@@ -74,10 +72,8 @@ def _get_safe_key(method_name, args, kwargs):
 
     elif args is not None and len(args) >= 1:
         # for example django "set_many/get_many" or redis "get"
-        if isinstance(args[0], (list, tuple)):
+        if isinstance(args[0], (dict, list, tuple)):
             key = tuple(args[0])
-        elif isinstance(args[0], (dict)):
-            key = tuple(args[0].keys())
         else:
             key = (args[0],)
 
