@@ -8,7 +8,6 @@ from anthropic.types.message_start_event import MessageStartEvent
 from anthropic.types.content_block_start_event import ContentBlockStartEvent
 from anthropic.types.content_block_delta_event import ContentBlockDeltaEvent
 from anthropic.types.content_block_stop_event import ContentBlockStopEvent
-from anthropic.types.text_block import TextBlock
 
 try:
     # 0.27+
@@ -16,6 +15,11 @@ try:
 except ImportError:
     # pre 0.27
     from anthropic.types.message_delta_event import Delta
+
+try:
+    from anthropic.types.text_block import TextBlock
+except ImportError:
+    from anthropic.types.content_block import ContentBlock as TextBlock
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
