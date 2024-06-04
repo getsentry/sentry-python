@@ -104,6 +104,16 @@ TRANSACTION_STYLE_VALUES = ("function_name", "url")
 
 
 class DjangoIntegration(Integration):
+    """
+    Auto instrument a Django application.
+
+    :param transaction_style: How to derive transaction names. Either `"function_name"` or `"url"`. Defaults to `"url"`.
+    :param middleware_spans: Whether to create spans for middleware. Defaults to `True`.
+    :param signals_spans: Whether to create spans for signals. Defaults to `True`.
+    :param signals_denylist: A list of signals to ignore when creating spans.
+    :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
+    """
+
     identifier = "django"
 
     transaction_style = ""
@@ -128,9 +138,11 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+
         self.signals_spans = signals_spans
-        self.cache_spans = cache_spans
         self.signals_denylist = signals_denylist or []
+
+        self.cache_spans = cache_spans
 
     @staticmethod
     def setup_once():

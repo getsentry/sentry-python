@@ -287,8 +287,8 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
 async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
     aiohttp_client,
-    DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,
+    DictionaryContaining,  # noqa: N803
+    ObjectDescribedBy,  # noqa: N803
 ):
     traces_sampler = mock.Mock()
     sentry_init(

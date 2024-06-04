@@ -1,5 +1,46 @@
 # Changelog
 
+## 2.4.0
+
+### Various fixes & improvements
+
+- Celery: Made `cache.key` span data field a list (#3110) by @antonpirker
+- Celery Beat: Refactor the Celery Beat integration (#3105) by @antonpirker
+- GRPC: Add None check for grpc.aio interceptor (#3109) by @ordinary-jamie
+- Docs: Remove `last_event_id` from migration guide (#3126) by @szokeasaurusrex
+- fix(django): Proper transaction names for i18n routes (#3104) by @sentrivana
+- fix(scope): Copy `_last_event_id` in `Scope.__copy__` (#3123) by @szokeasaurusrex
+- fix(tests): Adapt to new Anthropic version (#3119) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `4381a97` to `59f9683` (#3066) by @dependabot
+
+## 2.3.1
+
+### Various fixes & improvements
+
+- Handle also byte arras as strings in Redis caches (#3101) by @antonpirker
+- Do not crash exceptiongroup (by patching excepthook and keeping the name of the function) (#3099) by @antonpirker
+
+## 2.3.0
+
+### Various fixes & improvements
+
+- NEW: Redis integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3073) by @antonpirker
+- NEW: Django integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3009) by @antonpirker
+- Fix `cohere` testsuite for new release of `cohere` (#3098) by @antonpirker
+- Fix ClickHouse integration where `_sentry_span` might be missing (#3096) by @sentrivana
+
+## 2.2.1
+
+### Various fixes & improvements
+
+- Add conditional check for delivery_info's existence (#3083) by @cmanallen
+- Updated deps for latest langchain version (#3092) by @antonpirker
+- Fixed grpcio extras to work as described in the docs (#3081) by @antonpirker
+- Use pythons venv instead of virtualenv to create virtual envs (#3077) by @antonpirker
+- Celery: Add comment about kwargs_headers (#3079) by @szokeasaurusrex
+- Celery: Queues module producer implementation (#3079) by @szokeasaurusrex
+- Fix N803 flake8 failures (#3082) by @szokeasaurusrex
+
 ## 2.2.0
 
 ### New features
@@ -11,11 +52,11 @@
 ### Other fixes & improvements
 
 - Add tags + data passing functionality to @ai_track (#3071) by @colin-sentry
-- fix(tracing): Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
-- ref(metrics): Improve type hints for set metrics (#3048) by @elramen
-- ref(scope): Fix `get_client` typing (#3063) by @szokeasaurusrex
+- Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
+- Improve type hints for set metrics (#3048) by @elramen
+- Fix `get_client` typing (#3063) by @szokeasaurusrex
 - Auto-enable Anthropic integration + gate imports (#3054) by @colin-sentry
-- Made MeasurementValue.unit NotRequired (#3051) by @antonpirker
+- Made `MeasurementValue.unit` NotRequired (#3051) by @antonpirker
 
 ## 2.1.1
 
