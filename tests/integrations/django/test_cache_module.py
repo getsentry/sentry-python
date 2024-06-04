@@ -1,9 +1,9 @@
-import pytest
 import os
 import random
+import uuid
 
+import pytest
 from django import VERSION as DJANGO_VERSION
-
 from werkzeug.test import Client
 
 try:
@@ -198,7 +198,7 @@ def test_cache_spans_middleware(
         "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"]["network.peer.address"] is not None
-    assert first_event["spans"][0]["data"]["cache.key"].startswith(
+    assert first_event["spans"][0]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
     assert not first_event["spans"][0]["data"]["cache.hit"]
@@ -209,7 +209,7 @@ def test_cache_spans_middleware(
         "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][1]["data"]["network.peer.address"] is not None
-    assert first_event["spans"][1]["data"]["cache.key"].startswith(
+    assert first_event["spans"][1]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
     assert "cache.hit" not in first_event["spans"][1]["data"]
@@ -220,7 +220,7 @@ def test_cache_spans_middleware(
         "views.decorators.cache.cache_header."
     )
     assert second_event["spans"][0]["data"]["network.peer.address"] is not None
-    assert second_event["spans"][0]["data"]["cache.key"].startswith(
+    assert second_event["spans"][0]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
     assert not second_event["spans"][0]["data"]["cache.hit"]
@@ -231,7 +231,7 @@ def test_cache_spans_middleware(
         "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["network.peer.address"] is not None
-    assert second_event["spans"][1]["data"]["cache.key"].startswith(
+    assert second_event["spans"][1]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["cache.hit"]
@@ -264,7 +264,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
         "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][0]["data"]["network.peer.address"] is not None
-    assert first_event["spans"][0]["data"]["cache.key"].startswith(
+    assert first_event["spans"][0]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
     assert not first_event["spans"][0]["data"]["cache.hit"]
@@ -275,7 +275,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
         "views.decorators.cache.cache_header."
     )
     assert first_event["spans"][1]["data"]["network.peer.address"] is not None
-    assert first_event["spans"][1]["data"]["cache.key"].startswith(
+    assert first_event["spans"][1]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_header."
     )
     assert "cache.hit" not in first_event["spans"][1]["data"]
@@ -286,7 +286,7 @@ def test_cache_spans_decorator(sentry_init, client, capture_events, use_django_c
         "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["network.peer.address"] is not None
-    assert second_event["spans"][1]["data"]["cache.key"].startswith(
+    assert second_event["spans"][1]["data"]["cache.key"][0].startswith(
         "views.decorators.cache.cache_page."
     )
     assert second_event["spans"][1]["data"]["cache.hit"]
@@ -322,7 +322,7 @@ def test_cache_spans_templatetag(
         "template.cache.some_identifier."
     )
     assert first_event["spans"][0]["data"]["network.peer.address"] is not None
-    assert first_event["spans"][0]["data"]["cache.key"].startswith(
+    assert first_event["spans"][0]["data"]["cache.key"][0].startswith(
         "template.cache.some_identifier."
     )
     assert not first_event["spans"][0]["data"]["cache.hit"]
@@ -333,7 +333,7 @@ def test_cache_spans_templatetag(
         "template.cache.some_identifier."
     )
     assert first_event["spans"][1]["data"]["network.peer.address"] is not None
-    assert first_event["spans"][1]["data"]["cache.key"].startswith(
+    assert first_event["spans"][1]["data"]["cache.key"][0].startswith(
         "template.cache.some_identifier."
     )
     assert "cache.hit" not in first_event["spans"][1]["data"]
@@ -344,7 +344,7 @@ def test_cache_spans_templatetag(
         "template.cache.some_identifier."
     )
     assert second_event["spans"][0]["data"]["network.peer.address"] is not None
-    assert second_event["spans"][0]["data"]["cache.key"].startswith(
+    assert second_event["spans"][0]["data"]["cache.key"][0].startswith(
         "template.cache.some_identifier."
     )
     assert second_event["spans"][0]["data"]["cache.hit"]
@@ -358,6 +358,7 @@ def test_cache_spans_templatetag(
         ("get", None, None, ""),
         ("get", [], {}, ""),
         ("get", ["bla", "blub", "foo"], {}, "bla"),
+        ("get", [uuid.uuid4().bytes], {}, ""),
         (
             "get_many",
             [["bla1", "bla2", "bla3"], "blub", "foo"],
