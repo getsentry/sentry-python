@@ -71,7 +71,6 @@ class StarletteIntegration(Integration):
     identifier = "starlette"
 
     transaction_style = ""
-    failed_request_status_codes = [range(500, 599)]
 
     def __init__(self, transaction_style="url", failed_request_status_codes=None):
         # type: (str, Optional[list[HttpStatusCodeRange]]) -> None
