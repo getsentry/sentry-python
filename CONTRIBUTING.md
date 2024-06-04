@@ -163,12 +163,12 @@ This project follows [semver](https://semver.org/), with three additions:
 
 - Certain features (e.g. integrations) may be explicitly called out as "experimental" or "unstable" in the documentation. They come with their own versioning policy described in the documentation.
 
-We recommend to pin your version requirements against `1.x.*` or `1.x.y`.
+We recommend to pin your version requirements against `2.x.*` or `2.x.y`.
 Either one of the following is fine:
 
 ```
-sentry-sdk>=1.0.0,<2.0.0
-sentry-sdk==1.5.0
+sentry-sdk>=2.0.0,<3.0.0
+sentry-sdk==2.4.0
 ```
 
 A major release `N` implies the previous release `N-1` will no longer receive updates. We generally do not backport bugfixes to older versions unless they are security relevant. However, feel free to ask for backports of specific commits on the bugtracker.
