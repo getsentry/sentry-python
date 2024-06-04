@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.4.0
+
+### Various fixes & improvements
+
+- Celery: Made `cache.key` span data field a list (#3110) by @antonpirker
+- Celery Beat: Refactor the Celery Beat integration (#3105) by @antonpirker
+- GRPC: Add None check for grpc.aio interceptor (#3109) by @ordinary-jamie
+- Docs: Remove `last_event_id` from migration guide (#3126) by @szokeasaurusrex
+- fix(django): Proper transaction names for i18n routes (#3104) by @sentrivana
+- fix(scope): Copy `_last_event_id` in `Scope.__copy__` (#3123) by @szokeasaurusrex
+- fix(tests): Adapt to new Anthropic version (#3119) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `4381a97` to `59f9683` (#3066) by @dependabot
+
 ## 2.3.1
 
 ### Various fixes & improvements
