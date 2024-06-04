@@ -74,7 +74,7 @@ class StarletteIntegration(Integration):
     failed_request_status_codes = [range(500, 599)]
 
     def __init__(self, transaction_style="url", failed_request_status_codes=None):
-        # type: (str, list[HttpStatusCodeRange]) -> None
+        # type: (str, Optional[list[HttpStatusCodeRange]]) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
