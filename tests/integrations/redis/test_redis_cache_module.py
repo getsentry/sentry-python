@@ -244,6 +244,12 @@ def test_cache_data(sentry_init, capture_events):
             None,
             (b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t",),
         ),
+        (
+            "get",
+            [123],
+            None,
+            ("123",),
+        ),
     ],
 )
 def test_get_safe_key(method_name, args, kwargs, expected_key):
