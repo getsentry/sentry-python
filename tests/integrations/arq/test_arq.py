@@ -275,6 +275,7 @@ async def test_span_origin_producer(capture_events, init_arq, source):
 async def test_span_origin_consumer(capture_events, init_arq):
     async def job(ctx):
         pass
+
     job.__qualname__ = job.__name__
 
     pool, worker = init_arq([job])

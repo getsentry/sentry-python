@@ -78,9 +78,7 @@ def patch_enqueue_job():
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_ARQ, 
-            description=function, 
-            origin=ArqIntegration.origin
+            op=OP.QUEUE_SUBMIT_ARQ, description=function, origin=ArqIntegration.origin
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 

@@ -240,9 +240,7 @@ def test_span_origin(sentry_init, capture_events):
     ]
 
     with start_transaction(name="anthropic"):
-        client.messages.create(
-            max_tokens=1024, messages=messages, model="model"
-        )
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
 
     (event,) = events
 
