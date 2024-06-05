@@ -137,3 +137,32 @@ def test_bad_chat_completion(sentry_init, capture_events):
 
     (event,) = events
     assert event["level"] == "error"
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[HuggingfaceHubIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = InferenceClient("some-model")
+    client.post = mock.Mock(
+        return_value=[
+            b"""data:{
+                "token":{"id":1, "special": false, "text": "the model "}
+            }""",
+        ]
+    )
+    with start_transaction(name="huggingface_hub tx"):
+        list(
+            client.text_generation(
+                prompt="hello",
+                stream=True,
+            )
+        )
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.ai.huggingface_hub"
