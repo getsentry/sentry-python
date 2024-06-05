@@ -289,3 +289,37 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
         assert span["tags"] == expected[idx]["tags"]
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarliteIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    logging_config = LoggingMiddlewareConfig()
+    session_config = MemoryBackendConfig()
+    rate_limit_config = RateLimitConfig(rate_limit=("hour", 5))
+
+    starlite_app = starlite_app_factory(
+        middleware=[
+            session_config.middleware,
+            logging_config.middleware,
+            rate_limit_config.middleware,
+        ]
+    )
+    events = capture_events()
+
+    client = TestClient(
+        starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
+    )
+    try:
+        client.get("/message")
+    except Exception:
+        pass
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.http.starlite"

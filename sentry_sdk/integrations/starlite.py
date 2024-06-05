@@ -56,6 +56,7 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
 
 class StarliteIntegration(Integration):
     identifier = "starlite"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once() -> None:
@@ -130,7 +131,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 
         middleware_name = self.__class__.__name__
         with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLITE, description=middleware_name
+            op=OP.MIDDLEWARE_STARLITE,
+            description=middleware_name,
+            origin=StarliteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlite.middleware_name", middleware_name)
 
@@ -141,6 +144,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
+                    origin=StarliteIntegration.origin,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -154,6 +158,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     description=getattr(send, "__qualname__", str(send)),
+                    origin=StarliteIntegration.origin,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
                     return await send(message)
