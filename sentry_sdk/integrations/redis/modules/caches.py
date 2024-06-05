@@ -39,6 +39,8 @@ def _compile_cache_span_properties(redis_command, args, kwargs, integration):
             if kee.startswith(prefix):
                 is_cache_key = True
                 break
+        if is_cache_key:
+            break
 
     value = None
     if redis_command.lower() in SET_COMMANDS:
