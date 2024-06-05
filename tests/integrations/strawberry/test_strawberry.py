@@ -1,4 +1,5 @@
 import pytest
+from typing import AsyncGenerator, Optional
 
 strawberry = pytest.importorskip("strawberry")
 pytest.importorskip("fastapi")
@@ -26,7 +27,6 @@ from sentry_sdk.integrations.strawberry import (
     SentrySyncExtension,
 )
 from tests.conftest import ApproxDict
-
 
 parameterize_strawberry_test = pytest.mark.parametrize(
     "client_factory,async_execution,framework_integrations",
@@ -57,6 +57,19 @@ class Mutation:
     @strawberry.mutation
     def change(self, attribute: str) -> str:
         return attribute
+
+
+@strawberry.type
+class Message:
+    content: str
+
+
+@strawberry.type
+class Subscription:
+    @strawberry.subscription
+    async def message_added(self) -> Optional[AsyncGenerator[Message, None]]:
+        message = Message(content="Hello, world!")
+        yield message
 
 
 @pytest.fixture
@@ -627,3 +640,114 @@ def test_handle_none_query_gracefully(
     client.post("/graphql", json={})
 
     assert len(events) == 0, "expected no events to be sent to Sentry"
+
+
+@parameterize_strawberry_test
+def test_span_origin(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+):
+    """
+    Tests for OP.GRAPHQL_MUTATION, OP.GRAPHQL_PARSE, OP.GRAPHQL_VALIDATE, OP.GRAPHQL_RESOLVE,
+    """
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=async_execution),
+        ]
+        + framework_integrations,
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query, mutation=Mutation)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    query = 'mutation Change { change(attribute: "something") }'
+    client.post("/graphql", json={"query": query})
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        if span["op"].startswith("graphql."):
+            assert span["origin"] == "auto.graphql.strawberry"
+
+
+@parameterize_strawberry_test
+def test_span_origin2(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+):
+    """
+    Tests for OP.GRAPHQL_QUERY
+    """
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=async_execution),
+        ]
+        + framework_integrations,
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query, mutation=Mutation)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    query = "query GreetingQuery { hello }"
+    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        if span["op"].startswith("graphql."):
+            assert span["origin"] == "auto.graphql.strawberry"
+
+
+@parameterize_strawberry_test
+def test_span_origin3(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+):
+    """
+    Tests for OP.GRAPHQL_SUBSCRIPTION
+    """
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=async_execution),
+        ]
+        + framework_integrations,
+        traces_sample_rate=1,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query, subscription=Subscription)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    query = "subscription { messageAdded { content } }"
+    client.post("/graphql", json={"query": query})
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        if span["op"].startswith("graphql."):
+            assert span["origin"] == "auto.graphql.strawberry"
