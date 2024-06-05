@@ -108,7 +108,7 @@ def _sentry_after_call(context, parsed, **kwargs):
     streaming_span = span.start_child(
         op=OP.HTTP_CLIENT_STREAM,
         description=span.description,
-        origin=f"{Boto3Integration.origin}.stream",
+        origin=Boto3Integration.origin,
     )
 
     orig_read = body.read
