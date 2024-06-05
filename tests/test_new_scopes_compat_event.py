@@ -157,6 +157,7 @@ def expected_transaction():
                     "parent_span_id": None,
                     "op": "test_transaction_op",
                     "description": None,
+                    "origin": "manual",
                 },
                 "character": {
                     "name": "Mighty Fighter changed by before_send_transaction",
