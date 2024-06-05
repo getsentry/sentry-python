@@ -68,6 +68,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class StarletteIntegration(Integration):
     identifier = "starlette"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -119,7 +120,9 @@ def _enable_span_for_middleware(middleware_class):
             )
 
         with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
+            op=OP.MIDDLEWARE_STARLETTE,
+            description=middleware_name,
+            origin=StarletteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
@@ -129,6 +132,7 @@ def _enable_span_for_middleware(middleware_class):
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
+                    origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -143,6 +147,7 @@ def _enable_span_for_middleware(middleware_class):
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     description=getattr(send, "__qualname__", str(send)),
+                    origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await send(*args, **kwargs)

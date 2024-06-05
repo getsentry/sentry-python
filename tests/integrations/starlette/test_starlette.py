@@ -1078,3 +1078,26 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.http.starlette"
