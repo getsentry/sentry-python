@@ -214,6 +214,8 @@ def _in_http_status_code_range(code, code_ranges):
             if code in target:
                 return True
         except TypeError:
-            logger.warning("TODO")
+            logger.warning(
+                "failed_request_status_codes has to be a list of integers or containers"
+            )
 
     return False
