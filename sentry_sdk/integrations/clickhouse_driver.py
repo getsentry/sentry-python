@@ -107,7 +107,7 @@ def _wrap_end(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_end(*args: P.args, **kwargs: P.kwargs) -> T:
         res = f(*args, **kwargs)
         instance = args[0]
-        span = instance.connection._sentry_span  # type: ignore[attr-defined]
+        span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
 
         if span is not None:
             if res is not None and should_send_default_pii():
@@ -129,14 +129,15 @@ def _wrap_send_data(f: Callable[P, T]) -> Callable[P, T]:
     def _inner_send_data(*args: P.args, **kwargs: P.kwargs) -> T:
         instance = args[0]  # type: clickhouse_driver.client.Client
         data = args[2]
-        span = instance.connection._sentry_span
+        span = getattr(instance.connection, "_sentry_span", None)
 
-        _set_db_data(span, instance.connection)
+        if span is not None:
+            _set_db_data(span, instance.connection)
 
-        if should_send_default_pii():
-            db_params = span._data.get("db.params", [])
-            db_params.extend(data)
-            span.set_data("db.params", db_params)
+            if should_send_default_pii():
+                db_params = span._data.get("db.params", [])
+                db_params.extend(data)
+                span.set_data("db.params", db_params)
 
         return f(*args, **kwargs)
 

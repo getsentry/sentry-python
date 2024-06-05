@@ -3,7 +3,6 @@ import sys
 import sentry_sdk
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    ensure_integration_enabled,
     event_from_exception,
 )
 from sentry_sdk.integrations import Integration
@@ -47,10 +46,15 @@ class ExcepthookIntegration(Integration):
 
 def _make_excepthook(old_excepthook):
     # type: (Excepthook) -> Excepthook
-    @ensure_integration_enabled(ExcepthookIntegration, old_excepthook)
     def sentry_sdk_excepthook(type_, value, traceback):
         # type: (Type[BaseException], BaseException, Optional[TracebackType]) -> None
         integration = sentry_sdk.get_client().get_integration(ExcepthookIntegration)
+
+        # Note: If  we replace this with ensure_integration_enabled then
+        # we break the exceptiongroup backport;
+        # See: https://github.com/getsentry/sentry-python/issues/3097
+        if integration is None:
+            return old_excepthook(type_, value, traceback)
 
         if _should_send(integration.always_run):
             with capture_internal_exceptions():
