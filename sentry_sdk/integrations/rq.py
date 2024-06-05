@@ -74,7 +74,6 @@ class RqIntegration(Integration):
                 with sentry_sdk.start_transaction(
                     transaction,
                     custom_sampling_context={"rq_job": job},
-                    origin=RqIntegration.origin,
                 ):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
