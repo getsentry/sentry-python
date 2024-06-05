@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Mapping
 from functools import wraps
 
 import sentry_sdk
@@ -47,6 +48,7 @@ try:
         Retry,
         SoftTimeLimitExceeded,
     )
+    from kombu import Producer  # type: ignore
 except ImportError:
     raise DidNotEnable("Celery not installed")
 
@@ -68,10 +70,9 @@ class CeleryIntegration(Integration):
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
 
-        if monitor_beat_tasks:
-            _patch_beat_apply_entry()
-            _patch_redbeat_maybe_due()
-            _setup_celery_beat_signals()
+        _patch_beat_apply_entry()
+        _patch_redbeat_maybe_due()
+        _setup_celery_beat_signals()
 
     @staticmethod
     def setup_once():
@@ -82,6 +83,7 @@ class CeleryIntegration(Integration):
         _patch_build_tracer()
         _patch_task_apply_async()
         _patch_worker_exit()
+        _patch_producer_publish()
 
         # This logger logs every status of every task that ran on the worker.
         # Meaning that every task's breadcrumbs are full of stuff like "Task
@@ -164,11 +166,11 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     """
     updated_headers = original_headers.copy()
     with capture_internal_exceptions():
-        headers = {}
-        if span is not None:
-            headers = dict(
-                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
-            )
+        # if span is None (when the task was started by Celery Beat)
+        # this will return the trace headers from the scope.
+        headers = dict(
+            Scope.get_isolation_scope().iter_trace_propagation_headers(span=span)
+        )
 
         if monitor_beat_tasks:
             headers.update(
@@ -330,11 +332,12 @@ def _set_messaging_destination_name(task, span):
     """Set "messaging.destination.name" tag for span"""
     with capture_internal_exceptions():
         delivery_info = task.request.delivery_info
-        routing_key = delivery_info.get("routing_key")
-        if delivery_info.get("exchange") == "" and routing_key is not None:
-            # Empty exchange indicates the default exchange, meaning the tasks
-            # are sent to the queue with the same name as the routing key.
-            span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+        if delivery_info:
+            routing_key = delivery_info.get("routing_key")
+            if delivery_info.get("exchange") == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning the tasks
+                # are sent to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
 
 
 def _wrap_task_call(task, f):
@@ -433,3 +436,48 @@ def _patch_worker_exit():
                     sentry_sdk.flush()
 
     Worker.workloop = sentry_workloop
+
+
+def _patch_producer_publish():
+    # type: () -> None
+    original_publish = Producer.publish
+
+    @ensure_integration_enabled(CeleryIntegration, original_publish)
+    def sentry_publish(self, *args, **kwargs):
+        # type: (Producer, *Any, **Any) -> Any
+        kwargs_headers = kwargs.get("headers", {})
+        if not isinstance(kwargs_headers, Mapping):
+            # Ensure kwargs_headers is a Mapping, so we can safely call get().
+            # We don't expect this to happen, but it's better to be safe. Even
+            # if it does happen, only our instrumentation breaks. This line
+            # does not overwrite kwargs["headers"], so the original publish
+            # method will still work.
+            kwargs_headers = {}
+
+        task_name = kwargs_headers.get("task")
+        task_id = kwargs_headers.get("id")
+        retries = kwargs_headers.get("retries")
+
+        routing_key = kwargs.get("routing_key")
+        exchange = kwargs.get("exchange")
+
+        with sentry_sdk.start_span(op=OP.QUEUE_PUBLISH, description=task_name) as span:
+            if task_id is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
+
+            if exchange == "" and routing_key is not None:
+                # Empty exchange indicates the default exchange, meaning messages are
+                # routed to the queue with the same name as the routing key.
+                span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, routing_key)
+
+            if retries is not None:
+                span.set_data(SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, retries)
+
+            with capture_internal_exceptions():
+                span.set_data(
+                    SPANDATA.MESSAGING_SYSTEM, self.connection.transport.driver_type
+                )
+
+            return original_publish(self, *args, **kwargs)
+
+    Producer.publish = sentry_publish

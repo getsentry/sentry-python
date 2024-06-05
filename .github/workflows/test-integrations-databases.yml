@@ -50,7 +50,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.1.4
+      - uses: actions/checkout@v4.1.5
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -77,10 +77,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rediscluster latest
+      - name: Test redis_py_cluster_legacy latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
@@ -125,7 +125,7 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
     steps:
-      - uses: actions/checkout@v4.1.4
+      - uses: actions/checkout@v4.1.5
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -152,10 +152,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rediscluster pinned
+      - name: Test redis_py_cluster_legacy pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed

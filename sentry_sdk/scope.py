@@ -244,6 +244,8 @@ class Scope(object):
 
         rv._profile = self._profile
 
+        rv._last_event_id = self._last_event_id
+
         return rv
 
     @classmethod
@@ -604,9 +606,10 @@ class Scope(object):
     def iter_trace_propagation_headers(self, *args, **kwargs):
         # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
         """
-        Return HTTP headers which allow propagation of trace data. Data taken
-        from the span representing the request, if available, or the current
-        span on the scope if not.
+        Return HTTP headers which allow propagation of trace data.
+
+        If a span is given, the trace data will taken from the span.
+        If no span is given, the trace data is taken from the scope.
         """
         client = Scope.get_client()
         if not client.options.get("propagate_traces"):

@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.1.4
+      - uses: actions/checkout@v4.1.5
       - uses: actions/setup-python@v5
         with:
           python-version: 3.12
@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.1.4
+      - uses: actions/checkout@v4.1.5
       - uses: actions/setup-python@v5
         with:
           python-version: 3.12
@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.1.4
+      - uses: actions/checkout@v4.1.5
       - uses: actions/setup-python@v5
         with:
           python-version: 3.12
@@ -67,7 +67,6 @@ jobs:
       - name: Build Packages
         run: |
           echo "Creating directory containing Python SDK Lambda Layer"
-          pip install virtualenv
           # This will also trigger "make dist" that creates the Python packages
           make aws-lambda-layer
       - name: Upload Python Packages
@@ -83,13 +82,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4.1.4
+      - uses: actions/checkout@v4.1.5
       - uses: actions/setup-python@v5
         with:
           python-version: 3.12
 
       - run: |
-          pip install virtualenv
           make apidocs
           cd docs/_build && zip -r gh-pages ./
 

@@ -74,7 +74,7 @@ class RavenResolver:
             and isinstance(pattern.pattern, RoutePattern)
         ):
             return self._new_style_group_matcher.sub(
-                lambda m: "{%s}" % m.group(2), pattern.pattern._route
+                lambda m: "{%s}" % m.group(2), str(pattern.pattern._route)
             )
 
         result = get_regex(pattern).pattern
