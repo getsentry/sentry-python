@@ -247,7 +247,7 @@ def test_clickhouse_client_spans(
     expected_spans = [
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -262,7 +262,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -277,7 +277,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -292,7 +292,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -307,7 +307,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -370,7 +370,7 @@ def test_clickhouse_client_spans_with_pii(
     expected_spans = [
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -386,7 +386,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -402,7 +402,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -418,7 +418,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -434,7 +434,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -695,7 +695,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
     expected_spans = [
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -710,7 +710,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -725,7 +725,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -740,7 +740,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -755,7 +755,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -818,7 +818,7 @@ def test_clickhouse_dbapi_spans_with_pii(
     expected_spans = [
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -834,7 +834,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -850,7 +850,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -866,7 +866,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -882,7 +882,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
-            "origin": "manual",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -911,3 +911,22 @@ def test_clickhouse_dbapi_spans_with_pii(
         span.pop("timestamp", None)
 
     assert event["spans"] == expected_spans
+
+
+def test_span_origin(sentry_init, capture_events, capture_envelopes) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="test_clickhouse_transaction"):
+        conn = connect("clickhouse://localhost")
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.clickhouse_driver"
