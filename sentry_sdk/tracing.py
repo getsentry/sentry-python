@@ -87,6 +87,13 @@ if TYPE_CHECKING:
         scope: "sentry_sdk.Scope"
         """The scope to use for this span. If not provided, we use the current scope."""
 
+        origin: str
+        """
+        The origin of the span.
+        See https://develop.sentry.dev/sdk/performance/trace-origin/
+        Default "manual".
+        """
+
     class TransactionKwargs(SpanKwargs, total=False):
         name: str
         """Identifier of the transaction. Will show up in the Sentry UI."""
@@ -206,6 +213,7 @@ class Span:
         "_containing_transaction",
         "_local_aggregator",
         "scope",
+        "origin",
     )
 
     def __init__(
@@ -222,6 +230,7 @@ class Span:
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
+        origin="manual",  # type: str
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -234,6 +243,7 @@ class Span:
         self.status = status
         self.hub = hub
         self.scope = scope
+        self.origin = origin
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
@@ -276,7 +286,7 @@ class Span:
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
             % (
                 self.__class__.__name__,
                 self.op,
@@ -285,6 +295,7 @@ class Span:
                 self.span_id,
                 self.parent_span_id,
                 self.sampled,
+                self.origin,
             )
         )
 
@@ -604,6 +615,7 @@ class Span:
             "description": self.description,
             "start_timestamp": self.start_timestamp,
             "timestamp": self.timestamp,
+            "origin": self.origin,
         }  # type: Dict[str, Any]
 
         if self.status:
@@ -635,6 +647,7 @@ class Span:
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
+            "origin": self.origin,
         }  # type: Dict[str, Any]
         if self.status:
             rv["status"] = self.status
@@ -701,7 +714,7 @@ class Transaction(Span):
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r)>"
+            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r, origin=%r)>"
             % (
                 self.__class__.__name__,
                 self.name,
@@ -711,6 +724,7 @@ class Transaction(Span):
                 self.parent_span_id,
                 self.sampled,
                 self.source,
+                self.origin,
             )
         )
 
