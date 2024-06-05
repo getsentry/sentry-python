@@ -75,6 +75,7 @@ def expected_error():
                     "span_id": span.span_id,
                     "parent_span_id": span.parent_span_id,
                     "op": "test_span",
+                    "origin": "manual",
                     "description": None,
                 },
                 "runtime": {
@@ -156,8 +157,8 @@ def expected_transaction():
                     "span_id": trx.span_id,
                     "parent_span_id": None,
                     "op": "test_transaction_op",
-                    "description": None,
                     "origin": "manual",
+                    "description": None,
                 },
                 "character": {
                     "name": "Mighty Fighter changed by before_send_transaction",
