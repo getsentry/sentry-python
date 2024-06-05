@@ -37,6 +37,7 @@ if TYPE_CHECKING:
 
 class RqIntegration(Integration):
     identifier = "rq"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -64,13 +65,16 @@ class RqIntegration(Integration):
                     op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
                     source=TRANSACTION_SOURCE_TASK,
+                    origin=RqIntegration.origin,
                 )
 
                 with capture_internal_exceptions():
                     transaction.name = job.func_name
 
                 with sentry_sdk.start_transaction(
-                    transaction, custom_sampling_context={"rq_job": job}
+                    transaction,
+                    custom_sampling_context={"rq_job": job},
+                    origin=RqIntegration.origin,
                 ):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
