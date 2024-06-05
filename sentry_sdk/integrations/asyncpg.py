@@ -29,6 +29,7 @@ if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
 
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
+    origin = f"auto.db.{identifier}"
     _record_params = False
 
     def __init__(self, *, record_params: bool = False):
@@ -154,7 +155,9 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
         user = kwargs["params"].user
         database = kwargs["params"].database
 
-        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(
+            op=OP.DB, description="connect", origin=AsyncPGIntegration.origin
+        ) as span:
             span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
             addr = kwargs.get("addr")
             if addr:
