@@ -218,19 +218,21 @@ def test_cache_prefixes(sentry_init, capture_events):
         connection.mget("no.1", "no.2", "no.actually.yes")
         connection.mget(b"no.3", b"yes.5")
         connection.mget(uuid.uuid4().bytes)
+        connection.mget(uuid.uuid4().bytes, "yes")
 
     (event,) = events
 
     spans = event["spans"]
-    assert len(spans) == 11  # 7 db spans + 4 cache spans
+    assert len(spans) == 13  # 8 db spans + 5 cache spans
 
     cache_spans = [span for span in spans if span["op"] == "cache.get"]
-    assert len(cache_spans) == 4
+    assert len(cache_spans) == 5
 
     assert cache_spans[0]["description"] == "yes, no"
     assert cache_spans[1]["description"] == "no, 1, yes"
     assert cache_spans[2]["description"] == "no, yes.1, yes.2"
     assert cache_spans[3]["description"] == "no.3, yes.5"
+    assert cache_spans[4]["description"] == ", yes"
 
 
 @pytest.mark.parametrize(
