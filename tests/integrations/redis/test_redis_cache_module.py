@@ -244,6 +244,12 @@ def test_cache_data(sentry_init, capture_events):
             None,
             (b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t",),
         ),
+        (
+            "get",
+            [123],
+            None,
+            (123,),
+        ),
     ],
 )
 def test_get_safe_key(method_name, args, kwargs, expected_key):
@@ -266,6 +272,9 @@ def test_get_safe_key(method_name, args, kwargs, expected_key):
         ),
         (["bla", "blub", "foo"], "bla, blub, foo"),
         ([uuid.uuid4().bytes], ""),
+        ({"key1": 1, "key2": 2}, "key1, key2"),
+        (1, "1"),
+        ([1, 2, 3, b"hello"], "1, 2, 3, hello"),
     ],
 )
 def test_key_as_string(key, expected_key):
