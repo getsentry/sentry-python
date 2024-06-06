@@ -647,6 +647,8 @@ def test_set_db_data_custom_backend():
         pytest.fail("A TypeError was raised")
 
 
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
 def test_connection_reconnect_does_not_error(sentry_init):
     sentry_init(integrations=[DjangoIntegration()])
 
