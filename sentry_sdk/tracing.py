@@ -109,10 +109,7 @@ if TYPE_CHECKING:
         "ProfileContext",
         {
             "profiler.id": str,
-            "thread.id": str,
-            "thread.name": str,
         },
-        total=False,
     )
 
 
@@ -661,6 +658,19 @@ class Span:
                 self.containing_transaction.get_baggage().dynamic_sampling_context()
             )
 
+        data = {}
+
+        thread_id = self._data.get(SPANDATA.THREAD_ID)
+        if thread_id is not None:
+            data["thread.id"] = thread_id
+
+        thread_name = self._data.get(SPANDATA.THREAD_NAME)
+        if thread_name is not None:
+            data["thread.name"] = thread_name
+
+        if data:
+            rv["data"] = data
+
         return rv
 
     def get_profile_context(self):
@@ -669,19 +679,9 @@ class Span:
         if profiler_id is None:
             return None
 
-        rv = {
+        return {
             "profiler.id": profiler_id,
-        }  # type: ProfileContext
-
-        thread_id = self._data.get(SPANDATA.THREAD_ID)
-        if thread_id is not None:
-            rv["thread.id"] = thread_id
-
-        thread_name = self._data.get(SPANDATA.THREAD_NAME)
-        if thread_name is not None:
-            rv["thread.name"] = thread_name
-
-        return rv
+        }
 
 
 class Transaction(Span):
