@@ -142,7 +142,9 @@ def test_profiles_sample_rate(
     envelopes = capture_envelopes()
     reports = capture_client_reports()
 
-    with mock.patch("sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
+    ):
         with start_transaction(name="profiling"):
             pass
 
@@ -211,7 +213,9 @@ def test_profiles_sampler(
     envelopes = capture_envelopes()
     reports = capture_client_reports()
 
-    with mock.patch("sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
+    ):
         with start_transaction(name="profiling"):
             pass
 
