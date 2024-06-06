@@ -7,6 +7,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
+    _in_http_status_code_range,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -30,7 +31,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, HttpStatusCodeRange
 
 try:
     import starlette  # type: ignore
@@ -71,14 +72,17 @@ class StarletteIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="url"):
-        # type: (str) -> None
+    def __init__(self, transaction_style="url", failed_request_status_codes=None):
+        # type: (str, Optional[list[HttpStatusCodeRange]]) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.failed_request_status_codes = failed_request_status_codes or [
+            range(500, 599)
+        ]
 
     @staticmethod
     def setup_once():
@@ -198,12 +202,18 @@ def patch_exception_middleware(middleware_class):
 
             async def _sentry_patched_exception_handler(self, *args, **kwargs):
                 # type: (Any, Any, Any) -> None
+                integration = sentry_sdk.get_client().get_integration(
+                    StarletteIntegration
+                )
+
                 exp = args[0]
 
                 is_http_server_error = (
                     hasattr(exp, "status_code")
                     and isinstance(exp.status_code, int)
-                    and exp.status_code >= 500
+                    and _in_http_status_code_range(
+                        exp.status_code, integration.failed_request_status_codes
+                    )
                 )
                 if is_http_server_error:
                     _capture_exception(exp, handled=True)

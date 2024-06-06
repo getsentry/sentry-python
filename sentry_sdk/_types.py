@@ -9,7 +9,7 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import Container, MutableMapping
 
     from datetime import datetime
 
@@ -220,3 +220,5 @@ if TYPE_CHECKING:
         },
         total=False,
     )
+
+    HttpStatusCodeRange = Union[int, Container[int]]
