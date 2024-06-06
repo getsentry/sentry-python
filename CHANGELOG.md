@@ -4,11 +4,43 @@
 
 ### Various fixes & improvements
 
-- feat(starlette): Allow to configure status codes to report to Sentry (#3008) by @sentrivana
-- fix(redis): Support multiple keys with cache_prefixes (#3136) by @sentrivana
-- fix(cache): Fix key_as_string (#3132) by @sentrivana
-- build(deps): bump actions/checkout from 4.1.4 to 4.1.5 (#3067) by @dependabot
+- Allow to configure status codes to report to Sentry in Starlette and FastAPI (#3008) by @sentrivana
+
+  By passing a new option to the FastAPI and Starlette integrations, you're now able to configure what
+  status codes should be sent as events to Sentry. Here's how it works:
+
+  ```python
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+  from sentry_sdk.integrations.fastapi import FastApiIntegration
+  
+  sentry_sdk.init(
+      # ...
+      integrations=[
+          StarletteIntegration(
+              failed_request_status_codes=[403, range(500, 599)],
+          ),
+          FastApiIntegration(
+              failed_request_status_codes=[403, range(500, 599)],
+          ),
+      ]
+  )
+  ```
+
+  `failed_request_status_codes` expects a list of integers or containers (objects that allow membership checks via `in`)
+  of integers. Examples of valid `failed_request_status_codes`:
+
+  - `[500]` will only send events on HTTP 500.
+  - `[400, range(500, 599)]` will send events on HTTP 400 as well as the 500-599 range.
+  - `[500, 503]` will send events on HTTP 500 and 503.
+
+  The default is `[range(500, 599)]`.
+
+  See the [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/) and [Starlette](https://docs.sentry.io/platforms/python/integrations/starlette/) integration docs for more details.
+
+- Support multiple keys with `cache_prefixes` (#3136) by @sentrivana
+- Support integer Redis keys (#3132) by @sentrivana
 - Update SDK version in CONTRIBUTING.md (#3129) by @sentrivana
+- Bump actions/checkout from 4.1.4 to 4.1.5 (#3067) by @dependabot
 
 ## 2.4.0
 
