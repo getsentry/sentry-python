@@ -32,7 +32,7 @@ API Docs
 .. autoclass:: sentry_sdk.tracing.Span
    :members:
 
-.. autoclass:: sentry_sdk.profiler.Profile
+.. autoclass:: sentry_sdk.profiler.transaction_profiler.Profile
    :members:
 
 .. autoclass:: sentry_sdk.session.Session
