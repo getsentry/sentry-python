@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.5.0
+
+### Various fixes & improvements
+
+- feat(starlette): Allow to configure status codes to report to Sentry (#3008) by @sentrivana
+- fix(redis): Support multiple keys with cache_prefixes (#3136) by @sentrivana
+- fix(cache): Fix key_as_string (#3132) by @sentrivana
+- build(deps): bump actions/checkout from 4.1.4 to 4.1.5 (#3067) by @dependabot
+- Update SDK version in CONTRIBUTING.md (#3129) by @sentrivana
+
 ## 2.4.0
 
 ### Various fixes & improvements
