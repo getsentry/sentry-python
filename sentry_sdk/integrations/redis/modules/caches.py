@@ -31,11 +31,15 @@ def _compile_cache_span_properties(redis_command, args, kwargs, integration):
     # type: (str, tuple[Any, ...], dict[str, Any], RedisIntegration) -> dict[str, Any]
     key = _get_safe_key(redis_command, args, kwargs)
     key_as_string = _key_as_string(key)
+    keys_as_string = key_as_string.split(", ")
 
     is_cache_key = False
     for prefix in integration.cache_prefixes:
-        if key_as_string.startswith(prefix):
-            is_cache_key = True
+        for kee in keys_as_string:
+            if kee.startswith(prefix):
+                is_cache_key = True
+                break
+        if is_cache_key:
             break
 
     value = None
