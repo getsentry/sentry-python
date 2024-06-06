@@ -457,7 +457,6 @@ def test_span_origin(sentry_init, app, capture_events):
     with c as client:
         client.get("/message?foo=bar")
 
-    import ipdb; ipdb.set_trace()
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.sanic"
