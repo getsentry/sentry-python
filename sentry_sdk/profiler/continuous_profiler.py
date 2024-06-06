@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import TypedDict
     from sentry_sdk._types import ContinuousProfilerMode
-    from sentry_sdk.profiler import (
+    from sentry_sdk.profiler.transaction_profiler import (
         ExtractedSample,
         FrameId,
         StackId,

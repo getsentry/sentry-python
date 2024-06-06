@@ -732,7 +732,9 @@ class Transaction(Span):
         self.parent_sampled = parent_sampled
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
-        self._profile = None  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
+        self._profile = (
+            None
+        )  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
         self._baggage = baggage
 
     def __repr__(self):
