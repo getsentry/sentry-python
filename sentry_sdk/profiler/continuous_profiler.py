@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.profiler.transaction_profiler import (
+from sentry_sdk.profiler.utils import (
     DEFAULT_SAMPLING_FREQUENCY,
     extract_stack,
 )
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import TypedDict
     from sentry_sdk._types import ContinuousProfilerMode
-    from sentry_sdk.profiler.transaction_profiler import (
+    from sentry_sdk.profiler.utils import (
         ExtractedSample,
         FrameId,
         StackId,

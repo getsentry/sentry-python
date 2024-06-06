@@ -60,13 +60,19 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import Set
-    from typing import Sequence
-    from typing import Tuple
     from typing_extensions import TypedDict
 
+    from sentry_sdk.profiler.utils import (
+        ProcessedStack,
+        ProcessedFrame,
+        ProcessedThreadMetadata,
+        FrameId,
+        StackId,
+        ThreadId,
+        ExtractedStack,
+        ExtractedSample,
+    )
     from sentry_sdk._types import Event, SamplingContext, ProfilerMode
-
-    ThreadId = str
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
@@ -75,24 +81,6 @@ if TYPE_CHECKING:
             "thread_id": ThreadId,
             "stack_id": int,
         },
-    )
-
-    ProcessedStack = List[int]
-
-    ProcessedFrame = TypedDict(
-        "ProcessedFrame",
-        {
-            "abs_path": str,
-            "filename": Optional[str],
-            "function": str,
-            "lineno": int,
-            "module": Optional[str],
-        },
-    )
-
-    ProcessedThreadMetadata = TypedDict(
-        "ProcessedThreadMetadata",
-        {"name": str},
     )
 
     ProcessedProfile = TypedDict(
@@ -104,22 +92,6 @@ if TYPE_CHECKING:
             "thread_metadata": Dict[ThreadId, ProcessedThreadMetadata],
         },
     )
-
-    FrameId = Tuple[
-        str,  # abs_path
-        int,  # lineno
-        str,  # function
-    ]
-    FrameIds = Tuple[FrameId, ...]
-
-    # The exact value of this id is not very meaningful. The purpose
-    # of this id is to give us a compact and unique identifier for a
-    # raw stack that can be used as a key to a dictionary so that it
-    # can be used during the sampled format generation.
-    StackId = Tuple[int, int]
-
-    ExtractedStack = Tuple[StackId, FrameIds, List[ProcessedFrame]]
-    ExtractedSample = Sequence[Tuple[ThreadId, ExtractedStack]]
 
 
 try:
