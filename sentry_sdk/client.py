@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from importlib import import_module
 
 from sentry_sdk._compat import PY37, check_uwsgi_thread_support
-from sentry_sdk.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
@@ -34,7 +33,8 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.utils import ContextVar
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.profiler import has_profiling_enabled, Profile, setup_profiler
+from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
+from sentry_sdk.profiler.transaction_profiler import has_profiling_enabled, Profile, setup_profiler
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.spotlight import setup_spotlight

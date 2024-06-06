@@ -20,10 +20,10 @@ except ImportError:
     eventlet = None
 
 import sentry_sdk
-from sentry_sdk.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
-from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.transaction_profiler import teardown_profiler
+from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
 

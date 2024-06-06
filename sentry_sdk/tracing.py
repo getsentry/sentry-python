@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA
-from sentry_sdk.continuous_profiler import get_profiler_id
+from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,

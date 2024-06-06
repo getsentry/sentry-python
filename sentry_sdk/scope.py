@@ -10,8 +10,8 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.continuous_profiler import try_autostart_continuous_profiler
-from sentry_sdk.profiler import Profile
+from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
+from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,

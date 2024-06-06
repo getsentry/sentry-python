@@ -6,7 +6,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.continuous_profiler import (
+from sentry_sdk.profiler.continuous_profiler import (
     setup_continuous_profiler,
     start_profiler,
     stop_profiler,
@@ -140,7 +140,7 @@ def assert_single_transaction_without_profile_chunks(envelopes):
     "make_options",
     [pytest.param(experimental_options, id="experiment")],
 )
-@mock.patch("sentry_sdk.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_auto_start_and_manual_stop(
     sentry_init,
     capture_envelopes,
@@ -197,7 +197,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
     "make_options",
     [pytest.param(experimental_options, id="experiment")],
 )
-@mock.patch("sentry_sdk.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_manual_start_and_stop(
     sentry_init,
     capture_envelopes,

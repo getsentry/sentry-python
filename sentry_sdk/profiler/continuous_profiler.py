@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from sentry_sdk.envelope import Envelope
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.profiler import DEFAULT_SAMPLING_FREQUENCY, extract_stack
+from sentry_sdk.profiler.transaction_profiler import DEFAULT_SAMPLING_FREQUENCY, extract_stack
 from sentry_sdk.utils import (
     capture_internal_exception,
     is_gevent,
