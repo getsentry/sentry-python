@@ -52,7 +52,7 @@ def _safe_decode(key):
         except UnicodeDecodeError:
             return ""
 
-    return key
+    return str(key)
 
 
 def _key_as_string(key):
