@@ -446,6 +446,9 @@ def test_transactions(test_config, sentry_init, app, capture_events):
     )
 
 
+@pytest.mark.skipif(
+    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
+)
 def test_span_origin(sentry_init, app, capture_events):
     sentry_init(integrations=[SanicIntegration()], traces_sample_rate=1.0)
     events = capture_events()
@@ -454,6 +457,7 @@ def test_span_origin(sentry_init, app, capture_events):
     with c as client:
         client.get("/message?foo=bar")
 
+    import ipdb; ipdb.set_trace()
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.sanic"
