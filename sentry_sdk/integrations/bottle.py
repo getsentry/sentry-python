@@ -40,6 +40,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class BottleIntegration(Integration):
     identifier = "bottle"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -69,9 +70,12 @@ class BottleIntegration(Integration):
         @ensure_integration_enabled(BottleIntegration, old_app)
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                lambda *a, **kw: old_app(self, *a, **kw), 
+                span_origin=BottleIntegration.origin,
             )
+            
+            return middleware(environ, start_response)
 
         Bottle.__call__ = sentry_patched_wsgi_app
 

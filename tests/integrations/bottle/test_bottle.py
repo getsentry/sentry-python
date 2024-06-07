@@ -474,3 +474,22 @@ def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
     client.get("/")
 
     assert not events
+
+
+def test_span_origin(
+    sentry_init,
+    get_client,
+    capture_events,
+):
+    sentry_init(
+        integrations=[bottle_sentry.BottleIntegration()], 
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = get_client()
+    client.get("/message")
+
+    (_, event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.bottle"
