@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.5.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.5.1 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=397bb51e" />
@@ -990,9 +990,9 @@ currently active span or the scopes Propagation Context.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.iter_trace_propagation_headers">
 <span class="sig-name descname"><span class="pre">iter_trace_propagation_headers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.iter_trace_propagation_headers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.iter_trace_propagation_headers" title="Link to this definition">¶</a></dt>
-<dd><p>Return HTTP headers which allow propagation of trace data.</p>
-<p>If a span is given, the trace data will taken from the span.
-If no span is given, the trace data is taken from the scope.</p>
+<dd><p>Return HTTP headers which allow propagation of trace data. Data taken
+from the span representing the request, if available, or the current
+span on the scope if not.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Generator" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Generator</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Tuple" title="(in Python v3.12)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.12)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>]</span></p>
@@ -2069,7 +2069,7 @@ each envelope may have at most one Item with type “event” or “transaction�
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=3c4615cf"></script>
+      <script src="_static/documentation_options.js?v=983e91d6"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=3cc430e2"></script></body>
