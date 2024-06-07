@@ -44,16 +44,6 @@ except ImportError:
 _DEFAULT_TRANSACTION_NAME = "generic Starlite request"
 
 
-class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
-    def __init__(self, app: "ASGIApp"):
-        super().__init__(
-            app=app,
-            unsafe_context_data=False,
-            transaction_style="endpoint",
-            mechanism_type="asgi",
-        )
-
-
 class StarliteIntegration(Integration):
     identifier = "starlite"
     origin = f"auto.http.{identifier}"
@@ -63,6 +53,17 @@ class StarliteIntegration(Integration):
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()
+
+
+class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
+    def __init__(self, app: "ASGIApp", span_origin: str = StarliteIntegration.origin):
+        super().__init__(
+            app=app,
+            unsafe_context_data=False,
+            transaction_style="endpoint",
+            mechanism_type="asgi",
+            span_origin=span_origin,
+        )
 
 
 def patch_app_init() -> None:
