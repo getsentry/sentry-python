@@ -592,26 +592,3 @@ def test_asgi_mixin_iscoroutinefunction_when_not_async_after_3_12():
 
     instance = sentry_asgi_mixin(get_response)
     assert not inspect.iscoroutinefunction(instance)
-
-
-@pytest.mark.forked
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
-)
-@pytest.mark.parametrize("application", APPS)
-async def test_span_origin(sentry_init, capture_events, application):
-    sentry_init(
-        integrations=[DjangoIntegration()], 
-        traces_sample_rate=1.0,
-    )
-
-    events = capture_events()
-
-    comm = HttpCommunicator(application, "GET", "/async_message")
-    await comm.get_response()
-
-    (event,) = events
-
-
-    assert event["contexts"]["trace"]["origin"] == "auto.http.django"

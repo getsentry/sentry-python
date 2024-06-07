@@ -195,6 +195,7 @@ class SentryAsgiMiddleware:
                             op=OP.HTTP_SERVER,
                             name=transaction_name,
                             source=transaction_source,
+                            origin=self.span_origin,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (new): %s", transaction
@@ -210,7 +211,6 @@ class SentryAsgiMiddleware:
                     with sentry_sdk.start_transaction(
                         transaction, 
                         custom_sampling_context={"asgi_scope": scope}, 
-                        origin=self.span_origin,
                     ):
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
