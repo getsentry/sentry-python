@@ -71,10 +71,10 @@ class BottleIntegration(Integration):
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
             middleware = SentryWsgiMiddleware(
-                lambda *a, **kw: old_app(self, *a, **kw), 
+                lambda *a, **kw: old_app(self, *a, **kw),
                 span_origin=BottleIntegration.origin,
             )
-            
+
             return middleware(environ, start_response)
 
         Bottle.__call__ = sentry_patched_wsgi_app

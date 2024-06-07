@@ -482,7 +482,7 @@ def test_span_origin(
     capture_events,
 ):
     sentry_init(
-        integrations=[bottle_sentry.BottleIntegration()], 
+        integrations=[bottle_sentry.BottleIntegration()],
         traces_sample_rate=1.0,
     )
     events = capture_events()
@@ -490,6 +490,6 @@ def test_span_origin(
     client = get_client()
     client.get("/message")
 
-    (_, event,) = events
+    (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.bottle"
