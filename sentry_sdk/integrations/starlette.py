@@ -351,6 +351,7 @@ def patch_asgi_app():
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
+            span_origin=StarletteIntegration.origin,
         )
 
         middleware.__call__ = middleware._run_asgi3

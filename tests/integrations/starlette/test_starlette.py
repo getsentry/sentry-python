@@ -1098,6 +1098,6 @@ def test_span_origin(sentry_init, capture_events):
 
     (_, event) = events
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
     for span in event["spans"]:
         assert span["origin"] == "auto.http.starlette"
