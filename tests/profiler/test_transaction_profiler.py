@@ -14,11 +14,13 @@ from sentry_sdk.profiler.transaction_profiler import (
     Profile,
     Scheduler,
     ThreadScheduler,
+    setup_profiler,
+)
+from sentry_sdk.profiler.utils import (
     extract_frame,
     extract_stack,
     frame_id,
     get_frame_name,
-    setup_profiler,
 )
 from sentry_sdk._lru_cache import LRUCache
 
