@@ -1128,6 +1128,7 @@ def test_get_receiver_name():
         assert name == "partial(<function " + a_partial.func.__name__ + ">)"
 
 
+@pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 def test_span_origin(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
