@@ -115,6 +115,7 @@ class DjangoIntegration(Integration):
     """
 
     identifier = "django"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
     middleware_spans = None
@@ -171,9 +172,12 @@ class DjangoIntegration(Integration):
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
-            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                bound_old_app,
+                use_x_forwarded_for,
+                span_origin=DjangoIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
