@@ -884,7 +884,7 @@ def test_span_origin(run_lambda_function):
         LAMBDA_PRELUDE
         + dedent(
             """
-        init_sdk()
+        init_sdk(traces_sample_rate=1.0)
 
         def test_handler(event, context):
             pass
