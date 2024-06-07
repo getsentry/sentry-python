@@ -128,7 +128,9 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert spans[0]["op"] == "cache.get"
     assert spans[0]["description"] == "myasynccachekey"
-    assert spans[0]["data"]["cache.key"] == "myasynccachekey"
+    assert spans[0]["data"]["cache.key"] == [
+        "myasynccachekey",
+    ]
     assert spans[0]["data"]["cache.hit"] == False  # noqa: E712
     assert "cache.item_size" not in spans[0]["data"]
     # very old fakeredis can not handle port and/or host.
@@ -146,7 +148,9 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert spans[2]["op"] == "cache.put"
     assert spans[2]["description"] == "myasynccachekey"
-    assert spans[2]["data"]["cache.key"] == "myasynccachekey"
+    assert spans[2]["data"]["cache.key"] == [
+        "myasynccachekey",
+    ]
     assert "cache.hit" not in spans[1]["data"]
     assert spans[2]["data"]["cache.item_size"] == 18
     # very old fakeredis can not handle port.
@@ -164,7 +168,9 @@ async def test_cache_data(sentry_init, capture_events):
 
     assert spans[4]["op"] == "cache.get"
     assert spans[4]["description"] == "myasynccachekey"
-    assert spans[4]["data"]["cache.key"] == "myasynccachekey"
+    assert spans[4]["data"]["cache.key"] == [
+        "myasynccachekey",
+    ]
     assert spans[4]["data"]["cache.hit"] == True  # noqa: E712
     assert spans[4]["data"]["cache.item_size"] == 18
     # very old fakeredis can not handle port.

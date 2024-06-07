@@ -1,3 +1,4 @@
+from functools import wraps
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.integrations import DidNotEnable
@@ -113,133 +114,108 @@ def _get_monitor_config(celery_schedule, app, monitor_name):
     return monitor_config
 
 
-def _patch_beat_apply_entry():
-    # type: () -> None
+def _apply_crons_data_to_schedule_entry(scheduler, schedule_entry, integration):
+    # type: (Any, Any, sentry_sdk.integrations.celery.CeleryIntegration) -> None
     """
-    Makes sure that the Sentry Crons information is set in the Celery Beat task's
-    headers so that is is monitored with Sentry Crons.
+    Add Sentry Crons information to the schedule_entry headers.
+    """
+    if not integration.monitor_beat_tasks:
+        return
 
-    This is only called by Celery Beat. After apply_entry is called
-    Celery will call apply_async to put the task in the queue.
+    monitor_name = schedule_entry.name
+
+    task_should_be_excluded = match_regex_list(
+        monitor_name, integration.exclude_beat_tasks
+    )
+    if task_should_be_excluded:
+        return
+
+    celery_schedule = schedule_entry.schedule
+    app = scheduler.app
+
+    monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
+
+    is_supported_schedule = bool(monitor_config)
+    if not is_supported_schedule:
+        return
+
+    headers = schedule_entry.options.pop("headers", {})
+    headers.update(
+        {
+            "sentry-monitor-slug": monitor_name,
+            "sentry-monitor-config": monitor_config,
+        }
+    )
+
+    check_in_id = capture_checkin(
+        monitor_slug=monitor_name,
+        monitor_config=monitor_config,
+        status=MonitorStatus.IN_PROGRESS,
+    )
+    headers.update({"sentry-monitor-check-in-id": check_in_id})
+
+    # Set the Sentry configuration in the options of the ScheduleEntry.
+    # Those will be picked up in `apply_async` and added to the headers.
+    schedule_entry.options["headers"] = headers
+
+
+def _wrap_beat_scheduler(f):
+    # type: (Callable[..., Any]) -> Callable[..., Any]
+    """
+    Makes sure that:
+    - a new Sentry trace is started for each task started by Celery Beat and
+      it is propagated to the task.
+    - the Sentry Crons information is set in the Celery Beat task's
+      headers so that is is monitored with Sentry Crons.
+
+    After the patched function is called,
+    Celery Beat will call apply_async to put the task in the queue.
     """
     from sentry_sdk.integrations.celery import CeleryIntegration
 
-    original_apply_entry = Scheduler.apply_entry
-
-    def sentry_apply_entry(*args, **kwargs):
+    @wraps(f)
+    def sentry_patched_scheduler(*args, **kwargs):
         # type: (*Any, **Any) -> None
-        scheduler, schedule_entry = args
-        app = scheduler.app
-
-        celery_schedule = schedule_entry.schedule
-        monitor_name = schedule_entry.name
-
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
         if integration is None:
-            return original_apply_entry(*args, **kwargs)
-
-        if match_regex_list(monitor_name, integration.exclude_beat_tasks):
-            return original_apply_entry(*args, **kwargs)
+            return f(*args, **kwargs)
 
         # Tasks started by Celery Beat start a new Trace
         scope = Scope.get_isolation_scope()
         scope.set_new_propagation_context()
         scope._name = "celery-beat"
 
-        monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
+        scheduler, schedule_entry = args
+        _apply_crons_data_to_schedule_entry(scheduler, schedule_entry, integration)
 
-        is_supported_schedule = bool(monitor_config)
-        if is_supported_schedule:
-            headers = schedule_entry.options.pop("headers", {})
-            headers.update(
-                {
-                    "sentry-monitor-slug": monitor_name,
-                    "sentry-monitor-config": monitor_config,
-                }
-            )
+        return f(*args, **kwargs)
 
-            check_in_id = capture_checkin(
-                monitor_slug=monitor_name,
-                monitor_config=monitor_config,
-                status=MonitorStatus.IN_PROGRESS,
-            )
-            headers.update({"sentry-monitor-check-in-id": check_in_id})
+    return sentry_patched_scheduler
 
-            # Set the Sentry configuration in the options of the ScheduleEntry.
-            # Those will be picked up in `apply_async` and added to the headers.
-            schedule_entry.options["headers"] = headers
 
-        return original_apply_entry(*args, **kwargs)
-
-    Scheduler.apply_entry = sentry_apply_entry
+def _patch_beat_apply_entry():
+    # type: () -> None
+    Scheduler.apply_entry = _wrap_beat_scheduler(Scheduler.apply_entry)
 
 
 def _patch_redbeat_maybe_due():
     # type: () -> None
-
     if RedBeatScheduler is None:
         return
 
-    from sentry_sdk.integrations.celery import CeleryIntegration
-
-    original_maybe_due = RedBeatScheduler.maybe_due
-
-    def sentry_maybe_due(*args, **kwargs):
-        # type: (*Any, **Any) -> None
-        scheduler, schedule_entry = args
-        app = scheduler.app
-
-        celery_schedule = schedule_entry.schedule
-        monitor_name = schedule_entry.name
-
-        integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-        if integration is None:
-            return original_maybe_due(*args, **kwargs)
-
-        task_should_be_excluded = match_regex_list(
-            monitor_name, integration.exclude_beat_tasks
-        )
-        if task_should_be_excluded:
-            return original_maybe_due(*args, **kwargs)
-
-        # Tasks started by Celery Beat start a new Trace
-        scope = Scope.get_isolation_scope()
-        scope.set_new_propagation_context()
-        scope._name = "celery-beat"
-
-        monitor_config = _get_monitor_config(celery_schedule, app, monitor_name)
-
-        is_supported_schedule = bool(monitor_config)
-        if is_supported_schedule:
-            headers = schedule_entry.options.pop("headers", {})
-            headers.update(
-                {
-                    "sentry-monitor-slug": monitor_name,
-                    "sentry-monitor-config": monitor_config,
-                }
-            )
-
-            check_in_id = capture_checkin(
-                monitor_slug=monitor_name,
-                monitor_config=monitor_config,
-                status=MonitorStatus.IN_PROGRESS,
-            )
-            headers.update({"sentry-monitor-check-in-id": check_in_id})
-
-            # Set the Sentry configuration in the options of the ScheduleEntry.
-            # Those will be picked up in `apply_async` and added to the headers.
-            schedule_entry.options["headers"] = headers
-
-        return original_maybe_due(*args, **kwargs)
-
-    RedBeatScheduler.maybe_due = sentry_maybe_due
+    RedBeatScheduler.maybe_due = _wrap_beat_scheduler(RedBeatScheduler.maybe_due)
 
 
 def _setup_celery_beat_signals():
     # type: () -> None
-    task_success.connect(crons_task_success)
-    task_failure.connect(crons_task_failure)
-    task_retry.connect(crons_task_retry)
+    from sentry_sdk.integrations.celery import CeleryIntegration
+
+    integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
+
+    if integration is not None and integration.monitor_beat_tasks:
+        task_success.connect(crons_task_success)
+        task_failure.connect(crons_task_failure)
+        task_retry.connect(crons_task_retry)
 
 
 def crons_task_success(sender, **kwargs):

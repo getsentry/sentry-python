@@ -44,38 +44,60 @@ def _get_safe_command(name, args):
     return command
 
 
+def _safe_decode(key):
+    # type: (Any) -> str
+    if isinstance(key, bytes):
+        try:
+            return key.decode()
+        except UnicodeDecodeError:
+            return ""
+
+    return str(key)
+
+
+def _key_as_string(key):
+    # type: (Any) -> str
+    if isinstance(key, (dict, list, tuple)):
+        key = ", ".join(_safe_decode(x) for x in key)
+    elif isinstance(key, bytes):
+        key = _safe_decode(key)
+    elif key is None:
+        key = ""
+    else:
+        key = str(key)
+
+    return key
+
+
 def _get_safe_key(method_name, args, kwargs):
-    # type: (str, Optional[tuple[Any, ...]], Optional[dict[str, Any]]) -> str
+    # type: (str, Optional[tuple[Any, ...]], Optional[dict[str, Any]]) -> Optional[tuple[str, ...]]
     """
-    Gets the keys (or keys) from the given method_name.
+    Gets the key (or keys) from the given method_name.
     The method_name could be a redis command or a django caching command
     """
-    key = ""
+    key = None
+
     if args is not None and method_name.lower() in _MULTI_KEY_COMMANDS:
         # for example redis "mget"
-        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in args)
+        key = tuple(args)
 
     elif args is not None and len(args) >= 1:
         # for example django "set_many/get_many" or redis "get"
-        key = args[0].decode() if isinstance(args[0], bytes) else args[0]
+        if isinstance(args[0], (dict, list, tuple)):
+            key = tuple(args[0])
+        else:
+            key = (args[0],)
 
     elif kwargs is not None and "key" in kwargs:
-        # this is a legacy case for older versions of django (I guess)
-        key = (
-            kwargs["key"].decode()
-            if isinstance(kwargs["key"], bytes)
-            else kwargs["key"]
-        )
+        # this is a legacy case for older versions of Django
+        if isinstance(kwargs["key"], (list, tuple)):
+            if len(kwargs["key"]) > 0:
+                key = tuple(kwargs["key"])
+        else:
+            if kwargs["key"] is not None:
+                key = (kwargs["key"],)
 
-    if isinstance(key, dict):
-        # Django caching set_many() has a dictionary {"key": "data", "key2": "data2"}
-        # as argument. In this case only return the keys of the dictionary (to not leak data)
-        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key.keys())
-
-    if isinstance(key, list):
-        key = ", ".join(x.decode() if isinstance(x, bytes) else x for x in key)
-
-    return str(key)
+    return key
 
 
 def _parse_rediscluster_command(command):

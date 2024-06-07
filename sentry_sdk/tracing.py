@@ -753,8 +753,27 @@ class Transaction(Span):
             )
         )
 
+    def _possibly_started(self):
+        # type: () -> bool
+        """Returns whether the transaction might have been started.
+
+        If this returns False, we know that the transaction was not started
+        with sentry_sdk.start_transaction, and therefore the transaction will
+        be discarded.
+        """
+
+        # We must explicitly check self.sampled is False since self.sampled can be None
+        return self._span_recorder is not None or self.sampled is False
+
     def __enter__(self):
         # type: () -> Transaction
+        if not self._possibly_started():
+            logger.warning(
+                "Transaction was entered without being started with sentry_sdk.start_transaction."
+                "The transaction will not be sent to Sentry. To fix, start the transaction by"
+                "passing it to sentry_sdk.start_transaction."
+            )
+
         super().__enter__()
 
         if self._profile is not None:
