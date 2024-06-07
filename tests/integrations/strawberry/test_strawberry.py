@@ -756,7 +756,7 @@ def test_span_origin3(
     client.post("/graphql", json={"query": query})
 
     (event,) = events
-    
+
     is_flask = "Flask" in str(framework_integrations[0])
     if is_flask:
         assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
