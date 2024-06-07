@@ -673,7 +673,12 @@ def test_span_origin(
 
     (event,) = events
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
+    is_flask = "Flask" in str(framework_integrations[0])
+    if is_flask:
+        assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
+    else:
+        assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
+
     for span in event["spans"]:
         if span["op"].startswith("graphql."):
             assert span["origin"] == "auto.graphql.strawberry"
@@ -710,7 +715,12 @@ def test_span_origin2(
 
     (event,) = events
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
+    is_flask = "Flask" in str(framework_integrations[0])
+    if is_flask:
+        assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
+    else:
+        assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
+
     for span in event["spans"]:
         if span["op"].startswith("graphql."):
             assert span["origin"] == "auto.graphql.strawberry"
@@ -746,8 +756,13 @@ def test_span_origin3(
     client.post("/graphql", json={"query": query})
 
     (event,) = events
+    
+    is_flask = "Flask" in str(framework_integrations[0])
+    if is_flask:
+        assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
+    else:
+        assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
     for span in event["spans"]:
         if span["op"].startswith("graphql."):
             assert span["origin"] == "auto.graphql.strawberry"
