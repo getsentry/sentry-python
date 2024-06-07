@@ -12,7 +12,7 @@ from trytond.wsgi import app  # type: ignore
 
 class TrytondWSGIIntegration(Integration):
     identifier = "trytond_wsgi"
-    origin = f"auto.ai.{identifier}"
+    origin = f"auto.http.{identifier}"
 
     def __init__(self):  # type: () -> None
         pass
