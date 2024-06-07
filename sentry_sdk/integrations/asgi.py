@@ -82,7 +82,13 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type", "span_origin")
+    __slots__ = (
+        "app",
+        "__call__",
+        "transaction_style",
+        "mechanism_type",
+        "span_origin",
+    )
 
     def __init__(
         self,
@@ -209,8 +215,8 @@ class SentryAsgiMiddleware:
                     )
 
                     with sentry_sdk.start_transaction(
-                        transaction, 
-                        custom_sampling_context={"asgi_scope": scope}, 
+                        transaction,
+                        custom_sampling_context={"asgi_scope": scope},
                     ):
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:

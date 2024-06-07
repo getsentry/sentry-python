@@ -95,8 +95,8 @@ def patch_django_asgi_handler_impl(cls):
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
-            old_app.__get__(self, cls), 
-            unsafe_context_data=True, 
+            old_app.__get__(self, cls),
+            unsafe_context_data=True,
             span_origin=DjangoIntegration.origin,
         )._run_asgi3
 
@@ -147,8 +147,8 @@ def patch_channels_asgi_handler_impl(cls):
                 return await old_app(self, receive, send)
 
             middleware = SentryAsgiMiddleware(
-                lambda _scope: old_app.__get__(self, cls), 
-                unsafe_context_data=True, 
+                lambda _scope: old_app.__get__(self, cls),
+                unsafe_context_data=True,
                 span_origin=DjangoIntegration.origin,
             )
 
@@ -174,8 +174,8 @@ def wrap_async_view(callback):
             sentry_scope.profile.update_active_thread_id()
 
         with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER, 
-            description=request.resolver_match.view_name, 
+            op=OP.VIEW_RENDER,
+            description=request.resolver_match.view_name,
             origin=DjangoIntegration.origin,
         ):
             return await callback(request, *args, **kwargs)
