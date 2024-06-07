@@ -82,7 +82,7 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
+    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type", "span_origin")
 
     def __init__(
         self,
@@ -90,8 +90,9 @@ class SentryAsgiMiddleware:
         unsafe_context_data=False,
         transaction_style="endpoint",
         mechanism_type="asgi",
+        span_origin="manual",
     ):
-        # type: (Any, bool, str, str) -> None
+        # type: (Any, bool, str, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -124,6 +125,7 @@ class SentryAsgiMiddleware:
 
         self.transaction_style = transaction_style
         self.mechanism_type = mechanism_type
+        self.span_origin = span_origin
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -182,6 +184,7 @@ class SentryAsgiMiddleware:
                             op="{}.server".format(ty),
                             name=transaction_name,
                             source=transaction_source,
+                            origin=self.span_origin,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (continuing trace): %s",
@@ -205,7 +208,9 @@ class SentryAsgiMiddleware:
                     )
 
                     with sentry_sdk.start_transaction(
-                        transaction, custom_sampling_context={"asgi_scope": scope}
+                        transaction, 
+                        custom_sampling_context={"asgi_scope": scope}, 
+                        origin=self.span_origin,
                     ):
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
