@@ -5,20 +5,20 @@ from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    from opentelemetry import trace
-    from opentelemetry.instrumentation.distro import BaseDistro
-    from opentelemetry.propagate import set_global_textmap
-    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry import trace  # type: ignore
+    from opentelemetry.instrumentation.distro import BaseDistro  # type: ignore
+    from opentelemetry.propagate import set_global_textmap  # type: ignore
+    from opentelemetry.sdk.trace import TracerProvider  # type: ignore
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
 try:
-    from opentelemetry.instrumentation.django import DjangoInstrumentor
+    from opentelemetry.instrumentation.django import DjangoInstrumentor  # type: ignore
 except ImportError:
     DjangoInstrumentor = None
 
 try:
-    from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    from opentelemetry.instrumentation.flask import FlaskInstrumentor  # type: ignore
 except ImportError:
     FlaskInstrumentor = None
 
