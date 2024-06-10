@@ -16,38 +16,38 @@ except ImportError:
 
 needs_potel = pytest.mark.skipif(
     not instrumentation_packages_installed,
-    reason="needs experimental OTel support enabled",
+    reason="needs OTel instrumentor libraries installed",
 )
 
 
-def test_integration_enabled_if_option_is_on(sentry_init):
+def test_integration_enabled_if_option_is_on(sentry_init, reset_integrations):
     OpenTelemetryIntegration.setup_once = MagicMock()
     sentry_init(
         _experiments={
             "otel_powered_performance": True,
-        }
+        },
     )
     OpenTelemetryIntegration.setup_once.assert_called_once()
 
 
-def test_integration_not_enabled_if_option_is_off(sentry_init):
+def test_integration_not_enabled_if_option_is_off(sentry_init, reset_integrations):
     OpenTelemetryIntegration.setup_once = MagicMock()
     sentry_init(
         _experiments={
             "otel_powered_performance": False,
-        }
+        },
     )
     OpenTelemetryIntegration.setup_once.assert_not_called()
 
 
-def test_integration_not_enabled_if_option_is_missing(sentry_init):
+def test_integration_not_enabled_if_option_is_missing(sentry_init, reset_integrations):
     OpenTelemetryIntegration.setup_once = MagicMock()
     sentry_init()
     OpenTelemetryIntegration.setup_once.assert_not_called()
 
 
 @needs_potel
-def test_instrumentors_applied(sentry_init):
+def test_instrumentors_applied(sentry_init, reset_integrations):
     sentry_init(
         _experiments={
             "otel_powered_performance": True,
@@ -58,11 +58,16 @@ def test_instrumentors_applied(sentry_init):
 
 
 @needs_potel
-def test_post_patching(sentry_init):
+def test_post_patching(sentry_init, reset_integrations):
+    from flask import Flask
+
     sentry_init(
         _experiments={
             "otel_powered_performance": True,
         },
+        debug=True,
     )
 
-    assert False
+    app = Flask(__name__)
+    assert hasattr(app, "_is_instrumented_by_opentelemetry")
+    assert app._is_instrumented_by_opentelemetry is True
