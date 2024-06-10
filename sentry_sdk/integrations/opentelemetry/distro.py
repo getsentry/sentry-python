@@ -12,7 +12,6 @@ try:
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
-
 try:
     from opentelemetry.instrumentation.django import DjangoInstrumentor
 except ImportError:

@@ -1,6 +1,6 @@
-import pytest
-
 from unittest.mock import MagicMock
+
+import pytest
 
 from sentry_sdk.integrations.opentelemetry.integration import OpenTelemetryIntegration
 
