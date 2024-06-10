@@ -36,7 +36,7 @@ CONFIGURABLE_INSTRUMENTATIONS = {
 }
 
 
-class SentryDistro(BaseDistro):
+class SentryDistro(BaseDistro):  # type: ignore[misc]
     def _configure(self, **kwargs):
         # type: (Any) -> None
         provider = TracerProvider()
