@@ -70,9 +70,10 @@ class CeleryIntegration(Integration):
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
 
-        _patch_beat_apply_entry()
-        _patch_redbeat_maybe_due()
-        _setup_celery_beat_signals()
+        if monitor_beat_tasks:
+            _patch_beat_apply_entry()
+            _patch_redbeat_maybe_due()
+            _setup_celery_beat_signals()
 
     @staticmethod
     def setup_once():
@@ -166,11 +167,11 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     """
     updated_headers = original_headers.copy()
     with capture_internal_exceptions():
-        # if span is None (when the task was started by Celery Beat)
-        # this will return the trace headers from the scope.
-        headers = dict(
-            Scope.get_isolation_scope().iter_trace_propagation_headers(span=span)
-        )
+        headers = {}
+        if span is not None:
+            headers = dict(
+                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
+            )
 
         if monitor_beat_tasks:
             headers.update(
