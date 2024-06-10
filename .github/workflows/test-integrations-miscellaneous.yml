@@ -50,6 +50,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test opentelemetry_experimental latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry_experimental-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test pure_eval latest
         run: |
           set -x # print commands that are executed
@@ -98,6 +102,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test opentelemetry_experimental pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry_experimental" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test pure_eval pinned
         run: |
           set -x # print commands that are executed

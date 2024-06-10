@@ -8,7 +8,7 @@ import sys
 from importlib import import_module
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.opentelemetry.distro import SentryDistro
+from sentry_sdk.integrations.opentelemetry.distro import _SentryDistro
 from sentry_sdk.utils import logger, _get_installed_modules
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -47,7 +47,7 @@ class OpenTelemetryIntegration(Integration):
         original_classes = _record_unpatched_classes()
 
         try:
-            distro = SentryDistro()
+            distro = _SentryDistro()
             distro.configure()
             # XXX This does some initial checks before loading instrumentations
             # (checks OTEL_PYTHON_DISABLED_INSTRUMENTATIONS, checks version
