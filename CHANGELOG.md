@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.5.1
+
+This change fixes a regression in our cron monitoring feature, which caused cron checkins not to be sent. The regression appears to have been introduced in version 2.4.0.
+
+**We recommend that all users, who use Cron monitoring and are currently running sentry-python ≥2.4.0, upgrade to this release as soon as possible!**
+
+### Other fixes & improvements
+
+- feat(tracing): Warn if not-started transaction entered (#3003) by @szokeasaurusrex
+- test(scope): Ensure `last_event_id` cleared (#3124) by @szokeasaurusrex
+- fix(scope): Clear last_event_id on scope clear (#3124) by @szokeasaurusrex
+
 ## 2.5.0
 
 ### Various fixes & improvements
