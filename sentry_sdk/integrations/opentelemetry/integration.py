@@ -8,7 +8,12 @@ import sys
 from importlib import import_module
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.integrations.opentelemetry.potel_span_processor import (
+    PotelSentrySpanProcessor,
+)
+from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+    SentryContextVarsRuntimeContext,
+)
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.utils import logger, _get_installed_modules
 from sentry_sdk._types import TYPE_CHECKING
@@ -21,6 +26,7 @@ try:
     )
     from opentelemetry.propagate import set_global_textmap  # type: ignore
     from opentelemetry.sdk.trace import TracerProvider  # type: ignore
+    from opentelemetry import context
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
@@ -165,9 +171,14 @@ def _import_by_path(path):
 
 def _setup_sentry_tracing():
     # type: () -> None
+
+    # TODO-neel-potel make sure lifecycle is correct
+    # TODO-neel-potel contribute upstream so this is not necessary
+    context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
+
     provider = TracerProvider()
 
-    provider.add_span_processor(SentrySpanProcessor())
+    provider.add_span_processor(PotelSentrySpanProcessor())
 
     trace.set_tracer_provider(provider)
 
