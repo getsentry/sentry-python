@@ -1,3 +1,4 @@
+import os
 import pytest
 
 from celery.contrib.testing.worker import start_worker
@@ -15,6 +16,8 @@ def celery_config():
         "task_always_eager": False,
         "worker_concurrency": 1,
         "beat_scheduler": "tests.integrations.celery.integration_tests:ImmediateScheduler",
+        "task_create_missing_queues": True,
+        "task_routes": {'*': {'queue': f'queue_{os.getpid()}'}},
     }
 
 
