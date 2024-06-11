@@ -36,7 +36,7 @@ def expected_error():
                                     "abs_path": mock.ANY,
                                     "function": "_faulty_function",
                                     "module": "tests.test_new_scopes_compat_event",
-                                    "lineno": 244,
+                                    "lineno": 248,
                                     "pre_context": [
                                         "    return create_expected_transaction_event",
                                         "",
@@ -78,7 +78,7 @@ def expected_error():
                     "description": None,
                     "data": {
                         "thread.id": mock.ANY,
-                        "thread.name": mock.ANY,
+                        "thread.name": "MainThread",
                     },
                 },
                 "runtime": {
@@ -161,6 +161,10 @@ def expected_transaction():
                     "parent_span_id": None,
                     "op": "test_transaction_op",
                     "description": None,
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": "MainThread",
+                    },
                 },
                 "character": {
                     "name": "Mighty Fighter changed by before_send_transaction",
