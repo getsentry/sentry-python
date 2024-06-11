@@ -37,12 +37,14 @@ from abc import ABC, abstractmethod
 from collections import deque
 
 import sentry_sdk
-from sentry_sdk._compat import PY311
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.profiler.utils import (
+    DEFAULT_SAMPLING_FREQUENCY,
+    extract_stack,
+)
 from sentry_sdk.utils import (
     capture_internal_exception,
-    filename_for_module,
     get_current_thread_meta,
     is_gevent,
     is_valid_sample_rate,
@@ -52,7 +54,6 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from types import FrameType
     from typing import Any
     from typing import Callable
     from typing import Deque
@@ -60,15 +61,19 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import Set
-    from typing import Sequence
-    from typing import Tuple
     from typing import Type
     from typing_extensions import TypedDict
 
-    import sentry_sdk.tracing
+    from sentry_sdk.profiler.utils import (
+        ProcessedStack,
+        ProcessedFrame,
+        ProcessedThreadMetadata,
+        FrameId,
+        StackId,
+        ThreadId,
+        ExtractedSample,
+    )
     from sentry_sdk._types import Event, SamplingContext, ProfilerMode
-
-    ThreadId = str
 
     ProcessedSample = TypedDict(
         "ProcessedSample",
@@ -77,24 +82,6 @@ if TYPE_CHECKING:
             "thread_id": ThreadId,
             "stack_id": int,
         },
-    )
-
-    ProcessedStack = List[int]
-
-    ProcessedFrame = TypedDict(
-        "ProcessedFrame",
-        {
-            "abs_path": str,
-            "filename": Optional[str],
-            "function": str,
-            "lineno": int,
-            "module": Optional[str],
-        },
-    )
-
-    ProcessedThreadMetadata = TypedDict(
-        "ProcessedThreadMetadata",
-        {"name": str},
     )
 
     ProcessedProfile = TypedDict(
@@ -106,27 +93,6 @@ if TYPE_CHECKING:
             "thread_metadata": Dict[ThreadId, ProcessedThreadMetadata],
         },
     )
-
-    ProfileContext = TypedDict(
-        "ProfileContext",
-        {"profile_id": str},
-    )
-
-    FrameId = Tuple[
-        str,  # abs_path
-        int,  # lineno
-        str,  # function
-    ]
-    FrameIds = Tuple[FrameId, ...]
-
-    # The exact value of this id is not very meaningful. The purpose
-    # of this id is to give us a compact and unique identifier for a
-    # raw stack that can be used as a key to a dictionary so that it
-    # can be used during the sampled format generation.
-    StackId = Tuple[int, int]
-
-    ExtractedStack = Tuple[StackId, FrameIds, List[ProcessedFrame]]
-    ExtractedSample = Sequence[Tuple[ThreadId, ExtractedStack]]
 
 
 try:
@@ -142,10 +108,6 @@ except ImportError:
 
 
 _scheduler = None  # type: Optional[Scheduler]
-
-# The default sampling frequency to use. This is set at 101 in order to
-# mitigate the effects of lockstep sampling.
-DEFAULT_SAMPLING_FREQUENCY = 101
 
 
 # The minimum number of unique samples that must exist in a profile to be
@@ -238,155 +200,14 @@ def teardown_profiler():
     _scheduler = None
 
 
-# We want to impose a stack depth limit so that samples aren't too large.
-MAX_STACK_DEPTH = 128
-
-
-def extract_stack(
-    raw_frame,  # type: Optional[FrameType]
-    cache,  # type: LRUCache
-    cwd,  # type: str
-    max_stack_depth=MAX_STACK_DEPTH,  # type: int
-):
-    # type: (...) -> ExtractedStack
-    """
-    Extracts the stack starting the specified frame. The extracted stack
-    assumes the specified frame is the top of the stack, and works back
-    to the bottom of the stack.
-
-    In the event that the stack is more than `MAX_STACK_DEPTH` frames deep,
-    only the first `MAX_STACK_DEPTH` frames will be returned.
-    """
-
-    raw_frames = deque(maxlen=max_stack_depth)  # type: Deque[FrameType]
-
-    while raw_frame is not None:
-        f_back = raw_frame.f_back
-        raw_frames.append(raw_frame)
-        raw_frame = f_back
-
-    frame_ids = tuple(frame_id(raw_frame) for raw_frame in raw_frames)
-    frames = []
-    for i, fid in enumerate(frame_ids):
-        frame = cache.get(fid)
-        if frame is None:
-            frame = extract_frame(fid, raw_frames[i], cwd)
-            cache.set(fid, frame)
-        frames.append(frame)
-
-    # Instead of mapping the stack into frame ids and hashing
-    # that as a tuple, we can directly hash the stack.
-    # This saves us from having to generate yet another list.
-    # Additionally, using the stack as the key directly is
-    # costly because the stack can be large, so we pre-hash
-    # the stack, and use the hash as the key as this will be
-    # needed a few times to improve performance.
-    #
-    # To Reduce the likelihood of hash collisions, we include
-    # the stack depth. This means that only stacks of the same
-    # depth can suffer from hash collisions.
-    stack_id = len(raw_frames), hash(frame_ids)
-
-    return stack_id, frame_ids, frames
-
-
-def frame_id(raw_frame):
-    # type: (FrameType) -> FrameId
-    return (raw_frame.f_code.co_filename, raw_frame.f_lineno, get_frame_name(raw_frame))
-
-
-def extract_frame(fid, raw_frame, cwd):
-    # type: (FrameId, FrameType, str) -> ProcessedFrame
-    abs_path = raw_frame.f_code.co_filename
-
-    try:
-        module = raw_frame.f_globals["__name__"]
-    except Exception:
-        module = None
-
-    # namedtuples can be many times slower when initialing
-    # and accessing attribute so we opt to use a tuple here instead
-    return {
-        # This originally was `os.path.abspath(abs_path)` but that had
-        # a large performance overhead.
-        #
-        # According to docs, this is equivalent to
-        # `os.path.normpath(os.path.join(os.getcwd(), path))`.
-        # The `os.getcwd()` call is slow here, so we precompute it.
-        #
-        # Additionally, since we are using normalized path already,
-        # we skip calling `os.path.normpath` entirely.
-        "abs_path": os.path.join(cwd, abs_path),
-        "module": module,
-        "filename": filename_for_module(module, abs_path) or None,
-        "function": fid[2],
-        "lineno": raw_frame.f_lineno,
-    }
-
-
-if PY311:
-
-    def get_frame_name(frame):
-        # type: (FrameType) -> str
-        return frame.f_code.co_qualname
-
-else:
-
-    def get_frame_name(frame):
-        # type: (FrameType) -> str
-
-        f_code = frame.f_code
-        co_varnames = f_code.co_varnames
-
-        # co_name only contains the frame name.  If the frame was a method,
-        # the class name will NOT be included.
-        name = f_code.co_name
-
-        # if it was a method, we can get the class name by inspecting
-        # the f_locals for the `self` argument
-        try:
-            if (
-                # the co_varnames start with the frame's positional arguments
-                # and we expect the first to be `self` if its an instance method
-                co_varnames
-                and co_varnames[0] == "self"
-                and "self" in frame.f_locals
-            ):
-                for cls in frame.f_locals["self"].__class__.__mro__:
-                    if name in cls.__dict__:
-                        return "{}.{}".format(cls.__name__, name)
-        except (AttributeError, ValueError):
-            pass
-
-        # if it was a class method, (decorated with `@classmethod`)
-        # we can get the class name by inspecting the f_locals for the `cls` argument
-        try:
-            if (
-                # the co_varnames start with the frame's positional arguments
-                # and we expect the first to be `cls` if its a class method
-                co_varnames
-                and co_varnames[0] == "cls"
-                and "cls" in frame.f_locals
-            ):
-                for cls in frame.f_locals["cls"].__mro__:
-                    if name in cls.__dict__:
-                        return "{}.{}".format(cls.__name__, name)
-        except (AttributeError, ValueError):
-            pass
-
-        # nothing we can do if it is a staticmethod (decorated with @staticmethod)
-
-        # we've done all we can, time to give up and return what we have
-        return name
-
-
 MAX_PROFILE_DURATION_NS = int(3e10)  # 30 seconds
 
 
 class Profile:
     def __init__(
         self,
-        transaction,  # type: sentry_sdk.tracing.Transaction
+        sampled,  # type: Optional[bool]
+        start_ns,  # type: int
         hub=None,  # type: Optional[sentry_sdk.Hub]
         scheduler=None,  # type: Optional[Scheduler]
     ):
@@ -396,11 +217,7 @@ class Profile:
 
         self.event_id = uuid.uuid4().hex  # type: str
 
-        # Here, we assume that the sampling decision on the transaction has been finalized.
-        #
-        # We cannot keep a reference to the transaction around here because it'll create
-        # a reference cycle. So we opt to pull out just the necessary attributes.
-        self.sampled = transaction.sampled  # type: Optional[bool]
+        self.sampled = sampled  # type: Optional[bool]
 
         # Various framework integrations are capable of overwriting the active thread id.
         # If it is set to `None` at the end of the profile, we fall back to the default.
@@ -408,7 +225,7 @@ class Profile:
         self.active_thread_id = None  # type: Optional[int]
 
         try:
-            self.start_ns = transaction._start_timestamp_monotonic_ns  # type: int
+            self.start_ns = start_ns  # type: int
         except AttributeError:
             self.start_ns = 0
 
@@ -422,8 +239,6 @@ class Profile:
         self.samples = []  # type: List[ProcessedSample]
 
         self.unique_samples = 0
-
-        transaction._profile = self
 
     def update_active_thread_id(self):
         # type: () -> None
