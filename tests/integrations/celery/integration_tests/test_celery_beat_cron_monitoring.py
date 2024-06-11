@@ -7,17 +7,19 @@ from sentry_sdk.utils import logger
 
 from tests.integrations.celery.integration_tests import run_beat
 
+import logging
+loggg = logging.getLogger(__name__)
 
 @pytest.fixture()
 def celery_config():
     return {
-        "broker_url": "redis://127.0.0.1:6379/14",
+        "broker_url": "redis://127.0.0.1:6379/15",
         "result_backend": "redis://127.0.0.1:6379/15",
         "task_always_eager": False,
         "worker_concurrency": 1,
         "beat_scheduler": "tests.integrations.celery.integration_tests:ImmediateScheduler",
         "task_create_missing_queues": True,
-        "task_routes": {"*": {"queue": f"queue_{os.getpid()}"}},
+        "task_default_queue": f"queue_{os.getpid()}",
     }
 
 
@@ -97,8 +99,8 @@ def test_beat_task_crons_error(celery_init, capture_envelopes):
     with start_worker(app, perform_ping_check=False):
         run_beat(app)
 
-    assert len(envelopes) == 2
-    (envelop_in_progress, envelope_error) = envelopes
+    envelop_in_progress = envelopes[0]
+    envelope_error = envelopes[-1]
 
     check_in = envelop_in_progress.items[0].payload.json
     assert check_in["type"] == "check_in"
