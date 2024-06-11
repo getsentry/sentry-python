@@ -198,6 +198,43 @@ def test_cache_data(sentry_init, capture_events):
     assert spans[5]["op"] == "db.redis"  # we ignore db spans in this test.
 
 
+def test_cache_prefixes(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            RedisIntegration(
+                cache_prefixes=["yes"],
+            ),
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with sentry_sdk.start_transaction():
+        connection.mget("yes", "no")
+        connection.mget("no", 1, "yes")
+        connection.mget("no", "yes.1", "yes.2")
+        connection.mget("no.1", "no.2", "no.3")
+        connection.mget("no.1", "no.2", "no.actually.yes")
+        connection.mget(b"no.3", b"yes.5")
+        connection.mget(uuid.uuid4().bytes)
+        connection.mget(uuid.uuid4().bytes, "yes")
+
+    (event,) = events
+
+    spans = event["spans"]
+    assert len(spans) == 13  # 8 db spans + 5 cache spans
+
+    cache_spans = [span for span in spans if span["op"] == "cache.get"]
+    assert len(cache_spans) == 5
+
+    assert cache_spans[0]["description"] == "yes, no"
+    assert cache_spans[1]["description"] == "no, 1, yes"
+    assert cache_spans[2]["description"] == "no, yes.1, yes.2"
+    assert cache_spans[3]["description"] == "no.3, yes.5"
+    assert cache_spans[4]["description"] == ", yes"
+
+
 @pytest.mark.parametrize(
     "method_name,args,kwargs,expected_key",
     [
@@ -244,6 +281,12 @@ def test_cache_data(sentry_init, capture_events):
             None,
             (b"\x00c\x0f\xeaC\xe1L\x1c\xbff\xcb\xcc\xc1\xed\xc6\t",),
         ),
+        (
+            "get",
+            [123],
+            None,
+            (123,),
+        ),
     ],
 )
 def test_get_safe_key(method_name, args, kwargs, expected_key):
@@ -266,6 +309,9 @@ def test_get_safe_key(method_name, args, kwargs, expected_key):
         ),
         (["bla", "blub", "foo"], "bla, blub, foo"),
         ([uuid.uuid4().bytes], ""),
+        ({"key1": 1, "key2": 2}, "key1, key2"),
+        (1, "1"),
+        ([1, 2, 3, b"hello"], "1, 2, 3, hello"),
     ],
 )
 def test_key_as_string(key, expected_key):

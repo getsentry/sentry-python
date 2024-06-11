@@ -856,3 +856,16 @@ def test_last_event_id_transaction(sentry_init):
         pass
 
     assert Scope.last_event_id() is None, "Transaction should not set last_event_id"
+
+
+def test_last_event_id_cleared(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    # Make sure last_event_id is set
+    sentry_sdk.capture_exception(Exception("test"))
+    assert Scope.last_event_id() is not None
+
+    # Clearing the isolation scope should clear the last_event_id
+    Scope.get_isolation_scope().clear()
+
+    assert Scope.last_event_id() is None, "last_event_id should be cleared"

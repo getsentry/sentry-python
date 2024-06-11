@@ -401,3 +401,19 @@ def test_transaction_dropeed_sampled_false(sentry_init):
         mock_logger.debug.assert_any_call(
             "Discarding transaction because it was not started with sentry_sdk.start_transaction"
         )
+
+
+def test_transaction_not_started_warning(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction()
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with tx:
+            pass
+
+    mock_logger.warning.assert_any_call(
+        "Transaction was entered without being started with sentry_sdk.start_transaction."
+        "The transaction will not be sent to Sentry. To fix, start the transaction by"
+        "passing it to sentry_sdk.start_transaction."
+    )

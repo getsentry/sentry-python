@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue
+from sentry_sdk.utils import AnnotatedValue, logger
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from typing import MutableMapping
     from typing import Optional
     from typing import Union
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, HttpStatusCodeRange
 
 
 SENSITIVE_ENV_KEYS = (
@@ -201,3 +201,22 @@ def _filter_headers(headers):
         )
         for k, v in headers.items()
     }
+
+
+def _in_http_status_code_range(code, code_ranges):
+    # type: (int, list[HttpStatusCodeRange]) -> bool
+    for target in code_ranges:
+        if isinstance(target, int):
+            if code == target:
+                return True
+            continue
+
+        try:
+            if code in target:
+                return True
+        except TypeError:
+            logger.warning(
+                "failed_request_status_codes has to be a list of integers or containers"
+            )
+
+    return False

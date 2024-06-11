@@ -208,9 +208,6 @@ class Scope(object):
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
-        # self._last_event_id is only applicable to isolation scopes
-        self._last_event_id = None  # type: Optional[str]
-
     def __copy__(self):
         # type: () -> Scope
         """
@@ -606,10 +603,9 @@ class Scope(object):
     def iter_trace_propagation_headers(self, *args, **kwargs):
         # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
         """
-        Return HTTP headers which allow propagation of trace data.
-
-        If a span is given, the trace data will taken from the span.
-        If no span is given, the trace data is taken from the scope.
+        Return HTTP headers which allow propagation of trace data. Data taken
+        from the span representing the request, if available, or the current
+        span on the scope if not.
         """
         client = Scope.get_client()
         if not client.options.get("propagate_traces"):
@@ -679,6 +675,9 @@ class Scope(object):
         self._profile = None  # type: Optional[Profile]
 
         self._propagation_context = None
+
+        # self._last_event_id is only applicable to isolation scopes
+        self._last_event_id = None  # type: Optional[str]
 
     @_attr_setter
     def level(self, value):
