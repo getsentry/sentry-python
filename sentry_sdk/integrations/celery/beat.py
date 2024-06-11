@@ -206,13 +206,9 @@ def _patch_redbeat_maybe_due():
     RedBeatScheduler.maybe_due = _wrap_beat_scheduler(RedBeatScheduler.maybe_due)
 
 
-def _setup_celery_beat_signals():
-    # type: () -> None
-    from sentry_sdk.integrations.celery import CeleryIntegration
-
-    integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-
-    if integration is not None and integration.monitor_beat_tasks:
+def _setup_celery_beat_signals(monitor_beat_tasks):
+    # type: (bool) -> None
+    if monitor_beat_tasks:
         task_success.connect(crons_task_success)
         task_failure.connect(crons_task_failure)
         task_retry.connect(crons_task_retry)

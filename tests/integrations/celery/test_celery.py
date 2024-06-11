@@ -26,9 +26,19 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", **kwargs):
+    def inner(
+        propagate_traces=True,
+        backend="always_eager",
+        monitor_beat_tasks=False,
+        **kwargs,
+    ):
         sentry_init(
-            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
+            integrations=[
+                CeleryIntegration(
+                    propagate_traces=propagate_traces,
+                    monitor_beat_tasks=monitor_beat_tasks,
+                )
+            ],
             **kwargs,
         )
         celery = Celery(__name__)

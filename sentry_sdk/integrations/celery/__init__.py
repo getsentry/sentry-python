@@ -72,7 +72,7 @@ class CeleryIntegration(Integration):
 
         _patch_beat_apply_entry()
         _patch_redbeat_maybe_due()
-        _setup_celery_beat_signals()
+        _setup_celery_beat_signals(monitor_beat_tasks)
 
     @staticmethod
     def setup_once():
