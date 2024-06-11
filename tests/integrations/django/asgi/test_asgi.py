@@ -95,7 +95,9 @@ async def test_async_views(sentry_init, capture_events, application):
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, application):
-    with mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
+    ):
         sentry_init(
             integrations=[DjangoIntegration()],
             traces_sample_rate=1.0,

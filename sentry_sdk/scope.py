@@ -10,7 +10,8 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.profiler import Profile
+from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
+from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
@@ -1000,6 +1001,8 @@ class Scope(object):
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
+        try_autostart_continuous_profiler()
+
         custom_sampling_context = custom_sampling_context or {}
 
         # kwargs at this point has type TransactionKwargs, since we have removed
@@ -1019,8 +1022,13 @@ class Scope(object):
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
-        profile = Profile(transaction)
-        profile._set_initial_sampling_decision(sampling_context=sampling_context)
+        if transaction.sampled:
+            profile = Profile(
+                transaction.sampled, transaction._start_timestamp_monotonic_ns
+            )
+            profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
+            transaction._profile = profile
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
