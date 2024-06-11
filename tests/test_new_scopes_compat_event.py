@@ -492,6 +492,7 @@ def test_event5(sentry_init, capture_envelopes, expected_error, expected_transac
     transaction = transaction_envelope.get_transaction_event()
     attachment = error_envelope.items[-1]
 
+    assert error["contexts"] == expected_error(trx, span)["contexts"]
     assert error == expected_error(trx, span)
     assert transaction == expected_transaction(trx, span)
     assert attachment.headers == {
