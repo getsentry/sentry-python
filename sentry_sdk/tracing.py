@@ -668,8 +668,8 @@ class Span:
         if thread_name is not None:
             data["thread.name"] = thread_name
 
-        # if data:
-        #     rv["data"] = data
+        if data:
+            rv["data"] = data
 
         return rv
 

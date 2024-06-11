@@ -76,10 +76,10 @@ def expected_error():
                     "parent_span_id": span.parent_span_id,
                     "op": "test_span",
                     "description": None,
-                    # "data": {
-                    #     "thread.id": mock.ANY,
-                    #     "thread.name": mock.ANY,
-                    # },
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": mock.ANY,
+                    },
                 },
                 "runtime": {
                     "name": "CPython",
