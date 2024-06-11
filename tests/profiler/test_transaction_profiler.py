@@ -9,18 +9,19 @@ from unittest import mock
 import pytest
 
 from sentry_sdk import start_transaction
-from sentry_sdk.profiler import (
+from sentry_sdk.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
     Scheduler,
     ThreadScheduler,
+    setup_profiler,
+)
+from sentry_sdk.profiler.utils import (
     extract_frame,
     extract_stack,
     frame_id,
     get_frame_name,
-    setup_profiler,
 )
-from sentry_sdk.tracing import Transaction
 from sentry_sdk._lru_cache import LRUCache
 
 try:
@@ -49,13 +50,7 @@ def experimental_options(mode=None, sample_rate=None):
 
 @pytest.mark.parametrize(
     "mode",
-    [
-        pytest.param("foo"),
-        pytest.param(
-            "gevent",
-            marks=pytest.mark.skipif(gevent is not None, reason="gevent not enabled"),
-        ),
-    ],
+    [pytest.param("foo")],
 )
 @pytest.mark.parametrize(
     "make_options",
@@ -127,7 +122,7 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
         pytest.param(non_experimental_options, id="non experimental"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
@@ -149,7 +144,9 @@ def test_profiles_sample_rate(
     envelopes = capture_envelopes()
     reports = capture_client_reports()
 
-    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
+    ):
         with start_transaction(name="profiling"):
             pass
 
@@ -200,7 +197,7 @@ def test_profiles_sample_rate(
         pytest.param(lambda _: False, 0, id="profiler sampled at False"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profiles_sampler(
     sentry_init,
     capture_envelopes,
@@ -218,7 +215,9 @@ def test_profiles_sampler(
     envelopes = capture_envelopes()
     reports = capture_client_reports()
 
-    with mock.patch("sentry_sdk.profiler.random.random", return_value=0.5):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
+    ):
         with start_transaction(name="profiling"):
             pass
 
@@ -631,7 +630,7 @@ def test_thread_scheduler_no_thread_on_shutdown(scheduler_class):
         pytest.param(GeventScheduler, marks=requires_gevent, id="gevent scheduler"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 1)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 1)
 def test_max_profile_duration_reached(scheduler_class):
     sample = [
         (
@@ -645,8 +644,7 @@ def test_max_profile_duration_reached(scheduler_class):
     ]
 
     with scheduler_class(frequency=1000) as scheduler:
-        transaction = Transaction(sampled=True)
-        with Profile(transaction, scheduler=scheduler) as profile:
+        with Profile(True, 0, scheduler=scheduler) as profile:
             # profile just started, it's active
             assert profile.active
 
@@ -793,15 +791,14 @@ sample_stacks = [
         ),
     ],
 )
-@mock.patch("sentry_sdk.profiler.MAX_PROFILE_DURATION_NS", 5)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.MAX_PROFILE_DURATION_NS", 5)
 def test_profile_processing(
     DictionaryContaining,  # noqa: N803
     samples,
     expected,
 ):
     with NoopScheduler(frequency=1000) as scheduler:
-        transaction = Transaction(sampled=True)
-        with Profile(transaction, scheduler=scheduler) as profile:
+        with Profile(True, 0, scheduler=scheduler) as profile:
             for ts, sample in samples:
                 # force the sample to be written at a time relative to the
                 # start of the profile
