@@ -8,7 +8,9 @@ from sentry_sdk.utils import logger
 from tests.integrations.celery.integration_tests import run_beat
 
 import logging
+
 loggg = logging.getLogger(__name__)
+
 
 @pytest.fixture()
 def celery_config():
