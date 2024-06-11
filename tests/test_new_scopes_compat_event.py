@@ -36,7 +36,7 @@ def expected_error():
                                     "abs_path": mock.ANY,
                                     "function": "_faulty_function",
                                     "module": "tests.test_new_scopes_compat_event",
-                                    "lineno": 240,
+                                    "lineno": 244,
                                     "pre_context": [
                                         "    return create_expected_transaction_event",
                                         "",
