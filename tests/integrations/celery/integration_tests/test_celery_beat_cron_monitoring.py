@@ -53,6 +53,44 @@ def celery_init(sentry_init, celery_config):
 
 
 @pytest.mark.forked
+def test_explanation(celery_init, capture_envelopes):
+    """
+    This is a dummy test for explaining how to test using Celery Beat
+    """
+
+    # First initialize a Celery app.
+    # You can give the options of CeleryIntegrations
+    # and the options for `sentry_dks.init` as keyword arguments.
+    # See the celery_init fixture for details.
+    app = celery_init(
+        monitor_beat_tasks=True,
+    )
+
+    # Capture envelopes.
+    envelopes = capture_envelopes()
+
+    # Define the task you want to run
+    @app.task
+    def test_task():
+        logger.info("Running test_task")
+
+    # Add the task to the beat schedule
+    app.add_periodic_task(60.0, test_task.s(), name="success_from_beat")
+
+    # Start a Celery worker
+    with start_worker(app, perform_ping_check=False):
+        # And start a Celery Beat instance
+        # This Celery Beat will start the task above immediately
+        # after start for the first time
+        # By default Celery Beat is terminated after 1 second.
+        # See `run_beat` function on how to change this.
+        run_beat(app)
+
+    # After the Celery Beat is terminated, you can check the envelopes
+    assert len(envelopes) >= 0
+
+
+@pytest.mark.forked
 def test_beat_task_crons_success(celery_init, capture_envelopes):
     app = celery_init(
         monitor_beat_tasks=True,

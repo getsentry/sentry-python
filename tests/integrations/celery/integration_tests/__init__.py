@@ -34,13 +34,24 @@ def kill_beat(beat_pid_file, delay_seconds=1):
     os.kill(pid, signal.SIGTERM)
 
 
-def run_beat(celery_app, loglevel="warning", quiet=True):
+def run_beat(celery_app, runtime_seconds=1, loglevel="warning", quiet=True):
     """
     Run Celery Beat that immediately starts tasks.
+    The Celery Beat instance is automatically terminated after `runtime_seconds`.
     """
     logger.info("Starting Celery Beat...")
     pid_file = f"/tmp/celery-beat-{os.getpid()}.pid"
-    t = threading.Thread(target=kill_beat, args=(pid_file,))
+
+    t = threading.Thread(
+        target=kill_beat,
+        args=(pid_file,),
+        kwargs={"delay_seconds": runtime_seconds},
+    )
     t.start()
-    beat_instance = celery_app.Beat(loglevel=loglevel, quiet=quiet, pidfile=pid_file)
+
+    beat_instance = celery_app.Beat(
+        loglevel=loglevel,
+        quiet=quiet,
+        pidfile=pid_file,
+    )
     beat_instance.run()
