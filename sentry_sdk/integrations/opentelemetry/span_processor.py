@@ -119,11 +119,6 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not client.dsn:
             return
 
-        try:
-            _ = Dsn(client.dsn)
-        except Exception:
-            return
-
         if client.options["instrumenter"] != INSTRUMENTER.OTEL:
             return
 
@@ -223,8 +218,12 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
 
         dsn_url = None
         client = get_client()
+
         if client.dsn:
-            dsn_url = Dsn(client.dsn).netloc
+            try:
+                dsn_url = Dsn(client.dsn).netloc
+            except Exception:
+                pass
 
         if otel_span_url and dsn_url in otel_span_url:
             return True
