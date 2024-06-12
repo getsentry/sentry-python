@@ -51,7 +51,6 @@ CONFIGURABLE_INSTRUMENTATIONS = {
 class _SentryDistro(BaseDistro):  # type: ignore[misc]
     def _configure(self, **kwargs):
         # type: (Any) -> None
-        # TODO-neel-potel make sure lifecycle is correct
         # TODO-neel-potel contribute upstream so this is not necessary
         context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
         provider = TracerProvider()
