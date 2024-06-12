@@ -172,7 +172,6 @@ def _import_by_path(path):
 def _setup_sentry_tracing():
     # type: () -> None
 
-    # TODO-neel-potel make sure lifecycle is correct
     # TODO-neel-potel contribute upstream so this is not necessary
     context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
 
