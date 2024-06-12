@@ -126,6 +126,11 @@ def _patch_beat_apply_entry():
 
     original_apply_entry = Scheduler.apply_entry
 
+    # Cant use __name__ here, because some of our tests mock original_apply_entry
+    already_patched = "sentry_apply_entry" in str(original_apply_entry)
+    if already_patched:
+        return
+
     def sentry_apply_entry(*args, **kwargs):
         # type: (*Any, **Any) -> None
         scheduler, schedule_entry = args
@@ -183,6 +188,11 @@ def _patch_redbeat_maybe_due():
     from sentry_sdk.integrations.celery import CeleryIntegration
 
     original_maybe_due = RedBeatScheduler.maybe_due
+
+    # Cant use __name__ here, because some of our tests mock original_apply_entry
+    already_patched = "sentry_maybe_due" in str(original_maybe_due)
+    if already_patched:
+        return
 
     def sentry_maybe_due(*args, **kwargs):
         # type: (*Any, **Any) -> None

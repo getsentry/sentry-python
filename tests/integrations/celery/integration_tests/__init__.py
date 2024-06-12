@@ -1,5 +1,6 @@
 import os
 import signal
+import tempfile
 import threading
 import time
 
@@ -40,7 +41,7 @@ def run_beat(celery_app, runtime_seconds=1, loglevel="warning", quiet=True):
     The Celery Beat instance is automatically terminated after `runtime_seconds`.
     """
     logger.info("Starting Celery Beat...")
-    pid_file = f"/tmp/celery-beat-{os.getpid()}.pid"
+    pid_file = os.path.join(tempfile.mkdtemp(), f"celery-beat-{os.getpid()}.pid")
 
     t = threading.Thread(
         target=kill_beat,

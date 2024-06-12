@@ -7,19 +7,19 @@ from sentry_sdk.utils import logger
 
 from tests.integrations.celery.integration_tests import run_beat
 
-import logging
 
-loggg = logging.getLogger(__name__)
+REDIS_SERVER = "redis://127.0.0.1:6379"
+REDIS_DB = 15
 
 
 @pytest.fixture()
 def celery_config():
     return {
-        "broker_url": "redis://127.0.0.1:6379/15",
-        "result_backend": "redis://127.0.0.1:6379/15",
-        "task_always_eager": False,
         "worker_concurrency": 1,
+        "broker_url": f"{REDIS_SERVER}/{REDIS_DB}",
+        "result_backend": f"{REDIS_SERVER}/{REDIS_DB}",
         "beat_scheduler": "tests.integrations.celery.integration_tests:ImmediateScheduler",
+        "task_always_eager": False,
         "task_create_missing_queues": True,
         "task_default_queue": f"queue_{os.getpid()}",
     }
