@@ -77,6 +77,10 @@ def expected_error():
                     "op": "test_span",
                     "origin": "manual",
                     "description": None,
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": "MainThread",
+                    },
                 },
                 "runtime": {
                     "name": "CPython",
@@ -159,6 +163,10 @@ def expected_transaction():
                     "op": "test_transaction_op",
                     "origin": "manual",
                     "description": None,
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": "MainThread",
+                    },
                 },
                 "character": {
                     "name": "Mighty Fighter changed by before_send_transaction",
