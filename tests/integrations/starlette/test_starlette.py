@@ -1081,7 +1081,6 @@ def test_transaction_name_in_middleware(
     )
 
 
-<<<<<<< antonpirker/trace-origin-in-integrations
 def test_span_origin(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration()],
@@ -1103,7 +1102,8 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
     for span in event["spans"]:
         assert span["origin"] == "auto.http.starlette"
-=======
+
+
 @pytest.mark.parametrize(
     "failed_request_status_codes,status_code,expected_error",
     [
@@ -1156,4 +1156,3 @@ def test_configurable_status_codes(
         assert len(events) == 1
     else:
         assert not events
->>>>>>> antonpirker/trace-origin
