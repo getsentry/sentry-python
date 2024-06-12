@@ -1,4 +1,4 @@
-from opentelemetry.trace import Span  # type: ignore
+from opentelemetry.sdk.trace import ReadableSpan  # type: ignore
 
 
 class PotelSentrySpanExporter:
@@ -11,7 +11,7 @@ class PotelSentrySpanExporter:
         pass
 
     def export(self, span):
-        # type: (Span) -> None
+        # type: (ReadableSpan) -> None
         pass
 
     def flush(self, timeout_millis):

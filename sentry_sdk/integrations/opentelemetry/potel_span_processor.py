@@ -1,10 +1,12 @@
-from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
+from opentelemetry.trace import INVALID_SPAN, get_current_span  # type: ignore
 from opentelemetry.context import Context  # type: ignore
-from opentelemetry.trace import Span  # type: ignore
+from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor  # type: ignore
 
+from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
 from sentry_sdk.integrations.opentelemetry.potel_span_exporter import (
     PotelSentrySpanExporter,
 )
+
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -30,9 +32,19 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
         pass
+        # if is_sentry_span(span):
+        #     return
+
+        # parent_span = get_current_span(parent_context)
+
+        # # TODO-neel-potel check remote logic with propagation and incoming trace later
+        # if parent_span != INVALID_SPAN:
+        #     # TODO-neel once we add our apis, we might need to store references on the span
+        #     # directly, see if we need to do this like JS
+        #     pass
 
     def on_end(self, span):
-        # type: (Span) -> None
+        # type: (ReadableSpan) -> None
         self._exporter.export(span)
 
     # TODO-neel-potel not sure we need a clear like JS

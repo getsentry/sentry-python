@@ -22,9 +22,9 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
+from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
-from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
 from urllib3.util import parse_url as urlparse
@@ -125,7 +125,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         if not otel_span.get_span_context().is_valid:
             return
 
-        if self._is_sentry_span(otel_span):
+        if is_sentry_span(otel_span):
             return
 
         trace_data = self._get_trace_data(otel_span, parent_context)
@@ -207,28 +207,6 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
         )  # OTel spans have nanosecond precision
         self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
         self._prune_old_spans()
-
-    def _is_sentry_span(self, otel_span):
-        # type: (OTelSpan) -> bool
-        """
-        Break infinite loop:
-        HTTP requests to Sentry are caught by OTel and send again to Sentry.
-        """
-        otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
-
-        dsn_url = None
-        client = get_client()
-
-        if client.dsn:
-            try:
-                dsn_url = Dsn(client.dsn).netloc
-            except Exception:
-                pass
-
-        if otel_span_url and dsn_url in otel_span_url:
-            return True
-
-        return False
 
     def _get_otel_context(self, otel_span):
         # type: (OTelSpan) -> Dict[str, Any]
