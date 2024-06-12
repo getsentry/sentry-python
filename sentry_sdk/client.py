@@ -763,6 +763,9 @@ class _Client(BaseClient):
         if self.transport is None:
             return None
 
+        if is_transaction:
+            breakpoint()
+
         self.transport.capture_envelope(envelope)
 
         return event_id

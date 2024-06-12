@@ -310,6 +310,7 @@ class Span:
 
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        breakpoint()
         if value is not None:
             self.set_status("internal_error")
 

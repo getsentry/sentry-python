@@ -210,6 +210,7 @@ def capture_events(monkeypatch):
         def append_event(envelope):
             for item in envelope:
                 if item.headers.get("type") in ("event", "transaction"):
+                    print(f"append_event: {item}")
                     events.append(item.payload.json)
             return old_capture_envelope(envelope)
 
