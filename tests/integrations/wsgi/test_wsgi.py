@@ -412,7 +412,7 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_sent(
     sentry_init,
     capture_envelopes,

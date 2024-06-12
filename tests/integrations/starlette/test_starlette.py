@@ -25,6 +25,7 @@ from starlette.authentication import (
     AuthenticationError,
     SimpleUser,
 )
+from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -258,7 +259,7 @@ class SamplePartialReceiveSendMiddleware:
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_content_length(sentry_init):
+async def test_starletterequestextractor_content_length(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
@@ -270,7 +271,7 @@ async def test_starlettrequestextractor_content_length(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_cookies(sentry_init):
+async def test_starletterequestextractor_cookies(sentry_init):
     starlette_request = starlette.requests.Request(SCOPE)
     extractor = StarletteRequestExtractor(starlette_request)
 
@@ -281,7 +282,7 @@ async def test_starlettrequestextractor_cookies(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_json(sentry_init):
+async def test_starletterequestextractor_json(sentry_init):
     starlette_request = starlette.requests.Request(SCOPE)
 
     # Mocking async `_receive()` that works in Python 3.7+
@@ -295,7 +296,7 @@ async def test_starlettrequestextractor_json(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_form(sentry_init):
+async def test_starletterequestextractor_form(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
@@ -323,7 +324,7 @@ async def test_starlettrequestextractor_form(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_body_consumed_twice(
+async def test_starletterequestextractor_body_consumed_twice(
     sentry_init, capture_events
 ):
     """
@@ -361,7 +362,7 @@ async def test_starlettrequestextractor_body_consumed_twice(
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init):
+async def test_starletterequestextractor_extract_request_info_too_big(sentry_init):
     sentry_init(
         send_default_pii=True,
         integrations=[StarletteIntegration()],
@@ -392,7 +393,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_extract_request_info(sentry_init):
+async def test_starletterequestextractor_extract_request_info(sentry_init):
     sentry_init(
         send_default_pii=True,
         integrations=[StarletteIntegration()],
@@ -423,7 +424,7 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init):
+async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init):
     sentry_init(
         send_default_pii=False,
         integrations=[StarletteIntegration()],
@@ -834,7 +835,7 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
@@ -1080,6 +1081,7 @@ def test_transaction_name_in_middleware(
     )
 
 
+<<<<<<< antonpirker/trace-origin-in-integrations
 def test_span_origin(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration()],
@@ -1101,3 +1103,57 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
     for span in event["spans"]:
         assert span["origin"] == "auto.http.starlette"
+=======
+@pytest.mark.parametrize(
+    "failed_request_status_codes,status_code,expected_error",
+    [
+        (None, 500, True),
+        (None, 400, False),
+        ([500, 501], 500, True),
+        ([500, 501], 401, False),
+        ([range(400, 499)], 401, True),
+        ([range(400, 499)], 500, False),
+        ([range(400, 499), range(500, 599)], 300, False),
+        ([range(400, 499), range(500, 599)], 403, True),
+        ([range(400, 499), range(500, 599)], 503, True),
+        ([range(400, 403), 500, 501], 401, True),
+        ([range(400, 403), 500, 501], 405, False),
+        ([range(400, 403), 500, 501], 501, True),
+        ([range(400, 403), 500, 501], 503, False),
+        ([None], 500, False),
+    ],
+)
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    sentry_init(
+        integrations=[
+            StarletteIntegration(
+                failed_request_status_codes=failed_request_status_codes
+            )
+        ]
+    )
+
+    events = capture_events()
+
+    async def _error(request):
+        raise HTTPException(status_code)
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/error", _error, methods=["GET"]),
+        ],
+    )
+
+    client = TestClient(app)
+    client.get("/error")
+
+    if expected_error:
+        assert len(events) == 1
+    else:
+        assert not events
+>>>>>>> antonpirker/trace-origin

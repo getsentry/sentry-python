@@ -703,15 +703,10 @@ def _set_db_data(span, cursor_or_db):
     if is_psycopg2:
         connection_params = cursor_or_db.connection.get_dsn_parameters()
     else:
-        is_psycopg3 = (
-            hasattr(cursor_or_db, "connection")
-            and hasattr(cursor_or_db.connection, "info")
-            and hasattr(cursor_or_db.connection.info, "get_parameters")
-            and inspect.isroutine(cursor_or_db.connection.info.get_parameters)
-        )
-        if is_psycopg3:
+        try:
+            # psycopg3
             connection_params = cursor_or_db.connection.info.get_parameters()
-        else:
+        except Exception:
             connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
