@@ -59,6 +59,7 @@ def patch_spark_context_init():
     @ensure_integration_enabled(SparkIntegration, spark_context_init)
     def _sentry_patched_spark_context_init(self, *args, **kwargs):
         # type: (SparkContext, *Any, **Any) -> Optional[Any]
+        rv = spark_context_init(self, *args, **kwargs)
         _start_sentry_listener(self)
         _set_app_properties()
 
@@ -96,7 +97,7 @@ def patch_spark_context_init():
 
             return event
 
-        return spark_context_init(self, *args, **kwargs)
+        return rv
 
     SparkContext._do_init = _sentry_patched_spark_context_init
 
