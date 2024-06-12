@@ -41,6 +41,11 @@ def test_start_sentry_listener():
     assert gateway._callback_server is not None
 
 
+def test_initialize_spark_integration(sentry_init):
+    sentry_init(integrations=[SparkIntegration()])
+    SparkContext.getOrCreate()
+
+
 @pytest.fixture
 def sentry_listener():
 
