@@ -22,7 +22,8 @@ from sentry_sdk.profiler.utils import (
 __all__ = [
     "start_profiler",
     "stop_profiler",
-    # Re-exported for backwards compatibility
+    # DEPRECATED: The following was re-exported for backwards compatibility. It
+    # will be removed from the public profiler API in a future release.
     "MAX_PROFILE_DURATION_NS",
     "PROFILE_MINIMUM_SAMPLES",
     "Profile",
