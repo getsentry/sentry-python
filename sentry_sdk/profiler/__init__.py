@@ -23,7 +23,7 @@ __all__ = [
     "start_profiler",
     "stop_profiler",
     # DEPRECATED: The following was re-exported for backwards compatibility. It
-    # will be removed from the public profiler API in a future release.
+    # will be removed from sentry_sdk.profiler in a future release.
     "MAX_PROFILE_DURATION_NS",
     "PROFILE_MINIMUM_SAMPLES",
     "Profile",
