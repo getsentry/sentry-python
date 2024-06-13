@@ -5,6 +5,7 @@ types-certifi
 types-protobuf
 types-redis
 types-setuptools
+opentelemetry-distro
 pymongo # There is no separate types module.
 loguru # There is no separate types module.
 flake8-bugbear

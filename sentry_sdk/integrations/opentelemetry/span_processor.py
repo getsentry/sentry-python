@@ -1,18 +1,17 @@
 from datetime import datetime, timezone
 from time import time
 
-from opentelemetry.context import get_value  # type: ignore
-from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
-from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import (  # type: ignore
+from opentelemetry.context import get_value
+from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
+from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.trace import (
     format_span_id,
     format_trace_id,
     get_current_span,
     SpanContext,
-    Span as OTelSpan,
     SpanKind,
 )
-from opentelemetry.trace.span import (  # type: ignore
+from opentelemetry.trace.span import (
     INVALID_SPAN_ID,
     INVALID_TRACE_ID,
 )
@@ -69,7 +68,7 @@ def link_trace_context_to_error_event(event, otel_span_map):
     return event
 
 
-class SentrySpanProcessor(SpanProcessor):  # type: ignore
+class SentrySpanProcessor(SpanProcessor):
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
     """

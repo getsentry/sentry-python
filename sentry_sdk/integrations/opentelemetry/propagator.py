@@ -1,10 +1,10 @@
-from opentelemetry import trace  # type: ignore
-from opentelemetry.context import (  # type: ignore
+from opentelemetry import trace
+from opentelemetry.context import (
     Context,
     get_current,
     set_value,
 )
-from opentelemetry.propagators.textmap import (  # type: ignore
+from opentelemetry.propagators.textmap import (
     CarrierT,
     Getter,
     Setter,
@@ -12,7 +12,7 @@ from opentelemetry.propagators.textmap import (  # type: ignore
     default_getter,
     default_setter,
 )
-from opentelemetry.trace import (  # type: ignore
+from opentelemetry.trace import (
     NonRecordingSpan,
     SpanContext,
     TraceFlags,
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from typing import Set
 
 
-class SentryPropagator(TextMapPropagator):  # type: ignore
+class SentryPropagator(TextMapPropagator):
     """
     Propagates tracing headers for Sentry's tracing system in a way OTel understands.
     """
