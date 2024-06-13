@@ -69,9 +69,6 @@ def test_sentry_listener_on_job_start(sentry_init, sentry_listener):
     assert crumb["level"] == "info"
     assert "sample-job-id-start" in crumb["message"]
 
-    # assert mock_hub.kwargs["level"] == "info"
-    # assert "sample-job-id-start" in mock_hub.kwargs["message"]
-
 
 @pytest.mark.parametrize(
     "job_result, level", [("JobSucceeded", "info"), ("JobFailed", "warning")]
