@@ -1,8 +1,12 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from flask import Flask
-from fastapi import FastAPI
+
+try:
+    from flask import Flask
+    from fastapi import FastAPI
+except ImportError:
+    pass
 
 
 try:
