@@ -72,6 +72,9 @@ def patch_spark_context_init():
                 if sentry_sdk.get_client().get_integration(SparkIntegration) is None:
                     return event
 
+                if self._active_spark_context is None:
+                    return event
+
                 event.setdefault("user", {}).setdefault("id", self.sparkUser())
 
                 event.setdefault("tags", {}).setdefault(
