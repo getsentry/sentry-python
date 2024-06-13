@@ -29,7 +29,7 @@ CLASSES_TO_INSTRUMENT = {
     # instrumentation took place.
     "fastapi": "fastapi.FastAPI",
     "flask": "flask.Flask",
-    # XXX Add a mapping for all instrumentors that instrument a class
+    # XXX Add a mapping for all instrumentors that patch by replacing a class
 }
 
 
@@ -58,6 +58,10 @@ class OpenTelemetryIntegration(Integration):
         except Exception:
             logger.exception("[OTel] Failed to auto-initialize OpenTelemetry")
 
+        # XXX: Consider whether this is ok to keep and make default.
+        # The alternative is asking folks to follow specific import order for
+        # some integrations (sentry_sdk.init before you even import Flask, for
+        # instance).
         try:
             _patch_remaining_classes(original_classes)
         except Exception:
