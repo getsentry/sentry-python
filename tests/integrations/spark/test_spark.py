@@ -1,6 +1,6 @@
 import pytest
 import sys
-from sentry_sdk import Scope
+from unittest.mock import patch
 from sentry_sdk.integrations.spark.spark_driver import (
     _set_app_properties,
     _start_sentry_listener,
@@ -54,8 +54,13 @@ def sentry_listener():
     return listener
 
 
-def test_sentry_listener_on_job_start(sentry_init, sentry_listener):
-    sentry_init(integrations=[SparkIntegration()])
+@pytest.fixture
+def mock_add_breadcrumb():
+    with patch("sentry_sdk.add_breadcrumb") as mock:
+        yield mock
+
+
+def test_sentry_listener_on_job_start(sentry_listener, mock_add_breadcrumb):
     listener = sentry_listener
 
     class MockJobStart:
@@ -65,16 +70,19 @@ def test_sentry_listener_on_job_start(sentry_init, sentry_listener):
     mock_job_start = MockJobStart()
     listener.onJobStart(mock_job_start)
 
-    crumb = Scope.get_isolation_scope()._breadcrumbs.pop()
-    assert crumb["level"] == "info"
-    assert "sample-job-id-start" in crumb["message"]
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
+    assert mock_hub.kwargs["level"] == "info"
+    assert "sample-job-id-start" in mock_hub.kwargs["message"]
 
 
 @pytest.mark.parametrize(
     "job_result, level", [("JobSucceeded", "info"), ("JobFailed", "warning")]
 )
-def test_sentry_listener_on_job_end(sentry_init, sentry_listener, job_result, level):
-    sentry_init(integrations=[SparkIntegration()])
+def test_sentry_listener_on_job_end(
+    sentry_listener, mock_add_breadcrumb, job_result, level
+):
     listener = sentry_listener
 
     class MockJobResult:
@@ -92,14 +100,15 @@ def test_sentry_listener_on_job_end(sentry_init, sentry_listener, job_result, le
     mock_job_end = MockJobEnd()
     listener.onJobEnd(mock_job_end)
 
-    crumb = Scope.get_isolation_scope()._breadcrumbs.pop()
-    assert crumb["level"] == level
-    assert crumb["data"]["result"] == job_result
-    assert "sample-job-id-end" in crumb["message"]
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
+    assert mock_hub.kwargs["level"] == level
+    assert mock_hub.kwargs["data"]["result"] == job_result
+    assert "sample-job-id-end" in mock_hub.kwargs["message"]
 
 
-def test_sentry_listener_on_stage_submitted(sentry_init, sentry_listener):
-    sentry_init(integrations=[SparkIntegration()])
+def test_sentry_listener_on_stage_submitted(sentry_listener, mock_add_breadcrumb):
     listener = sentry_listener
 
     class StageInfo:
@@ -120,11 +129,13 @@ def test_sentry_listener_on_stage_submitted(sentry_init, sentry_listener):
     mock_stage_submitted = MockStageSubmitted()
     listener.onStageSubmitted(mock_stage_submitted)
 
-    crumb = Scope.get_isolation_scope()._breadcrumbs.pop()
-    assert crumb["level"] == "info"
-    assert "sample-stage-id-submit" in crumb["message"]
-    assert crumb["data"]["attemptId"] == 14
-    assert crumb["data"]["name"] == "run-job"
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
+    assert mock_hub.kwargs["level"] == "info"
+    assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+    assert mock_hub.kwargs["data"]["attemptId"] == 14
+    assert mock_hub.kwargs["data"]["name"] == "run-job"
 
 
 @pytest.fixture
@@ -164,37 +175,39 @@ def get_mock_stage_completed():
 
 
 def test_sentry_listener_on_stage_completed_success(
-    sentry_init, sentry_listener, get_mock_stage_completed
+    sentry_listener, mock_add_breadcrumb, get_mock_stage_completed
 ):
-    sentry_init(integrations=[SparkIntegration()])
     listener = sentry_listener
 
     mock_stage_completed = get_mock_stage_completed(failure_reason=False)
     listener.onStageCompleted(mock_stage_completed)
 
-    crumb = Scope.get_isolation_scope()._breadcrumbs.pop()
-    assert crumb["level"] == "info"
-    assert "sample-stage-id-submit" in crumb["message"]
-    assert crumb["data"]["attemptId"] == 14
-    assert crumb["data"]["name"] == "run-job"
-    assert "reason" not in crumb["data"]
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
+    assert mock_hub.kwargs["level"] == "info"
+    assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+    assert mock_hub.kwargs["data"]["attemptId"] == 14
+    assert mock_hub.kwargs["data"]["name"] == "run-job"
+    assert "reason" not in mock_hub.kwargs["data"]
 
 
 def test_sentry_listener_on_stage_completed_failure(
-    sentry_init, sentry_listener, get_mock_stage_completed
+    sentry_listener, mock_add_breadcrumb, get_mock_stage_completed
 ):
-    sentry_init(integrations=[SparkIntegration()])
     listener = sentry_listener
 
     mock_stage_completed = get_mock_stage_completed(failure_reason=True)
     listener.onStageCompleted(mock_stage_completed)
 
-    crumb = Scope.get_isolation_scope()._breadcrumbs.pop()
-    assert crumb["level"] == "warning"
-    assert "sample-stage-id-submit" in crumb["message"]
-    assert crumb["data"]["attemptId"] == 14
-    assert crumb["data"]["name"] == "run-job"
-    assert crumb["data"]["reason"] == "failure-reason"
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
+    assert mock_hub.kwargs["level"] == "warning"
+    assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
+    assert mock_hub.kwargs["data"]["attemptId"] == 14
+    assert mock_hub.kwargs["data"]["name"] == "run-job"
+    assert mock_hub.kwargs["data"]["reason"] == "failure-reason"
 
 
 ################
