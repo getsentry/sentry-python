@@ -171,6 +171,13 @@ def _wrap_beat_scheduler(f):
     After the patched function is called,
     Celery Beat will call apply_async to put the task in the queue.
     """
+
+    # Only patch once.
+    # Cant use __name__ here, because some of our tests mock original_apply_entry
+    already_patched = "sentry_" in str(f)
+    if already_patched:
+        return f
+
     from sentry_sdk.integrations.celery import CeleryIntegration
 
     @wraps(f)
@@ -206,13 +213,9 @@ def _patch_redbeat_maybe_due():
     RedBeatScheduler.maybe_due = _wrap_beat_scheduler(RedBeatScheduler.maybe_due)
 
 
-def _setup_celery_beat_signals():
-    # type: () -> None
-    from sentry_sdk.integrations.celery import CeleryIntegration
-
-    integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-
-    if integration is not None and integration.monitor_beat_tasks:
+def _setup_celery_beat_signals(monitor_beat_tasks):
+    # type: (bool) -> None
+    if monitor_beat_tasks:
         task_success.connect(crons_task_success)
         task_failure.connect(crons_task_failure)
         task_retry.connect(crons_task_retry)
