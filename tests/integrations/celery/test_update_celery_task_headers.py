@@ -29,11 +29,17 @@ def test_monitor_beat_tasks(monitor_beat_tasks):
 
     if monitor_beat_tasks:
         assert updated_headers == {
-            "headers": {"sentry-monitor-start-timestamp-s": mock.ANY},
+            "headers": {
+                "sentry-monitor-start-timestamp-s": mock.ANY,
+                "sentry-task-enqueued-time": mock.ANY,
+            },
             "sentry-monitor-start-timestamp-s": mock.ANY,
+            "sentry-task-enqueued-time": mock.ANY,
         }
     else:
-        assert updated_headers == headers
+        assert updated_headers == {
+            "sentry-task-enqueued-time": mock.ANY,
+        }
 
 
 @pytest.mark.parametrize("monitor_beat_tasks", [True, False, None, "", "bla", 1, 0])
@@ -41,6 +47,7 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
     headers = {
         "blub": "foo",
         "sentry-something": "bar",
+        "sentry-task-enqueued-time": mock.ANY,
     }
     span = None
 
@@ -53,8 +60,10 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
             "headers": {
                 "sentry-monitor-start-timestamp-s": mock.ANY,
                 "sentry-something": "bar",
+                "sentry-task-enqueued-time": mock.ANY,
             },
             "sentry-monitor-start-timestamp-s": mock.ANY,
+            "sentry-task-enqueued-time": mock.ANY,
         }
     else:
         assert updated_headers == headers
