@@ -181,6 +181,12 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
                 }
             )
 
+        # Add the time the task was enqueued to the headers
+        # This is used in the consumer to calculate the latency
+        updated_headers.update(
+            {"sentry-task-enqueued-time": _now_seconds_since_epoch()}
+        )
+
         if headers:
             existing_baggage = updated_headers.get(BAGGAGE_HEADER_NAME)
             sentry_baggage = headers.get(BAGGAGE_HEADER_NAME)
@@ -360,12 +366,25 @@ def _wrap_task_call(task, f):
                 op=OP.QUEUE_PROCESS, description=task.name
             ) as span:
                 _set_messaging_destination_name(task, span)
+
+                latency = None
+                with capture_internal_exceptions():
+                    if "sentry-task-enqueued-time" in task.request.headers:
+                        latency = _now_seconds_since_epoch() - task.request.headers.pop(
+                            "sentry-task-enqueued-time"
+                        )
+
+                if latency is not None:
+                    span.set_data(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+
                 with capture_internal_exceptions():
                     span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+
                 with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
+
                 with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_SYSTEM,
