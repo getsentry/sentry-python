@@ -1,0 +1,1 @@
+SPAN_ORIGIN = f"auto.grpc.grpc"
