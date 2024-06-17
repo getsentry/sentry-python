@@ -530,6 +530,7 @@ def test_task_headers(celery):
     # Newly added headers
     expected_headers["sentry-trace"] = mock.ANY
     expected_headers["baggage"] = mock.ANY
+    expected_headers["sentry-task-enqueued-time"] = mock.ANY
 
     assert result.get() == expected_headers
 

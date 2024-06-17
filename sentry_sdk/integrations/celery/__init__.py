@@ -369,7 +369,10 @@ def _wrap_task_call(task, f):
 
                 latency = None
                 with capture_internal_exceptions():
-                    if "sentry-task-enqueued-time" in task.request.headers:
+                    if (
+                        task.request.headers is not None
+                        and "sentry-task-enqueued-time" in task.request.headers
+                    ):
                         latency = _now_seconds_since_epoch() - task.request.headers.pop(
                             "sentry-task-enqueued-time"
                         )
