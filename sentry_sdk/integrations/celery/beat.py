@@ -189,7 +189,7 @@ def _patch_redbeat_maybe_due():
 
     original_maybe_due = RedBeatScheduler.maybe_due
 
-    # Cant use __name__ here, because some of our tests mock original_apply_entry
+    # Cant use __name__ here, because some of our tests mock original_maybe_due
     already_patched = "sentry_maybe_due" in str(original_maybe_due)
     if already_patched:
         return
