@@ -540,6 +540,7 @@ def test_task_headers(celery):
     # Newly added headers
     expected_headers["sentry-trace"] = mock.ANY
     expected_headers["baggage"] = mock.ANY
+    expected_headers["sentry-task-enqueued-time"] = mock.ANY
 
     assert result.get() == expected_headers
 
@@ -764,3 +765,18 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     assert span["data"]["messaging.message.retry.count"] == 0
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+def test_receive_latency(init_celery, capture_events):
+    celery = init_celery(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.message.receive.latency" in span["data"]
+    assert span["data"]["messaging.message.receive.latency"] > 0
