@@ -291,6 +291,27 @@ def test_stream_unary(sentry_init):
         assert response.text == "test"
 
 
+@pytest.mark.forked
+def test_span_origin(sentry_init, capture_events_forksafe):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    events = capture_events_forksafe()
+
+    server = _set_up()
+
+    with grpc.insecure_channel("localhost:{}".format(PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        # with start_transaction(name="foo"):
+        stub.TestServe(gRPCTestMessage(text="test"))
+
+    _tear_down(server=server)
+
+    events.write_file.close()
+    event = events.read_event()
+    # import ipdb; ipdb.set_trace()
+    assert event["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
+    assert event["spans"][0]["origin"] == "auto.grpc.grpc.TestService"
+
+
 def _set_up(interceptors: Optional[List[grpc.ServerInterceptor]] = None):
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=2),
@@ -317,8 +338,12 @@ class TestService(gRPCTestServiceServicer):
 
     @staticmethod
     def TestServe(request, context):  # noqa: N802
-        with start_span(op="test", description="test"):
-            pass
+        # with start_span(
+        #     op="test", 
+        #     description="test", 
+        #     origin="auto.grpc.grpc.TestService",
+        # ):
+        #     pass
 
         return gRPCTestMessage(text=request.text)
 

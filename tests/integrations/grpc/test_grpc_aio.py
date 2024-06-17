@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 import sentry_sdk
 
-from sentry_sdk import Hub, start_transaction
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.conftest import ApproxDict
@@ -254,8 +254,11 @@ class TestService(gRPCTestServiceServicer):
 
     @classmethod
     async def TestServe(cls, request, context):  # noqa: N802
-        hub = Hub.current
-        with hub.start_span(op="test", description="test"):
+        with start_span(
+            op="test", 
+            description="test", 
+            origin="auto.grpc.grpc.TestService.aio",
+        ):
             pass
 
         if request.text == "exception":
@@ -280,3 +283,19 @@ class TestService(gRPCTestServiceServicer):
     async def TestStreamUnary(cls, request, context):  # noqa: N802
         requests = [r async for r in request]
         return requests.pop()
+
+
+# @pytest.mark.asyncio
+# async def test_span_origin(capture_events, grpc_server):
+#     events = capture_events()
+
+#     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
+#         stub = gRPCTestServiceStub(channel)
+#         await stub.TestServe(gRPCTestMessage(text="test"))
+
+#     (event,) = events
+
+#     # import ipdb; ipdb.set_trace()
+#     assert event["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
+
+#     assert event["spans"][0]["origin"] == "auto.grpc.grpc"
