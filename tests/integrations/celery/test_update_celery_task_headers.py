@@ -52,6 +52,7 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
     assert headers == {
         "blub": "foo",
         "sentry-something": "bar",
+        "sentry-task-enqueued-time": mock.ANY,
     }  # left unchanged
 
     if monitor_beat_tasks:
