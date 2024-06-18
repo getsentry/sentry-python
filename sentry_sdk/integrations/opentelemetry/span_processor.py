@@ -8,7 +8,6 @@ from opentelemetry.trace import (
     format_span_id,
     format_trace_id,
     get_current_span,
-    SpanContext,
     SpanKind,
 )
 from opentelemetry.trace.span import (
@@ -30,7 +29,7 @@ from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
-
+    from opentelemetry import context as context_api
     from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
@@ -52,13 +51,11 @@ def link_trace_context_to_error_event(event, otel_span_map):
         return event
 
     ctx = otel_span.get_span_context()
-    trace_id = format_trace_id(ctx.trace_id)
-    span_id = format_span_id(ctx.span_id)
 
-    if trace_id == INVALID_TRACE_ID or span_id == INVALID_SPAN_ID:
+    if ctx.trace_id == INVALID_TRACE_ID or ctx.span_id == INVALID_SPAN_ID:
         return event
 
-    sentry_span = otel_span_map.get(span_id, None)
+    sentry_span = otel_span_map.get(format_span_id(ctx.span_id), None)
     if not sentry_span:
         return event
 
@@ -112,7 +109,7 @@ class SentrySpanProcessor(SpanProcessor):
                     self.otel_span_map.pop(span_id, None)
 
     def on_start(self, otel_span, parent_context=None):
-        # type: (OTelSpan, Optional[SpanContext]) -> None
+        # type: (OTelSpan, Optional[context_api.Context]) -> None
         client = get_client()
 
         if not client.dsn:
@@ -132,6 +129,9 @@ class SentrySpanProcessor(SpanProcessor):
         if self._is_sentry_span(otel_span):
             return
 
+        if parent_context is None:
+            return
+
         trace_data = self._get_trace_data(otel_span, parent_context)
 
         parent_span_id = trace_data["parent_span_id"]
@@ -139,14 +139,18 @@ class SentrySpanProcessor(SpanProcessor):
             self.otel_span_map.get(parent_span_id, None) if parent_span_id else None
         )
 
+        start_timestamp = None
+        if otel_span.start_time is not None:
+            start_timestamp = datetime.fromtimestamp(
+                otel_span.start_time / 1e9, timezone.utc
+            )  # OTel spans have nanosecond precision
+
         sentry_span = None
         if sentry_parent_span:
             sentry_span = sentry_parent_span.start_child(
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
-                start_timestamp=datetime.fromtimestamp(
-                    otel_span.start_time / 1e9, timezone.utc
-                ),  # OTel spans have nanosecond precision
+                start_timestamp=start_timestamp,
                 instrumenter=INSTRUMENTER.OTEL,
             )
         else:
@@ -156,20 +160,20 @@ class SentrySpanProcessor(SpanProcessor):
                 parent_span_id=parent_span_id,
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
-                start_timestamp=datetime.fromtimestamp(
-                    otel_span.start_time / 1e9, timezone.utc
-                ),  # OTel spans have nanosecond precision
+                start_timestamp=start_timestamp,
                 instrumenter=INSTRUMENTER.OTEL,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
 
-        span_start_in_minutes = int(
-            otel_span.start_time / 1e9 / 60
-        )  # OTel spans have nanosecond precision
-        self.open_spans.setdefault(span_start_in_minutes, set()).add(
-            trace_data["span_id"]
-        )
+        if otel_span.start_time is not None:
+            span_start_in_minutes = int(
+                otel_span.start_time / 1e9 / 60
+            )  # OTel spans have nanosecond precision
+            self.open_spans.setdefault(span_start_in_minutes, set()).add(
+                trace_data["span_id"]
+            )
+
         self._prune_old_spans()
 
     def on_end(self, otel_span):
@@ -202,14 +206,20 @@ class SentrySpanProcessor(SpanProcessor):
         else:
             self._update_span_with_otel_data(sentry_span, otel_span)
 
-        sentry_span.finish(
-            end_timestamp=datetime.fromtimestamp(otel_span.end_time / 1e9, timezone.utc)
-        )  # OTel spans have nanosecond precision
+        end_timestamp = None
+        if otel_span.end_time is not None:
+            end_timestamp = datetime.fromtimestamp(
+                otel_span.end_time / 1e9, timezone.utc
+            )  # OTel spans have nanosecond precision
 
-        span_start_in_minutes = int(
-            otel_span.start_time / 1e9 / 60
-        )  # OTel spans have nanosecond precision
-        self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
+        sentry_span.finish(end_timestamp=end_timestamp)
+
+        if otel_span.start_time is not None:
+            span_start_in_minutes = int(
+                otel_span.start_time / 1e9 / 60
+            )  # OTel spans have nanosecond precision
+            self.open_spans.setdefault(span_start_in_minutes, set()).discard(span_id)
+
         self._prune_old_spans()
 
     def _is_sentry_span(self, otel_span):
@@ -218,7 +228,9 @@ class SentrySpanProcessor(SpanProcessor):
         Break infinite loop:
         HTTP requests to Sentry are caught by OTel and send again to Sentry.
         """
-        otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+        otel_span_url = None
+        if otel_span.attributes is not None:
+            otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
 
         dsn_url = None
         client = get_client()
@@ -247,7 +259,7 @@ class SentrySpanProcessor(SpanProcessor):
         return ctx
 
     def _get_trace_data(self, otel_span, parent_context):
-        # type: (OTelSpan, SpanContext) -> Dict[str, Any]
+        # type: (OTelSpan, context_api.Context) -> Dict[str, Any]
         """
         Extracts tracing information from one OTel span and its parent OTel context.
         """
@@ -295,8 +307,9 @@ class SentrySpanProcessor(SpanProcessor):
         Convert OTel span data and update the Sentry span with it.
         This should eventually happen on the server when ingesting the spans.
         """
-        for key, val in otel_span.attributes.items():
-            sentry_span.set_data(key, val)
+        if otel_span.attributes is not None:
+            for key, val in otel_span.attributes.items():
+                sentry_span.set_data(key, val)
 
         sentry_span.set_data("otel.kind", otel_span.kind)
 
