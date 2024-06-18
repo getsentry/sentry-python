@@ -645,7 +645,10 @@ def start_child_span_decorator(func):
             ):
                 return await func(*args, **kwargs)
 
-        func_with_tracing.__signature__ = inspect.signature(func)
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)
+        except Exception:
+            pass
 
     # Synchronous case
     else:
@@ -670,7 +673,10 @@ def start_child_span_decorator(func):
             ):
                 return func(*args, **kwargs)
 
-        func_with_tracing.__signature__ = inspect.signature(func)
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)
+        except Exception:
+            pass
 
     return func_with_tracing
 
