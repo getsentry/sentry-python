@@ -240,6 +240,10 @@ async def my_async_view(request):
     return HttpResponse("Hello World")
 
 
+async def simple_async_view(request):
+    return HttpResponse("Simple Hello World")
+
+
 async def thread_ids_async(request):
     response = json.dumps(
         {
