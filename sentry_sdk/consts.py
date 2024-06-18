@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         BreadcrumbProcessor,
+        ContinuousProfilerMode,
         Event,
         EventProcessor,
         Hint,
@@ -55,6 +56,8 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
+            "continuous_profiling_auto_start": Optional[bool],
+            "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
@@ -298,6 +301,11 @@ class SPANDATA:
     Number of retries/attempts to process a message.
     """
 
+    MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
+    """
+    The latency between when the task was enqueued and when it was started to be processed.
+    """
+
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`
@@ -362,6 +370,12 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
+    """
+
+    PROFILER_ID = "profiler.id"
+    """
+    Label identifying the profiler id that the span occurred in. This should be a string.
+    Example: "5249fbada8d5416482c2f6e47e337372"
     """
 
 
@@ -508,4 +522,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.5.0"
+VERSION = "2.5.1"
