@@ -1,4 +1,3 @@
-from functools import wraps
 import sentry_sdk
 from sentry_sdk.crons import capture_checkin, MonitorStatus
 from sentry_sdk.integrations import DidNotEnable
@@ -159,7 +158,7 @@ def _apply_crons_data_to_schedule_entry(scheduler, schedule_entry, integration):
     schedule_entry.options["headers"] = headers
 
 
-def _wrap_beat_scheduler(f):
+def _wrap_beat_scheduler(original_function):
     # type: (Callable[..., Any]) -> Callable[..., Any]
     """
     Makes sure that:
@@ -171,14 +170,19 @@ def _wrap_beat_scheduler(f):
     After the patched function is called,
     Celery Beat will call apply_async to put the task in the queue.
     """
+    # Patch only once
+    # Can't use __name__ here, because some of our tests mock original_apply_entry
+    already_patched = "sentry_patched_scheduler" in str(original_function)
+    if already_patched:
+        return original_function
+
     from sentry_sdk.integrations.celery import CeleryIntegration
 
-    @wraps(f)
     def sentry_patched_scheduler(*args, **kwargs):
         # type: (*Any, **Any) -> None
         integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
         if integration is None:
-            return f(*args, **kwargs)
+            return original_function(*args, **kwargs)
 
         # Tasks started by Celery Beat start a new Trace
         scope = Scope.get_isolation_scope()
@@ -188,7 +192,7 @@ def _wrap_beat_scheduler(f):
         scheduler, schedule_entry = args
         _apply_crons_data_to_schedule_entry(scheduler, schedule_entry, integration)
 
-        return f(*args, **kwargs)
+        return original_function(*args, **kwargs)
 
     return sentry_patched_scheduler
 
@@ -206,13 +210,9 @@ def _patch_redbeat_maybe_due():
     RedBeatScheduler.maybe_due = _wrap_beat_scheduler(RedBeatScheduler.maybe_due)
 
 
-def _setup_celery_beat_signals():
-    # type: () -> None
-    from sentry_sdk.integrations.celery import CeleryIntegration
-
-    integration = sentry_sdk.get_client().get_integration(CeleryIntegration)
-
-    if integration is not None and integration.monitor_beat_tasks:
+def _setup_celery_beat_signals(monitor_beat_tasks):
+    # type: (bool) -> None
+    if monitor_beat_tasks:
         task_success.connect(crons_task_success)
         task_failure.connect(crons_task_failure)
         task_retry.connect(crons_task_retry)
