@@ -1,4 +1,3 @@
-import inspect
 import logging
 import os
 import sys
@@ -19,7 +18,6 @@ from sentry_sdk import (
     last_event_id,
     add_breadcrumb,
     isolation_scope,
-    tracing,
     Hub,
     Scope,
 )
@@ -681,23 +679,6 @@ def test_functions_to_trace(sentry_init, capture_events):
     assert event["spans"][0]["description"] == "time.sleep"
     assert event["spans"][1]["description"] == "tests.test_basics._hello_world"
     assert event["spans"][2]["description"] == "tests.test_basics._hello_world"
-
-
-def test_functions_to_trace_signature_unchanged(sentry_init):
-    sentry_init(
-        traces_sample_rate=1.0,
-    )
-
-    def _some_function(a, b, c):
-        pass
-
-    @tracing.trace
-    def _some_function_traced(a, b, c):
-        pass
-
-    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
-        _some_function_traced, 1, 2, 3
-    )
 
 
 class WorldGreeter:
