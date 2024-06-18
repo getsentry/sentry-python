@@ -8,6 +8,16 @@ from openfeature.provider.metadata import Metadata
 
 
 class SentryOpenFeatureProviderDecorator:
+    """OpenFeature provider wrapper.
+
+    The OpenFeature specification defines how provider's should be shaped so they can interop
+    with OpenFeature SDKs. Because of this we can wrap provider classes and intercept flag
+    evaluation results. These results are set on a tag and submitted with the error or span.
+
+    Example LaunchDarkly integration code:
+
+            provider = SentryOpenFeatureProviderDecorator(LaunchDarklyProvider(...))
+    """
 
     def __init__(self, provider):
         self.provider = provider
@@ -23,6 +33,10 @@ class SentryOpenFeatureProviderDecorator:
         )
         sentry_sdk.set_tag(flag_key, details.value)
         return details
+
+    # Pass throughs. We don't alter the state of the SDK when executing these functions. There's
+    # no particular reason for this it just exists this way because it was easier to test this
+    # with boolean flags first.
 
     def resolve_string_details(self, *args, **kwargs):
         return self.provider.resolve_string_details(*args, **kwargs)
