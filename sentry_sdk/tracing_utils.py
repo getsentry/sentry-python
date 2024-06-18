@@ -646,7 +646,7 @@ def start_child_span_decorator(func):
                 return await func(*args, **kwargs)
 
         try:
-            func_with_tracing.__signature__ = inspect.signature(func)
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
         except Exception:
             pass
 
@@ -674,7 +674,7 @@ def start_child_span_decorator(func):
                 return func(*args, **kwargs)
 
         try:
-            func_with_tracing.__signature__ = inspect.signature(func)
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
         except Exception:
             pass
 
