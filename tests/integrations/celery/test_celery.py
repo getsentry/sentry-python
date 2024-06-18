@@ -26,9 +26,19 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", **kwargs):
+    def inner(
+        propagate_traces=True,
+        backend="always_eager",
+        monitor_beat_tasks=False,
+        **kwargs,
+    ):
         sentry_init(
-            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
+            integrations=[
+                CeleryIntegration(
+                    propagate_traces=propagate_traces,
+                    monitor_beat_tasks=monitor_beat_tasks,
+                )
+            ],
             **kwargs,
         )
         celery = Celery(__name__)
@@ -530,6 +540,7 @@ def test_task_headers(celery):
     # Newly added headers
     expected_headers["sentry-trace"] = mock.ANY
     expected_headers["baggage"] = mock.ANY
+    expected_headers["sentry-task-enqueued-time"] = mock.ANY
 
     assert result.get() == expected_headers
 
@@ -754,3 +765,18 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     assert span["data"]["messaging.message.retry.count"] == 0
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+def test_receive_latency(init_celery, capture_events):
+    celery = init_celery(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.message.receive.latency" in span["data"]
+    assert span["data"]["messaging.message.receive.latency"] > 0

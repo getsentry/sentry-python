@@ -1,7 +1,9 @@
+import inspect
 from unittest import mock
 
 import pytest
 
+from sentry_sdk.tracing import trace
 from sentry_sdk.tracing_utils import start_child_span_decorator
 from sentry_sdk.utils import logger
 from tests.conftest import patch_start_tracing_child
@@ -76,3 +78,38 @@ async def test_trace_decorator_async_no_trx():
                 "test_decorator.my_async_example_function",
             )
             assert result2 == "return_of_async_function"
+
+
+def test_functions_to_trace_signature_unchanged_sync(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+
+    def _some_function(a, b, c):
+        pass
+
+    @trace
+    def _some_function_traced(a, b, c):
+        pass
+
+    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
+        _some_function_traced, 1, 2, 3
+    )
+
+
+@pytest.mark.asyncio
+async def test_functions_to_trace_signature_unchanged_async(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+    )
+
+    async def _some_function(a, b, c):
+        pass
+
+    @trace
+    async def _some_function_traced(a, b, c):
+        pass
+
+    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
+        _some_function_traced, 1, 2, 3
+    )
