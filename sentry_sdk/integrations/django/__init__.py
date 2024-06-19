@@ -629,7 +629,12 @@ def install_sql_hook():
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, params, paramstyle="format", executemany=False
+            cursor=self.cursor,
+            query=sql,
+            params_list=params,
+            paramstyle="format",
+            executemany=False,
+            span_origin=DjangoIntegration.origin,
         ) as span:
             _set_db_data(span, self)
             options = (
@@ -657,7 +662,12 @@ def install_sql_hook():
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, param_list, paramstyle="format", executemany=True
+            cursor=self.cursor,
+            query=sql,
+            params_list=param_list,
+            paramstyle="format",
+            executemany=True,
+            span_origin=DjangoIntegration.origin,
         ) as span:
             _set_db_data(span, self)
 
@@ -674,7 +684,11 @@ def install_sql_hook():
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            description="connect",
+            origin=DjangoIntegration.origin,
+        ) as span:
             _set_db_data(span, self)
             return real_connect(self)
 
