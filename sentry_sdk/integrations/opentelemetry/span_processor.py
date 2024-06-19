@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from time import time
+from typing import cast
 
 from opentelemetry.context import get_value
 from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
@@ -28,7 +29,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Optional, Union
     from opentelemetry import context as context_api
     from sentry_sdk._types import Event, Hint
 
@@ -37,7 +38,7 @@ SPAN_MAX_TIME_OPEN_MINUTES = 10
 
 
 def link_trace_context_to_error_event(event, otel_span_map):
-    # type: (Event, Dict[str, Union[Transaction, SentrySpan]]) -> Event
+    # type: (Event, dict[str, Union[Transaction, SentrySpan]]) -> Event
     client = get_client()
 
     if client.options["instrumenter"] != INSTRUMENTER.OTEL:
@@ -71,7 +72,7 @@ class SentrySpanProcessor(SpanProcessor):
     """
 
     # The mapping from otel span ids to sentry spans
-    otel_span_map = {}  # type: Dict[str, Union[Transaction, SentrySpan]]
+    otel_span_map = {}  # type: dict[str, Union[Transaction, SentrySpan]]
 
     # The currently open spans. Elements will be discarded after SPAN_MAX_TIME_OPEN_MINUTES
     open_spans = {}  # type: dict[int, set[str]]
@@ -230,20 +231,21 @@ class SentrySpanProcessor(SpanProcessor):
         """
         otel_span_url = None
         if otel_span.attributes is not None:
-            otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+            otel_span_url = otel_span.attributes.get(SpanAttributes.HTTP_URL)
+        otel_span_url = cast("Optional[str]", otel_span_url)
 
         dsn_url = None
         client = get_client()
         if client.dsn:
             dsn_url = Dsn(client.dsn).netloc
 
-        if otel_span_url and dsn_url in otel_span_url:
+        if otel_span_url and dsn_url and dsn_url in otel_span_url:
             return True
 
         return False
 
     def _get_otel_context(self, otel_span):
-        # type: (OTelSpan) -> Dict[str, Any]
+        # type: (OTelSpan) -> dict[str, Any]
         """
         Returns the OTel context for Sentry.
         See: https://develop.sentry.dev/sdk/performance/opentelemetry/#step-5-add-opentelemetry-context
@@ -259,11 +261,11 @@ class SentrySpanProcessor(SpanProcessor):
         return ctx
 
     def _get_trace_data(self, otel_span, parent_context):
-        # type: (OTelSpan, context_api.Context) -> Dict[str, Any]
+        # type: (OTelSpan, context_api.Context) -> dict[str, Any]
         """
         Extracts tracing information from one OTel span and its parent OTel context.
         """
-        trace_data = {}
+        trace_data = {}  # type: dict[str, Any]
         span_context = otel_span.get_span_context()
 
         span_id = format_span_id(span_context.span_id)
@@ -278,6 +280,7 @@ class SentrySpanProcessor(SpanProcessor):
         trace_data["parent_span_id"] = parent_span_id
 
         sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
+        sentry_trace_data = cast("dict[str, Union[str, bool, None]]", sentry_trace_data)
         trace_data["parent_sampled"] = (
             sentry_trace_data["parent_sampled"] if sentry_trace_data else None
         )
@@ -316,8 +319,11 @@ class SentrySpanProcessor(SpanProcessor):
             for key, val in otel_span.attributes.items():
                 sentry_span.set_data(key, val)
 
-            http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD, None)
-            db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM, None)
+            http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD)
+            http_method = cast("Optional[str]", http_method)
+
+            db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM)
+            db_query = cast("Optional[str]", db_query)
 
             if http_method:
                 op = "http"
@@ -339,6 +345,7 @@ class SentrySpanProcessor(SpanProcessor):
 
                 if not peer_name and not target:
                     url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+                    url = cast(str, url)
                     if url:
                         parsed_url = urlparse(url)
                         url = "{}://{}{}".format(
@@ -349,12 +356,14 @@ class SentrySpanProcessor(SpanProcessor):
                 status_code = otel_span.attributes.get(
                     SpanAttributes.HTTP_STATUS_CODE, None
                 )
+                status_code = cast("Optional[int]", status_code)
                 if status_code:
                     sentry_span.set_http_status(status_code)
 
             elif db_query:
                 op = "db"
                 statement = otel_span.attributes.get(SpanAttributes.DB_STATEMENT, None)
+                statement = cast("Optional[str]", statement)
                 if statement:
                     description = statement
 
@@ -370,6 +379,7 @@ class SentrySpanProcessor(SpanProcessor):
 
         if http_method:
             status_code = otel_span.attributes.get(SpanAttributes.HTTP_STATUS_CODE)
+            status_code = cast("Optional[int]", status_code)
             if status_code:
                 sentry_span.set_http_status(status_code)
 
