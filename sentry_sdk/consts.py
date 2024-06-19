@@ -301,6 +301,11 @@ class SPANDATA:
     Number of retries/attempts to process a message.
     """
 
+    MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
+    """
+    The latency between when the task was enqueued and when it was started to be processed.
+    """
+
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`
