@@ -107,7 +107,6 @@ If you need help setting up or configuring the Python SDK (or anything else in t
 Licensed under the MIT license, see [`LICENSE`](LICENSE)
 
 
-
 ### Thanks to all the people who contributed!
 
 <a href="https://github.com/getsentry/sentry-python/graphs/contributors">
