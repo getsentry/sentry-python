@@ -126,7 +126,7 @@ class CommandTracer(monitoring.CommandListener):
             command.pop("$clusterTime", None)
             command.pop("$signature", None)
 
-            op = "db.query"
+            op = "db"
 
             tags = {
                 "db.name": event.database_name,
