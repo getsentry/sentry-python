@@ -9,6 +9,8 @@ from sentry_sdk.client import Client
 from tests.conftest import patch_start_tracing_child
 
 from sentry_sdk import (
+    client,
+    get_client,
     push_scope,
     configure_scope,
     capture_event,
@@ -433,6 +435,38 @@ def test_integration_scoping(sentry_init, capture_events):
     events = capture_events()
     logger.warning("This is not a warning")
     assert not events
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "provided_integrations,default_integrations,auto_enabling_integrations,disabled_integrations,expected_integrations",
+    [
+        ([], False, False, None, set()),
+        ([], False, False, [], set()),
+        ([LoggingIntegration()], False, False, None, {LoggingIntegration}),
+        ([LoggingIntegration()], False, False, [LoggingIntegration], set()),
+        ([LoggingIntegration()], False, False, [LoggingIntegration()], set()),
+    ],
+)
+def test_integrations(
+    sentry_init,
+    provided_integrations,
+    default_integrations,
+    auto_enabling_integrations,
+    disabled_integrations,
+    expected_integrations,
+    reset_integrations,
+):
+    assert isinstance(get_client(), client.NonRecordingClient)
+    sentry_init(
+        integrations=provided_integrations,
+        default_integrations=default_integrations,
+        auto_enabling_integrations=auto_enabling_integrations,
+        disabled_integrations=disabled_integrations,
+    )
+    assert {
+        type(integration) for integration in get_client().integrations.values()
+    } == expected_integrations
 
 
 @pytest.mark.skip(
