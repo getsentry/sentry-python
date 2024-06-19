@@ -781,7 +781,7 @@ def test_receive_latency(init_celery, capture_events):
     (span,) = event["spans"]
     assert "messaging.message.receive.latency" in span["data"]
     assert span["data"]["messaging.message.receive.latency"] > 0
-    
+
 
 def tests_span_origin_consumer(init_celery, capture_events):
     celery = init_celery(enable_tracing=True)
