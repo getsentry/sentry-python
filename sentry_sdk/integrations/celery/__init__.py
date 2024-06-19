@@ -71,10 +71,9 @@ class CeleryIntegration(Integration):
         self.monitor_beat_tasks = monitor_beat_tasks
         self.exclude_beat_tasks = exclude_beat_tasks
 
-        if monitor_beat_tasks:
-            _patch_beat_apply_entry()
-            _patch_redbeat_maybe_due()
-            _setup_celery_beat_signals()
+        _patch_beat_apply_entry()
+        _patch_redbeat_maybe_due()
+        _setup_celery_beat_signals(monitor_beat_tasks)
 
     @staticmethod
     def setup_once():
@@ -168,11 +167,11 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
     """
     updated_headers = original_headers.copy()
     with capture_internal_exceptions():
-        headers = {}
-        if span is not None:
-            headers = dict(
-                Scope.get_current_scope().iter_trace_propagation_headers(span=span)
-            )
+        # if span is None (when the task was started by Celery Beat)
+        # this will return the trace headers from the scope.
+        headers = dict(
+            Scope.get_isolation_scope().iter_trace_propagation_headers(span=span)
+        )
 
         if monitor_beat_tasks:
             headers.update(
@@ -181,6 +180,12 @@ def _update_celery_task_headers(original_headers, span, monitor_beat_tasks):
                     % _now_seconds_since_epoch(),
                 }
             )
+
+        # Add the time the task was enqueued to the headers
+        # This is used in the consumer to calculate the latency
+        updated_headers.update(
+            {"sentry-task-enqueued-time": _now_seconds_since_epoch()}
+        )
 
         if headers:
             existing_baggage = updated_headers.get(BAGGAGE_HEADER_NAME)
@@ -368,12 +373,28 @@ def _wrap_task_call(task, f):
                 origin=CeleryIntegration.origin,
             ) as span:
                 _set_messaging_destination_name(task, span)
+
+                latency = None
+                with capture_internal_exceptions():
+                    if (
+                        task.request.headers is not None
+                        and "sentry-task-enqueued-time" in task.request.headers
+                    ):
+                        latency = _now_seconds_since_epoch() - task.request.headers.pop(
+                            "sentry-task-enqueued-time"
+                        )
+
+                if latency is not None:
+                    span.set_data(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+
                 with capture_internal_exceptions():
                     span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+
                 with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
                     )
+
                 with capture_internal_exceptions():
                     span.set_data(
                         SPANDATA.MESSAGING_SYSTEM,
