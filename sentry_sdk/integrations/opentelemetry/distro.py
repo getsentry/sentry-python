@@ -12,7 +12,7 @@ from sentry_sdk._types import TYPE_CHECKING
 
 try:
     from opentelemetry import trace
-    from opentelemetry.instrumentation.distro import BaseDistro
+    from opentelemetry.instrumentation.distro import BaseDistro  # type: ignore[attr-defined]
     from opentelemetry.propagate import set_global_textmap
     from opentelemetry.sdk.trace import TracerProvider
 except ImportError:
