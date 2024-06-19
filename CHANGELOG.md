@@ -2,8 +2,6 @@
 
 ## 2.6.0
 
-### Various fixes & improvements
-
 - Introduce continuous profiling mode (#2830) by @Zylphrex
 - Profiling: Add deprecation comment for profiler internals (#3167) by @sentrivana
 - Profiling: Move thread data to trace context (#3157) by @Zylphrex
