@@ -58,6 +58,7 @@ CELERY_CONTROL_FLOW_EXCEPTIONS = (Retry, Ignore, Reject)
 
 class CeleryIntegration(Integration):
     identifier = "celery"
+    origin = f"auto.queue.{identifier}"
 
     def __init__(
         self,
@@ -261,7 +262,11 @@ def _wrap_apply_async(f):
         )
 
         span_mgr = (
-            sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_CELERY, description=task.name)
+            sentry_sdk.start_span(
+                op=OP.QUEUE_SUBMIT_CELERY,
+                description=task.name,
+                origin=CeleryIntegration.origin,
+            )
             if not task_started_from_beat
             else NoOpMgr()
         )  # type: Union[Span, NoOpMgr]
@@ -304,6 +309,7 @@ def _wrap_tracer(task, f):
                     op=OP.QUEUE_TASK_CELERY,
                     name="unknown celery task",
                     source=TRANSACTION_SOURCE_TASK,
+                    origin=CeleryIntegration.origin,
                 )
                 transaction.name = task.name
                 transaction.set_status("ok")
@@ -357,7 +363,9 @@ def _wrap_task_call(task, f):
         # type: (*Any, **Any) -> Any
         try:
             with sentry_sdk.start_span(
-                op=OP.QUEUE_PROCESS, description=task.name
+                op=OP.QUEUE_PROCESS,
+                description=task.name,
+                origin=CeleryIntegration.origin,
             ) as span:
                 _set_messaging_destination_name(task, span)
                 with capture_internal_exceptions():
@@ -462,7 +470,11 @@ def _patch_producer_publish():
         routing_key = kwargs.get("routing_key")
         exchange = kwargs.get("exchange")
 
-        with sentry_sdk.start_span(op=OP.QUEUE_PUBLISH, description=task_name) as span:
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_PUBLISH,
+            description=task_name,
+            origin=CeleryIntegration.origin,
+        ) as span:
             if task_id is not None:
                 span.set_data(SPANDATA.MESSAGING_MESSAGE_ID, task_id)
 
