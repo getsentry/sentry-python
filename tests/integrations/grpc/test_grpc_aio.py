@@ -255,8 +255,8 @@ class TestService(gRPCTestServiceServicer):
     @classmethod
     async def TestServe(cls, request, context):  # noqa: N802
         with start_span(
-            op="test", 
-            description="test", 
+            op="test",
+            description="test",
             origin="auto.grpc.grpc.TestService.aio",
         ):
             pass
@@ -285,17 +285,17 @@ class TestService(gRPCTestServiceServicer):
         return requests.pop()
 
 
-# @pytest.mark.asyncio
-# async def test_span_origin(capture_events, grpc_server):
-#     events = capture_events()
+@pytest.mark.asyncio
+async def test_span_origin(capture_events, grpc_server):
+    events = capture_events()
 
-#     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
-#         stub = gRPCTestServiceStub(channel)
-#         await stub.TestServe(gRPCTestMessage(text="test"))
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        await stub.TestServe(gRPCTestMessage(text="test"))
 
-#     (event,) = events
+    (event,) = events
 
-#     # import ipdb; ipdb.set_trace()
-#     assert event["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
+    # import ipdb; ipdb.set_trace()
+    assert event["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
 
-#     assert event["spans"][0]["origin"] == "auto.grpc.grpc"
+    assert event["spans"][0]["origin"] == "auto.grpc.grpc"

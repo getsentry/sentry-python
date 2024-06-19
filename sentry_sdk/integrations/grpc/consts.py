@@ -1,1 +1,1 @@
-SPAN_ORIGIN = f"auto.grpc.grpc"
+SPAN_ORIGIN = "auto.grpc.grpc"
