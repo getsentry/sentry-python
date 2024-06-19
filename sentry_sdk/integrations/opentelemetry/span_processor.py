@@ -307,62 +307,65 @@ class SentrySpanProcessor(SpanProcessor):
         Convert OTel span data and update the Sentry span with it.
         This should eventually happen on the server when ingesting the spans.
         """
-        if otel_span.attributes is not None:
-            for key, val in otel_span.attributes.items():
-                sentry_span.set_data(key, val)
-
         sentry_span.set_data("otel.kind", otel_span.kind)
 
         op = otel_span.name
         description = otel_span.name
 
-        http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD, None)
-        db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM, None)
+        if otel_span.attributes is not None:
+            for key, val in otel_span.attributes.items():
+                sentry_span.set_data(key, val)
 
-        if http_method:
-            op = "http"
+            http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD, None)
+            db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM, None)
 
-            if otel_span.kind == SpanKind.SERVER:
-                op += ".server"
-            elif otel_span.kind == SpanKind.CLIENT:
-                op += ".client"
+            if http_method:
+                op = "http"
 
-            description = http_method
+                if otel_span.kind == SpanKind.SERVER:
+                    op += ".server"
+                elif otel_span.kind == SpanKind.CLIENT:
+                    op += ".client"
 
-            peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
-            if peer_name:
-                description += " {}".format(peer_name)
+                description = http_method
 
-            target = otel_span.attributes.get(SpanAttributes.HTTP_TARGET, None)
-            if target:
-                description += " {}".format(target)
+                peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
+                if peer_name:
+                    description += " {}".format(peer_name)
 
-            if not peer_name and not target:
-                url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
-                if url:
-                    parsed_url = urlparse(url)
-                    url = "{}://{}{}".format(
-                        parsed_url.scheme, parsed_url.netloc, parsed_url.path
-                    )
-                    description += " {}".format(url)
+                target = otel_span.attributes.get(SpanAttributes.HTTP_TARGET, None)
+                if target:
+                    description += " {}".format(target)
 
-            status_code = otel_span.attributes.get(
-                SpanAttributes.HTTP_STATUS_CODE, None
-            )
-            if status_code:
-                sentry_span.set_http_status(status_code)
+                if not peer_name and not target:
+                    url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
+                    if url:
+                        parsed_url = urlparse(url)
+                        url = "{}://{}{}".format(
+                            parsed_url.scheme, parsed_url.netloc, parsed_url.path
+                        )
+                        description += " {}".format(url)
 
-        elif db_query:
-            op = "db"
-            statement = otel_span.attributes.get(SpanAttributes.DB_STATEMENT, None)
-            if statement:
-                description = statement
+                status_code = otel_span.attributes.get(
+                    SpanAttributes.HTTP_STATUS_CODE, None
+                )
+                if status_code:
+                    sentry_span.set_http_status(status_code)
+
+            elif db_query:
+                op = "db"
+                statement = otel_span.attributes.get(SpanAttributes.DB_STATEMENT, None)
+                if statement:
+                    description = statement
 
         sentry_span.op = op
         sentry_span.description = description
 
     def _update_transaction_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
+        if otel_span.attributes is None:
+            return
+
         http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD)
 
         if http_method:

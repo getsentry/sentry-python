@@ -43,7 +43,7 @@ class SentryPropagator(TextMapPropagator):
     """
 
     def extract(self, carrier, context=None, getter=default_getter):
-        # type: (CarrierT, Optional[Context], Getter) -> Context
+        # type: (CarrierT, Optional[Context], Getter[CarrierT]) -> Context
         if context is None:
             context = get_current()
 
@@ -85,7 +85,7 @@ class SentryPropagator(TextMapPropagator):
         return modified_context
 
     def inject(self, carrier, context=None, setter=default_setter):
-        # type: (CarrierT, Optional[Context], Setter) -> None
+        # type: (CarrierT, Optional[Context], Setter[CarrierT]) -> None
         if context is None:
             context = get_current()
 
