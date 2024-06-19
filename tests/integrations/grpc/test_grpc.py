@@ -1,5 +1,6 @@
-import grpc
 import os
+
+import grpc
 import pytest
 
 from concurrent import futures

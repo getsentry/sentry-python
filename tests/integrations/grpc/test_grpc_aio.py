@@ -12,8 +12,8 @@ from sentry_sdk.integrations.grpc import GRPCIntegration
 from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
-    gRPCTestServiceServicer,
     add_gRPCTestServiceServicer_to_server,
+    gRPCTestServiceServicer,
     gRPCTestServiceStub,
 )
 
@@ -29,8 +29,23 @@ def event_loop(request):
     loop.close()
 
 
+@pytest_asyncio.fixture(scope="function")
+async def grpc_server(sentry_init, event_loop):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    server = grpc.aio.server()
+    server.add_insecure_port("[::]:{}".format(AIO_PORT))
+    add_gRPCTestServiceServicer_to_server(TestService, server)
+
+    await event_loop.create_task(server.start())
+
+    try:
+        yield server
+    finally:
+        await server.stop(None)
+
+
 @pytest.mark.asyncio
-async def test_noop_for_unimplemented_method(sentry_init, capture_events, event_loop):
+async def test_noop_for_unimplemented_method(event_loop, sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
     server = grpc.aio.server()
     server.add_insecure_port("[::]:{}".format(AIO_PORT))
@@ -52,23 +67,8 @@ async def test_noop_for_unimplemented_method(sentry_init, capture_events, event_
     assert not events
 
 
-@pytest_asyncio.fixture(scope="function")
-async def grpc_server(sentry_init, event_loop):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    server = grpc.aio.server()
-    server.add_insecure_port("[::]:{}".format(AIO_PORT))
-    add_gRPCTestServiceServicer_to_server(TestService, server)
-
-    await event_loop.create_task(server.start())
-
-    try:
-        yield server
-    finally:
-        await server.stop(None)
-
-
 @pytest.mark.asyncio
-async def test_grpc_server_starts_transaction(capture_events, grpc_server):
+async def test_grpc_server_starts_transaction(grpc_server, capture_events):
     events = capture_events()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -87,7 +87,7 @@ async def test_grpc_server_starts_transaction(capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_continues_transaction(capture_events, grpc_server):
+async def test_grpc_server_continues_transaction(grpc_server, capture_events):
     events = capture_events()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -127,7 +127,7 @@ async def test_grpc_server_continues_transaction(capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_exception(capture_events, grpc_server):
+async def test_grpc_server_exception(grpc_server, capture_events):
     events = capture_events()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -147,7 +147,7 @@ async def test_grpc_server_exception(capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
-async def test_grpc_server_abort(capture_events, grpc_server):
+async def test_grpc_server_abort(grpc_server, capture_events):
     events = capture_events()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -162,9 +162,7 @@ async def test_grpc_server_abort(capture_events, grpc_server):
 
 
 @pytest.mark.asyncio
-async def test_grpc_client_starts_span(
-    grpc_server, sentry_init, capture_events_forksafe
-):
+async def test_grpc_client_starts_span(grpc_server, capture_events_forksafe):
     events = capture_events_forksafe()
 
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -224,7 +222,8 @@ async def test_grpc_client_unary_stream_starts_span(
 
 @pytest.mark.asyncio
 async def test_stream_stream(grpc_server):
-    """Test to verify stream-stream works.
+    """
+    Test to verify stream-stream works.
     Tracing not supported for it yet.
     """
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
@@ -236,13 +235,40 @@ async def test_stream_stream(grpc_server):
 
 @pytest.mark.asyncio
 async def test_stream_unary(grpc_server):
-    """Test to verify stream-stream works.
+    """
+    Test to verify stream-stream works.
     Tracing not supported for it yet.
     """
     async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
         stub = gRPCTestServiceStub(channel)
         response = await stub.TestStreamUnary((gRPCTestMessage(text="test"),))
         assert response.text == "test"
+
+
+@pytest.mark.asyncio
+async def test_span_origin(grpc_server, capture_events_forksafe):
+    events = capture_events_forksafe()
+
+    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
+        stub = gRPCTestServiceStub(channel)
+        with start_transaction(name="custom_transaction"):
+            await stub.TestServe(gRPCTestMessage(text="test"))
+
+    events.write_file.close()
+
+    transaction_from_integration = events.read_event()
+    custom_transaction = events.read_event()
+
+    assert (
+        transaction_from_integration["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
+    )
+    assert (
+        transaction_from_integration["spans"][0]["origin"]
+        == "auto.grpc.grpc.TestService.aio"
+    )  # manually created in TestService, not the instrumentation
+
+    assert custom_transaction["contexts"]["trace"]["origin"] == "manual"
+    assert custom_transaction["spans"][0]["origin"] == "auto.grpc.grpc"
 
 
 class TestService(gRPCTestServiceServicer):
@@ -283,19 +309,3 @@ class TestService(gRPCTestServiceServicer):
     async def TestStreamUnary(cls, request, context):  # noqa: N802
         requests = [r async for r in request]
         return requests.pop()
-
-
-@pytest.mark.asyncio
-async def test_span_origin(capture_events, grpc_server):
-    events = capture_events()
-
-    async with grpc.aio.insecure_channel("localhost:{}".format(AIO_PORT)) as channel:
-        stub = gRPCTestServiceStub(channel)
-        await stub.TestServe(gRPCTestMessage(text="test"))
-
-    (event,) = events
-
-    # import ipdb; ipdb.set_trace()
-    assert event["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
-
-    assert event["spans"][0]["origin"] == "auto.grpc.grpc"
