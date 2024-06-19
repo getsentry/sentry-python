@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.6.0
+
+### SDK Core (ongoing)
+
+By: @spladug (#3072)
+
+### Continuous Profiling (ongoing)
+
+By: @Zylphrex (#2830)
+
+### Various fixes & improvements
+
+- Added contributor image to readme (#3183) by @antonpirker
+- fix(tracing): Keep original function signature when decorated (#3178) by @sentrivana
+- Cleaning up ASGI tests for Django (#3180) by @antonpirker
+- Reapply "Refactor the Celery Beat integration (#3105)" (#3144) (#3175) by @antonpirker
+- Add Celery receive latency (#3174) by @antonpirker
+- Add deprecation comment for profiler internals (#3167) by @sentrivana
+- ref(metrics): Update type hints for tag values (#3156) by @elramen
+- fix(profiling): Move thread data to trace context (#3157) by @Zylphrex
+- fix(django): Fix psycopg3 reconnect error (#3111) by @szokeasaurusrex
+- build(deps): bump actions/checkout from 4.1.4 to 4.1.6 (#3147) by @dependabot
+- build(deps): bump checkouts/data-schemas from `59f9683` to `8c13457` (#3146) by @dependabot
+
 ## 2.5.1
 
 This change fixes a regression in our cron monitoring feature, which caused cron checkins not to be sent. The regression appears to have been introduced in version 2.4.0.
