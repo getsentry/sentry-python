@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
@@ -103,6 +104,13 @@ if TYPE_CHECKING:
 
         baggage: "Baggage"
         """The W3C baggage header value. (see https://www.w3.org/TR/baggage/)"""
+
+    ProfileContext = TypedDict(
+        "ProfileContext",
+        {
+            "profiler.id": str,
+        },
+    )
 
 
 BAGGAGE_HEADER_NAME = "baggage"
@@ -258,6 +266,7 @@ class Span:
 
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
+        self.set_profiler_id(get_profiler_id())
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -513,6 +522,11 @@ class Span:
             if thread_name is not None:
                 self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
+    def set_profiler_id(self, profiler_id):
+        # type: (Optional[str]) -> None
+        if profiler_id is not None:
+            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
+
     def set_http_status(self, http_status):
         # type: (int) -> None
         self.set_tag(
@@ -644,7 +658,30 @@ class Span:
                 self.containing_transaction.get_baggage().dynamic_sampling_context()
             )
 
+        data = {}
+
+        thread_id = self._data.get(SPANDATA.THREAD_ID)
+        if thread_id is not None:
+            data["thread.id"] = thread_id
+
+        thread_name = self._data.get(SPANDATA.THREAD_NAME)
+        if thread_name is not None:
+            data["thread.name"] = thread_name
+
+        if data:
+            rv["data"] = data
+
         return rv
+
+    def get_profile_context(self):
+        # type: () -> Optional[ProfileContext]
+        profiler_id = self._data.get(SPANDATA.PROFILER_ID)
+        if profiler_id is None:
+            return None
+
+        return {
+            "profiler.id": profiler_id,
+        }
 
 
 class Transaction(Span):
@@ -695,7 +732,9 @@ class Transaction(Span):
         self.parent_sampled = parent_sampled
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
-        self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
+        self._profile = (
+            None
+        )  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
         self._baggage = baggage
 
     def __repr__(self):
@@ -838,6 +877,9 @@ class Transaction(Span):
         contexts = {}
         contexts.update(self._contexts)
         contexts.update({"trace": self.get_trace_context()})
+        profile_context = self.get_profile_context()
+        if profile_context is not None:
+            contexts.update({"profile": profile_context})
 
         event = {
             "type": "transaction",
@@ -1072,6 +1114,10 @@ class NoOpSpan(Span):
         return {}
 
     def get_trace_context(self):
+        # type: () -> Any
+        return {}
+
+    def get_profile_context(self):
         # type: () -> Any
         return {}
 

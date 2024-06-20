@@ -22,7 +22,8 @@ except ImportError:
 import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import _processed_integrations  # noqa: F401
-from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.transaction_profiler import teardown_profiler
+from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
 
@@ -538,8 +539,15 @@ def object_described_by_matcher():
 
 @pytest.fixture
 def teardown_profiling():
-    yield
+    # Make sure that a previous test didn't leave the profiler running
     teardown_profiler()
+    teardown_continuous_profiler()
+
+    yield
+
+    # Make sure that to shut down the profiler after the test
+    teardown_profiler()
+    teardown_continuous_profiler()
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
