@@ -1,23 +1,18 @@
 import threading
+import kombu
+from unittest import mock
 
 import pytest
+from celery import Celery, VERSION
+from celery.bin import worker
 
 from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
-    _get_headers,
     _wrap_apply_async,
 )
-
-from sentry_sdk._compat import text_type
-
-from celery import Celery, VERSION
-from celery.bin import worker
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk.integrations.celery.beat import _get_headers
+from tests.conftest import ApproxDict
 
 
 @pytest.fixture
@@ -31,10 +26,20 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", **kwargs):
+    def inner(
+        propagate_traces=True,
+        backend="always_eager",
+        monitor_beat_tasks=False,
+        **kwargs,
+    ):
         sentry_init(
-            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
-            **kwargs
+            integrations=[
+                CeleryIntegration(
+                    propagate_traces=propagate_traces,
+                    monitor_beat_tasks=monitor_beat_tasks,
+                )
+            ],
+            **kwargs,
         )
         celery = Celery(__name__)
 
@@ -160,11 +165,11 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
 
         assert (
             error_event["contexts"]["trace"]["trace_id"]
-            == scope._propagation_context["trace_id"]
+            == scope._propagation_context.trace_id
         )
         assert (
             error_event["contexts"]["trace"]["span_id"]
-            != scope._propagation_context["span_id"]
+            != scope._propagation_context.span_id
         )
         assert error_event["transaction"] == "dummy_task"
         assert "celery_task_id" in error_event["tags"]
@@ -215,9 +220,20 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
     else:
         assert execution_event["contexts"]["trace"]["status"] == "ok"
 
-    assert execution_event["spans"] == []
+    assert len(execution_event["spans"]) == 1
+    assert (
+        execution_event["spans"][0].items()
+        >= {
+            "trace_id": str(transaction.trace_id),
+            "same_process_as_parent": True,
+            "op": "queue.process",
+            "description": "dummy_task",
+            "data": ApproxDict(),
+        }.items()
+    )
     assert submission_event["spans"] == [
         {
+            "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
@@ -225,7 +241,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "span_id": submission_event["spans"][0]["span_id"],
             "start_timestamp": submission_event["spans"][0]["start_timestamp"],
             "timestamp": submission_event["spans"][0]["timestamp"],
-            "trace_id": text_type(transaction.trace_id),
+            "trace_id": str(transaction.trace_id),
         }
     ]
 
@@ -285,6 +301,9 @@ def test_ignore_expected(capture_events, celery):
     assert not events
 
 
+@pytest.mark.skip(
+    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
+)
 def test_broken_prerun(init_celery, connect_signal):
     from celery.signals import task_prerun
 
@@ -358,11 +377,12 @@ def test_retry(celery, capture_events):
         assert e["type"] == "ZeroDivisionError"
 
 
-# TODO: This test is hanging when running test with `tox --parallel auto`. Find out why and fix it!
-@pytest.mark.skip
+@pytest.mark.skip(
+    reason="This test is hanging when running test with `tox --parallel auto`. TODO: Figure out why and fix it!"
+)
 @pytest.mark.forked
 def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
-    celery = init_celery(traces_sample_rate=1.0, backend="redis", debug=True)
+    celery = init_celery(traces_sample_rate=1.0, backend="redis")
 
     events = capture_events_forksafe()
 
@@ -416,11 +436,24 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
 @pytest.mark.parametrize("newrelic_order", ["sentry_first", "sentry_last"])
 def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
-        import celery.app.trace as celery_mod
-        from newrelic.hooks.application_celery import instrument_celery_execute_trace
+        try:
+            # older newrelic versions
+            from newrelic.hooks.application_celery import (
+                instrument_celery_execute_trace,
+            )
+            import celery.app.trace as celery_trace_module
 
-        assert hasattr(celery_mod, "build_tracer")
-        instrument_celery_execute_trace(celery_mod)
+            assert hasattr(celery_trace_module, "build_tracer")
+            instrument_celery_execute_trace(celery_trace_module)
+
+        except ImportError:
+            # newer newrelic versions
+            from newrelic.hooks.application_celery import instrument_celery_app_base
+            import celery.app as celery_app_module
+
+            assert hasattr(celery_app_module, "Celery")
+            assert hasattr(celery_app_module.Celery, "send_task")
+            instrument_celery_app_base(celery_app_module)
 
     if newrelic_order == "sentry_first":
         celery = init_celery()
@@ -502,7 +535,14 @@ def test_task_headers(celery):
     # in the monkey patched version of `apply_async`
     # in `sentry_sdk/integrations/celery.py::_wrap_apply_async()`
     result = dummy_task.apply_async(args=(1, 0), headers=sentry_crons_setup)
-    assert result.get() == sentry_crons_setup
+
+    expected_headers = sentry_crons_setup.copy()
+    # Newly added headers
+    expected_headers["sentry-trace"] = mock.ANY
+    expected_headers["baggage"] = mock.ANY
+    expected_headers["sentry-task-enqueued-time"] = mock.ANY
+
+    assert result.get() == expected_headers
 
 
 def test_baggage_propagation(init_celery):
@@ -575,26 +615,6 @@ def test_apply_async_manually_span(sentry_init):
     wrapped(mock.MagicMock(), (), headers={})
 
 
-def test_apply_async_from_beat_no_span(sentry_init):
-    sentry_init(
-        integrations=[CeleryIntegration()],
-    )
-
-    def dummy_function(*args, **kwargs):
-        headers = kwargs.get("headers")
-        assert "sentry-trace" not in headers
-        assert "baggage" not in headers
-
-    wrapped = _wrap_apply_async(dummy_function)
-    wrapped(
-        mock.MagicMock(),
-        [
-            "BEAT",
-        ],
-        headers={},
-    )
-
-
 def test_apply_async_no_args(init_celery):
     celery = init_celery()
 
@@ -608,3 +628,155 @@ def test_apply_async_no_args(init_celery):
         pytest.fail("Calling `apply_async` without arguments raised a TypeError")
 
     assert result.get() == "success"
+
+
+@pytest.mark.parametrize("routing_key", ("celery", "custom"))
+@mock.patch("celery.app.task.Task.request")
+def test_messaging_destination_name_default_exchange(
+    mock_request, routing_key, init_celery, capture_events
+):
+    celery_app = init_celery(enable_tracing=True)
+    events = capture_events()
+    mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
+
+    @celery_app.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.destination.name"] == routing_key
+
+
+@mock.patch("celery.app.task.Task.request")
+def test_messaging_destination_name_nondefault_exchange(
+    mock_request, init_celery, capture_events
+):
+    """
+    Currently, we only capture the routing key as the messaging.destination.name when
+    we are using the default exchange (""). This is because the default exchange ensures
+    that the routing key is the queue name. Other exchanges may not guarantee this
+    behavior.
+    """
+    celery_app = init_celery(enable_tracing=True)
+    events = capture_events()
+    mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
+
+    @celery_app.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.destination.name" not in span["data"]
+
+
+def test_messaging_id(init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    events = capture_events()
+
+    @celery.task
+    def example_task(): ...
+
+    example_task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.message.id" in span["data"]
+
+
+def test_retry_count_zero(init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.message.retry.count"] == 0
+
+
+@mock.patch("celery.app.task.Task.request")
+def test_retry_count_nonzero(mock_request, init_celery, capture_events):
+    mock_request.retries = 3
+
+    celery = init_celery(enable_tracing=True)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.message.retry.count"] == 3
+
+
+@pytest.mark.parametrize("system", ("redis", "amqp"))
+def test_messaging_system(system, init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    events = capture_events()
+
+    # Does not need to be a real URL, since we use always eager
+    celery.conf.broker_url = f"{system}://example.com"  # noqa: E231
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert span["data"]["messaging.system"] == system
+
+
+@pytest.mark.parametrize("system", ("amqp", "redis"))
+def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
+    old_publish = kombu.messaging.Producer._publish
+
+    def publish(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    with start_transaction():
+        task.apply_async()
+
+    (event,) = events
+    span = next(span for span in event["spans"] if span["op"] == "queue.publish")
+
+    assert span["data"]["messaging.system"] == system
+
+    assert span["data"]["messaging.destination.name"] == "celery"
+    assert "messaging.message.id" in span["data"]
+    assert span["data"]["messaging.message.retry.count"] == 0
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+def test_receive_latency(init_celery, capture_events):
+    celery = init_celery(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.message.receive.latency" in span["data"]
+    assert span["data"]["messaging.message.receive.latency"] > 0

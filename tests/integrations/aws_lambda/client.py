@@ -386,12 +386,14 @@ else:
                 _REPL_CODE.format(line=line),
                 b"",
                 cleanup.append,
-                subprocess_kwargs={
-                    "stdout": subprocess.DEVNULL,
-                    "stderr": subprocess.DEVNULL,
-                }
-                if not verbose
-                else {},
+                subprocess_kwargs=(
+                    {
+                        "stdout": subprocess.DEVNULL,
+                        "stderr": subprocess.DEVNULL,
+                    }
+                    if not verbose
+                    else {}
+                ),
             )
 
             for line in base64.b64decode(response["LogResult"]).splitlines():

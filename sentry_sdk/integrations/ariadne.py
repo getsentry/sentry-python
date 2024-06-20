@@ -1,11 +1,13 @@
 from importlib import import_module
 
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk import get_client, capture_event
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     package_version,
 )
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
     from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
     from graphql.language.ast import DocumentNode  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 class AriadneIntegration(Integration):
@@ -51,73 +53,60 @@ def _patch_graphql():
     old_handle_errors = ariadne_graphql.handle_graphql_errors
     old_handle_query_result = ariadne_graphql.handle_query_result
 
+    @ensure_integration_enabled(AriadneIntegration, old_parse_query)
     def _sentry_patched_parse_query(context_value, query_parser, data):
         # type: (Optional[Any], Optional[QueryParser], Any) -> DocumentNode
-        hub = Hub.current
-        integration = hub.get_integration(AriadneIntegration)
-        if integration is None:
-            return old_parse_query(context_value, query_parser, data)
-
-        with hub.configure_scope() as scope:
-            event_processor = _make_request_event_processor(data)
-            scope.add_event_processor(event_processor)
+        event_processor = _make_request_event_processor(data)
+        Scope.get_isolation_scope().add_event_processor(event_processor)
 
         result = old_parse_query(context_value, query_parser, data)
         return result
 
+    @ensure_integration_enabled(AriadneIntegration, old_handle_errors)
     def _sentry_patched_handle_graphql_errors(errors, *args, **kwargs):
         # type: (List[GraphQLError], Any, Any) -> GraphQLResult
-        hub = Hub.current
-        integration = hub.get_integration(AriadneIntegration)
-        if integration is None:
-            return old_handle_errors(errors, *args, **kwargs)
-
         result = old_handle_errors(errors, *args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            event_processor = _make_response_event_processor(result[1])
-            scope.add_event_processor(event_processor)
+        event_processor = _make_response_event_processor(result[1])
+        Scope.get_isolation_scope().add_event_processor(event_processor)
 
-        if hub.client:
+        client = get_client()
+        if client.is_active():
             with capture_internal_exceptions():
                 for error in errors:
                     event, hint = event_from_exception(
                         error,
-                        client_options=hub.client.options,
+                        client_options=client.options,
                         mechanism={
-                            "type": integration.identifier,
+                            "type": AriadneIntegration.identifier,
                             "handled": False,
                         },
                     )
-                    hub.capture_event(event, hint=hint)
+                    capture_event(event, hint=hint)
 
         return result
 
+    @ensure_integration_enabled(AriadneIntegration, old_handle_query_result)
     def _sentry_patched_handle_query_result(result, *args, **kwargs):
         # type: (Any, Any, Any) -> GraphQLResult
-        hub = Hub.current
-        integration = hub.get_integration(AriadneIntegration)
-        if integration is None:
-            return old_handle_query_result(result, *args, **kwargs)
-
         query_result = old_handle_query_result(result, *args, **kwargs)
 
-        with hub.configure_scope() as scope:
-            event_processor = _make_response_event_processor(query_result[1])
-            scope.add_event_processor(event_processor)
+        event_processor = _make_response_event_processor(query_result[1])
+        Scope.get_isolation_scope().add_event_processor(event_processor)
 
-        if hub.client:
+        client = get_client()
+        if client.is_active():
             with capture_internal_exceptions():
                 for error in result.errors or []:
                     event, hint = event_from_exception(
                         error,
-                        client_options=hub.client.options,
+                        client_options=client.options,
                         mechanism={
-                            "type": integration.identifier,
+                            "type": AriadneIntegration.identifier,
                             "handled": False,
                         },
                     )
-                    hub.capture_event(event, hint=hint)
+                    capture_event(event, hint=hint)
 
         return query_result
 
@@ -131,7 +120,7 @@ def _make_request_event_processor(data):
     """Add request data and api_target to events."""
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         if not isinstance(data, dict):
             return event
 
@@ -143,8 +132,8 @@ def _make_request_event_processor(data):
             except (TypeError, ValueError):
                 return event
 
-            if _should_send_default_pii() and request_body_within_bounds(
-                Hub.current.client, content_length
+            if should_send_default_pii() and request_body_within_bounds(
+                get_client(), content_length
             ):
                 request_info = event.setdefault("request", {})
                 request_info["api_target"] = "graphql"
@@ -163,9 +152,9 @@ def _make_response_event_processor(response):
     """Add response data to the event's response context."""
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
-            if _should_send_default_pii() and response.get("errors"):
+            if should_send_default_pii() and response.get("errors"):
                 contexts = event.setdefault("contexts", {})
                 contexts["response"] = {
                     "data": response,

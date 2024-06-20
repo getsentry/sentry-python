@@ -1,12 +1,8 @@
-from __future__ import absolute_import
+from unittest import mock
 
 import pytest
 import django
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from django.utils.translation import pgettext_lazy
 
 
 # django<2.0 has only `url` with regex based patterns.
@@ -121,3 +117,14 @@ def test_resolver_path_no_converter():
     resolver = RavenResolver()
     result = resolver.resolve("/api/v4/myproject", url_conf)
     assert result == "/api/v4/{project_id}"
+
+
+@pytest.mark.skipif(
+    django.VERSION < (2, 0),
+    reason="Django>=2.0 required for path patterns",
+)
+def test_resolver_path_with_i18n():
+    url_conf = (path(pgettext_lazy("url", "pgettext"), lambda x: ""),)
+    resolver = RavenResolver()
+    result = resolver.resolve("/pgettext", url_conf)
+    assert result == "/pgettext"

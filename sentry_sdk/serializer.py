@@ -1,6 +1,6 @@
 import sys
 import math
-
+from collections.abc import Mapping, Sequence, Set
 from datetime import datetime
 
 from sentry_sdk.utils import (
@@ -10,14 +10,6 @@ from sentry_sdk.utils import (
     format_timestamp,
     safe_repr,
     strip_string,
-)
-from sentry_sdk._compat import (
-    text_type,
-    PY2,
-    string_types,
-    number_types,
-    iteritems,
-    binary_sequence_types,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -41,20 +33,8 @@ if TYPE_CHECKING:
     Segment = Union[str, int]
 
 
-if PY2:
-    # Importing ABCs from collections is deprecated, and will stop working in 3.8
-    # https://github.com/python/cpython/blob/master/Lib/collections/__init__.py#L49
-    from collections import Mapping, Sequence, Set
-
-    serializable_str_types = string_types + binary_sequence_types
-
-else:
-    # New in 3.3
-    # https://docs.python.org/3/library/collections.abc.html
-    from collections.abc import Mapping, Sequence, Set
-
-    # Bytes are technically not strings in Python 3, but we can serialize them
-    serializable_str_types = string_types + binary_sequence_types
+# Bytes are technically not strings in Python 3, but we can serialize them
+serializable_str_types = (str, bytes, bytearray, memoryview)
 
 
 # Maximum length of JSON-serialized event payloads that can be safely sent
@@ -82,7 +62,7 @@ def add_global_repr_processor(processor):
     global_repr_processors.append(processor)
 
 
-class Memo(object):
+class Memo:
     __slots__ = ("_ids", "_objs")
 
     def __init__(self):
@@ -130,7 +110,7 @@ def serialize(event, **kwargs):
         while len(meta_stack) <= len(path):
             try:
                 segment = path[len(meta_stack) - 1]
-                node = meta_stack[-1].setdefault(text_type(segment), {})
+                node = meta_stack[-1].setdefault(str(segment), {})
             except IndexError:
                 node = {}
 
@@ -310,7 +290,7 @@ def serialize(event, **kwargs):
 
         sentry_repr = getattr(type(obj), "__sentry_repr__", None)
 
-        if obj is None or isinstance(obj, (bool, number_types)):
+        if obj is None or isinstance(obj, (bool, int, float)):
             if should_repr_strings or (
                 isinstance(obj, float) and (math.isinf(obj) or math.isnan(obj))
             ):
@@ -323,7 +303,7 @@ def serialize(event, **kwargs):
 
         elif isinstance(obj, datetime):
             return (
-                text_type(format_timestamp(obj))
+                str(format_timestamp(obj))
                 if not should_repr_strings
                 else safe_repr(obj)
             )
@@ -331,26 +311,26 @@ def serialize(event, **kwargs):
         elif isinstance(obj, Mapping):
             # Create temporary copy here to avoid calling too much code that
             # might mutate our dictionary while we're still iterating over it.
-            obj = dict(iteritems(obj))
+            obj = dict(obj.items())
 
             rv_dict = {}  # type: Dict[str, Any]
             i = 0
 
-            for k, v in iteritems(obj):
+            for k, v in obj.items():
                 if remaining_breadth is not None and i >= remaining_breadth:
                     _annotate(len=len(obj))
                     break
 
-                str_k = text_type(k)
+                str_k = str(k)
                 v = _serialize_node(
                     v,
                     segment=str_k,
                     should_repr_strings=should_repr_strings,
                     is_databag=is_databag,
                     is_request_body=is_request_body,
-                    remaining_depth=remaining_depth - 1
-                    if remaining_depth is not None
-                    else None,
+                    remaining_depth=(
+                        remaining_depth - 1 if remaining_depth is not None else None
+                    ),
                     remaining_breadth=remaining_breadth,
                 )
                 rv_dict[str_k] = v
@@ -375,9 +355,9 @@ def serialize(event, **kwargs):
                         should_repr_strings=should_repr_strings,
                         is_databag=is_databag,
                         is_request_body=is_request_body,
-                        remaining_depth=remaining_depth - 1
-                        if remaining_depth is not None
-                        else None,
+                        remaining_depth=(
+                            remaining_depth - 1 if remaining_depth is not None else None
+                        ),
                         remaining_breadth=remaining_breadth,
                     )
                 )
@@ -390,7 +370,7 @@ def serialize(event, **kwargs):
             if isinstance(obj, bytes) or isinstance(obj, bytearray):
                 obj = obj.decode("utf-8", "replace")
 
-            if not isinstance(obj, string_types):
+            if not isinstance(obj, str):
                 obj = safe_repr(obj)
 
         is_span_description = (

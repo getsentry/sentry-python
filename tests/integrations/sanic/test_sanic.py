@@ -7,8 +7,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from sentry_sdk import capture_message, configure_scope
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
 
 from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
@@ -233,13 +234,13 @@ def test_concurrency(sentry_init, app):
 
     @app.route("/context-check/<i>")
     async def context_check(request, i):
-        with configure_scope() as scope:
-            scope.set_tag("i", i)
+        scope = Scope.get_isolation_scope()
+        scope.set_tag("i", i)
 
         await asyncio.sleep(random.random())
 
-        with configure_scope() as scope:
-            assert scope._tags["i"] == i
+        scope = Scope.get_isolation_scope()
+        assert scope._tags["i"] == i
 
         return response.text("ok")
 
@@ -328,8 +329,8 @@ def test_concurrency(sentry_init, app):
     else:
         asyncio.run(runner())
 
-    with configure_scope() as scope:
-        assert not scope._tags
+    scope = Scope.get_isolation_scope()
+    assert not scope._tags
 
 
 class TransactionTestConfig:

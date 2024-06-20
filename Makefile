@@ -15,7 +15,7 @@ help:
 	@false
 
 .venv:
-	virtualenv -ppython3 $(VENV_PATH)
+	python -m venv $(VENV_PATH)
 	$(VENV_PATH)/bin/pip install tox
 
 dist: .venv
@@ -30,7 +30,7 @@ format: .venv
 .PHONY: format
 
 test: .venv
-	@$(VENV_PATH)/bin/tox -e py3.9
+	@$(VENV_PATH)/bin/tox -e py3.12
 .PHONY: test
 
 test-all: .venv
@@ -51,6 +51,7 @@ lint: .venv
 apidocs: .venv
 	@$(VENV_PATH)/bin/pip install --editable .
 	@$(VENV_PATH)/bin/pip install -U -r ./docs-requirements.txt
+	rm -rf docs/_build
 	@$(VENV_PATH)/bin/sphinx-build -vv -W -b html docs/ docs/_build
 .PHONY: apidocs
 

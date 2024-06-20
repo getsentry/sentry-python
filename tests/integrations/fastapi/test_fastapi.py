@@ -1,21 +1,17 @@
 import json
 import logging
 import threading
+from unittest import mock
 
 import pytest
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlette import StarletteIntegration
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 
 def fastapi_app_factory():
@@ -63,7 +59,6 @@ async def test_response(sentry_init, capture_events):
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -166,7 +161,7 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
@@ -200,7 +195,6 @@ async def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = FastAPI()
@@ -358,7 +352,6 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -388,7 +381,6 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
             FastApiIntegration(),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -442,7 +434,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = fastapi_app_factory()
@@ -486,7 +477,6 @@ def test_transaction_name_in_middleware(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -511,3 +501,55 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
+
+
+@pytest.mark.parametrize(
+    "failed_request_status_codes,status_code,expected_error",
+    [
+        (None, 500, True),
+        (None, 400, False),
+        ([500, 501], 500, True),
+        ([500, 501], 401, False),
+        ([range(400, 499)], 401, True),
+        ([range(400, 499)], 500, False),
+        ([range(400, 499), range(500, 599)], 300, False),
+        ([range(400, 499), range(500, 599)], 403, True),
+        ([range(400, 499), range(500, 599)], 503, True),
+        ([range(400, 403), 500, 501], 401, True),
+        ([range(400, 403), 500, 501], 405, False),
+        ([range(400, 403), 500, 501], 501, True),
+        ([range(400, 403), 500, 501], 503, False),
+        ([None], 500, False),
+    ],
+)
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    sentry_init(
+        integrations=[
+            StarletteIntegration(
+                failed_request_status_codes=failed_request_status_codes
+            ),
+            FastApiIntegration(failed_request_status_codes=failed_request_status_codes),
+        ]
+    )
+
+    events = capture_events()
+
+    app = FastAPI()
+
+    @app.get("/error")
+    async def _error():
+        raise HTTPException(status_code)
+
+    client = TestClient(app)
+    client.get("/error")
+
+    if expected_error:
+        assert len(events) == 1
+    else:
+        assert not events

@@ -13,7 +13,6 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from __future__ import absolute_import
 
 try:
     from django.urls import path
@@ -25,6 +24,7 @@ except ImportError:
 
 
 from . import views
+from django_helpers import views as helper_views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
@@ -59,6 +59,11 @@ urlpatterns = [
     path("postgres-select", views.postgres_select, name="postgres_select"),
     path("postgres-select-slow", views.postgres_select_orm, name="postgres_select_orm"),
     path(
+        "postgres-select-slow-from-supplement",
+        helper_views.postgres_select_orm,
+        name="postgres_select_slow_from_supplement",
+    ),
+    path(
         "permission-denied-exc",
         views.permission_denied_exc,
         name="permission_denied_exc",
@@ -69,6 +74,11 @@ urlpatterns = [
         name="csrf_hello_not_exempt",
     ),
     path("sync/thread_ids", views.thread_ids_sync, name="thread_ids_sync"),
+    path(
+        "send-myapp-custom-signal",
+        views.send_myapp_custom_signal,
+        name="send_myapp_custom_signal",
+    ),
 ]
 
 # async views
@@ -77,6 +87,11 @@ if views.async_message is not None:
 
 if views.my_async_view is not None:
     urlpatterns.append(path("my_async_view", views.my_async_view, name="my_async_view"))
+
+if views.my_async_view is not None:
+    urlpatterns.append(
+        path("simple_async_view", views.simple_async_view, name="simple_async_view")
+    )
 
 if views.thread_ids_async is not None:
     urlpatterns.append(

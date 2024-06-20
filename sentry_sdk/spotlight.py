@@ -12,7 +12,7 @@ from sentry_sdk.utils import logger
 from sentry_sdk.envelope import Envelope
 
 
-class SpotlightClient(object):
+class SpotlightClient:
     def __init__(self, url):
         # type: (str) -> None
         self.url = url

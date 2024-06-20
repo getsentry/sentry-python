@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from sentry_sdk.consts import TYPE_CHECKING
 from sentry_sdk.db.explain_plan import cache_statement, should_run_explain_plan
 from sentry_sdk.integrations import DidNotEnable

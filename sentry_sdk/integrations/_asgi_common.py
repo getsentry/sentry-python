@@ -8,7 +8,10 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Dict
     from typing import Optional
+    from typing import Union
     from typing_extensions import Literal
+
+    from sentry_sdk.utils import AnnotatedValue
 
 
 def _get_headers(asgi_scope):
@@ -29,7 +32,7 @@ def _get_headers(asgi_scope):
 
 
 def _get_url(asgi_scope, default_scheme, host):
-    # type: (Dict[str, Any], Literal["ws", "http"], Optional[str]) -> str
+    # type: (Dict[str, Any], Literal["ws", "http"], Optional[Union[AnnotatedValue, str]]) -> str
     """
     Extract URL from the ASGI scope, without also including the querystring.
     """

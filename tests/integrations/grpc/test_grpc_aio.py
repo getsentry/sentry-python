@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import asyncio
 import os
 
@@ -11,6 +9,7 @@ import sentry_sdk
 from sentry_sdk import Hub, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
+from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
@@ -28,6 +27,29 @@ def event_loop(request):
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.mark.asyncio
+async def test_noop_for_unimplemented_method(sentry_init, capture_events, event_loop):
+    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
+    server = grpc.aio.server()
+    server.add_insecure_port("[::]:{}".format(AIO_PORT))
+
+    await event_loop.create_task(server.start())
+
+    events = capture_events()
+    try:
+        async with grpc.aio.insecure_channel(
+            "localhost:{}".format(AIO_PORT)
+        ) as channel:
+            stub = gRPCTestServiceStub(channel)
+            with pytest.raises(grpc.RpcError) as exc:
+                await stub.TestServe(gRPCTestMessage(text="test"))
+            assert exc.value.details() == "Method not found!"
+    finally:
+        await server.stop(None)
+
+    assert not events
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -161,11 +183,13 @@ async def test_grpc_client_starts_span(
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == {
-        "type": "unary unary",
-        "method": "/grpc_test_server.gRPCTestService/TestServe",
-        "code": "OK",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary unary",
+            "method": "/grpc_test_server.gRPCTestService/TestServe",
+            "code": "OK",
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -190,10 +214,12 @@ async def test_grpc_client_unary_stream_starts_span(
         span["description"]
         == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
     )
-    assert span["data"] == {
-        "type": "unary stream",
-        "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-    }
+    assert span["data"] == ApproxDict(
+        {
+            "type": "unary stream",
+            "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -221,6 +247,8 @@ async def test_stream_unary(grpc_server):
 
 class TestService(gRPCTestServiceServicer):
     class TestException(Exception):
+        __test__ = False
+
         def __init__(self):
             super().__init__("test")
 

@@ -1,13 +1,17 @@
-from __future__ import absolute_import
+from functools import partial
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing import Span
 
-from sentry_sdk._functools import partial
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.utils import capture_internal_exceptions, parse_url, parse_version
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    parse_url,
+    parse_version,
+)
 
 if TYPE_CHECKING:
     from typing import Any
@@ -58,15 +62,11 @@ class Boto3Integration(Integration):
         BaseClient.__init__ = sentry_patched_init
 
 
+@ensure_integration_enabled(Boto3Integration)
 def _sentry_request_created(service_id, request, operation_name, **kwargs):
     # type: (str, AWSRequest, str, **Any) -> None
-    hub = Hub.current
-    if hub.get_integration(Boto3Integration) is None:
-        return
-
     description = "aws.%s.%s" % (service_id, operation_name)
-    span = hub.start_span(
-        hub=hub,
+    span = sentry_sdk.start_span(
         op=OP.HTTP_CLIENT,
         description=description,
     )

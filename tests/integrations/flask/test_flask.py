@@ -20,16 +20,15 @@ try:
 except ImportError:
     UnsupportedMediaType = None
 
+import sentry_sdk
 import sentry_sdk.integrations.flask as flask_sentry
 from sentry_sdk import (
     set_tag,
-    configure_scope,
     capture_message,
     capture_exception,
-    last_event_id,
-    Hub,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
@@ -126,7 +125,7 @@ def test_errors(
     testing,
     integration_enabled_params,
 ):
-    sentry_init(debug=True, **integration_enabled_params)
+    sentry_init(**integration_enabled_params)
 
     app.debug = debug
     app.testing = testing
@@ -212,7 +211,7 @@ def test_flask_login_configured(
 ):
     sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
 
-    class User(object):
+    class User:
         is_authenticated = is_active = True
         is_anonymous = user_id is not None
 
@@ -279,8 +278,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
     @app.route("/")
     def index():
-        with configure_scope() as scope:
-            scope.set_user({"ip_address": "1.2.3.4", "id": "42"})
+        Scope.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:
@@ -295,7 +293,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
         except ZeroDivisionError:
             pass
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (first_event, error_event, session) = envelopes
     first_event = first_event.get_event()
@@ -599,7 +597,7 @@ def test_wsgi_level_error_is_caught(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "wsgi"
 
 
-def test_500(sentry_init, capture_events, app):
+def test_500(sentry_init, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
 
     app.debug = False
@@ -611,15 +609,12 @@ def test_500(sentry_init, capture_events, app):
 
     @app.errorhandler(500)
     def error_handler(err):
-        return "Sentry error: %s" % last_event_id()
-
-    events = capture_events()
+        return "Sentry error."
 
     client = app.test_client()
     response = client.get("/")
 
-    (event,) = events
-    assert response.data.decode("utf-8") == "Sentry error: %s" % event["event_id"]
+    assert response.data.decode("utf-8") == "Sentry error."
 
 
 def test_error_in_errorhandler(sentry_init, capture_events, app):
@@ -671,18 +666,15 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
-    with configure_scope() as scope:
-        scope.set_tag("request_data", False)
+    Scope.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     def index():
-        with configure_scope() as scope:
-            scope.set_tag("request_data", True)
+        Scope.get_isolation_scope().set_tag("request_data", True)
 
         def generate():
             for row in range(1000):
-                with configure_scope() as scope:
-                    assert scope._tags["request_data"]
+                assert Scope.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -693,8 +685,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
     assert not events
 
-    with configure_scope() as scope:
-        assert not scope._tags["request_data"]
+    assert not Scope.get_isolation_scope()._tags["request_data"]
 
 
 def test_scoped_test_client(sentry_init, app):
@@ -842,8 +833,7 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
 
     @app.route("/")
     def index():
-        hub = Hub.current
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        capture_message(sentry_sdk.get_traceparent() + "\n" + sentry_sdk.get_baggage())
         return render_template_string(template_string)
 
     with app.test_client() as client:
@@ -862,9 +852,8 @@ def test_template_tracing_meta(sentry_init, app, capture_events, template_string
     assert match is not None
     assert match.group(1) == traceparent
 
-    # Python 2 does not preserve sort order
     rendered_baggage = match.group(2)
-    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
+    assert rendered_baggage == baggage
 
 
 def test_dont_override_sentry_trace_context(sentry_init, app):
@@ -903,37 +892,6 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
     assert event["request"]["headers"]["Authorization"] == "[Filtered]"
 
 
-@pytest.mark.parametrize("traces_sample_rate", [None, 1.0])
-def test_replay_event_context(sentry_init, capture_events, app, traces_sample_rate):
-    """
-    Tests that the replay context is added to the event context.
-    This is not strictly a Flask integration test, but it's the easiest way to test this.
-    """
-    sentry_init(traces_sample_rate=traces_sample_rate)
-
-    @app.route("/error")
-    def error():
-        return 1 / 0
-
-    events = capture_events()
-
-    client = app.test_client()
-    headers = {
-        "baggage": "other-vendor-value-1=foo;bar;baz,sentry-trace_id=771a43a4192642f0b136d5159a501700,sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337,sentry-user_id=Am%C3%A9lie,other-vendor-value-2=foo;bar,sentry-replay_id=12312012123120121231201212312012",
-        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
-    }
-    with pytest.raises(ZeroDivisionError):
-        client.get("/error", headers=headers)
-
-    event = events[0]
-
-    assert event["contexts"]
-    assert event["contexts"]["replay"]
-    assert (
-        event["contexts"]["replay"]["replay_id"] == "12312012123120121231201212312012"
-    )
-
-
 def test_response_status_code_ok_in_transaction_context(
     sentry_init, capture_envelopes, app
 ):
@@ -952,7 +910,7 @@ def test_response_status_code_ok_in_transaction_context(
     client = app.test_client()
     client.get("/message")
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (_, transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
@@ -979,7 +937,7 @@ def test_response_status_code_not_found_in_transaction_context(
     client = app.test_client()
     client.get("/not-existing-route")
 
-    Hub.current.client.flush()
+    sentry_sdk.get_client().flush()
 
     (transaction_envelope, _) = envelopes
     transaction = transaction_envelope.get_transaction_event()
