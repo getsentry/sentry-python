@@ -323,7 +323,6 @@ class SentrySpanProcessor(SpanProcessor):
             http_method = cast("Optional[str]", http_method)
 
             db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM)
-            db_query = cast("Optional[str]", db_query)
 
             if http_method:
                 op = "http"
@@ -345,7 +344,7 @@ class SentrySpanProcessor(SpanProcessor):
 
                 if not peer_name and not target:
                     url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
-                    url = cast(str, url)
+                    url = cast("Optional[str]", url)
                     if url:
                         parsed_url = urlparse(url)
                         url = "{}://{}{}".format(
