@@ -77,18 +77,11 @@
           {% endif %}
       {% endfor %}
 
-      - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() }}{% endraw %}
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-
       - name: Upload coverage to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}
         uses: codecov/codecov-action@v4.5.0
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
-          files: coverage.xml
 
       - name: Upload test results to Codecov
         if: {% raw %}${{ !cancelled() }}{% endraw %}

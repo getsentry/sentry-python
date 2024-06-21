@@ -76,17 +76,11 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest"
-      - name: Generate coverage XML
-        if: ${{ !cancelled() }}
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
@@ -150,17 +144,11 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi"
-      - name: Generate coverage XML
-        if: ${{ !cancelled() }}
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
       - name: Upload coverage to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
