@@ -80,7 +80,7 @@ jobs:
       - name: Test aws_lambda pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
         run: |
