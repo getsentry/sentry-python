@@ -155,7 +155,7 @@ class CommandTracer(monitoring.CommandListener):
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = "{} {}".format(event.command_name, command)
+            query = "{}".format(command)
             span = sentry_sdk.start_span(op=op, description=query)
 
             for tag, value in tags.items():
