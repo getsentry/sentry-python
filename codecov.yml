@@ -14,17 +14,16 @@ ignore:
 comment:
   # This is the addition of carry forward builds and fresh builds, thus, it's the addition
   # of the FE and BE builds
-  after_n_builds: 100
+  after_n_builds: 50  # (in prod then: 90 or something)
   layout: 'diff, files'
   # Update, if comment exists. Otherwise post new.
   behavior: default
   # Comments will only post when coverage changes. Furthermore, if a comment
   # already exists, and a newer commit results in no coverage change for the
   # entire pull, the comment will be deleted.
-  require_changes: true
-  require_base: true # must have a base report to post
-  require_head: true # must have a head report to post
-  require_bundle_changes: True # only post a comment when there are bundle size changes
+  require_changes: false  # (in prod then: TRUE)
+  require_base: false  # must have a base report to post (in prod then: TRUE)
+  require_head: false  # must have a head report to post (in prod then: TRUE)
 
 github_checks:
   annotations: false
