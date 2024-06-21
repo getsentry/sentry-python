@@ -597,6 +597,8 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
     assert transaction["spans"][3]["description"] == f"S{id}"
 
 
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
 @pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 def test_span_origin_cache(sentry_init, client, capture_events, use_django_caching):
     sentry_init(
