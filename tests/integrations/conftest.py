@@ -17,6 +17,7 @@ def capture_exceptions(monkeypatch):
             return old_capture_event_hub(self, event, hint=hint, scope=scope)
 
         def capture_event_scope(self, event, hint=None, scope=None):
+            raise Exception("Dang!")
             if hint:
                 if "exc_info" in hint:
                     error = hint["exc_info"][1]
