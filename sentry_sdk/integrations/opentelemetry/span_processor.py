@@ -130,14 +130,11 @@ class SentrySpanProcessor(SpanProcessor):
         if self._is_sentry_span(otel_span):
             return
 
-        if parent_context is None:
-            return
-
         trace_data = self._get_trace_data(otel_span, parent_context)
 
         parent_span_id = trace_data["parent_span_id"]
         sentry_parent_span = (
-            self.otel_span_map.get(parent_span_id, None) if parent_span_id else None
+            self.otel_span_map.get(parent_span_id) if parent_span_id else None
         )
 
         start_timestamp = None
@@ -261,7 +258,7 @@ class SentrySpanProcessor(SpanProcessor):
         return ctx
 
     def _get_trace_data(self, otel_span, parent_context):
-        # type: (OTelSpan, context_api.Context) -> dict[str, Any]
+        # type: (OTelSpan, Optional[context_api.Context]) -> dict[str, Any]
         """
         Extracts tracing information from one OTel span and its parent OTel context.
         """
@@ -279,14 +276,17 @@ class SentrySpanProcessor(SpanProcessor):
         )
         trace_data["parent_span_id"] = parent_span_id
 
-        sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
-        sentry_trace_data = cast("dict[str, Union[str, bool, None]]", sentry_trace_data)
-        trace_data["parent_sampled"] = (
-            sentry_trace_data["parent_sampled"] if sentry_trace_data else None
-        )
+        if parent_context is not None:
+            sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
+            sentry_trace_data = cast(
+                "dict[str, Union[str, bool, None]]", sentry_trace_data
+            )
+            trace_data["parent_sampled"] = (
+                sentry_trace_data["parent_sampled"] if sentry_trace_data else None
+            )
 
-        baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
-        trace_data["baggage"] = baggage
+            baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
+            trace_data["baggage"] = baggage
 
         return trace_data
 
