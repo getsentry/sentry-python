@@ -71,9 +71,9 @@
         run: |
           set -x # print commands that are executed
           {% if category == "pinned" %}
-          ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
+          ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
           {% elif category == "latest" %}
-          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
+          ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
           {% endif %}
       {% endfor %}
 
