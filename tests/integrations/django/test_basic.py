@@ -1131,13 +1131,38 @@ def test_get_receiver_name():
 @pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 def test_span_origin(sentry_init, client, capture_events):
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=True,
+                signals_spans=True,
+                cache_spans=True,
+            )
+        ],
         traces_sample_rate=1.0,
     )
     events = capture_events()
 
-    client.get("/message")
+    client.get("/view-with-signal")
+    client.get("/cached-view")
 
-    (event,) = events
+    (signal_transaction, cache_transaction) = events
 
-    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert signal_transaction["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    signal_span_found = False
+    for span in signal_transaction["spans"]:
+        assert span["origin"] == "auto.http.django"
+        if span["op"] == "event.django":
+            signal_span_found = True
+
+    assert signal_span_found
+
+    assert cache_transaction["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    cache_span_found = False
+    for span in cache_transaction["spans"]:
+        assert span["origin"] == "auto.http.django"
+        if span["op"].startswith("cache."):
+            cache_span_found = True
+
+    assert cache_span_found

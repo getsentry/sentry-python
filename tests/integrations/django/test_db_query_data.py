@@ -460,7 +460,7 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_db_span_origin(sentry_init, client, capture_events):
+def test_db_span_origin_execute(sentry_init, client, capture_events):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
