@@ -595,3 +595,32 @@ def test_cache_spans_set_many(sentry_init, capture_events, use_django_caching):
 
     assert transaction["spans"][3]["op"] == "cache.get"
     assert transaction["spans"][3]["description"] == f"S{id}"
+
+
+@pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
+def test_span_origin_cache(sentry_init, client, capture_events, use_django_caching):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=True,
+                signals_spans=True,
+                cache_spans=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("cached_view"))
+
+    (transaction,) = events
+
+    assert transaction["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    cache_span_found = False
+    for span in transaction["spans"]:
+        assert span["origin"] == "auto.http.django"
+        if span["op"].startswith("cache."):
+            cache_span_found = True
+
+    assert cache_span_found

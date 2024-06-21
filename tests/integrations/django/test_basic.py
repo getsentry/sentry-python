@@ -1142,27 +1142,16 @@ def test_span_origin(sentry_init, client, capture_events):
     )
     events = capture_events()
 
-    client.get("/view-with-signal")
-    client.get("/cached-view")
+    client.get(reverse("view_with_signal"))
 
-    (signal_transaction, cache_transaction) = events
+    (transaction,) = events
 
-    assert signal_transaction["contexts"]["trace"]["origin"] == "auto.http.django"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.http.django"
 
     signal_span_found = False
-    for span in signal_transaction["spans"]:
+    for span in transaction["spans"]:
         assert span["origin"] == "auto.http.django"
         if span["op"] == "event.django":
             signal_span_found = True
 
     assert signal_span_found
-
-    assert cache_transaction["contexts"]["trace"]["origin"] == "auto.http.django"
-
-    cache_span_found = False
-    for span in cache_transaction["spans"]:
-        assert span["origin"] == "auto.http.django"
-        if span["op"].startswith("cache."):
-            cache_span_found = True
-
-    assert cache_span_found
