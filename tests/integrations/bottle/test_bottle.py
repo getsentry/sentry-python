@@ -91,7 +91,6 @@ def test_transaction_style(
     # and in later Pythons "test_bottle.app.<locals>.hi"
     assert event["transaction"].endswith(expected_transaction)
     assert event["transaction_info"] == {"source": expected_source}
-    assert False
 
 
 @pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
