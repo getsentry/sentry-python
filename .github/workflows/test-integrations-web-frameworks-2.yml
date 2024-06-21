@@ -82,11 +82,16 @@ jobs:
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - name: Upload coverage report
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
   test-web_frameworks_2-pinned:
     name: Web Frameworks 2 (pinned)
     timeout-minutes: 30
@@ -151,11 +156,16 @@ jobs:
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - name: Upload coverage report
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
   check_required_tests:
     name: All Web Frameworks 2 tests passed
     needs: test-web_frameworks_2-pinned
