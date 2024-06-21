@@ -258,6 +258,8 @@ def test_user_captured(sentry_init, client, capture_events):
 
     (event,) = events
 
+    assert {} == event["user"] # TODO! DELETE MEEEE!!!!
+
     assert event["user"] == {
         "email": "lennon@thebeatles.com",
         "username": "john",
