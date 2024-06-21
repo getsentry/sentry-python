@@ -5,6 +5,7 @@
 *.pid
 .python-version
 .coverage*
+junit.xml
 .DS_Store
 .tox
 pip-log.txt

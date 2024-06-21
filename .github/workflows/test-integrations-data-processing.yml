@@ -47,43 +47,43 @@ jobs:
       - name: Test anthropic latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test arq latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test beam latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test celery latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test cohere latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test huey latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test langchain latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test openai latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test huggingface_hub latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test rq latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Generate coverage XML
         run: |
           coverage combine .coverage*
@@ -122,43 +122,43 @@ jobs:
       - name: Test anthropic pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-anthropic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-anthropic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test arq pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test beam pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test celery pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test cohere pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test huey pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test langchain pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test openai pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test huggingface_hub pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Test rq pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=.
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch --junitxml=junit.xml
       - name: Generate coverage XML
         run: |
           coverage combine .coverage*
