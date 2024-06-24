@@ -71,13 +71,14 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     assert insert_success["tags"]["db.operation"] == "insert"
     assert insert_fail["tags"]["db.operation"] == "insert"
 
-    assert find["description"].startswith("find {")
-    assert insert_success["description"].startswith("insert {")
-    assert insert_fail["description"].startswith("insert {")
-
+    assert find["description"].startswith("{'find")
+    assert insert_success["description"].startswith("{'insert")
+    assert insert_fail["description"].startswith("{'insert")
+    
     assert find["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
     assert insert_success["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
     assert insert_fail["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
+    
     if with_pii:
         assert "1" in find["description"]
         assert "2" in insert_success["description"]
@@ -117,7 +118,7 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
     (crumb,) = event["breadcrumbs"]["values"]
 
     assert crumb["category"] == "query"
-    assert crumb["message"].startswith("find {")
+    assert crumb["message"].startswith("{'find")
     if with_pii:
         assert "1" in crumb["message"]
     else:
