@@ -38,7 +38,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install "virtualenv<20.26.3"
           pip install coverage tox
       - name: Erase coverage
         run: |
