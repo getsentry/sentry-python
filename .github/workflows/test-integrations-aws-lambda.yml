@@ -73,13 +73,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox tox-virtualenv-no-download "pip<24.0" -U
+          pip install coverage tox "pip<24.0" -U
       - name: Erase coverage
         run: |
           coverage erase
       - name: Test aws_lambda pinned
         run: |
           set -x # print commands that are executed
+          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
