@@ -53,6 +53,7 @@ except ImportError:
 
 class OpenAIIntegration(Integration):
     identifier = "openai"
+    origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True):
         # type: (OpenAIIntegration, bool) -> None
@@ -143,6 +144,7 @@ def _wrap_chat_completion_create(f):
         span = sentry_sdk.start_span(
             op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
             description="Chat Completion",
+            origin=OpenAIIntegration.origin,
         )
         span.__enter__()
         try:
@@ -226,6 +228,7 @@ def _wrap_embeddings_create(f):
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
             description="OpenAI Embedding Creation",
+            origin=OpenAIIntegration.origin,
         ) as span:
             integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
             if "input" in kwargs and (

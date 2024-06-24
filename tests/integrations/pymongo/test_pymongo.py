@@ -422,3 +422,23 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
 )
 def test_strip_pii(testcase):
     assert _strip_pii(testcase["command"]) == testcase["command_stripped"]
+
+
+def test_span_origin(sentry_init, capture_events, mongo_server):
+    sentry_init(
+        integrations=[PyMongoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = MongoClient(mongo_server.uri)
+
+    with start_transaction():
+        list(
+            connection["test_db"]["test_collection"].find({"foobar": 1})
+        )  # force query execution
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.pymongo"
