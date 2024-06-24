@@ -27,8 +27,6 @@ searchstring="$1"
 
 export TOX_PARALLEL_NO_SPINNER=1
 
-tox --version
-
 if $excludelatest; then
     echo "Excluding latest"
     ENV="$($TOXPATH -l | grep -- "$searchstring" | grep -v -- '-latest' | tr $'\n' ',')"
