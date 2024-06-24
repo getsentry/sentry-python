@@ -326,6 +326,7 @@ def test_on_start_transaction():
                 otel_span.start_time / 1e9, timezone.utc
             ),
             instrumenter="otel",
+            origin="auto.otel",
         )
 
         assert len(span_processor.otel_span_map.keys()) == 1
@@ -365,6 +366,7 @@ def test_on_start_child():
             otel_span.start_time / 1e9, timezone.utc
         ),
         instrumenter="otel",
+        origin="auto.otel",
     )
 
     assert len(span_processor.otel_span_map.keys()) == 2
