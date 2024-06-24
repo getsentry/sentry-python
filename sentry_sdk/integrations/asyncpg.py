@@ -30,7 +30,6 @@ if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
     origin = f"auto.db.{identifier}"
-
     _record_params = False
 
     def __init__(self, *, record_params: bool = False):

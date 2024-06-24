@@ -156,7 +156,11 @@ class CommandTracer(monitoring.CommandListener):
                 command = _strip_pii(command)
 
             query = "{}".format(command)
-            span = sentry_sdk.start_span(op=op, description=query)
+            span = sentry_sdk.start_span(
+                op=op,
+                description=query,
+                origin=PyMongoIntegration.origin,
+            )
 
             for tag, value in tags.items():
                 span.set_tag(tag, value)
@@ -198,6 +202,7 @@ class CommandTracer(monitoring.CommandListener):
 
 class PyMongoIntegration(Integration):
     identifier = "pymongo"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once():

@@ -51,6 +51,7 @@ ignore_logger("strawberry.execution")
 
 class StrawberryIntegration(Integration):
     identifier = "strawberry"
+    origin = f"auto.graphql.{identifier}"
 
     def __init__(self, async_execution=None):
         # type: (Optional[bool]) -> None
@@ -177,9 +178,17 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         scope = Scope.get_isolation_scope()
         if scope.span:
-            self.graphql_span = scope.span.start_child(op=op, description=description)
+            self.graphql_span = scope.span.start_child(
+                op=op,
+                description=description,
+                origin=StrawberryIntegration.origin,
+            )
         else:
-            self.graphql_span = sentry_sdk.start_span(op=op, description=description)
+            self.graphql_span = sentry_sdk.start_span(
+                op=op,
+                description=description,
+                origin=StrawberryIntegration.origin,
+            )
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
@@ -193,7 +202,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
     def on_validate(self):
         # type: () -> Generator[None, None, None]
         self.validation_span = self.graphql_span.start_child(
-            op=OP.GRAPHQL_VALIDATE, description="validation"
+            op=OP.GRAPHQL_VALIDATE,
+            description="validation",
+            origin=StrawberryIntegration.origin,
         )
 
         yield
@@ -203,7 +214,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
     def on_parse(self):
         # type: () -> Generator[None, None, None]
         self.parsing_span = self.graphql_span.start_child(
-            op=OP.GRAPHQL_PARSE, description="parsing"
+            op=OP.GRAPHQL_PARSE,
+            description="parsing",
+            origin=StrawberryIntegration.origin,
         )
 
         yield
@@ -231,7 +244,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
         with self.graphql_span.start_child(
-            op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
+            op=OP.GRAPHQL_RESOLVE,
+            description="resolving {}".format(field_path),
+            origin=StrawberryIntegration.origin,
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
             span.set_data("graphql.parent_type", info.parent_type.name)
@@ -250,7 +265,9 @@ class SentrySyncExtension(SentryAsyncExtension):
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
         with self.graphql_span.start_child(
-            op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
+            op=OP.GRAPHQL_RESOLVE,
+            description="resolving {}".format(field_path),
+            origin=StrawberryIntegration.origin,
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
             span.set_data("graphql.parent_type", info.parent_type.name)
