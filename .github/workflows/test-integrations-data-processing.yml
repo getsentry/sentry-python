@@ -40,7 +40,8 @@ jobs:
         uses: supercharge/redis-github-action@1.7.0
       - name: Setup Test Env
         run: |
-          pip install coverage tox "pip<24.0" -U
+          pip install "virtualenv<20.26.3"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -124,7 +125,8 @@ jobs:
         uses: supercharge/redis-github-action@1.7.0
       - name: Setup Test Env
         run: |
-          pip install coverage tox "pip<24.0" -U
+          pip install "virtualenv<20.26.3"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
