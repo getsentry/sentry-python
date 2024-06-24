@@ -289,5 +289,5 @@ async def test_span_origin_consumer(capture_events, init_arq):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.queue.arq"
-    assert event["spans"][0]["origin"] == "manual"  # redis db access
-    assert event["spans"][1]["origin"] == "manual"  # redis db access
+    assert event["spans"][0]["origin"] == "auto.db.redis"
+    assert event["spans"][1]["origin"] == "auto.db.redis"
