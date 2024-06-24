@@ -121,7 +121,7 @@ def _calculate_chat_completion_usage(
 
 def _wrap_chat_completion_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
-    @wraps(f)
+
     @ensure_integration_enabled(OpenAIIntegration, f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
@@ -211,7 +211,7 @@ def _wrap_chat_completion_create(f):
             else:
                 set_data_normalized(span, "unknown_response", True)
                 span.__exit__(None, None, None)
-            return res
+        return res
 
     return new_chat_completion
 
