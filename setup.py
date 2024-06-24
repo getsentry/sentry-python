@@ -85,6 +85,7 @@ setup(
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=5"],
+        "openfeature-sdk": ["openfeature-sdk>=0.7.0"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
