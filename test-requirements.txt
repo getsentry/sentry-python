@@ -1,4 +1,4 @@
-pippip<24.1
+pip<24.1
 pytest
 pytest-cov
 pytest-forked
