@@ -38,7 +38,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox
+          pip install coverage tox tox-virtualenv-no-download "pip<24.0" -U
       - name: Erase coverage
         run: |
           coverage erase
@@ -86,7 +86,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage tox
+          pip install coverage tox tox-virtualenv-no-download "pip<24.0" -U
       - name: Erase coverage
         run: |
           coverage erase
