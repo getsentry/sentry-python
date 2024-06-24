@@ -154,7 +154,7 @@ class CommandTracer(monitoring.CommandListener):
                 command = _strip_pii(command)
 
             query = "{}".format(command)
-            span = sentry_sdk.start_span(op=op, description=query)
+            span = sentry_sdk.start_span(op=OP.DB, description=query)
 
             for tag, value in tags.items():
                 span.set_tag(tag, value)
