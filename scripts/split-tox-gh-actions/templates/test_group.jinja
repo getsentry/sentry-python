@@ -60,7 +60,7 @@
 
       - name: Setup Test Env
         run: |
-          pip install coverage tox tox-virtualenv-no-download "pip<24.0" -U
+          pip install coverage tox "pip<24.0" -U
 
       - name: Erase coverage
         run: |
@@ -71,8 +71,10 @@
         run: |
           set -x # print commands that are executed
           {% if category == "pinned" %}
+          pip --version
           ./scripts/runtox.sh --exclude-latest "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           {% elif category == "latest" %}
+          pip --version
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
           {% endif %}
       {% endfor %}
