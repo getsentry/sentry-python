@@ -436,3 +436,17 @@ def test_error_has_existing_trace_context_performance_disabled(
         == error_event["contexts"]["trace"]["trace_id"]
         == "471a43a4192642f0b136d5159a501701"
     )
+
+
+def test_span_origin(tornado_testcase, sentry_init, capture_events):
+    sentry_init(integrations=[TornadoIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+
+    client.fetch(
+        "/hi?foo=bar", headers={"Cookie": "name=value; name2=value2; name3=value3"}
+    )
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
