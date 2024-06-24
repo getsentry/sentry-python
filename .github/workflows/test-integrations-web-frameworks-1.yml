@@ -64,22 +64,18 @@ jobs:
       - name: Test django latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test flask latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-flask-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test starlette latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-starlette-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test fastapi latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-fastapi-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
@@ -135,22 +131,18 @@ jobs:
       - name: Test django pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test flask pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-flask" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test starlette pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-starlette" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test fastapi pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-fastapi" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |

@@ -65,32 +65,26 @@ jobs:
       - name: Test asyncpg latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test redis latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test redis_py_cluster_legacy latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
@@ -147,32 +141,26 @@ jobs:
       - name: Test asyncpg pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test redis pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test redis_py_cluster_legacy pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
-          pip --version
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |

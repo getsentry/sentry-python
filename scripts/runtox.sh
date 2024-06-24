@@ -40,6 +40,4 @@ if [ -z "${ENV}" ]; then
     exit 0
 fi
 
-pip --version
-
 exec $TOXPATH -r -p auto -o -e "$ENV" -- "${@:2}"
