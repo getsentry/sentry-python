@@ -40,6 +40,7 @@ HUEY_CONTROL_FLOW_EXCEPTIONS = (CancelExecution, RetryTask, TaskLockedException)
 
 class HueyIntegration(Integration):
     identifier = "huey"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -55,7 +56,11 @@ def patch_enqueue():
     @ensure_integration_enabled(HueyIntegration, old_enqueue)
     def _sentry_enqueue(self, task):
         # type: (Huey, Task) -> Optional[Union[Result, ResultGroup]]
-        with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_HUEY, description=task.name):
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_SUBMIT_HUEY,
+            description=task.name,
+            origin=HueyIntegration.origin,
+        ):
             if not isinstance(task, PeriodicTask):
                 # Attach trace propagation data to task kwargs. We do
                 # not do this for periodic tasks, as these don't
@@ -154,6 +159,7 @@ def patch_execute():
                 name=task.name,
                 op=OP.QUEUE_TASK_HUEY,
                 source=TRANSACTION_SOURCE_TASK,
+                origin=HueyIntegration.origin,
             )
             transaction.set_status("ok")
 

@@ -53,6 +53,7 @@ TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
 
 class PyramidIntegration(Integration):
     identifier = "pyramid"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -123,9 +124,11 @@ class PyramidIntegration(Integration):
                     _capture_exception(einfo)
                     reraise(*einfo)
 
-            return SentryWsgiMiddleware(sentry_patched_inner_wsgi_call)(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                sentry_patched_inner_wsgi_call,
+                span_origin=PyramidIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         router.Router.__call__ = sentry_patched_wsgi_call
 
