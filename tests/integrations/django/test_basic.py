@@ -1126,3 +1126,32 @@ def test_get_receiver_name():
         assert name == "functools.partial(<function " + a_partial.func.__name__ + ">)"
     else:
         assert name == "partial(<function " + a_partial.func.__name__ + ">)"
+
+
+@pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
+def test_span_origin(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                middleware_spans=True,
+                signals_spans=True,
+                cache_spans=True,
+            )
+        ],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client.get(reverse("view_with_signal"))
+
+    (transaction,) = events
+
+    assert transaction["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    signal_span_found = False
+    for span in transaction["spans"]:
+        assert span["origin"] == "auto.http.django"
+        if span["op"] == "event.django":
+            signal_span_found = True
+
+    assert signal_span_found

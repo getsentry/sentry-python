@@ -91,8 +91,8 @@ def _install_httplib():
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+            origin="auto.http.stdlib.httplib",
         )
-
         span.set_data(SPANDATA.HTTP_METHOD, method)
         if parsed_url is not None:
             span.set_data("url", parsed_url.url)
@@ -197,7 +197,11 @@ def _install_subprocess():
 
         env = None
 
-        with sentry_sdk.start_span(op=OP.SUBPROCESS, description=description) as span:
+        with sentry_sdk.start_span(
+            op=OP.SUBPROCESS,
+            description=description,
+            origin="auto.subprocess.stdlib.subprocess",
+        ) as span:
             for k, v in Scope.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
@@ -222,7 +226,10 @@ def _install_subprocess():
     @ensure_integration_enabled(StdlibIntegration, old_popen_wait)
     def sentry_patched_popen_wait(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> Any
-        with sentry_sdk.start_span(op=OP.SUBPROCESS_WAIT) as span:
+        with sentry_sdk.start_span(
+            op=OP.SUBPROCESS_WAIT,
+            origin="auto.subprocess.stdlib.subprocess",
+        ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_wait(self, *a, **kw)
 
@@ -233,7 +240,10 @@ def _install_subprocess():
     @ensure_integration_enabled(StdlibIntegration, old_popen_communicate)
     def sentry_patched_popen_communicate(self, *a, **kw):
         # type: (subprocess.Popen[Any], *Any, **Any) -> Any
-        with sentry_sdk.start_span(op=OP.SUBPROCESS_COMMUNICATE) as span:
+        with sentry_sdk.start_span(
+            op=OP.SUBPROCESS_COMMUNICATE,
+            origin="auto.subprocess.stdlib.subprocess",
+        ) as span:
             span.set_tag("subprocess.pid", self.pid)
             return old_popen_communicate(self, *a, **kw)
 
