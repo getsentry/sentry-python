@@ -112,6 +112,7 @@ def record_sql_queries(
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
+    span_origin="manual",  # type: str
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
@@ -141,7 +142,11 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with sentry_sdk.start_span(op=OP.DB, description=query) as span:
+    with sentry_sdk.start_span(
+        op=OP.DB,
+        description=query,
+        origin=span_origin,
+    ) as span:
         for k, v in data.items():
             span.set_data(k, v)
         yield span
@@ -645,6 +650,11 @@ def start_child_span_decorator(func):
             ):
                 return await func(*args, **kwargs)
 
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
     # Synchronous case
     else:
 
@@ -667,6 +677,11 @@ def start_child_span_decorator(func):
                 description=qualname_from_function(func),
             ):
                 return func(*args, **kwargs)
+
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
     return func_with_tracing
 

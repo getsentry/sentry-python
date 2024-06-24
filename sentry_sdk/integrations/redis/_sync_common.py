@@ -1,5 +1,6 @@
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
     _set_cache_data,
@@ -36,7 +37,9 @@ def patch_redis_pipeline(
             return old_execute(self, *args, **kwargs)
 
         with sentry_sdk.start_span(
-            op=OP.DB_REDIS, description="redis.pipeline.execute"
+            op=OP.DB_REDIS,
+            description="redis.pipeline.execute",
+            origin=SPAN_ORIGIN,
         ) as span:
             with capture_internal_exceptions():
                 set_db_data_fn(span, self)
@@ -81,6 +84,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
             cache_span = sentry_sdk.start_span(
                 op=cache_properties["op"],
                 description=cache_properties["description"],
+                origin=SPAN_ORIGIN,
             )
             cache_span.__enter__()
 
@@ -89,6 +93,7 @@ def patch_redis_client(cls, is_cluster, set_db_data_fn):
         db_span = sentry_sdk.start_span(
             op=db_properties["op"],
             description=db_properties["description"],
+            origin=SPAN_ORIGIN,
         )
         db_span.__enter__()
 

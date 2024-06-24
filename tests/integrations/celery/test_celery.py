@@ -26,9 +26,19 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", **kwargs):
+    def inner(
+        propagate_traces=True,
+        backend="always_eager",
+        monitor_beat_tasks=False,
+        **kwargs,
+    ):
         sentry_init(
-            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
+            integrations=[
+                CeleryIntegration(
+                    propagate_traces=propagate_traces,
+                    monitor_beat_tasks=monitor_beat_tasks,
+                )
+            ],
             **kwargs,
         )
         celery = Celery(__name__)
@@ -226,6 +236,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
+            "origin": "auto.queue.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
             "same_process_as_parent": True,
             "span_id": submission_event["spans"][0]["span_id"],
@@ -530,6 +541,7 @@ def test_task_headers(celery):
     # Newly added headers
     expected_headers["sentry-trace"] = mock.ANY
     expected_headers["baggage"] = mock.ANY
+    expected_headers["sentry-task-enqueued-time"] = mock.ANY
 
     assert result.get() == expected_headers
 
@@ -752,5 +764,66 @@ def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
     assert span["data"]["messaging.destination.name"] == "celery"
     assert "messaging.message.id" in span["data"]
     assert span["data"]["messaging.message.retry.count"] == 0
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+def test_receive_latency(init_celery, capture_events):
+    celery = init_celery(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.message.receive.latency" in span["data"]
+    assert span["data"]["messaging.message.receive.latency"] > 0
+
+
+def tests_span_origin_consumer(init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    celery.conf.broker_url = "redis://example.com"  # noqa: E231
+
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.celery"
+    assert event["spans"][0]["origin"] == "auto.queue.celery"
+
+
+def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
+    old_publish = kombu.messaging.Producer._publish
+
+    def publish(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    with start_transaction(name="custom_transaction"):
+        task.apply_async()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.queue.celery"
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)

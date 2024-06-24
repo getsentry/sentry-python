@@ -29,6 +29,7 @@ if asyncpg_version is not None and asyncpg_version < (0, 23, 0):
 
 class AsyncPGIntegration(Integration):
     identifier = "asyncpg"
+    origin = f"auto.db.{identifier}"
     _record_params = False
 
     def __init__(self, *, record_params: bool = False):
@@ -69,7 +70,14 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             return await f(*args, **kwargs)
 
         query = args[1]
-        with record_sql_queries(None, query, None, None, executemany=False) as span:
+        with record_sql_queries(
+            cursor=None,
+            query=query,
+            params_list=None,
+            paramstyle=None,
+            executemany=False,
+            span_origin=AsyncPGIntegration.origin,
+        ) as span:
             res = await f(*args, **kwargs)
 
         with capture_internal_exceptions():
@@ -98,12 +106,13 @@ def _record(
     param_style = "pyformat" if params_list else None
 
     with record_sql_queries(
-        cursor,
-        query,
-        params_list,
-        param_style,
+        cursor=cursor,
+        query=query,
+        params_list=params_list,
+        paramstyle=param_style,
         executemany=executemany,
         record_cursor_repr=cursor is not None,
+        span_origin=AsyncPGIntegration.origin,
     ) as span:
         yield span
 
@@ -154,7 +163,11 @@ def _wrap_connect_addr(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitabl
         user = kwargs["params"].user
         database = kwargs["params"].database
 
-        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            description="connect",
+            origin=AsyncPGIntegration.origin,
+        ) as span:
             span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
             addr = kwargs.get("addr")
             if addr:

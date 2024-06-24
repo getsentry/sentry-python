@@ -604,9 +604,10 @@ class Scope(object):
     def iter_trace_propagation_headers(self, *args, **kwargs):
         # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
         """
-        Return HTTP headers which allow propagation of trace data. Data taken
-        from the span representing the request, if available, or the current
-        span on the scope if not.
+        Return HTTP headers which allow propagation of trace data.
+
+        If a span is given, the trace data will taken from the span.
+        If no span is given, the trace data is taken from the scope.
         """
         client = Scope.get_client()
         if not client.options.get("propagate_traces"):
@@ -1082,8 +1083,10 @@ class Scope(object):
 
             return span
 
-    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    def continue_trace(
+        self, environ_or_headers, op=None, name=None, source=None, origin="manual"
+    ):
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
@@ -1092,6 +1095,7 @@ class Scope(object):
         transaction = Transaction.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
+            origin=origin,
             name=name,
             source=source,
         )

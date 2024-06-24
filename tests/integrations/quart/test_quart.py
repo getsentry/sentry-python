@@ -547,3 +547,20 @@ async def test_active_thread_id(sentry_init, capture_envelopes, endpoint, app):
         transactions = profile.payload.json["transactions"]
         assert len(transactions) == 1
         assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+
+@pytest.mark.asyncio
+async def test_span_origin(sentry_init, capture_events, app):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    client = app.test_client()
+    await client.get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.quart"

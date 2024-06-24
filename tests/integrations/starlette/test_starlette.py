@@ -1081,6 +1081,29 @@ def test_transaction_name_in_middleware(
     )
 
 
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.http.starlette"
+
+
 @pytest.mark.parametrize(
     "failed_request_status_codes,status_code,expected_error",
     [
