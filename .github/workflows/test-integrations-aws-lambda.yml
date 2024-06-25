@@ -30,7 +30,7 @@ jobs:
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@v4.1.7
         with:
           persist-credentials: false
       - name: Check permissions on PR
@@ -65,7 +65,7 @@ jobs:
         os: [ubuntu-20.04]
     needs: check-permissions
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@v4.1.7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v5
