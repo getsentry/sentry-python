@@ -132,3 +132,20 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     assert "aws.request.url" not in event["spans"][0]["data"]
     assert "http.fragment" not in event["spans"][0]["data"]
     assert "http.query" not in event["spans"][0]["data"]
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, integrations=[Boto3Integration()])
+    events = capture_events()
+
+    s3 = session.resource("s3")
+    with sentry_sdk.start_transaction(), MockResponse(
+        s3.meta.client, 200, {}, read_fixture("s3_list.xml")
+    ):
+        bucket = s3.Bucket("bucket")
+        _ = [obj for obj in bucket.objects.all()]
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.http.boto3"

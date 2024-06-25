@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 OPEN_TELEMETRY_CONTEXT = "otel"
 SPAN_MAX_TIME_OPEN_MINUTES = 10
+SPAN_ORIGIN = "auto.otel"
 
 
 def link_trace_context_to_error_event(event, otel_span_map):
@@ -149,6 +150,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                     otel_span.start_time / 1e9, timezone.utc
                 ),  # OTel spans have nanosecond precision
                 instrumenter=INSTRUMENTER.OTEL,
+                origin=SPAN_ORIGIN,
             )
         else:
             sentry_span = start_transaction(
@@ -161,6 +163,7 @@ class SentrySpanProcessor(SpanProcessor):  # type: ignore
                     otel_span.start_time / 1e9, timezone.utc
                 ),  # OTel spans have nanosecond precision
                 instrumenter=INSTRUMENTER.OTEL,
+                origin=SPAN_ORIGIN,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span

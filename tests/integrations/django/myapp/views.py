@@ -5,6 +5,7 @@ import threading
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.dispatch import Signal
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
 from django.template import Context, Template
@@ -13,6 +14,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
+
 
 from tests.integrations.django.myapp.signals import (
     myapp_custom_signal,
@@ -110,6 +112,13 @@ def read_body_and_view_exc(request):
 @csrf_exempt
 def message(request):
     sentry_sdk.capture_message("hi")
+    return HttpResponse("ok")
+
+
+@csrf_exempt
+def view_with_signal(request):
+    custom_signal = Signal()
+    custom_signal.send(sender="hello")
     return HttpResponse("ok")
 
 

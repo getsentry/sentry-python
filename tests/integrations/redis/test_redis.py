@@ -293,3 +293,29 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_events):
     assert span["data"][SPANDATA.DB_NAME] == "1"
     assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
     assert span["data"][SPANDATA.SERVER_PORT] == 63791
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction(name="custom_transaction"):
+        # default case
+        connection.set("somekey", "somevalue")
+
+        # pipeline
+        pipeline = connection.pipeline(transaction=False)
+        pipeline.get("somekey")
+        pipeline.set("anotherkey", 1)
+        pipeline.execute()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.db.redis"

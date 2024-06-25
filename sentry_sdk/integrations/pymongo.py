@@ -1,7 +1,7 @@
 import copy
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANDATA, OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
@@ -126,8 +126,6 @@ class CommandTracer(monitoring.CommandListener):
             command.pop("$clusterTime", None)
             command.pop("$signature", None)
 
-            op = "db.query"
-
             tags = {
                 "db.name": event.database_name,
                 SPANDATA.DB_SYSTEM: "mongodb",
@@ -157,7 +155,11 @@ class CommandTracer(monitoring.CommandListener):
                 command = _strip_pii(command)
 
             query = "{}".format(command)
-            span = sentry_sdk.start_span(op=op, description=query)
+            span = sentry_sdk.start_span(
+                op=OP.DB,
+                description=query,
+                origin=PyMongoIntegration.origin,
+            )
 
             for tag, value in tags.items():
                 span.set_tag(tag, value)
@@ -167,7 +169,7 @@ class CommandTracer(monitoring.CommandListener):
 
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
-                    message=query, category="query", type=op, data=tags
+                    message=query, category="query", type=OP.DB, data=tags
                 )
 
             self._ongoing_operations[self._operation_key(event)] = span.__enter__()
@@ -199,6 +201,7 @@ class CommandTracer(monitoring.CommandListener):
 
 class PyMongoIntegration(Integration):
     identifier = "pymongo"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once():
