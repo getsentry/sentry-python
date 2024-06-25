@@ -335,7 +335,7 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
     ]
 
     # Add some data to the scope
-    sentry_sdk.add_breadcrumb(message="test breadcrumb")  
+    sentry_sdk.add_breadcrumb(message="test breadcrumb")
     sentry_sdk.set_context("test_context", {"test_key": "test_value"})
     sentry_sdk.set_extra("test_extra", "test_value")
     sentry_sdk.set_level("warning")

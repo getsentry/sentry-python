@@ -9,6 +9,7 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import (
     Hub,
     Client,
@@ -585,7 +586,9 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
 
-    Hub.current._capture_internal_exception((ValueError, ValueError("OK"), None))
+    sentry_sdk.Scope.get_isolation_scope()._capture_internal_exception(
+        (ValueError, ValueError("OK"), None)
+    )
     assert "OK" in caplog.text
 
 
@@ -595,7 +598,9 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     if with_client:
         sentry_init()
 
-    Hub.current._capture_internal_exception((ValueError, ValueError("OK"), None))
+    sentry_sdk.Scope.get_isolation_scope()._capture_internal_exception(
+        (ValueError, ValueError("OK"), None)
+    )
     assert "OK" not in caplog.text
 
 
@@ -949,7 +954,7 @@ def test_init_string_types(dsn, sentry_init):
     # extra code
     sentry_init(dsn)
     assert (
-        Hub.current.client.dsn
+        sentry_sdk.get_client().dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
     )
 
@@ -1047,7 +1052,7 @@ def test_debug_option(
     else:
         sentry_init(debug=client_option)
 
-    Hub.current._capture_internal_exception(
+    sentry_sdk.Scope.get_isolation_scope()._capture_internal_exception(
         (ValueError, ValueError("something is wrong"), None)
     )
     if debug_output_expected:
