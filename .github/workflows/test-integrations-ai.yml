@@ -1,4 +1,4 @@
-name: Test Data Processing
+name: Test AI
 on:
   push:
     branches:
@@ -18,14 +18,14 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-data_processing-latest:
-    name: Data Processing (latest)
+  test-ai-latest:
+    name: AI (latest)
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.10","3.11","3.12"]
+        python-version: ["3.7","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -36,38 +36,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
         run: |
           pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test arq latest
+      - name: Test anthropic latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test beam latest
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test cohere latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test celery latest
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test langchain latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test huey latest
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test openai latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rq latest
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test huggingface_hub latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test spark latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-spark-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
           coverage combine .coverage*
@@ -76,14 +70,14 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-data_processing-pinned:
-    name: Data Processing (pinned)
+  test-ai-pinned:
+    name: AI (pinned)
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
+        python-version: ["3.7","3.9","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -94,38 +88,32 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
         run: |
           pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test arq pinned
+      - name: Test anthropic pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test beam pinned
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-anthropic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test cohere pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test celery pinned
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test langchain pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test huey pinned
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test openai pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rq pinned
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+      - name: Test huggingface_hub pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test spark pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-spark" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Generate coverage XML
         run: |
           coverage combine .coverage*
@@ -135,13 +123,13 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
   check_required_tests:
-    name: All Data Processing tests passed
-    needs: test-data_processing-pinned
+    name: All AI tests passed
+    needs: test-ai-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
-        if: contains(needs.test-data_processing-pinned.result, 'failure') || contains(needs.test-data_processing-pinned.result, 'skipped')
+        if: contains(needs.test-ai-pinned.result, 'failure') || contains(needs.test-ai-pinned.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
