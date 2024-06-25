@@ -39,7 +39,7 @@
     {% endif %}
 
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@v4.1.7
       {% if needs_github_secrets %}
       {% raw %}
         with:
@@ -51,6 +51,11 @@
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
       {% if needs_clickhouse %}
       - uses: getsentry/action-clickhouse-in-ci@v1
+      {% endif %}
+
+      {% if needs_redis %}
+      - name: Start Redis
+        uses: supercharge/redis-github-action@1.8.0
       {% endif %}
 
       - name: Setup Test Env
