@@ -130,6 +130,7 @@ class CommandTracer(monitoring.CommandListener):
                 "db.name": event.database_name,
                 SPANDATA.DB_SYSTEM: "mongodb",
                 SPANDATA.DB_OPERATION: event.command_name,
+                SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
             }
 
             try:
