@@ -564,7 +564,11 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
 
 
 def test_configure_scope_available(sentry_init, request, monkeypatch):
-    # Test that scope is configured if client is configured
+    """
+    Test that scope is configured if client is configured
+
+    This test can be removed once configure_scope and the Hub are removed.
+    """
     sentry_init()
 
     with configure_scope() as scope:
