@@ -82,6 +82,7 @@ GROUPS = {
         "celery",
         "huey",
         "rq",
+        "spark",
     ],
     "Databases": [
         "asyncpg",
