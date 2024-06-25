@@ -6,7 +6,7 @@ import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
 
-from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
+from sentry_sdk import configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_apply_async,
@@ -59,9 +59,6 @@ def init_celery(sentry_init, request):
             celery.conf.broker_url = "redis://127.0.0.1:6379"
             celery.conf.result_backend = "redis://127.0.0.1:6379"
             celery.conf.task_always_eager = False
-
-            Hub.main.bind_client(Hub.current.client)
-            request.addfinalizer(lambda: Hub.main.bind_client(None))
 
             # Once we drop celery 3 we can use the celery_worker fixture
             if VERSION < (5,):
@@ -300,45 +297,6 @@ def test_ignore_expected(capture_events, celery):
     dummy_task.delay(1, 2)
     dummy_task.delay(1, 0)
     assert not events
-
-
-@pytest.mark.skip(
-    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
-)
-def test_broken_prerun(init_celery, connect_signal):
-    from celery.signals import task_prerun
-
-    stack_lengths = []
-
-    def crash(*args, **kwargs):
-        # scope should exist in prerun
-        stack_lengths.append(len(Hub.current._stack))
-        1 / 0
-
-    # Order here is important to reproduce the bug: In Celery 3, a crashing
-    # prerun would prevent other preruns from running.
-
-    connect_signal(task_prerun, crash)
-    celery = init_celery()
-
-    assert len(Hub.current._stack) == 1
-
-    @celery.task(name="dummy_task")
-    def dummy_task(x, y):
-        stack_lengths.append(len(Hub.current._stack))
-        return x / y
-
-    if VERSION >= (4,):
-        dummy_task.delay(2, 2)
-    else:
-        with pytest.raises(ZeroDivisionError):
-            dummy_task.delay(2, 2)
-
-    assert len(Hub.current._stack) == 1
-    if VERSION < (4,):
-        assert stack_lengths == [2]
-    else:
-        assert stack_lengths == [2, 2]
 
 
 @pytest.mark.xfail(
