@@ -877,3 +877,22 @@ def test_basic_with_eventbridge_source(run_lambda_function):
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
+
+
+def test_span_origin(run_lambda_function):
+    envelope_items, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            pass
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (event,) = envelope_items
+
+    assert event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"

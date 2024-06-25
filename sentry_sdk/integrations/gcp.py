@@ -87,6 +87,7 @@ def _wrap_func(func):
                 op=OP.FUNCTION_GCP,
                 name=environ.get("FUNCTION_NAME", ""),
                 source=TRANSACTION_SOURCE_COMPONENT,
+                origin=GcpIntegration.origin,
             )
             sampling_context = {
                 "gcp_env": {
@@ -123,6 +124,7 @@ def _wrap_func(func):
 
 class GcpIntegration(Integration):
     identifier = "gcp"
+    origin = f"auto.function.{identifier}"
 
     def __init__(self, timeout_warning=False):
         # type: (bool) -> None

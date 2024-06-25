@@ -948,3 +948,18 @@ def test_response_status_code_not_found_in_transaction_context(
         "response" in transaction["contexts"].keys()
     ), "Response context not found in transaction"
     assert transaction["contexts"]["response"]["status_code"] == 404
+
+
+def test_span_origin(sentry_init, app, capture_events):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
