@@ -79,6 +79,7 @@ GROUPS = {
         "langchain",
         "openai",
         "huggingface_hub",
+        "ray",
         "rq",
     ],
     "Databases": [
