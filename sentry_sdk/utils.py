@@ -54,6 +54,8 @@ if TYPE_CHECKING:
         Union,
     )
 
+    from gevent.hub import Hub
+
     import sentry_sdk.integrations
     from sentry_sdk._types import Event, ExcInfo
 
@@ -1182,8 +1184,8 @@ def _is_contextvars_broken():
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
-        import gevent  # type: ignore
-        from gevent.monkey import is_object_patched  # type: ignore
+        import gevent
+        from gevent.monkey import is_object_patched
 
         # Get the MAJOR and MINOR version numbers of Gevent
         version_tuple = tuple(
@@ -1209,7 +1211,7 @@ def _is_contextvars_broken():
         pass
 
     try:
-        import greenlet  # type: ignore
+        import greenlet
         from eventlet.patcher import is_monkey_patched  # type: ignore
 
         greenlet_version = parse_version(greenlet.__version__)
@@ -1794,12 +1796,14 @@ try:
     from gevent.monkey import is_module_patched
 except ImportError:
 
-    def get_gevent_hub():
-        # type: () -> Any
+    # it's not great that the signatures are different, get_hub can't return None
+    # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
+    def get_gevent_hub():  # type: ignore[misc]
+        # type: () -> Optional[Hub]
         return None
 
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
+    def is_module_patched(mod_name):
+        # type: (str) -> bool
         # unable to import from gevent means no modules have been patched
         return False
 
