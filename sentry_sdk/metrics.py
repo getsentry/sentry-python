@@ -731,7 +731,7 @@ def _get_aggregator():
 def _get_aggregator_and_update_tags(key, value, unit, tags):
     # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
     client = sentry_sdk.get_client()
-    if client.is_active() or client.metrics_aggregator is None:
+    if not client.is_active() or client.metrics_aggregator is None:
         return None, None, tags
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
