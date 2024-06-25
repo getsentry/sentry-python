@@ -63,6 +63,7 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+        allow-prereleases: true
     needs: check-permissions
     steps:
       - uses: actions/checkout@v4.1.7
