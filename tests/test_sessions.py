@@ -64,7 +64,6 @@ def test_aggregates(sentry_init, capture_envelopes):
 
     sentry_sdk.Scope.get_isolation_scope().start_session(session_mode="request")
     sentry_sdk.Scope.get_isolation_scope().end_session()
-
     sentry_sdk.flush()
 
     assert len(envelopes) == 2
@@ -104,7 +103,6 @@ def test_aggregates_explicitly_disabled_session_tracking_request_mode(
 
     sentry_sdk.Scope.get_isolation_scope().start_session(session_mode="request")
     sentry_sdk.Scope.get_isolation_scope().end_session()
-
     sentry_sdk.flush()
 
     sess = envelopes[1]

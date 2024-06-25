@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import Hub, configure_scope, set_level
+
 from sentry_sdk.crons import capture_checkin
 
 
@@ -322,6 +322,8 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         # Optional event keys
         "release",
         "environment",
+        "server_name",
+        "sdk",
         # Mandatory check-in specific keys
         "check_in_id",
         "monitor_slug",
@@ -330,42 +332,33 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         "duration",
         "monitor_config",
         "contexts",  # an event processor adds this
-        # TODO: These fields need to be checked if valid for checkin:
-        "_meta",
-        "tags",
-        "extra",  # an event processor adds this
-        "modules",
-        "server_name",
-        "sdk",
     ]
 
-    hub = Hub.current
-    with configure_scope() as scope:
-        # Add some data to the scope
-        set_level("warning")
-        hub.add_breadcrumb(message="test breadcrumb")
-        scope.set_tag("test_tag", "test_value")
-        scope.set_extra("test_extra", "test_value")
-        scope.set_context("test_context", {"test_key": "test_value"})
+    # Add some data to the scope
+    sentry_sdk.add_breadcrumb(message="test breadcrumb")  
+    sentry_sdk.set_context("test_context", {"test_key": "test_value"})
+    sentry_sdk.set_extra("test_extra", "test_value")
+    sentry_sdk.set_level("warning")
+    sentry_sdk.set_tag("test_tag", "test_value")
 
-        capture_checkin(
-            monitor_slug="abc123",
-            check_in_id="112233",
-            status="ok",
-            duration=123,
-        )
+    capture_checkin(
+        monitor_slug="abc123",
+        check_in_id="112233",
+        status="ok",
+        duration=123,
+    )
 
-        (envelope,) = envelopes
-        check_in_event = envelope.items[0].payload.json
+    (envelope,) = envelopes
+    check_in_event = envelope.items[0].payload.json
 
-        invalid_keys = []
-        for key in check_in_event.keys():
-            if key not in valid_keys:
-                invalid_keys.append(key)
+    invalid_keys = []
+    for key in check_in_event.keys():
+        if key not in valid_keys:
+            invalid_keys.append(key)
 
-        assert len(invalid_keys) == 0, "Unexpected keys found in checkin: {}".format(
-            invalid_keys
-        )
+    assert len(invalid_keys) == 0, "Unexpected keys found in checkin: {}".format(
+        invalid_keys
+    )
 
 
 @pytest.mark.asyncio
