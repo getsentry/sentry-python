@@ -453,7 +453,7 @@ def test_parse_version(version, expected_result):
 @pytest.fixture
 def mock_client_with_dsn_netloc():
     """
-    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    Returns a mocked Client with a DSN netloc of "abcd1234.ingest.sentry.io".
     """
     mock_client = mock.Mock(spec=sentry_sdk.Client)
     mock_client.transport = mock.Mock(spec=sentry_sdk.Transport)

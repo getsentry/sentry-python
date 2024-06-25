@@ -12,7 +12,7 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
 import sentry_sdk
-from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
+from sentry_sdk import Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
@@ -255,7 +255,8 @@ def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        with Hub(client):
+        sentry_sdk.Scope.get_global_scope().set_client(client)
+        with sentry_sdk.isolation_scope():
             capture_message("hi")
 
     # nothing exploded but also no events can be sent anymore
