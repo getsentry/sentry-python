@@ -80,6 +80,7 @@ GROUPS = {
         "openai",
         "huggingface_hub",
         "rq",
+        "spark",
     ],
     "Databases": [
         "asyncpg",
