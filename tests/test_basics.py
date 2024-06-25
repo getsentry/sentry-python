@@ -467,7 +467,7 @@ def test_client_initialized_within_scope(sentry_init, caplog):
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
     """
     This test can be removed when we remove push_scope and the Hub from the SDK.
-    """ 
+    """
     caplog.set_level(logging.WARNING)
 
     sentry_init()
