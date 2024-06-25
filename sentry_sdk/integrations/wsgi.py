@@ -63,12 +63,13 @@ def get_request_url(environ, use_x_forwarded_for=False):
 
 
 class SentryWsgiMiddleware:
-    __slots__ = ("app", "use_x_forwarded_for")
+    __slots__ = ("app", "use_x_forwarded_for", "span_origin")
 
-    def __init__(self, app, use_x_forwarded_for=False):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool) -> None
+    def __init__(self, app, use_x_forwarded_for=False, span_origin="manual"):
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool, str) -> None
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
+        self.span_origin = span_origin
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -93,6 +94,7 @@ class SentryWsgiMiddleware:
                         op=OP.HTTP_SERVER,
                         name="generic WSGI request",
                         source=TRANSACTION_SOURCE_ROUTE,
+                        origin=self.span_origin,
                     )
 
                     with sentry_sdk.start_transaction(

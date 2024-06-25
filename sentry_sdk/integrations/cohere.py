@@ -66,6 +66,7 @@ COLLECTED_PII_CHAT_RESP_ATTRS = {
 
 class CohereIntegration(Integration):
     identifier = "cohere"
+    origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True):
         # type: (CohereIntegration, bool) -> None
@@ -141,6 +142,7 @@ def _wrap_chat(f, streaming):
         span = sentry_sdk.start_span(
             op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
             description="cohere.client.Chat",
+            origin=CohereIntegration.origin,
         )
         span.__enter__()
         try:
@@ -225,6 +227,7 @@ def _wrap_embed(f):
         with sentry_sdk.start_span(
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
             description="Cohere Embedding Creation",
+            origin=CohereIntegration.origin,
         ) as span:
             integration = sentry_sdk.get_client().get_integration(CohereIntegration)
             if "texts" in kwargs and (
