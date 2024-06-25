@@ -31,12 +31,12 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
-        allow-prereleases: true
     steps:
       - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Setup Test Env
         run: |
           pip install coverage tox
@@ -80,12 +80,12 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
-        allow-prereleases: true
     steps:
       - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Setup Test Env
         run: |
           pip install coverage tox
