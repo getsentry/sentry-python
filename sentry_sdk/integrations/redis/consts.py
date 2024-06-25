@@ -1,3 +1,5 @@
+SPAN_ORIGIN = "auto.db.redis"
+
 _SINGLE_KEY_COMMANDS = frozenset(
     ["decr", "decrby", "get", "incr", "incrby", "pttl", "set", "setex", "setnx", "ttl"],
 )
