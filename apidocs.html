@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.6.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>API Docs - sentry-python 2.7.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="prev" title="Integrations" href="integrations.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=397bb51e" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=d3bb9062" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=0e780e79" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -74,161 +74,161 @@ data-aria-dark="Switch to auto color mode">
     </button>
     <div class="sy-scrollbar sy-rside-inner px-6 xl:top-16 xl:sticky xl:pl-0 pt-6 pb-4"><div class="localtoc"><h3>On this page</h3><ul>
 <li><a class="reference internal" href="#sentry_sdk.Hub"><code class="docutils literal notranslate"><span class="pre">Hub</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.Hub.add_breadcrumb"><code class="docutils literal notranslate"><span class="pre">Hub.add_breadcrumb()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.bind_client"><code class="docutils literal notranslate"><span class="pre">Hub.bind_client()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.capture_event"><code class="docutils literal notranslate"><span class="pre">Hub.capture_event()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.capture_exception"><code class="docutils literal notranslate"><span class="pre">Hub.capture_exception()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.capture_message"><code class="docutils literal notranslate"><span class="pre">Hub.capture_message()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.client"><code class="docutils literal notranslate"><span class="pre">Hub.client</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.configure_scope"><code class="docutils literal notranslate"><span class="pre">Hub.configure_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.continue_trace"><code class="docutils literal notranslate"><span class="pre">Hub.continue_trace()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.end_session"><code class="docutils literal notranslate"><span class="pre">Hub.end_session()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.flush"><code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.get_baggage"><code class="docutils literal notranslate"><span class="pre">Hub.get_baggage()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.get_integration"><code class="docutils literal notranslate"><span class="pre">Hub.get_integration()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.get_traceparent"><code class="docutils literal notranslate"><span class="pre">Hub.get_traceparent()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.iter_trace_propagation_headers"><code class="docutils literal notranslate"><span class="pre">Hub.iter_trace_propagation_headers()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.last_event_id"><code class="docutils literal notranslate"><span class="pre">Hub.last_event_id()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.pop_scope_unsafe"><code class="docutils literal notranslate"><span class="pre">Hub.pop_scope_unsafe()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.push_scope"><code class="docutils literal notranslate"><span class="pre">Hub.push_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.resume_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Hub.resume_auto_session_tracking()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.run"><code class="docutils literal notranslate"><span class="pre">Hub.run()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.scope"><code class="docutils literal notranslate"><span class="pre">Hub.scope</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.start_session"><code class="docutils literal notranslate"><span class="pre">Hub.start_session()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.start_span"><code class="docutils literal notranslate"><span class="pre">Hub.start_span()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.start_transaction"><code class="docutils literal notranslate"><span class="pre">Hub.start_transaction()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.stop_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Hub.stop_auto_session_tracking()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Hub.trace_propagation_meta"><code class="docutils literal notranslate"><span class="pre">Hub.trace_propagation_meta()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.add_breadcrumb"><code class="docutils literal notranslate">add_breadcrumb()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.bind_client"><code class="docutils literal notranslate">bind_client()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.capture_event"><code class="docutils literal notranslate">capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.capture_exception"><code class="docutils literal notranslate">capture_exception()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.capture_message"><code class="docutils literal notranslate">capture_message()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.client"><code class="docutils literal notranslate">client</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.configure_scope"><code class="docutils literal notranslate">configure_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.continue_trace"><code class="docutils literal notranslate">continue_trace()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.end_session"><code class="docutils literal notranslate">end_session()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.flush"><code class="docutils literal notranslate">flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.get_baggage"><code class="docutils literal notranslate">get_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.get_integration"><code class="docutils literal notranslate">get_integration()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.get_traceparent"><code class="docutils literal notranslate">get_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.iter_trace_propagation_headers"><code class="docutils literal notranslate">iter_trace_propagation_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.last_event_id"><code class="docutils literal notranslate">last_event_id()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.pop_scope_unsafe"><code class="docutils literal notranslate">pop_scope_unsafe()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.push_scope"><code class="docutils literal notranslate">push_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.resume_auto_session_tracking"><code class="docutils literal notranslate">resume_auto_session_tracking()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.run"><code class="docutils literal notranslate">run()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.scope"><code class="docutils literal notranslate">scope</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.start_session"><code class="docutils literal notranslate">start_session()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.start_span"><code class="docutils literal notranslate">start_span()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.start_transaction"><code class="docutils literal notranslate">start_transaction()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.stop_auto_session_tracking"><code class="docutils literal notranslate">stop_auto_session_tracking()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Hub.trace_propagation_meta"><code class="docutils literal notranslate">trace_propagation_meta()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.Scope"><code class="docutils literal notranslate"><span class="pre">Scope</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.Scope.add_attachment"><code class="docutils literal notranslate"><span class="pre">Scope.add_attachment()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.add_breadcrumb"><code class="docutils literal notranslate"><span class="pre">Scope.add_breadcrumb()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.add_error_processor"><code class="docutils literal notranslate"><span class="pre">Scope.add_error_processor()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.add_event_processor"><code class="docutils literal notranslate"><span class="pre">Scope.add_event_processor()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.apply_to_event"><code class="docutils literal notranslate"><span class="pre">Scope.apply_to_event()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.capture_event"><code class="docutils literal notranslate"><span class="pre">Scope.capture_event()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.capture_exception"><code class="docutils literal notranslate"><span class="pre">Scope.capture_exception()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.capture_message"><code class="docutils literal notranslate"><span class="pre">Scope.capture_message()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.clear"><code class="docutils literal notranslate"><span class="pre">Scope.clear()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.clear_breadcrumbs"><code class="docutils literal notranslate"><span class="pre">Scope.clear_breadcrumbs()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.continue_trace"><code class="docutils literal notranslate"><span class="pre">Scope.continue_trace()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.end_session"><code class="docutils literal notranslate"><span class="pre">Scope.end_session()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.fingerprint"><code class="docutils literal notranslate"><span class="pre">Scope.fingerprint</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.fork"><code class="docutils literal notranslate"><span class="pre">Scope.fork()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.generate_propagation_context"><code class="docutils literal notranslate"><span class="pre">Scope.generate_propagation_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_baggage"><code class="docutils literal notranslate"><span class="pre">Scope.get_baggage()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_client"><code class="docutils literal notranslate"><span class="pre">Scope.get_client()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_current_scope"><code class="docutils literal notranslate"><span class="pre">Scope.get_current_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_dynamic_sampling_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_dynamic_sampling_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_global_scope"><code class="docutils literal notranslate"><span class="pre">Scope.get_global_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_isolation_scope"><code class="docutils literal notranslate"><span class="pre">Scope.get_isolation_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_trace_context"><code class="docutils literal notranslate"><span class="pre">Scope.get_trace_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.get_traceparent"><code class="docutils literal notranslate"><span class="pre">Scope.get_traceparent()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.iter_headers"><code class="docutils literal notranslate"><span class="pre">Scope.iter_headers()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.iter_trace_propagation_headers"><code class="docutils literal notranslate"><span class="pre">Scope.iter_trace_propagation_headers()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.last_event_id"><code class="docutils literal notranslate"><span class="pre">Scope.last_event_id()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.level"><code class="docutils literal notranslate"><span class="pre">Scope.level</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.remove_context"><code class="docutils literal notranslate"><span class="pre">Scope.remove_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.remove_extra"><code class="docutils literal notranslate"><span class="pre">Scope.remove_extra()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.remove_tag"><code class="docutils literal notranslate"><span class="pre">Scope.remove_tag()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.resume_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Scope.resume_auto_session_tracking()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.run_error_processors"><code class="docutils literal notranslate"><span class="pre">Scope.run_error_processors()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.run_event_processors"><code class="docutils literal notranslate"><span class="pre">Scope.run_event_processors()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_client"><code class="docutils literal notranslate"><span class="pre">Scope.set_client()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_context"><code class="docutils literal notranslate"><span class="pre">Scope.set_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_current_scope"><code class="docutils literal notranslate"><span class="pre">Scope.set_current_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_extra"><code class="docutils literal notranslate"><span class="pre">Scope.set_extra()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_isolation_scope"><code class="docutils literal notranslate"><span class="pre">Scope.set_isolation_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_level"><code class="docutils literal notranslate"><span class="pre">Scope.set_level()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_new_propagation_context"><code class="docutils literal notranslate"><span class="pre">Scope.set_new_propagation_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_tag"><code class="docutils literal notranslate"><span class="pre">Scope.set_tag()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_tags"><code class="docutils literal notranslate"><span class="pre">Scope.set_tags()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_transaction_name"><code class="docutils literal notranslate"><span class="pre">Scope.set_transaction_name()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.set_user"><code class="docutils literal notranslate"><span class="pre">Scope.set_user()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.span"><code class="docutils literal notranslate"><span class="pre">Scope.span</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.start_session"><code class="docutils literal notranslate"><span class="pre">Scope.start_session()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.start_span"><code class="docutils literal notranslate"><span class="pre">Scope.start_span()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.start_transaction"><code class="docutils literal notranslate"><span class="pre">Scope.start_transaction()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.stop_auto_session_tracking"><code class="docutils literal notranslate"><span class="pre">Scope.stop_auto_session_tracking()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.trace_propagation_meta"><code class="docutils literal notranslate"><span class="pre">Scope.trace_propagation_meta()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.transaction"><code class="docutils literal notranslate"><span class="pre">Scope.transaction</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.update_from_kwargs"><code class="docutils literal notranslate"><span class="pre">Scope.update_from_kwargs()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.update_from_scope"><code class="docutils literal notranslate"><span class="pre">Scope.update_from_scope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Scope.user"><code class="docutils literal notranslate"><span class="pre">Scope.user</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_attachment"><code class="docutils literal notranslate">add_attachment()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_breadcrumb"><code class="docutils literal notranslate">add_breadcrumb()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_error_processor"><code class="docutils literal notranslate">add_error_processor()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.add_event_processor"><code class="docutils literal notranslate">add_event_processor()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.apply_to_event"><code class="docutils literal notranslate">apply_to_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.capture_event"><code class="docutils literal notranslate">capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.capture_exception"><code class="docutils literal notranslate">capture_exception()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.capture_message"><code class="docutils literal notranslate">capture_message()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.clear"><code class="docutils literal notranslate">clear()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.clear_breadcrumbs"><code class="docutils literal notranslate">clear_breadcrumbs()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.continue_trace"><code class="docutils literal notranslate">continue_trace()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.end_session"><code class="docutils literal notranslate">end_session()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.fingerprint"><code class="docutils literal notranslate">fingerprint</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.fork"><code class="docutils literal notranslate">fork()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.generate_propagation_context"><code class="docutils literal notranslate">generate_propagation_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_baggage"><code class="docutils literal notranslate">get_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_client"><code class="docutils literal notranslate">get_client()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_current_scope"><code class="docutils literal notranslate">get_current_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_dynamic_sampling_context"><code class="docutils literal notranslate">get_dynamic_sampling_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_global_scope"><code class="docutils literal notranslate">get_global_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_isolation_scope"><code class="docutils literal notranslate">get_isolation_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_trace_context"><code class="docutils literal notranslate">get_trace_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.get_traceparent"><code class="docutils literal notranslate">get_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.iter_headers"><code class="docutils literal notranslate">iter_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.iter_trace_propagation_headers"><code class="docutils literal notranslate">iter_trace_propagation_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.last_event_id"><code class="docutils literal notranslate">last_event_id()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.level"><code class="docutils literal notranslate">level</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_context"><code class="docutils literal notranslate">remove_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_extra"><code class="docutils literal notranslate">remove_extra()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.remove_tag"><code class="docutils literal notranslate">remove_tag()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.resume_auto_session_tracking"><code class="docutils literal notranslate">resume_auto_session_tracking()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.run_error_processors"><code class="docutils literal notranslate">run_error_processors()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.run_event_processors"><code class="docutils literal notranslate">run_event_processors()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_client"><code class="docutils literal notranslate">set_client()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_context"><code class="docutils literal notranslate">set_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_current_scope"><code class="docutils literal notranslate">set_current_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_extra"><code class="docutils literal notranslate">set_extra()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_isolation_scope"><code class="docutils literal notranslate">set_isolation_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_level"><code class="docutils literal notranslate">set_level()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_new_propagation_context"><code class="docutils literal notranslate">set_new_propagation_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_tag"><code class="docutils literal notranslate">set_tag()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_tags"><code class="docutils literal notranslate">set_tags()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_transaction_name"><code class="docutils literal notranslate">set_transaction_name()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.set_user"><code class="docutils literal notranslate">set_user()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.span"><code class="docutils literal notranslate">span</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.start_session"><code class="docutils literal notranslate">start_session()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.start_span"><code class="docutils literal notranslate">start_span()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.start_transaction"><code class="docutils literal notranslate">start_transaction()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.stop_auto_session_tracking"><code class="docutils literal notranslate">stop_auto_session_tracking()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.trace_propagation_meta"><code class="docutils literal notranslate">trace_propagation_meta()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.transaction"><code class="docutils literal notranslate">transaction</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.update_from_kwargs"><code class="docutils literal notranslate">update_from_kwargs()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.update_from_scope"><code class="docutils literal notranslate">update_from_scope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Scope.user"><code class="docutils literal notranslate">user</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.client.BaseClient"><code class="docutils literal notranslate"><span class="pre">BaseClient</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.client.BaseClient.is_active"><code class="docutils literal notranslate"><span class="pre">BaseClient.is_active()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client.BaseClient.is_active"><code class="docutils literal notranslate">is_active()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.client.NonRecordingClient"><code class="docutils literal notranslate"><span class="pre">NonRecordingClient</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.client._Client"><code class="docutils literal notranslate"><span class="pre">_Client</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.capture_event"><code class="docutils literal notranslate"><span class="pre">_Client.capture_event()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.close"><code class="docutils literal notranslate"><span class="pre">_Client.close()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.dsn"><code class="docutils literal notranslate"><span class="pre">_Client.dsn</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.flush"><code class="docutils literal notranslate"><span class="pre">_Client.flush()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.get_integration"><code class="docutils literal notranslate"><span class="pre">_Client.get_integration()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.is_active"><code class="docutils literal notranslate"><span class="pre">_Client.is_active()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.client._Client.should_send_default_pii"><code class="docutils literal notranslate"><span class="pre">_Client.should_send_default_pii()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.capture_event"><code class="docutils literal notranslate">capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.close"><code class="docutils literal notranslate">close()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.dsn"><code class="docutils literal notranslate">dsn</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.flush"><code class="docutils literal notranslate">flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.get_integration"><code class="docutils literal notranslate">get_integration()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.is_active"><code class="docutils literal notranslate">is_active()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.client._Client.should_send_default_pii"><code class="docutils literal notranslate">should_send_default_pii()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.Transport"><code class="docutils literal notranslate"><span class="pre">Transport</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.Transport.capture_envelope"><code class="docutils literal notranslate"><span class="pre">Transport.capture_envelope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Transport.capture_event"><code class="docutils literal notranslate"><span class="pre">Transport.capture_event()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Transport.flush"><code class="docutils literal notranslate"><span class="pre">Transport.flush()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Transport.kill"><code class="docutils literal notranslate"><span class="pre">Transport.kill()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.Transport.record_lost_event"><code class="docutils literal notranslate"><span class="pre">Transport.record_lost_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.capture_envelope"><code class="docutils literal notranslate">capture_envelope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.capture_event"><code class="docutils literal notranslate">capture_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.flush"><code class="docutils literal notranslate">flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.kill"><code class="docutils literal notranslate">kill()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.Transport.record_lost_event"><code class="docutils literal notranslate">record_lost_event()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.HttpTransport"><code class="docutils literal notranslate"><span class="pre">HttpTransport</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.HttpTransport.capture_envelope"><code class="docutils literal notranslate"><span class="pre">HttpTransport.capture_envelope()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.HttpTransport.flush"><code class="docutils literal notranslate"><span class="pre">HttpTransport.flush()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.HttpTransport.kill"><code class="docutils literal notranslate"><span class="pre">HttpTransport.kill()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.HttpTransport.record_lost_event"><code class="docutils literal notranslate"><span class="pre">HttpTransport.record_lost_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.capture_envelope"><code class="docutils literal notranslate">capture_envelope()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.flush"><code class="docutils literal notranslate">flush()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.kill"><code class="docutils literal notranslate">kill()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.HttpTransport.record_lost_event"><code class="docutils literal notranslate">record_lost_event()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Transaction"><code class="docutils literal notranslate"><span class="pre">Transaction</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.containing_transaction"><code class="docutils literal notranslate"><span class="pre">Transaction.containing_transaction</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.finish"><code class="docutils literal notranslate"><span class="pre">Transaction.finish()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.get_baggage"><code class="docutils literal notranslate"><span class="pre">Transaction.get_baggage()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.set_context"><code class="docutils literal notranslate"><span class="pre">Transaction.set_context()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.set_http_status"><code class="docutils literal notranslate"><span class="pre">Transaction.set_http_status()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.to_json"><code class="docutils literal notranslate"><span class="pre">Transaction.to_json()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.containing_transaction"><code class="docutils literal notranslate">containing_transaction</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.finish"><code class="docutils literal notranslate">finish()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.get_baggage"><code class="docutils literal notranslate">get_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.set_context"><code class="docutils literal notranslate">set_context()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.set_http_status"><code class="docutils literal notranslate">set_http_status()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Transaction.to_json"><code class="docutils literal notranslate">to_json()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.tracing.Span"><code class="docutils literal notranslate"><span class="pre">Span</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.containing_transaction"><code class="docutils literal notranslate"><span class="pre">Span.containing_transaction</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_environ"><code class="docutils literal notranslate"><span class="pre">Span.continue_from_environ()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_headers"><code class="docutils literal notranslate"><span class="pre">Span.continue_from_headers()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.finish"><code class="docutils literal notranslate"><span class="pre">Span.finish()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.from_traceparent"><code class="docutils literal notranslate"><span class="pre">Span.from_traceparent()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.iter_headers"><code class="docutils literal notranslate"><span class="pre">Span.iter_headers()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.start_child"><code class="docutils literal notranslate"><span class="pre">Span.start_child()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.timestamp"><code class="docutils literal notranslate"><span class="pre">Span.timestamp</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.to_baggage"><code class="docutils literal notranslate"><span class="pre">Span.to_baggage()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.tracing.Span.to_json"><code class="docutils literal notranslate"><span class="pre">Span.to_json()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.containing_transaction"><code class="docutils literal notranslate">containing_transaction</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_environ"><code class="docutils literal notranslate">continue_from_environ()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.continue_from_headers"><code class="docutils literal notranslate">continue_from_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.finish"><code class="docutils literal notranslate">finish()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.from_traceparent"><code class="docutils literal notranslate">from_traceparent()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.iter_headers"><code class="docutils literal notranslate">iter_headers()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.start_child"><code class="docutils literal notranslate">start_child()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.timestamp"><code class="docutils literal notranslate">timestamp</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.to_baggage"><code class="docutils literal notranslate">to_baggage()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.tracing.Span.to_json"><code class="docutils literal notranslate">to_json()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.profiler.transaction_profiler.Profile"><code class="docutils literal notranslate"><span class="pre">Profile</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.session.Session"><code class="docutils literal notranslate"><span class="pre">Session</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.attachments.Attachment"><code class="docutils literal notranslate"><span class="pre">Attachment</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.attachments.Attachment.to_envelope_item"><code class="docutils literal notranslate"><span class="pre">Attachment.to_envelope_item()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.attachments.Attachment.to_envelope_item"><code class="docutils literal notranslate">to_envelope_item()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.scrubber.EventScrubber"><code class="docutils literal notranslate"><span class="pre">EventScrubber</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.scrubber.EventScrubber.scrub_dict"><code class="docutils literal notranslate"><span class="pre">EventScrubber.scrub_dict()</span></code></a></li>
-<li><a class="reference internal" href="#sentry_sdk.scrubber.EventScrubber.scrub_list"><code class="docutils literal notranslate"><span class="pre">EventScrubber.scrub_list()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.scrubber.EventScrubber.scrub_dict"><code class="docutils literal notranslate">scrub_dict()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.scrubber.EventScrubber.scrub_list"><code class="docutils literal notranslate">scrub_list()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.monitor.Monitor"><code class="docutils literal notranslate"><span class="pre">Monitor</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.monitor.Monitor.check_health"><code class="docutils literal notranslate"><span class="pre">Monitor.check_health()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.monitor.Monitor.check_health"><code class="docutils literal notranslate">check_health()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#sentry_sdk.envelope.Envelope"><code class="docutils literal notranslate"><span class="pre">Envelope</span></code></a></li>
 <li><a class="reference internal" href="#sentry_sdk.envelope.Item"><code class="docutils literal notranslate"><span class="pre">Item</span></code></a><ul>
-<li><a class="reference internal" href="#sentry_sdk.envelope.Item.get_event"><code class="docutils literal notranslate"><span class="pre">Item.get_event()</span></code></a></li>
+<li><a class="reference internal" href="#sentry_sdk.envelope.Item.get_event"><code class="docutils literal notranslate">get_event()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -838,7 +838,7 @@ The <cite>scope</cite> and <cite>scope_kwargs</cite> parameters are mutually exc
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sentry_sdk.Scope.continue_trace">
-<span class="sig-name descname"><span class="pre">continue_trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environ_or_headers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.continue_trace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.continue_trace" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">continue_trace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">environ_or_headers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'manual'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/scope.html#Scope.continue_trace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.Scope.continue_trace" title="Link to this definition">¶</a></dt>
 <dd><p>Sets the propagation context from environment or headers and returns a transaction.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -1761,7 +1761,7 @@ documentation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.tracing.Span">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.tracing.</span></span><span class="sig-name descname"><span class="pre">Span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trace_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">span_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent_span_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">same_process_as_parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">containing_transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_timestamp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.tracing.</span></span><span class="sig-name descname"><span class="pre">Span</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trace_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">span_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">parent_span_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">same_process_as_parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampled</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">op</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hub</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">containing_transaction</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_timestamp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scope</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'manual'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/tracing.html#Span"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.tracing.Span" title="Link to this definition">¶</a></dt>
 <dd><p>A span holds timing information of a block of code.
 Spans can have multiple child spans thus forming a span tree.</p>
 <dl class="field-list simple">
@@ -2069,7 +2069,7 @@ each envelope may have at most one Item with type “event” or “transaction�
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=ae39cb24"></script>
+      <script src="_static/documentation_options.js?v=dfec817d"></script>
       <script src="_static/doctools.js?v=888ff710"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=3cc430e2"></script></body>
