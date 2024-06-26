@@ -124,6 +124,7 @@ GROUPS = {
     "Miscellaneous": [
         "loguru",
         "opentelemetry",
+        "potel",
         "pure_eval",
         "trytond",
     ],

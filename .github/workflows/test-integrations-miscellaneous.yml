@@ -50,6 +50,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry-latest"
+      - name: Test potel latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-potel-latest"
       - name: Test pure_eval latest
         run: |
           set -x # print commands that are executed
@@ -81,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
@@ -106,6 +110,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-opentelemetry"
+      - name: Test potel pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-potel"
       - name: Test pure_eval pinned
         run: |
           set -x # print commands that are executed
