@@ -19,11 +19,6 @@ except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
 try:
-    from opentelemetry.instrumentation.django import DjangoInstrumentor  # type: ignore
-except ImportError:
-    DjangoInstrumentor = None
-
-try:
     from opentelemetry.instrumentation.flask import FlaskInstrumentor  # type: ignore
 except ImportError:
     FlaskInstrumentor = None
@@ -37,7 +32,6 @@ if TYPE_CHECKING:
 
 
 CONFIGURABLE_INSTRUMENTATIONS = {
-    DjangoInstrumentor: {"is_sql_commentor_enabled": True},
     FlaskInstrumentor: {"enable_commenter": True},
 }
 
