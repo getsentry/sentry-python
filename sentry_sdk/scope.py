@@ -1059,13 +1059,6 @@ class Scope(object):
         with new_scope():
             kwargs.setdefault("scope", self)
 
-            client = Scope.get_client()
-
-            configuration_instrumenter = client.options["instrumenter"]
-
-            if instrumenter != configuration_instrumenter:
-                return NoOpSpan()
-
             # get current span or transaction
             span = self.span or Scope.get_isolation_scope().span
 

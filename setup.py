@@ -66,7 +66,8 @@ setup(
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-experimental": [
-            "opentelemetry-instrumentation-flask==0.46b0",
+            "opentelemetry-distro",
+            "opentelemetry-instrumentation-flask",
         ],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],

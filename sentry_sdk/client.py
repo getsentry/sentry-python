@@ -542,6 +542,7 @@ class _Client(BaseClient):
             origin = event["contexts"]["trace"]["origin"]
             if origin in IGNORE_ORIGIN:
                 # This is instrumented by OTel
+                logger.debug("Transaction with origin %s dropped", origin)
                 event = None
 
             before_send_transaction = self.options["before_send_transaction"]
