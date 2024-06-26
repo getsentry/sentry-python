@@ -231,6 +231,13 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.

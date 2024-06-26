@@ -25,73 +25,65 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.11","3.12"]
+        python-version: ["3.6","3.7","3.8","3.10","3.11","3.12"]
         # python3.6 reached EOL and is no longer being supported on
         # new versions of hosted runners on Github Actions
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Start Redis
-        uses: supercharge/redis-github-action@1.7.0
+        uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
         run: |
           pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test anthropic latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-anthropic-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test arq latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest"
       - name: Test beam latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest"
       - name: Test celery latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test cohere latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-cohere-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest"
       - name: Test huey latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test langchain latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-langchain-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test openai latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test huggingface_hub latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huggingface_hub-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest"
       - name: Test rq latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest"
+      - name: Test spark latest
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-spark-latest"
       - name: Generate coverage XML
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v4
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
   test-data_processing-pinned:
     name: Data Processing (pinned)
     timeout-minutes: 30
@@ -106,66 +98,58 @@ jobs:
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Start Redis
-        uses: supercharge/redis-github-action@1.7.0
+        uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
         run: |
           pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
-      - name: Test anthropic pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-anthropic" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
       - name: Test arq pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-arq"
       - name: Test beam pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-beam"
       - name: Test celery pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test cohere pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-cohere" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-celery"
       - name: Test huey pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test langchain pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-langchain" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test openai pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-openai" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test huggingface_hub pinned
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huggingface_hub" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-huey"
       - name: Test rq pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rq"
+      - name: Test spark pinned
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-spark"
       - name: Generate coverage XML
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v4
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
   check_required_tests:
     name: All Data Processing tests passed
     needs: test-data_processing-pinned

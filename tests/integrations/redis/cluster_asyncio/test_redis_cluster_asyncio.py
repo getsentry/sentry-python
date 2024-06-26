@@ -147,3 +147,30 @@ async def test_async_redis_pipeline(
         "redis.transaction": False,
         "redis.is_cluster": True,
     }
+
+
+@pytest.mark.asyncio
+async def test_async_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = cluster.RedisCluster(host="localhost", port=6379)
+    with start_transaction(name="custom_transaction"):
+        # default case
+        await connection.set("somekey", "somevalue")
+
+        # pipeline
+        pipeline = connection.pipeline(transaction=False)
+        pipeline.get("somekey")
+        pipeline.set("anotherkey", 1)
+        await pipeline.execute()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.db.redis"
