@@ -64,6 +64,10 @@ if TYPE_CHECKING:
 
 _client_init_debug = ContextVar("client_init_debug")
 
+# XXX: better place and name for this
+IGNORE_ORIGIN = {
+    "auto.http.flask",
+}
 
 SDK_INFO = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
@@ -534,22 +538,24 @@ class _Client(BaseClient):
                     )
             event = new_event  # type: ignore
 
-        before_send_transaction = self.options["before_send_transaction"]
-        if (
-            before_send_transaction is not None
-            and event is not None
-            and event.get("type") == "transaction"
-        ):
-            new_event = None
-            with capture_internal_exceptions():
-                new_event = before_send_transaction(event, hint or {})
-            if new_event is None:
-                logger.info("before send transaction dropped event")
-                if self.transport:
-                    self.transport.record_lost_event(
-                        "before_send", data_category="transaction"
-                    )
-            event = new_event  # type: ignore
+        if event.get("type") == "transaction":
+            origin = event["contexts"]["trace"]["origin"]
+            if origin in IGNORE_ORIGIN:
+                # This is instrumented by OTel
+                event = None
+
+            before_send_transaction = self.options["before_send_transaction"]
+            if before_send_transaction is not None and event is not None:
+                new_event = None
+                with capture_internal_exceptions():
+                    new_event = before_send_transaction(event, hint or {})
+                if new_event is None:
+                    logger.info("before send transaction dropped event")
+                    if self.transport:
+                        self.transport.record_lost_event(
+                            "before_send", data_category="transaction"
+                        )
+                event = new_event  # type: ignore
 
         return event
 
