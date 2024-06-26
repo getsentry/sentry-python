@@ -8,25 +8,14 @@ import sys
 from importlib import import_module
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations.opentelemetry.potel_span_processor import (
-    PotelSentrySpanProcessor,
-)
-from sentry_sdk.integrations.opentelemetry.contextvars_context import (
-    SentryContextVarsRuntimeContext,
-)
-from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
+from sentry_sdk.integrations.opentelemetry.distro import _SentryDistro
 from sentry_sdk.utils import logger, _get_installed_modules
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    from opentelemetry import trace  # type: ignore
-    from opentelemetry.instrumentation.auto_instrumentation._load import (  # type: ignore
-        _load_distro,
+    from opentelemetry.instrumentation.auto_instrumentation._load import (
         _load_instrumentors,
     )
-    from opentelemetry.propagate import set_global_textmap  # type: ignore
-    from opentelemetry.sdk.trace import TracerProvider  # type: ignore
-    from opentelemetry import context
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
@@ -40,6 +29,7 @@ CLASSES_TO_INSTRUMENT = {
     # instrumentation took place.
     "fastapi": "fastapi.FastAPI",
     "flask": "flask.Flask",
+    # XXX Add a mapping for all instrumentors that patch by replacing a class
 }
 
 
@@ -57,12 +47,21 @@ class OpenTelemetryIntegration(Integration):
         original_classes = _record_unpatched_classes()
 
         try:
-            distro = _load_distro()
+            distro = _SentryDistro()
             distro.configure()
+            # XXX This does some initial checks before loading instrumentations
+            # (checks OTEL_PYTHON_DISABLED_INSTRUMENTATIONS, checks version
+            # compat). If we don't want this in the future, we can implement our
+            # own _load_instrumentors (it anyway just iterates over
+            # opentelemetry_instrumentor entry points).
             _load_instrumentors(distro)
         except Exception:
             logger.exception("[OTel] Failed to auto-initialize OpenTelemetry")
 
+        # XXX: Consider whether this is ok to keep and make default.
+        # The alternative is asking folks to follow specific import order for
+        # some integrations (sentry_sdk.init before you even import Flask, for
+        # instance).
         try:
             _patch_remaining_classes(original_classes)
         except Exception:
@@ -70,8 +69,6 @@ class OpenTelemetryIntegration(Integration):
                 "[OTel] Failed to post-patch instrumented classes. "
                 "You might have to make sure sentry_sdk.init() is called before importing anything else."
             )
-
-        _setup_sentry_tracing()
 
         logger.debug("[OTel] Finished setting up OpenTelemetry integration")
 
@@ -167,19 +164,3 @@ def _import_by_path(path):
     # type: (str) -> type
     parts = path.rsplit(".", maxsplit=1)
     return getattr(import_module(parts[0]), parts[-1])
-
-
-def _setup_sentry_tracing():
-    # type: () -> None
-
-    # TODO-neel-potel make sure lifecycle is correct
-    # TODO-neel-potel contribute upstream so this is not necessary
-    context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
-
-    provider = TracerProvider()
-
-    provider.add_span_processor(PotelSentrySpanProcessor())
-
-    trace.set_tracer_provider(provider)
-
-    set_global_textmap(SentryPropagator())
