@@ -1,14 +1,14 @@
-from opentelemetry.sdk.trace import SpanProcessor  # type: ignore
-from opentelemetry.context import Context  # type: ignore
-from opentelemetry.trace import Span  # type: ignore
+from opentelemetry.sdk.trace import SpanProcessor
+from opentelemetry.context import Context
 
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Optional
+    from opentelemetry.sdk.trace import ReadableSpan
 
 
-class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
+class PotelSentrySpanProcessor(SpanProcessor):
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
     """
@@ -25,11 +25,11 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
         pass
 
     def on_start(self, span, parent_context=None):
-        # type: (Span, Optional[Context]) -> None
+        # type: (ReadableSpan, Optional[Context]) -> None
         pass
 
     def on_end(self, span):
-        # type: (Span) -> None
+        # type: (ReadableSpan) -> None
         pass
 
     # TODO-neel-potel not sure we need a clear like JS

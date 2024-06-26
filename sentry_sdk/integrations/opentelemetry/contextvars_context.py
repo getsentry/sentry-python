@@ -1,8 +1,8 @@
-from opentelemetry.context.context import Context  # type: ignore
-from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext  # type: ignore
+from opentelemetry.context.context import Context
+from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
 
 
-class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):  # type: ignore
+class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
     def attach(self, context):
         # type: (Context) -> object
         # TODO-neel-potel do scope management
