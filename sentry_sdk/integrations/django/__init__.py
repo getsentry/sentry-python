@@ -325,14 +325,10 @@ def _patch_drf():
 def _patch_channels():
     # type: () -> None
     try:
-        # Django < 3.0
         from channels.http import AsgiHandler  # type: ignore
     except ImportError:
-        try:
-            # DJango 3.0+
-            from django.core.handlers.asgi import ASGIHandler as AsgiHandler
-        except ImportError:
-            return
+        return
+
     if not HAS_REAL_CONTEXTVARS:
         # We better have contextvars or we're going to leak state between
         # requests.

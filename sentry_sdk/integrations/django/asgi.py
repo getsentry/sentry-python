@@ -134,15 +134,11 @@ def patch_get_response_async(cls, _before_get_response):
 
 def patch_channels_asgi_handler_impl(cls):
     # type: (Any) -> None
-
-    try:
-        import channels  # type: ignore
-    except ImportError:
-        channels = None
+    import channels  # type: ignore
 
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    if channels is not None and channels.__version__ < "3.0.0":
+    if channels.__version__ < "3.0.0":
         old_app = cls.__call__
 
         async def sentry_patched_asgi_handler(self, receive, send):
