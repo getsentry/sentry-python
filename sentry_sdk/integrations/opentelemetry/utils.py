@@ -1,16 +1,25 @@
-from opentelemetry.semconv.trace import SpanAttributes  # type: ignore
-from opentelemetry.trace import Span  # type: ignore
+from typing import cast
+from datetime import datetime, timezone
+
+from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.sdk.trace import ReadableSpan
 
 from sentry_sdk import get_client, start_transaction
 from sentry_sdk.utils import Dsn
 
+from sentry_sdk._types import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Optional
+
 def is_sentry_span(span):
-    # type: (Span) -> bool
+    # type: (ReadableSpan) -> bool
     """
     Break infinite loop:
     HTTP requests to Sentry are caught by OTel and send again to Sentry.
     """
     span_url = span.attributes.get(SpanAttributes.HTTP_URL, None)
+    span_url = cast("Optional[str]", span_url)
 
     if not span_url:
         return False
@@ -31,3 +40,7 @@ def is_sentry_span(span):
         return True
 
     return False
+
+def convert_otel_timestamp(time):
+    # type: (int) -> datetime
+   return datetime.fromtimestamp(time / 1e9, timezone.utc)

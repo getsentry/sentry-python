@@ -20,6 +20,8 @@ from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
+    OTEL_SENTRY_CONTEXT,
+    SPAN_ORIGIN,
 )
 from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
 from sentry_sdk.scope import add_global_event_processor
@@ -33,9 +35,7 @@ if TYPE_CHECKING:
     from opentelemetry import context as context_api
     from sentry_sdk._types import Event, Hint
 
-OPEN_TELEMETRY_CONTEXT = "otel"
 SPAN_MAX_TIME_OPEN_MINUTES = 10
-SPAN_ORIGIN = "auto.otel"
 
 
 def link_trace_context_to_error_event(event, otel_span_map):
@@ -195,7 +195,7 @@ class SentrySpanProcessor(SpanProcessor):
         if isinstance(sentry_span, Transaction):
             sentry_span.name = otel_span.name
             sentry_span.set_context(
-                OPEN_TELEMETRY_CONTEXT, self._get_otel_context(otel_span)
+                OTEL_SENTRY_CONTEXT, self._get_otel_context(otel_span)
             )
             self._update_transaction_with_otel_data(sentry_span, otel_span)
 

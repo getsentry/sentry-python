@@ -1,16 +1,18 @@
-from opentelemetry.trace import INVALID_SPAN, get_current_span  # type: ignore
-from opentelemetry.context import Context  # type: ignore
-from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor  # type: ignore
+from collections import deque
+from datetime import datetime
 
-from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
-from sentry_sdk.integrations.opentelemetry.potel_span_exporter import (
-    PotelSentrySpanExporter,
-)
+from opentelemetry.trace import INVALID_SPAN, get_current_span, format_trace_id, format_span_id
+from opentelemetry.context import Context
+from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
+from sentry_sdk import capture_event
+from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span, convert_otel_timestamp
+from sentry_sdk.integrations.opentelemetry.consts import OTEL_SENTRY_CONTEXT, SPAN_ORIGIN
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional
+    from typing import Optional, List, Any
+    from sentry_sdk._types import Event
 
 
 class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
@@ -27,25 +29,23 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
 
     def __init__(self):
         # type: () -> None
-        self._exporter = PotelSentrySpanExporter()
+        self._children_spans = {}  # type: dict[int, List[ReadableSpan]]
 
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
         pass
-        # if is_sentry_span(span):
-        #     return
-
-        # parent_span = get_current_span(parent_context)
-
-        # # TODO-neel-potel check remote logic with propagation and incoming trace later
-        # if parent_span != INVALID_SPAN:
-        #     # TODO-neel once we add our apis, we might need to store references on the span
-        #     # directly, see if we need to do this like JS
-        #     pass
 
     def on_end(self, span):
         # type: (ReadableSpan) -> None
-        self._exporter.export(span)
+        if is_sentry_span(span):
+            return
+
+        # TODO-neel-potel-remote only take parent if not remote
+        if span.parent:
+            self._children_spans.setdefault(span.parent.span_id, []).append(span)
+        else:
+            # if have a root span ending, we build a transaction and send it
+            self._flush_root_span(span)
 
     # TODO-neel-potel not sure we need a clear like JS
     def shutdown(self):
@@ -56,4 +56,77 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
     # TODO-neel-potel call this in client.flush
     def force_flush(self, timeout_millis=30000):
         # type: (int) -> bool
-        return self._exporter.flush(timeout_millis)
+        return True
+
+    def _flush_root_span(self, span):
+        # type: (ReadableSpan) -> None
+        transaction_event = self._root_span_to_transaction_event(span)
+        if not transaction_event:
+            return
+
+        children = self._collect_children(span)
+        # TODO add converted spans
+        capture_event(transaction_event)
+
+
+    def _collect_children(self, span):
+        # type: (ReadableSpan) -> List[ReadableSpan]
+        if not span.context:
+            return []
+
+        children = []
+        bfs_queue = deque()
+        bfs_queue.append(span.context.span_id)
+
+        while bfs_queue:
+            parent_span_id = bfs_queue.popleft()
+            node_children = self._children_spans.pop(parent_span_id, [])
+            children.extend(node_children)
+            bfs_queue.extend([child.context.span_id for child in node_children if child.context])
+
+        return children
+
+    # we construct the event from scratch here
+    # and not use the current Transaction class for easier refactoring
+    # TODO-neel-potel op, description, status logic
+    def _root_span_to_transaction_event(self, span):
+        # type: (ReadableSpan) -> Optional[Event]
+        if not span.context:
+            return None
+        if not span.start_time:
+            return None
+        if not span.end_time:
+            return None
+
+        trace_id = format_trace_id(span.context.trace_id)
+        span_id = format_span_id(span.context.span_id)
+        parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
+
+        trace_context = {
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "origin": SPAN_ORIGIN,
+            "op": span.name, # TODO
+            "status": "ok", # TODO
+        }  # type: dict[str, Any]
+
+        if parent_span_id:
+            trace_context["parent_span_id"] = parent_span_id
+        if span.attributes:
+            trace_context["data"] = dict(span.attributes)
+
+        contexts = {"trace": trace_context}
+        if span.resource.attributes:
+            contexts[OTEL_SENTRY_CONTEXT] = {"resource": dict(span.resource.attributes)}
+
+        event = {
+            "type": "transaction",
+            "transaction": span.name, # TODO
+            "transaction_info": {"source": "custom"}, # TODO
+            "contexts": contexts,
+            "start_timestamp": convert_otel_timestamp(span.start_time),
+            "timestamp": convert_otel_timestamp(span.end_time),
+            "spans": [],
+        }  # type: Event
+
+        return event
