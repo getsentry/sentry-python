@@ -43,6 +43,7 @@ urlpatterns = [
     ),
     path("middleware-exc", views.message, name="middleware_exc"),
     path("message", views.message, name="message"),
+    path("view-with-signal", views.view_with_signal, name="view_with_signal"),
     path("mylogin", views.mylogin, name="mylogin"),
     path("classbased", views.ClassBasedView.as_view(), name="classbased"),
     path("sentryclass", views.SentryClassBasedView(), name="sentryclass"),
@@ -87,6 +88,11 @@ if views.async_message is not None:
 
 if views.my_async_view is not None:
     urlpatterns.append(path("my_async_view", views.my_async_view, name="my_async_view"))
+
+if views.my_async_view is not None:
+    urlpatterns.append(
+        path("simple_async_view", views.simple_async_view, name="simple_async_view")
+    )
 
 if views.thread_ids_async is not None:
     urlpatterns.append(

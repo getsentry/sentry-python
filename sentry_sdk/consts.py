@@ -231,6 +231,13 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -299,6 +306,11 @@ class SPANDATA:
     MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
     """
     Number of retries/attempts to process a message.
+    """
+
+    MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
+    """
+    The latency between when the task was enqueued and when it was started to be processed.
     """
 
     MESSAGING_SYSTEM = "messaging.system"
@@ -517,4 +529,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.5.1"
+VERSION = "2.7.0"

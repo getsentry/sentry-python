@@ -67,6 +67,7 @@ def patch_signals():
                 with sentry_sdk.start_span(
                     op=OP.EVENT_DJANGO,
                     description=signal_name,
+                    origin=DjangoIntegration.origin,
                 ) as span:
                     span.set_data("signal", signal_name)
                     return receiver(*args, **kwargs)

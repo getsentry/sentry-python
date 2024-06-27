@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.7.0
+
+- Add `origin` to spans and transactions (#3133) by @antonpirker
+- OTel: Set up typing for OTel (#3168) by @sentrivana
+- OTel: Auto instrumentation skeleton (#3143) by @sentrivana
+- OpenAI: If there is an internal error, still return a value (#3192) by @colin-sentry
+- MongoDB: Add MongoDB collection span tag (#3182) by @0Calories
+- MongoDB: Change span operation from `db.query` to `db` (#3186) by @0Calories
+- MongoDB: Remove redundant command name in query description (#3189) by @0Calories
+- Apache Spark: Fix spark driver integration (#3162) by @seyoon-lim
+- Apache Spark: Add Spark test suite to tox.ini and to CI (#3199) by @sentrivana
+- Codecov: Add failed test commits in PRs (#3190) by @antonpirker
+- Update library, Python versions in tests (#3202) by @sentrivana
+- Remove Hub from our test suite (#3197) by @antonpirker
+- Use env vars for default CA cert bundle location (#3160) by @DragoonAethis
+- Create a separate test group for AI (#3198) by @sentrivana
+- Add additional stub packages for type checking (#3122) by @Daverball
+- Proper naming of requirements files (#3191) by @antonpirker
+- Pinning pip because new version does not work with some versions of Celery and Httpx (#3195) by @antonpirker
+- build(deps): bump supercharge/redis-github-action from 1.7.0 to 1.8.0 (#3193) by @dependabot
+- build(deps): bump actions/checkout from 4.1.6 to 4.1.7 (#3171) by @dependabot
+- build(deps): update pytest-asyncio requirement (#3087) by @dependabot
+
+## 2.6.0
+
+- Introduce continuous profiling mode (#2830) by @Zylphrex
+- Profiling: Add deprecation comment for profiler internals (#3167) by @sentrivana
+- Profiling: Move thread data to trace context (#3157) by @Zylphrex
+- Explicitly export cron symbols for typecheckers (#3072) by @spladug
+- Cleaning up ASGI tests for Django (#3180) by @antonpirker
+- Celery: Add Celery receive latency (#3174) by @antonpirker
+- Metrics: Update type hints for tag values (#3156) by @elramen
+- Django: Fix psycopg3 reconnect error (#3111) by @szokeasaurusrex
+- Tracing: Keep original function signature when decorated (#3178) by @sentrivana
+- Reapply "Refactor the Celery Beat integration (#3105)" (#3144) (#3175) by @antonpirker
+- Added contributor image to readme (#3183) by @antonpirker
+- bump actions/checkout from 4.1.4 to 4.1.6 (#3147) by @dependabot
+- bump checkouts/data-schemas from `59f9683` to `8c13457` (#3146) by @dependabot
+
 ## 2.5.1
 
 This change fixes a regression in our cron monitoring feature, which caused cron checkins not to be sent. The regression appears to have been introduced in version 2.4.0.

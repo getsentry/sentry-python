@@ -1,5 +1,5 @@
 from opentelemetry.context import Context, create_key, get_value, set_value
-from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext  # type: ignore
+from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
 
 from sentry_sdk.scope import Scope
 
@@ -7,7 +7,7 @@ from sentry_sdk.scope import Scope
 _SCOPES_KEY = create_key("sentry_scopes")
 
 
-class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):  # type: ignore
+class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
     def attach(self, context):
         # type: (Context) -> object
         scopes = get_value(_SCOPES_KEY, context)

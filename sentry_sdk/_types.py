@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from typing import Any
     from typing import Callable
     from typing import Dict
-    from typing import List
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
@@ -173,14 +172,7 @@ if TYPE_CHECKING:
     MetricTagsInternal = Tuple[Tuple[str, str], ...]
 
     # External representation of tags as a dictionary.
-    MetricTagValue = Union[
-        str,
-        int,
-        float,
-        None,
-        List[Union[int, str, float, None]],
-        Tuple[Union[int, str, float, None], ...],
-    ]
+    MetricTagValue = Union[str, int, float, None]
     MetricTags = Mapping[str, MetricTagValue]
 
     # Value inside the generator for the metric value.

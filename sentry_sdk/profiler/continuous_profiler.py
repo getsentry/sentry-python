@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from typing import Dict
     from typing import List
     from typing import Optional
+    from typing import Type
     from typing import Union
     from typing_extensions import TypedDict
     from sentry_sdk._types import ContinuousProfilerMode
@@ -51,9 +52,10 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent.monkey import get_original  # type: ignore
-    from gevent.threadpool import ThreadPool  # type: ignore
+    from gevent.monkey import get_original
+    from gevent.threadpool import ThreadPool as _ThreadPool
 
+    ThreadPool = _ThreadPool  # type: Optional[Type[_ThreadPool]]
     thread_sleep = get_original("time", "sleep")
 except ImportError:
     thread_sleep = time.sleep
@@ -347,7 +349,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
 
         super().__init__(frequency, options, capture_func)
 
-        self.thread = None  # type: Optional[ThreadPool]
+        self.thread = None  # type: Optional[_ThreadPool]
         self.pid = None  # type: Optional[int]
         self.lock = threading.Lock()
 
@@ -377,7 +379,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
             # we should create a new buffer along with it
             self.reset_buffer()
 
-            self.thread = ThreadPool(1)
+            self.thread = ThreadPool(1)  # type: ignore[misc]
             try:
                 self.thread.spawn(self.run)
             except RuntimeError:

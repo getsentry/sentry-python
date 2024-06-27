@@ -45,7 +45,9 @@ def patch_asyncio():
 
                 with sentry_sdk.isolation_scope():
                     with sentry_sdk.start_span(
-                        op=OP.FUNCTION, description=get_name(coro)
+                        op=OP.FUNCTION,
+                        description=get_name(coro),
+                        origin=AsyncioIntegration.origin,
                     ):
                         try:
                             result = await coro
@@ -97,6 +99,7 @@ def _capture_exception():
 
 class AsyncioIntegration(Integration):
     identifier = "asyncio"
+    origin = f"auto.function.{identifier}"
 
     @staticmethod
     def setup_once():

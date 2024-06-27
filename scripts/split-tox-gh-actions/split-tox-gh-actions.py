@@ -35,6 +35,10 @@ FRAMEWORKS_NEEDING_POSTGRES = {
     "asyncpg",
 }
 
+FRAMEWORKS_NEEDING_REDIS = {
+    "celery",
+}
+
 FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
 }
@@ -54,6 +58,13 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "AI": [
+        "anthropic",
+        "cohere",
+        "langchain",
+        "openai",
+        "huggingface_hub",
+    ],
     "AWS Lambda": [
         # this is separate from Cloud Computing because only this one test suite
         # needs to run with access to GitHub secrets
@@ -66,16 +77,12 @@ GROUPS = {
         "gcp",
     ],
     "Data Processing": [
-        "anthropic",
         "arq",
         "beam",
         "celery",
-        "cohere",
         "huey",
-        "langchain",
-        "openai",
-        "huggingface_hub",
         "rq",
+        "spark",
     ],
     "Databases": [
         "asyncpg",
@@ -117,6 +124,7 @@ GROUPS = {
     "Miscellaneous": [
         "loguru",
         "opentelemetry",
+        "potel",
         "pure_eval",
         "trytond",
     ],
@@ -275,6 +283,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
+        "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "needs_github_secrets": bool(
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),

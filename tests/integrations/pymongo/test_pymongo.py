@@ -63,17 +63,21 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         for field, value in common_tags.items():
             assert span["tags"][field] == value
 
-    assert find["op"] == "db.query"
-    assert insert_success["op"] == "db.query"
-    assert insert_fail["op"] == "db.query"
+    assert find["op"] == "db"
+    assert insert_success["op"] == "db"
+    assert insert_fail["op"] == "db"
 
     assert find["tags"]["db.operation"] == "find"
     assert insert_success["tags"]["db.operation"] == "insert"
     assert insert_fail["tags"]["db.operation"] == "insert"
 
-    assert find["description"].startswith("find {")
-    assert insert_success["description"].startswith("insert {")
-    assert insert_fail["description"].startswith("insert {")
+    assert find["description"].startswith("{'find")
+    assert insert_success["description"].startswith("{'insert")
+    assert insert_fail["description"].startswith("{'insert")
+
+    assert find["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
+    assert insert_success["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
+    assert insert_fail["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
     if with_pii:
         assert "1" in find["description"]
         assert "2" in insert_success["description"]
@@ -113,18 +117,19 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
     (crumb,) = event["breadcrumbs"]["values"]
 
     assert crumb["category"] == "query"
-    assert crumb["message"].startswith("find {")
+    assert crumb["message"].startswith("{'find")
     if with_pii:
         assert "1" in crumb["message"]
     else:
         assert "1" not in crumb["message"]
-    assert crumb["type"] == "db.query"
+    assert crumb["type"] == "db"
     assert crumb["data"] == {
         "db.name": "test_db",
         "db.system": "mongodb",
         "db.operation": "find",
         "net.peer.name": mongo_server.host,
         "net.peer.port": str(mongo_server.port),
+        "db.mongodb.collection": "test_collection",
     }
 
 
@@ -422,3 +427,23 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
 )
 def test_strip_pii(testcase):
     assert _strip_pii(testcase["command"]) == testcase["command_stripped"]
+
+
+def test_span_origin(sentry_init, capture_events, mongo_server):
+    sentry_init(
+        integrations=[PyMongoIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = MongoClient(mongo_server.uri)
+
+    with start_transaction():
+        list(
+            connection["test_db"]["test_collection"].find({"foobar": 1})
+        )  # force query execution
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.pymongo"
