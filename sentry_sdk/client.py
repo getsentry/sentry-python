@@ -64,10 +64,6 @@ if TYPE_CHECKING:
 
 _client_init_debug = ContextVar("client_init_debug")
 
-# XXX: better place and name for this
-IGNORE_ORIGIN = {
-    "auto.http.flask",
-}
 
 SDK_INFO = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
@@ -116,9 +112,6 @@ def _get_options(*args, **kwargs):
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
-
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     if rv["project_root"] is None:
         try:
@@ -361,7 +354,6 @@ class _Client(BaseClient):
                 logger.debug(
                     "[OTel] Enabling experimental OTel-powered performance monitoring."
                 )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
                 if (
                     "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
                     not in _DEFAULT_INTEGRATIONS

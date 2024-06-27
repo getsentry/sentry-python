@@ -448,7 +448,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
-    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+    def start_span(self, **kwargs):
         # type: (str, Any) -> Span
         """
         .. deprecated:: 2.0.0
@@ -470,12 +470,11 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         scope = Scope.get_current_scope()
-        return scope.start_span(instrumenter=instrumenter, **kwargs)
+        return scope.start_span(**kwargs)
 
     def start_transaction(
         self,
         transaction=None,
-        instrumenter=INSTRUMENTER.SENTRY,
         custom_sampling_context=None,
         **kwargs
     ):
@@ -516,7 +515,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         kwargs["hub"] = scope  # type: ignore
 
         return scope.start_transaction(
-            transaction, instrumenter, custom_sampling_context, **kwargs
+            transaction, custom_sampling_context, **kwargs
         )
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):

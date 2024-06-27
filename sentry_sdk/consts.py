@@ -4,6 +4,10 @@ from sentry_sdk._types import TYPE_CHECKING
 # up top to prevent circular import due to integration import
 DEFAULT_MAX_VALUE_LENGTH = 1024
 
+# XXX: better place and name for this
+IGNORE_ORIGIN = {
+    "auto.http.flask",
+}
 
 # Also needs to be at the top to prevent circular import
 class EndpointType(Enum):
@@ -489,7 +493,6 @@ class ClientConstructor:
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]

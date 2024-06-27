@@ -338,7 +338,7 @@ class Span:
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+    def start_child(self, **kwargs):
         # type: (str, **Any) -> Span
         """
         Start a sub-span from the current span or transaction.
@@ -1083,7 +1083,7 @@ class NoOpSpan(Span):
         # type: () -> Optional[Transaction]
         return None
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
+    def start_child(self, **kwargs):
         # type: (str, **Any) -> NoOpSpan
         return NoOpSpan()
 
