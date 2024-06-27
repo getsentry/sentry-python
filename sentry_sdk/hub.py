@@ -473,10 +473,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         return scope.start_span(**kwargs)
 
     def start_transaction(
-        self,
-        transaction=None,
-        custom_sampling_context=None,
-        **kwargs
+        self, transaction=None, custom_sampling_context=None, **kwargs
     ):
         # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
@@ -514,9 +511,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # Type checking disabled for this line because deprecated keys are not allowed in the type signature.
         kwargs["hub"] = scope  # type: ignore
 
-        return scope.start_transaction(
-            transaction, custom_sampling_context, **kwargs
-        )
+        return scope.start_transaction(transaction, custom_sampling_context, **kwargs)
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
         # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction

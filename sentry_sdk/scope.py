@@ -956,10 +956,7 @@ class Scope(object):
             self._breadcrumbs.popleft()
 
     def start_transaction(
-        self,
-        transaction=None,
-        custom_sampling_context=None,
-        **kwargs
+        self, transaction=None, custom_sampling_context=None, **kwargs
     ):
         # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """

@@ -9,6 +9,7 @@ IGNORE_ORIGIN = {
     "auto.http.flask",
 }
 
+
 # Also needs to be at the top to prevent circular import
 class EndpointType(Enum):
     """
