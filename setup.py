@@ -129,7 +129,7 @@ setup(
         "sqlalchemy": ["sqlalchemy>=1.2"],
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
-        "tornado": ["tornado>=5"],
+        "tornado": ["tornado>=6"],
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
