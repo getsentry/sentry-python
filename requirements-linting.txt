@@ -8,7 +8,6 @@ types-greenlet
 types-redis
 types-setuptools
 types-webob
-opentelemetry-distro
 pymongo # There is no separate types module.
 loguru # There is no separate types module.
 flake8-bugbear

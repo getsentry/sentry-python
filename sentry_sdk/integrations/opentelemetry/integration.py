@@ -13,7 +13,7 @@ from sentry_sdk.utils import logger, _get_installed_modules
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    from opentelemetry.instrumentation.auto_instrumentation._load import (
+    from opentelemetry.instrumentation.auto_instrumentation._load import (  # type: ignore
         _load_instrumentors,
     )
 except ImportError:
