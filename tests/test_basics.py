@@ -8,6 +8,7 @@ from sentry_sdk.client import Client
 
 from tests.conftest import patch_start_tracing_child
 
+import sentry_sdk
 from sentry_sdk import (
     push_scope,
     configure_scope,
@@ -220,7 +221,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     events = capture_events()
 
     monkeypatch.setattr(
-        Hub.current.client.transport, "record_lost_event", record_lost_event
+        sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
     )
 
     def do_this():
@@ -269,7 +270,7 @@ def test_option_enable_tracing(
     updated_traces_sample_rate,
 ):
     sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
-    options = Hub.current.client.options
+    options = sentry_sdk.get_client().options
     assert has_tracing_enabled(options) is tracing_enabled
     assert options["traces_sample_rate"] == updated_traces_sample_rate
 
@@ -311,6 +312,9 @@ def test_push_scope(sentry_init, capture_events):
 
 
 def test_push_scope_null_client(sentry_init, capture_events):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     sentry_init()
     events = capture_events()
 
@@ -331,6 +335,9 @@ def test_push_scope_null_client(sentry_init, capture_events):
 )
 @pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     sentry_init()
 
     if null_client:
@@ -439,6 +446,9 @@ def test_integration_scoping(sentry_init, capture_events):
     reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
 )
 def test_client_initialized_within_scope(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.WARNING)
 
     sentry_init()
@@ -455,6 +465,9 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
 )
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.WARNING)
 
     sentry_init()
@@ -475,6 +488,9 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
     reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
 )
 def test_scope_popped_too_soon(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.ERROR)
 
     sentry_init()
@@ -719,7 +735,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
 def test_redis_disabled_when_not_installed(sentry_init):
     sentry_init()
 
-    assert Hub.current.get_integration(RedisIntegration) is None
+    assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
 
 
 def test_multiple_setup_integrations_calls():

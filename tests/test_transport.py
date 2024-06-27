@@ -11,7 +11,8 @@ import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
-from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
+import sentry_sdk
+from sentry_sdk import Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
@@ -114,8 +115,8 @@ def test_transport_works(
     if use_pickle:
         client = pickle.loads(pickle.dumps(client))
 
-    Hub.current.bind_client(client)
-    request.addfinalizer(lambda: Hub.current.bind_client(None))
+    sentry_sdk.Scope.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.Scope.get_global_scope().set_client(None))
 
     add_breadcrumb(
         level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
@@ -238,7 +239,8 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     # to an infinite loop
     ignore_logger("werkzeug")
 
-    with Hub(client):
+    sentry_sdk.Scope.get_global_scope().set_client(client)
+    with sentry_sdk.isolation_scope():
         capture_message("hi")
         client.flush()
 
@@ -253,7 +255,8 @@ def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        with Hub(client):
+        sentry_sdk.Scope.get_global_scope().set_client(client)
+        with sentry_sdk.isolation_scope():
             capture_message("hi")
 
     # nothing exploded but also no events can be sent anymore

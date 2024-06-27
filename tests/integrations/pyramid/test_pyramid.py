@@ -421,3 +421,18 @@ def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_cl
     client.get("/")
 
     assert not errors
+
+
+def test_span_origin(sentry_init, capture_events, get_client):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = get_client()
+    client.get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.pyramid"

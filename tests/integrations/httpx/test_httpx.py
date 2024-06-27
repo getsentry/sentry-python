@@ -320,3 +320,30 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     assert "url" not in event["breadcrumbs"]["values"][0]["data"]
     assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
     assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_span_origin(sentry_init, capture_events, httpx_client):
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+    responses.add(responses.GET, url, status=200)
+
+    with start_transaction(name="test_transaction"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.http.httpx"

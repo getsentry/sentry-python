@@ -41,6 +41,7 @@ if clickhouse_driver.VERSION < (0, 2, 0):
 
 class ClickhouseDriverIntegration(Integration):
     identifier = "clickhouse_driver"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once() -> None:
@@ -81,7 +82,11 @@ def _wrap_start(f: Callable[P, T]) -> Callable[P, T]:
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
-        span = sentry_sdk.start_span(op=OP.DB, description=query)
+        span = sentry_sdk.start_span(
+            op=OP.DB,
+            description=query,
+            origin=ClickhouseDriverIntegration.origin,
+        )
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 

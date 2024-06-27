@@ -71,6 +71,7 @@ def patch_templates():
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
             description=_get_template_name_description(self.template_name),
+            origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", self.context_data)
             return real_rendered_content.fget(self)
@@ -98,6 +99,7 @@ def patch_templates():
         with sentry_sdk.start_span(
             op=OP.TEMPLATE_RENDER,
             description=_get_template_name_description(template_name),
+            origin=DjangoIntegration.origin,
         ) as span:
             span.set_data("context", context)
             return real_render(request, template_name, context, *args, **kwargs)

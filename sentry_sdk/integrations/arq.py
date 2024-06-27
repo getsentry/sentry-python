@@ -39,6 +39,7 @@ ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 
 class ArqIntegration(Integration):
     identifier = "arq"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -76,7 +77,9 @@ def patch_enqueue_job():
         if integration is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
-        with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_ARQ, description=function):
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_SUBMIT_ARQ, description=function, origin=ArqIntegration.origin
+        ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
     ArqRedis.enqueue_job = _sentry_enqueue_job
@@ -101,6 +104,7 @@ def patch_run_job():
                 status="ok",
                 op=OP.QUEUE_TASK_ARQ,
                 source=TRANSACTION_SOURCE_TASK,
+                origin=ArqIntegration.origin,
             )
 
             with sentry_sdk.start_transaction(transaction):

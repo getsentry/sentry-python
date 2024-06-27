@@ -47,6 +47,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class FlaskIntegration(Integration):
     identifier = "flask"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -81,9 +82,11 @@ class FlaskIntegration(Integration):
             if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
                 return old_app(self, environ, start_response)
 
-            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                lambda *a, **kw: old_app(self, *a, **kw),
+                span_origin=FlaskIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         Flask.__call__ = sentry_patched_wsgi_app
 

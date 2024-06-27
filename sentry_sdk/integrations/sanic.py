@@ -58,6 +58,7 @@ except AttributeError:
 
 class SanicIntegration(Integration):
     identifier = "sanic"
+    origin = f"auto.http.{identifier}"
     version = None
 
     def __init__(self, unsampled_statuses=frozenset({404})):
@@ -199,6 +200,7 @@ async def _context_enter(request):
         # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
         name=request.path,
         source=TRANSACTION_SOURCE_URL,
+        origin=SanicIntegration.origin,
     )
     request.ctx._sentry_transaction = sentry_sdk.start_transaction(
         transaction

@@ -358,9 +358,13 @@ class _Client(BaseClient):
                     "[OTel] Enabling experimental OTel-powered performance monitoring."
                 )
                 self.options["instrumenter"] = INSTRUMENTER.OTEL
-                _DEFAULT_INTEGRATIONS.append(
-                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
-                )
+                if (
+                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
+                    not in _DEFAULT_INTEGRATIONS
+                ):
+                    _DEFAULT_INTEGRATIONS.append(
+                        "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
+                    )
 
             self.integrations = setup_integrations(
                 self.options["integrations"],

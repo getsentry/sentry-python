@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 class SqlalchemyIntegration(Integration):
     identifier = "sqlalchemy"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -58,6 +59,7 @@ def _before_cursor_execute(
         parameters,
         paramstyle=context and context.dialect and context.dialect.paramstyle or None,
         executemany=executemany,
+        span_origin=SqlalchemyIntegration.origin,
     )
     context._sentry_sql_span_manager = ctx_mgr
 

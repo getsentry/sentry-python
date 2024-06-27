@@ -116,6 +116,7 @@ TRANSACTION_STYLE_VALUES = ("uri_template", "path")
 
 class FalconIntegration(Integration):
     identifier = "falcon"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -156,7 +157,8 @@ def _patch_wsgi_app():
             return original_wsgi_app(self, env, start_response)
 
         sentry_wrapped = SentryWsgiMiddleware(
-            lambda envi, start_resp: original_wsgi_app(self, envi, start_resp)
+            lambda envi, start_resp: original_wsgi_app(self, envi, start_resp),
+            span_origin=FalconIntegration.origin,
         )
 
         return sentry_wrapped(env, start_response)

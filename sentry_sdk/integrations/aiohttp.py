@@ -63,6 +63,7 @@ TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
+    origin = f"auto.http.{identifier}"
 
     def __init__(self, transaction_style="handler_name"):
         # type: (str) -> None
@@ -120,6 +121,7 @@ class AioHttpIntegration(Integration):
                         # URL resolver did not find a route or died trying.
                         name="generic AIOHTTP request",
                         source=TRANSACTION_SOURCE_ROUTE,
+                        origin=AioHttpIntegration.origin,
                     )
                     with sentry_sdk.start_transaction(
                         transaction,
@@ -206,6 +208,7 @@ def create_trace_config():
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+            origin=AioHttpIntegration.origin,
         )
         span.set_data(SPANDATA.HTTP_METHOD, method)
         if parsed_url is not None:

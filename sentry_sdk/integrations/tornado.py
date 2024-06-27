@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
 class TornadoIntegration(Integration):
     identifier = "tornado"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -123,6 +124,7 @@ def _handle_request_impl(self):
             # setting a transaction name later.
             name="generic Tornado request",
             source=TRANSACTION_SOURCE_ROUTE,
+            origin=TornadoIntegration.origin,
         )
 
         with sentry_sdk.start_transaction(

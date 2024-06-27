@@ -30,6 +30,7 @@ except ImportError:
 
 class Boto3Integration(Integration):
     identifier = "boto3"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -69,6 +70,7 @@ def _sentry_request_created(service_id, request, operation_name, **kwargs):
     span = sentry_sdk.start_span(
         op=OP.HTTP_CLIENT,
         description=description,
+        origin=Boto3Integration.origin,
     )
 
     with capture_internal_exceptions():
@@ -106,6 +108,7 @@ def _sentry_after_call(context, parsed, **kwargs):
     streaming_span = span.start_child(
         op=OP.HTTP_CLIENT_STREAM,
         description=span.description,
+        origin=Boto3Integration.origin,
     )
 
     orig_read = body.read

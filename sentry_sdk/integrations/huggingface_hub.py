@@ -26,6 +26,7 @@ except ImportError:
 
 class HuggingfaceHubIntegration(Integration):
     identifier = "huggingface_hub"
+    origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True):
         # type: (HuggingfaceHubIntegration, bool) -> None
@@ -73,6 +74,7 @@ def _wrap_text_generation(f):
         span = sentry_sdk.start_span(
             op=consts.OP.HUGGINGFACE_HUB_CHAT_COMPLETIONS_CREATE,
             description="Text Generation",
+            origin=HuggingfaceHubIntegration.origin,
         )
         span.__enter__()
         try:

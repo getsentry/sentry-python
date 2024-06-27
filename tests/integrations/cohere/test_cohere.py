@@ -200,3 +200,73 @@ def test_embed(sentry_init, capture_events, send_default_pii, include_prompts):
 
     assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 10
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 10
+
+
+def test_span_origin_chat(sentry_init, capture_events):
+    sentry_init(
+        integrations=[CohereIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = Client(api_key="z")
+    HTTPXClient.request = mock.Mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "text": "the model response",
+                "meta": {
+                    "billed_units": {
+                        "output_tokens": 10,
+                        "input_tokens": 20,
+                    }
+                },
+            },
+        )
+    )
+
+    with start_transaction(name="cohere tx"):
+        client.chat(
+            model="some-model",
+            chat_history=[ChatMessage(role="SYSTEM", message="some context")],
+            message="hello",
+        ).text
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.ai.cohere"
+
+
+def test_span_origin_embed(sentry_init, capture_events):
+    sentry_init(
+        integrations=[CohereIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = Client(api_key="z")
+    HTTPXClient.request = mock.Mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "response_type": "embeddings_floats",
+                "id": "1",
+                "texts": ["hello"],
+                "embeddings": [[1.0, 2.0, 3.0]],
+                "meta": {
+                    "billed_units": {
+                        "input_tokens": 10,
+                    }
+                },
+            },
+        )
+    )
+
+    with start_transaction(name="cohere tx"):
+        client.embed(texts=["hello"], model="text-embedding-3-large")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.ai.cohere"

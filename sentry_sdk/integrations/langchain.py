@@ -73,6 +73,7 @@ NO_COLLECT_TOKEN_MODELS = [
 
 class LangchainIntegration(Integration):
     identifier = "langchain"
+    origin = f"auto.ai.{identifier}"
 
     # The most number of spans (e.g., LLM calls) that can be processed at the same time.
     max_spans = 1024
@@ -192,6 +193,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_RUN,
                 description=kwargs.get("name") or "Langchain LLM call",
+                origin=LangchainIntegration.origin,
             )
             span = watched_span.span
             if should_send_default_pii() and self.include_prompts:
@@ -213,6 +215,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_CHAT_COMPLETIONS_CREATE,
                 description=kwargs.get("name") or "Langchain Chat Model",
+                origin=LangchainIntegration.origin,
             )
             span = watched_span.span
             model = all_params.get(
@@ -316,6 +319,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     else OP.LANGCHAIN_PIPELINE
                 ),
                 description=kwargs.get("name") or "Chain execution",
+                origin=LangchainIntegration.origin,
             )
             metadata = kwargs.get("metadata")
             if metadata:
@@ -348,6 +352,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 kwargs.get("parent_run_id"),
                 op=OP.LANGCHAIN_AGENT,
                 description=action.tool or "AI tool usage",
+                origin=LangchainIntegration.origin,
             )
             if action.tool_input and should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -382,6 +387,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 description=serialized.get("name")
                 or kwargs.get("name")
                 or "AI tool usage",
+                origin=LangchainIntegration.origin,
             )
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(

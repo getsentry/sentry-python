@@ -44,7 +44,7 @@ class LayerBuilder:
                 "pip",
                 "install",
                 "-r",
-                "aws-lambda-layer-requirements.txt",
+                "requirements-aws-lambda-layer.txt",
                 "--target",
                 self.python_site_packages,
             ],

@@ -50,7 +50,11 @@ def _patch_cache_method(cache, method_name, address, port):
         op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
-        with sentry_sdk.start_span(op=op, description=description) as span:
+        with sentry_sdk.start_span(
+            op=op,
+            description=description,
+            origin=DjangoIntegration.origin,
+        ) as span:
             value = original_method(*args, **kwargs)
 
             with capture_internal_exceptions():

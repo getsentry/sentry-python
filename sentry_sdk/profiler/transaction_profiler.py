@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import Set
+    from typing import Type
     from typing_extensions import TypedDict
 
     from sentry_sdk.profiler.utils import (
@@ -95,9 +96,10 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent.monkey import get_original  # type: ignore
-    from gevent.threadpool import ThreadPool  # type: ignore
+    from gevent.monkey import get_original
+    from gevent.threadpool import ThreadPool as _ThreadPool
 
+    ThreadPool = _ThreadPool  # type: Optional[Type[_ThreadPool]]
     thread_sleep = get_original("time", "sleep")
 except ImportError:
     thread_sleep = time.sleep
@@ -738,7 +740,7 @@ class GeventScheduler(Scheduler):
 
         # used to signal to the thread that it should stop
         self.running = False
-        self.thread = None  # type: Optional[ThreadPool]
+        self.thread = None  # type: Optional[_ThreadPool]
         self.pid = None  # type: Optional[int]
 
         # This intentionally uses the gevent patched threading.Lock.
@@ -775,7 +777,7 @@ class GeventScheduler(Scheduler):
             self.pid = pid
             self.running = True
 
-            self.thread = ThreadPool(1)
+            self.thread = ThreadPool(1)  # type: ignore[misc]
             try:
                 self.thread.spawn(self.run)
             except RuntimeError:

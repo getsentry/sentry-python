@@ -720,20 +720,18 @@ def _tags_to_dict(tags):
 
 def _get_aggregator():
     # type: () -> Optional[MetricsAggregator]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
+    client = sentry_sdk.get_client()
     return (
         client.metrics_aggregator
-        if client is not None and client.metrics_aggregator is not None
+        if client.is_active() and client.metrics_aggregator is not None
         else None
     )
 
 
 def _get_aggregator_and_update_tags(key, value, unit, tags):
     # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
-    if client is None or client.metrics_aggregator is None:
+    client = sentry_sdk.get_client()
+    if not client.is_active() or client.metrics_aggregator is None:
         return None, None, tags
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]

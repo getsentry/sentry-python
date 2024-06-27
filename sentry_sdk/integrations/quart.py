@@ -57,6 +57,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class QuartIntegration(Integration):
     identifier = "quart"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -92,7 +93,10 @@ def patch_asgi_app():
         if sentry_sdk.get_client().get_integration(QuartIntegration) is None:
             return await old_app(self, scope, receive, send)
 
-        middleware = SentryAsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))
+        middleware = SentryAsgiMiddleware(
+            lambda *a, **kw: old_app(self, *a, **kw),
+            span_origin=QuartIntegration.origin,
+        )
         middleware.__call__ = middleware._run_asgi3
         return await middleware(scope, receive, send)
 

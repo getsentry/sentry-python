@@ -1,11 +1,12 @@
 import pytest
 import sys
+from unittest.mock import patch
 from sentry_sdk.integrations.spark.spark_driver import (
     _set_app_properties,
     _start_sentry_listener,
     SentryListener,
+    SparkIntegration,
 )
-
 from sentry_sdk.integrations.spark.spark_worker import SparkWorkerIntegration
 
 from pyspark import SparkContext
@@ -40,27 +41,27 @@ def test_start_sentry_listener():
     assert gateway._callback_server is not None
 
 
-@pytest.fixture
-def sentry_listener(monkeypatch):
-    class MockHub:
-        def __init__(self):
-            self.args = []
-            self.kwargs = {}
+def test_initialize_spark_integration(sentry_init):
+    sentry_init(integrations=[SparkIntegration()])
+    SparkContext.getOrCreate()
 
-        def add_breadcrumb(self, *args, **kwargs):
-            self.args = args
-            self.kwargs = kwargs
+
+@pytest.fixture
+def sentry_listener():
 
     listener = SentryListener()
-    mock_hub = MockHub()
 
-    monkeypatch.setattr(listener, "hub", mock_hub)
-
-    return listener, mock_hub
+    return listener
 
 
-def test_sentry_listener_on_job_start(sentry_listener):
-    listener, mock_hub = sentry_listener
+@pytest.fixture
+def mock_add_breadcrumb():
+    with patch("sentry_sdk.add_breadcrumb") as mock:
+        yield mock
+
+
+def test_sentry_listener_on_job_start(sentry_listener, mock_add_breadcrumb):
+    listener = sentry_listener
 
     class MockJobStart:
         def jobId(self):  # noqa: N802
@@ -69,6 +70,9 @@ def test_sentry_listener_on_job_start(sentry_listener):
     mock_job_start = MockJobStart()
     listener.onJobStart(mock_job_start)
 
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
     assert mock_hub.kwargs["level"] == "info"
     assert "sample-job-id-start" in mock_hub.kwargs["message"]
 
@@ -76,8 +80,10 @@ def test_sentry_listener_on_job_start(sentry_listener):
 @pytest.mark.parametrize(
     "job_result, level", [("JobSucceeded", "info"), ("JobFailed", "warning")]
 )
-def test_sentry_listener_on_job_end(sentry_listener, job_result, level):
-    listener, mock_hub = sentry_listener
+def test_sentry_listener_on_job_end(
+    sentry_listener, mock_add_breadcrumb, job_result, level
+):
+    listener = sentry_listener
 
     class MockJobResult:
         def toString(self):  # noqa: N802
@@ -94,13 +100,16 @@ def test_sentry_listener_on_job_end(sentry_listener, job_result, level):
     mock_job_end = MockJobEnd()
     listener.onJobEnd(mock_job_end)
 
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
+
     assert mock_hub.kwargs["level"] == level
     assert mock_hub.kwargs["data"]["result"] == job_result
     assert "sample-job-id-end" in mock_hub.kwargs["message"]
 
 
-def test_sentry_listener_on_stage_submitted(sentry_listener):
-    listener, mock_hub = sentry_listener
+def test_sentry_listener_on_stage_submitted(sentry_listener, mock_add_breadcrumb):
+    listener = sentry_listener
 
     class StageInfo:
         def stageId(self):  # noqa: N802
@@ -119,6 +128,9 @@ def test_sentry_listener_on_stage_submitted(sentry_listener):
 
     mock_stage_submitted = MockStageSubmitted()
     listener.onStageSubmitted(mock_stage_submitted)
+
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
 
     assert mock_hub.kwargs["level"] == "info"
     assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
@@ -163,12 +175,15 @@ def get_mock_stage_completed():
 
 
 def test_sentry_listener_on_stage_completed_success(
-    sentry_listener, get_mock_stage_completed
+    sentry_listener, mock_add_breadcrumb, get_mock_stage_completed
 ):
-    listener, mock_hub = sentry_listener
+    listener = sentry_listener
 
     mock_stage_completed = get_mock_stage_completed(failure_reason=False)
     listener.onStageCompleted(mock_stage_completed)
+
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
 
     assert mock_hub.kwargs["level"] == "info"
     assert "sample-stage-id-submit" in mock_hub.kwargs["message"]
@@ -178,12 +193,15 @@ def test_sentry_listener_on_stage_completed_success(
 
 
 def test_sentry_listener_on_stage_completed_failure(
-    sentry_listener, get_mock_stage_completed
+    sentry_listener, mock_add_breadcrumb, get_mock_stage_completed
 ):
-    listener, mock_hub = sentry_listener
+    listener = sentry_listener
 
     mock_stage_completed = get_mock_stage_completed(failure_reason=True)
     listener.onStageCompleted(mock_stage_completed)
+
+    mock_add_breadcrumb.assert_called_once()
+    mock_hub = mock_add_breadcrumb.call_args
 
     assert mock_hub.kwargs["level"] == "warning"
     assert "sample-stage-id-submit" in mock_hub.kwargs["message"]

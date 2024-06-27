@@ -453,7 +453,7 @@ def test_parse_version(version, expected_result):
 @pytest.fixture
 def mock_client_with_dsn_netloc():
     """
-    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    Returns a mocked Client with a DSN netloc of "abcd1234.ingest.sentry.io".
     """
     mock_client = mock.Mock(spec=sentry_sdk.Client)
     mock_client.transport = mock.Mock(spec=sentry_sdk.Transport)
@@ -808,7 +808,7 @@ def test_get_current_thread_meta_gevent_in_thread_failed_to_get_hub():
     def target():
         with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
             with mock.patch(
-                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]
+                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake gevent hub"]
             ):
                 job = gevent.spawn(get_current_thread_meta)
                 job.join()

@@ -63,7 +63,7 @@ This will make sure that your commits will have the correct coding style.
 ```bash
 cd sentry-python
 
-pip install -r devenv-requirements.txt
+pip install -r requirements-devenv.txt
 
 pip install pre-commit
 

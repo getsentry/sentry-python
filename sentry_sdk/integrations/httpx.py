@@ -28,6 +28,7 @@ __all__ = ["HttpxIntegration"]
 
 class HttpxIntegration(Integration):
     identifier = "httpx"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -58,6 +59,7 @@ def _install_httpx_client():
                 request.method,
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
+            origin=HttpxIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:
@@ -113,6 +115,7 @@ def _install_httpx_async_client():
                 request.method,
                 parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
             ),
+            origin=HttpxIntegration.origin,
         ) as span:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             if parsed_url is not None:

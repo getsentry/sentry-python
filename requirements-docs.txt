@@ -1,3 +1,4 @@
+gevent
 shibuya
 sphinx==7.2.6
 sphinx-autodoc-typehints[type_comments]>=1.8.0

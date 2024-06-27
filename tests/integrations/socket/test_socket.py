@@ -56,3 +56,24 @@ def test_create_connection_trace(sentry_init, capture_events):
             "port": 443,
         }
     )
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SocketIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        socket.create_connection(("example.com", 443), 1, None)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    assert event["spans"][0]["op"] == "socket.connection"
+    assert event["spans"][0]["origin"] == "auto.socket.socket"
+
+    assert event["spans"][1]["op"] == "socket.dns"
+    assert event["spans"][1]["origin"] == "auto.socket.socket"

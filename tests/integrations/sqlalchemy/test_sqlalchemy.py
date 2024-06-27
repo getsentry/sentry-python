@@ -670,3 +670,23 @@ def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
             break
     else:
         raise AssertionError("No db span found")
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[SqlalchemyIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    engine = create_engine(
+        "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
+    with start_transaction(name="foo"):
+        with engine.connect() as con:
+            con.execute(text("SELECT 0"))
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.sqlalchemy"

@@ -359,3 +359,31 @@ def test_sentry_task_factory_context_with_factory(mock_get_running_loop):
 
     assert "context" in task_factory_kwargs
     assert task_factory_kwargs["context"] == mock_context
+
+
+@minimum_python_37
+@pytest.mark.asyncio
+async def test_span_origin(
+    sentry_init,
+    capture_events,
+    event_loop,
+):
+    sentry_init(
+        integrations=[AsyncioIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(name="something"):
+        tasks = [
+            event_loop.create_task(foo()),
+        ]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+
+        sentry_sdk.flush()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.function.asyncio"

@@ -326,3 +326,19 @@ def test_option_trace_propagation_targets(
         else:
             assert "sentry-trace" not in request_headers
             assert "baggage" not in request_headers
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0, debug=True)
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        conn = HTTPSConnection("example.com")
+        conn.request("GET", "/foo")
+        conn.getresponse()
+
+    (event,) = events
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    assert event["spans"][0]["op"] == "http.client"
+    assert event["spans"][0]["origin"] == "auto.http.stdlib.httplib"

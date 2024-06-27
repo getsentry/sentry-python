@@ -12,13 +12,17 @@ from trytond.wsgi import app  # type: ignore
 
 class TrytondWSGIIntegration(Integration):
     identifier = "trytond_wsgi"
+    origin = f"auto.http.{identifier}"
 
     def __init__(self):  # type: () -> None
         pass
 
     @staticmethod
     def setup_once():  # type: () -> None
-        app.wsgi_app = SentryWsgiMiddleware(app.wsgi_app)
+        app.wsgi_app = SentryWsgiMiddleware(
+            app.wsgi_app,
+            span_origin=TrytondWSGIIntegration.origin,
+        )
 
         @ensure_integration_enabled(TrytondWSGIIntegration)
         def error_handler(e):  # type: (Exception) -> None
