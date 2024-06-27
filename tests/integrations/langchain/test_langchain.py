@@ -2,7 +2,14 @@ from typing import List, Optional, Any, Iterator
 from unittest.mock import Mock
 
 import pytest
-from langchain_community.chat_models import ChatOpenAI
+
+try:
+    # Langchain >= 0.2
+    from langchain_openai import ChatOpenAI
+except ImportError:
+    # Langchain < 0.2
+    from langchain_community.chat_models import ChatOpenAI
+
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.messages import BaseMessage, AIMessageChunk
 from langchain_core.outputs import ChatGenerationChunk
@@ -221,3 +228,101 @@ def test_langchain_error(sentry_init, capture_events):
 
     error = events[0]
     assert error["level"] == "error"
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[LangchainIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are very powerful assistant, but don't know current events",
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+    global stream_result_mock
+    stream_result_mock = Mock(
+        side_effect=[
+            [
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(
+                        content="",
+                        additional_kwargs={
+                            "tool_calls": [
+                                {
+                                    "index": 0,
+                                    "id": "call_BbeyNhCKa6kYLYzrD40NGm3b",
+                                    "function": {
+                                        "arguments": "",
+                                        "name": "get_word_length",
+                                    },
+                                    "type": "function",
+                                }
+                            ]
+                        },
+                    ),
+                ),
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(
+                        content="",
+                        additional_kwargs={
+                            "tool_calls": [
+                                {
+                                    "index": 0,
+                                    "id": None,
+                                    "function": {
+                                        "arguments": '{"word": "eudca"}',
+                                        "name": None,
+                                    },
+                                    "type": None,
+                                }
+                            ]
+                        },
+                    ),
+                ),
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(content="5"),
+                    generation_info={"finish_reason": "function_call"},
+                ),
+            ],
+            [
+                ChatGenerationChunk(
+                    text="The word eudca has 5 letters.",
+                    type="ChatGenerationChunk",
+                    message=AIMessageChunk(content="The word eudca has 5 letters."),
+                ),
+                ChatGenerationChunk(
+                    type="ChatGenerationChunk",
+                    generation_info={"finish_reason": "stop"},
+                    message=AIMessageChunk(content=""),
+                ),
+            ],
+        ]
+    )
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    with start_transaction():
+        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.ai.langchain"

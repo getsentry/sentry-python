@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         BreadcrumbProcessor,
+        ContinuousProfilerMode,
         Event,
         EventProcessor,
         Hint,
@@ -55,6 +56,8 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
+            "continuous_profiling_auto_start": Optional[bool],
+            "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
@@ -228,6 +231,13 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -238,6 +248,24 @@ class SPANDATA:
     """
     The size of the requested data in bytes.
     Example: 58
+    """
+
+    CACHE_KEY = "cache.key"
+    """
+    The key of the requested data.
+    Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
+    """
+
+    NETWORK_PEER_ADDRESS = "network.peer.address"
+    """
+    Peer address of the network connection - IP address or Unix domain socket name.
+    Example: 10.1.2.80, /tmp/my.sock, localhost
+    """
+
+    NETWORK_PEER_PORT = "network.peer.port"
+    """
+    Peer port number of the network connection.
+    Example: 6379
     """
 
     HTTP_QUERY = "http.query"
@@ -278,6 +306,11 @@ class SPANDATA:
     MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
     """
     Number of retries/attempts to process a message.
+    """
+
+    MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
+    """
+    The latency between when the task was enqueued and when it was started to be processed.
     """
 
     MESSAGING_SYSTEM = "messaging.system"
@@ -346,10 +379,17 @@ class SPANDATA:
     Example: "MainThread"
     """
 
+    PROFILER_ID = "profiler.id"
+    """
+    Label identifying the profiler id that the span occurred in. This should be a string.
+    Example: "5249fbada8d5416482c2f6e47e337372"
+    """
+
 
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
-    CACHE_GET_ITEM = "cache.get_item"
+    CACHE_GET = "cache.get"
+    CACHE_PUT = "cache.put"
     COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
     COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
@@ -388,6 +428,7 @@ class OP:
     LANGCHAIN_AGENT = "ai.agent.langchain"
     LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
     QUEUE_PROCESS = "queue.process"
+    QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -488,4 +529,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.2.0"
+VERSION = "2.7.0"

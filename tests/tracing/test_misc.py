@@ -6,7 +6,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import sentry_sdk
-from sentry_sdk import Hub, Scope, start_span, start_transaction, set_measurement
+from sentry_sdk import Scope, start_span, start_transaction, set_measurement
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
@@ -84,7 +84,7 @@ def test_finds_transaction_on_scope(sentry_init):
 
     transaction = start_transaction(name="dogpark")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
 
     # See note in Scope class re: getters and setters of the `transaction`
     # property. For the moment, assigning to scope.transaction merely sets the
@@ -113,7 +113,7 @@ def test_finds_transaction_when_descendent_span_is_on_scope(
     transaction = start_transaction(name="dogpark")
     child_span = transaction.start_child(op="sniffing")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
     scope._span = child_span
 
     # this is the same whether it's the transaction itself or one of its
@@ -136,7 +136,7 @@ def test_finds_orphan_span_on_scope(sentry_init):
 
     span = start_span(op="sniffing")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
     scope._span = span
 
     assert scope._span is not None
@@ -150,7 +150,7 @@ def test_finds_non_orphan_span_on_scope(sentry_init):
     transaction = start_transaction(name="dogpark")
     child_span = transaction.start_child(op="sniffing")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
     scope._span = child_span
 
     assert scope._span is not None
@@ -401,3 +401,19 @@ def test_transaction_dropeed_sampled_false(sentry_init):
         mock_logger.debug.assert_any_call(
             "Discarding transaction because it was not started with sentry_sdk.start_transaction"
         )
+
+
+def test_transaction_not_started_warning(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction()
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with tx:
+            pass
+
+    mock_logger.warning.assert_any_call(
+        "Transaction was entered without being started with sentry_sdk.start_transaction."
+        "The transaction will not be sent to Sentry. To fix, start the transaction by"
+        "passing it to sentry_sdk.start_transaction."
+    )

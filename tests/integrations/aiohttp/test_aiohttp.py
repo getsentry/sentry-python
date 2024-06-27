@@ -4,7 +4,7 @@ from contextlib import suppress
 from unittest import mock
 
 import pytest
-from aiohttp import web
+from aiohttp import web, ClientSession
 from aiohttp.client import ServerDisconnectedError
 from aiohttp.web_request import Request
 
@@ -287,8 +287,8 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
 async def test_traces_sampler_gets_request_object_in_sampling_context(
     sentry_init,
     aiohttp_client,
-    DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,
+    DictionaryContaining,  # noqa: N803
+    ObjectDescribedBy,  # noqa: N803
 ):
     traces_sampler = mock.Mock()
     sentry_init(
@@ -567,3 +567,32 @@ async def test_outgoing_trace_headers_append_to_baggage(
             resp.request_info.headers["baggage"]
             == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
         )
+
+
+@pytest.mark.asyncio
+async def test_span_origin(
+    sentry_init,
+    aiohttp_client,
+    capture_events,
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    async def hello(request):
+        async with ClientSession() as session:
+            async with session.get("http://example.com"):
+                return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    (event,) = events
+    assert event["contexts"]["trace"]["origin"] == "auto.http.aiohttp"
+    assert event["spans"][0]["origin"] == "auto.http.aiohttp"

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
     is_valid_sample_rate,
@@ -87,6 +88,13 @@ if TYPE_CHECKING:
         scope: "sentry_sdk.Scope"
         """The scope to use for this span. If not provided, we use the current scope."""
 
+        origin: str
+        """
+        The origin of the span.
+        See https://develop.sentry.dev/sdk/performance/trace-origin/
+        Default "manual".
+        """
+
     class TransactionKwargs(SpanKwargs, total=False):
         name: str
         """Identifier of the transaction. Will show up in the Sentry UI."""
@@ -103,6 +111,13 @@ if TYPE_CHECKING:
 
         baggage: "Baggage"
         """The W3C baggage header value. (see https://www.w3.org/TR/baggage/)"""
+
+    ProfileContext = TypedDict(
+        "ProfileContext",
+        {
+            "profiler.id": str,
+        },
+    )
 
 
 BAGGAGE_HEADER_NAME = "baggage"
@@ -206,6 +221,7 @@ class Span:
         "_containing_transaction",
         "_local_aggregator",
         "scope",
+        "origin",
     )
 
     def __init__(
@@ -222,6 +238,7 @@ class Span:
         containing_transaction=None,  # type: Optional[Transaction]
         start_timestamp=None,  # type: Optional[Union[datetime, float]]
         scope=None,  # type: Optional[sentry_sdk.Scope]
+        origin="manual",  # type: str
     ):
         # type: (...) -> None
         self.trace_id = trace_id or uuid.uuid4().hex
@@ -234,6 +251,7 @@ class Span:
         self.status = status
         self.hub = hub
         self.scope = scope
+        self.origin = origin
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
@@ -258,6 +276,7 @@ class Span:
 
         thread_id, thread_name = get_current_thread_meta()
         self.set_thread(thread_id, thread_name)
+        self.set_profiler_id(get_profiler_id())
 
     # TODO this should really live on the Transaction class rather than the Span
     # class
@@ -276,7 +295,7 @@ class Span:
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r)>"
+            "<%s(op=%r, description:%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, origin=%r)>"
             % (
                 self.__class__.__name__,
                 self.op,
@@ -285,6 +304,7 @@ class Span:
                 self.span_id,
                 self.parent_span_id,
                 self.sampled,
+                self.origin,
             )
         )
 
@@ -513,6 +533,11 @@ class Span:
             if thread_name is not None:
                 self.set_data(SPANDATA.THREAD_NAME, thread_name)
 
+    def set_profiler_id(self, profiler_id):
+        # type: (Optional[str]) -> None
+        if profiler_id is not None:
+            self.set_data(SPANDATA.PROFILER_ID, profiler_id)
+
     def set_http_status(self, http_status):
         # type: (int) -> None
         self.set_tag(
@@ -604,6 +629,7 @@ class Span:
             "description": self.description,
             "start_timestamp": self.start_timestamp,
             "timestamp": self.timestamp,
+            "origin": self.origin,
         }  # type: Dict[str, Any]
 
         if self.status:
@@ -635,6 +661,7 @@ class Span:
             "parent_span_id": self.parent_span_id,
             "op": self.op,
             "description": self.description,
+            "origin": self.origin,
         }  # type: Dict[str, Any]
         if self.status:
             rv["status"] = self.status
@@ -644,7 +671,30 @@ class Span:
                 self.containing_transaction.get_baggage().dynamic_sampling_context()
             )
 
+        data = {}
+
+        thread_id = self._data.get(SPANDATA.THREAD_ID)
+        if thread_id is not None:
+            data["thread.id"] = thread_id
+
+        thread_name = self._data.get(SPANDATA.THREAD_NAME)
+        if thread_name is not None:
+            data["thread.name"] = thread_name
+
+        if data:
+            rv["data"] = data
+
         return rv
+
+    def get_profile_context(self):
+        # type: () -> Optional[ProfileContext]
+        profiler_id = self._data.get(SPANDATA.PROFILER_ID)
+        if profiler_id is None:
+            return None
+
+        return {
+            "profiler.id": profiler_id,
+        }
 
 
 class Transaction(Span):
@@ -695,13 +745,15 @@ class Transaction(Span):
         self.parent_sampled = parent_sampled
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._contexts = {}  # type: Dict[str, Any]
-        self._profile = None  # type: Optional[sentry_sdk.profiler.Profile]
+        self._profile = (
+            None
+        )  # type: Optional[sentry_sdk.profiler.transaction_profiler.Profile]
         self._baggage = baggage
 
     def __repr__(self):
         # type: () -> str
         return (
-            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r)>"
+            "<%s(name=%r, op=%r, trace_id=%r, span_id=%r, parent_span_id=%r, sampled=%r, source=%r, origin=%r)>"
             % (
                 self.__class__.__name__,
                 self.name,
@@ -711,11 +763,31 @@ class Transaction(Span):
                 self.parent_span_id,
                 self.sampled,
                 self.source,
+                self.origin,
             )
         )
 
+    def _possibly_started(self):
+        # type: () -> bool
+        """Returns whether the transaction might have been started.
+
+        If this returns False, we know that the transaction was not started
+        with sentry_sdk.start_transaction, and therefore the transaction will
+        be discarded.
+        """
+
+        # We must explicitly check self.sampled is False since self.sampled can be None
+        return self._span_recorder is not None or self.sampled is False
+
     def __enter__(self):
         # type: () -> Transaction
+        if not self._possibly_started():
+            logger.warning(
+                "Transaction was entered without being started with sentry_sdk.start_transaction."
+                "The transaction will not be sent to Sentry. To fix, start the transaction by"
+                "passing it to sentry_sdk.start_transaction."
+            )
+
         super().__enter__()
 
         if self._profile is not None:
@@ -819,6 +891,9 @@ class Transaction(Span):
         contexts = {}
         contexts.update(self._contexts)
         contexts.update({"trace": self.get_trace_context()})
+        profile_context = self.get_profile_context()
+        if profile_context is not None:
+            contexts.update({"profile": profile_context})
 
         event = {
             "type": "transaction",
@@ -1053,6 +1128,10 @@ class NoOpSpan(Span):
         return {}
 
     def get_trace_context(self):
+        # type: () -> Any
+        return {}
+
+    def get_profile_context(self):
         # type: () -> Any
         return {}
 

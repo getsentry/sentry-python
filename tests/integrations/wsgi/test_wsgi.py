@@ -412,7 +412,7 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_sent(
     sentry_init,
     capture_envelopes,
@@ -437,3 +437,42 @@ def test_profile_sent(
 
     profiles = [item for item in envelopes[0].items if item.type == "profile"]
     assert len(profiles) == 1
+
+
+def test_span_origin_manual(sentry_init, capture_events):
+    def dogpark(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+
+    events = capture_events()
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+
+def test_span_origin_custom(sentry_init, capture_events):
+    def dogpark(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(
+        dogpark,
+        span_origin="auto.dogpark.deluxe",
+    )
+
+    events = capture_events()
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.dogpark.deluxe"

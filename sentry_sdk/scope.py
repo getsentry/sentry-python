@@ -10,7 +10,8 @@ from itertools import chain
 
 from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
-from sentry_sdk.profiler import Profile
+from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
+from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.tracing_utils import (
     Baggage,
@@ -208,9 +209,6 @@ class Scope(object):
         incoming_trace_information = self._load_trace_data_from_env()
         self.generate_propagation_context(incoming_data=incoming_trace_information)
 
-        # self._last_event_id is only applicable to isolation scopes
-        self._last_event_id = None  # type: Optional[str]
-
     def __copy__(self):
         # type: () -> Scope
         """
@@ -243,6 +241,8 @@ class Scope(object):
         rv._attachments = list(self._attachments)
 
         rv._profile = self._profile
+
+        rv._last_event_id = self._last_event_id
 
         return rv
 
@@ -604,9 +604,10 @@ class Scope(object):
     def iter_trace_propagation_headers(self, *args, **kwargs):
         # type: (Any, Any) -> Generator[Tuple[str, str], None, None]
         """
-        Return HTTP headers which allow propagation of trace data. Data taken
-        from the span representing the request, if available, or the current
-        span on the scope if not.
+        Return HTTP headers which allow propagation of trace data.
+
+        If a span is given, the trace data will taken from the span.
+        If no span is given, the trace data is taken from the scope.
         """
         client = Scope.get_client()
         if not client.options.get("propagate_traces"):
@@ -676,6 +677,9 @@ class Scope(object):
         self._profile = None  # type: Optional[Profile]
 
         self._propagation_context = None
+
+        # self._last_event_id is only applicable to isolation scopes
+        self._last_event_id = None  # type: Optional[str]
 
     @_attr_setter
     def level(self, value):
@@ -998,6 +1002,8 @@ class Scope(object):
         if instrumenter != configuration_instrumenter:
             return NoOpSpan()
 
+        try_autostart_continuous_profiler()
+
         custom_sampling_context = custom_sampling_context or {}
 
         # kwargs at this point has type TransactionKwargs, since we have removed
@@ -1017,8 +1023,13 @@ class Scope(object):
         sampling_context.update(custom_sampling_context)
         transaction._set_initial_sampling_decision(sampling_context=sampling_context)
 
-        profile = Profile(transaction)
-        profile._set_initial_sampling_decision(sampling_context=sampling_context)
+        if transaction.sampled:
+            profile = Profile(
+                transaction.sampled, transaction._start_timestamp_monotonic_ns
+            )
+            profile._set_initial_sampling_decision(sampling_context=sampling_context)
+
+            transaction._profile = profile
 
         # we don't bother to keep spans if we already know we're not going to
         # send the transaction
@@ -1072,8 +1083,10 @@ class Scope(object):
 
             return span
 
-    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    def continue_trace(
+        self, environ_or_headers, op=None, name=None, source=None, origin="manual"
+    ):
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
@@ -1082,6 +1095,7 @@ class Scope(object):
         transaction = Transaction.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
+            origin=origin,
             name=name,
             source=source,
         )

@@ -1,11 +1,12 @@
 import threading
+import kombu
 from unittest import mock
 
 import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
 
-from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
+from sentry_sdk import configure_scope, start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_apply_async,
@@ -25,9 +26,19 @@ def connect_signal(request):
 
 @pytest.fixture
 def init_celery(sentry_init, request):
-    def inner(propagate_traces=True, backend="always_eager", **kwargs):
+    def inner(
+        propagate_traces=True,
+        backend="always_eager",
+        monitor_beat_tasks=False,
+        **kwargs,
+    ):
         sentry_init(
-            integrations=[CeleryIntegration(propagate_traces=propagate_traces)],
+            integrations=[
+                CeleryIntegration(
+                    propagate_traces=propagate_traces,
+                    monitor_beat_tasks=monitor_beat_tasks,
+                )
+            ],
             **kwargs,
         )
         celery = Celery(__name__)
@@ -48,9 +59,6 @@ def init_celery(sentry_init, request):
             celery.conf.broker_url = "redis://127.0.0.1:6379"
             celery.conf.result_backend = "redis://127.0.0.1:6379"
             celery.conf.task_always_eager = False
-
-            Hub.main.bind_client(Hub.current.client)
-            request.addfinalizer(lambda: Hub.main.bind_client(None))
 
             # Once we drop celery 3 we can use the celery_worker fixture
             if VERSION < (5,):
@@ -225,6 +233,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
+            "origin": "auto.queue.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
             "same_process_as_parent": True,
             "span_id": submission_event["spans"][0]["span_id"],
@@ -288,45 +297,6 @@ def test_ignore_expected(capture_events, celery):
     dummy_task.delay(1, 2)
     dummy_task.delay(1, 0)
     assert not events
-
-
-@pytest.mark.skip(
-    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
-)
-def test_broken_prerun(init_celery, connect_signal):
-    from celery.signals import task_prerun
-
-    stack_lengths = []
-
-    def crash(*args, **kwargs):
-        # scope should exist in prerun
-        stack_lengths.append(len(Hub.current._stack))
-        1 / 0
-
-    # Order here is important to reproduce the bug: In Celery 3, a crashing
-    # prerun would prevent other preruns from running.
-
-    connect_signal(task_prerun, crash)
-    celery = init_celery()
-
-    assert len(Hub.current._stack) == 1
-
-    @celery.task(name="dummy_task")
-    def dummy_task(x, y):
-        stack_lengths.append(len(Hub.current._stack))
-        return x / y
-
-    if VERSION >= (4,):
-        dummy_task.delay(2, 2)
-    else:
-        with pytest.raises(ZeroDivisionError):
-            dummy_task.delay(2, 2)
-
-    assert len(Hub.current._stack) == 1
-    if VERSION < (4,):
-        assert stack_lengths == [2]
-    else:
-        assert stack_lengths == [2, 2]
 
 
 @pytest.mark.xfail(
@@ -529,6 +499,7 @@ def test_task_headers(celery):
     # Newly added headers
     expected_headers["sentry-trace"] = mock.ANY
     expected_headers["baggage"] = mock.ANY
+    expected_headers["sentry-task-enqueued-time"] = mock.ANY
 
     assert result.get() == expected_headers
 
@@ -722,3 +693,95 @@ def test_messaging_system(system, init_celery, capture_events):
     (event,) = events
     (span,) = event["spans"]
     assert span["data"]["messaging.system"] == system
+
+
+@pytest.mark.parametrize("system", ("amqp", "redis"))
+def test_producer_span_data(system, monkeypatch, sentry_init, capture_events):
+    old_publish = kombu.messaging.Producer._publish
+
+    def publish(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    with start_transaction():
+        task.apply_async()
+
+    (event,) = events
+    span = next(span for span in event["spans"] if span["op"] == "queue.publish")
+
+    assert span["data"]["messaging.system"] == system
+
+    assert span["data"]["messaging.destination.name"] == "celery"
+    assert "messaging.message.id" in span["data"]
+    assert span["data"]["messaging.message.retry.count"] == 0
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+def test_receive_latency(init_celery, capture_events):
+    celery = init_celery(traces_sample_rate=1.0)
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+    (span,) = event["spans"]
+    assert "messaging.message.receive.latency" in span["data"]
+    assert span["data"]["messaging.message.receive.latency"] > 0
+
+
+def tests_span_origin_consumer(init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    celery.conf.broker_url = "redis://example.com"  # noqa: E231
+
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.celery"
+    assert event["spans"][0]["origin"] == "auto.queue.celery"
+
+
+def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
+    old_publish = kombu.messaging.Producer._publish
+
+    def publish(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    with start_transaction(name="custom_transaction"):
+        task.apply_async()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.queue.celery"
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)

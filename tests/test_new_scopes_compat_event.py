@@ -36,7 +36,7 @@ def expected_error():
                                     "abs_path": mock.ANY,
                                     "function": "_faulty_function",
                                     "module": "tests.test_new_scopes_compat_event",
-                                    "lineno": 240,
+                                    "lineno": mock.ANY,
                                     "pre_context": [
                                         "    return create_expected_transaction_event",
                                         "",
@@ -75,7 +75,12 @@ def expected_error():
                     "span_id": span.span_id,
                     "parent_span_id": span.parent_span_id,
                     "op": "test_span",
+                    "origin": "manual",
                     "description": None,
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": "MainThread",
+                    },
                 },
                 "runtime": {
                     "name": "CPython",
@@ -156,7 +161,12 @@ def expected_transaction():
                     "span_id": trx.span_id,
                     "parent_span_id": None,
                     "op": "test_transaction_op",
+                    "origin": "manual",
                     "description": None,
+                    "data": {
+                        "thread.id": mock.ANY,
+                        "thread.name": "MainThread",
+                    },
                 },
                 "character": {
                     "name": "Mighty Fighter changed by before_send_transaction",
@@ -183,6 +193,7 @@ def expected_transaction():
                     "parent_span_id": span.parent_span_id,
                     "same_process_as_parent": True,
                     "op": "test_span",
+                    "origin": "manual",
                     "description": None,
                     "start_timestamp": mock.ANY,
                     "timestamp": mock.ANY,

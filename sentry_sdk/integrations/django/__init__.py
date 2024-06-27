@@ -104,7 +104,18 @@ TRANSACTION_STYLE_VALUES = ("function_name", "url")
 
 
 class DjangoIntegration(Integration):
+    """
+    Auto instrument a Django application.
+
+    :param transaction_style: How to derive transaction names. Either `"function_name"` or `"url"`. Defaults to `"url"`.
+    :param middleware_spans: Whether to create spans for middleware. Defaults to `True`.
+    :param signals_spans: Whether to create spans for signals. Defaults to `True`.
+    :param signals_denylist: A list of signals to ignore when creating spans.
+    :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
+    """
+
     identifier = "django"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
     middleware_spans = None
@@ -128,9 +139,11 @@ class DjangoIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+
         self.signals_spans = signals_spans
-        self.cache_spans = cache_spans
         self.signals_denylist = signals_denylist or []
+
+        self.cache_spans = cache_spans
 
     @staticmethod
     def setup_once():
@@ -159,9 +172,12 @@ class DjangoIntegration(Integration):
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
-            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                bound_old_app,
+                use_x_forwarded_for,
+                span_origin=DjangoIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -609,7 +625,12 @@ def install_sql_hook():
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, params, paramstyle="format", executemany=False
+            cursor=self.cursor,
+            query=sql,
+            params_list=params,
+            paramstyle="format",
+            executemany=False,
+            span_origin=DjangoIntegration.origin,
         ) as span:
             _set_db_data(span, self)
             options = (
@@ -637,7 +658,12 @@ def install_sql_hook():
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, param_list, paramstyle="format", executemany=True
+            cursor=self.cursor,
+            query=sql,
+            params_list=param_list,
+            paramstyle="format",
+            executemany=True,
+            span_origin=DjangoIntegration.origin,
         ) as span:
             _set_db_data(span, self)
 
@@ -654,7 +680,11 @@ def install_sql_hook():
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            description="connect",
+            origin=DjangoIntegration.origin,
+        ) as span:
             _set_db_data(span, self)
             return real_connect(self)
 
@@ -683,15 +713,10 @@ def _set_db_data(span, cursor_or_db):
     if is_psycopg2:
         connection_params = cursor_or_db.connection.get_dsn_parameters()
     else:
-        is_psycopg3 = (
-            hasattr(cursor_or_db, "connection")
-            and hasattr(cursor_or_db.connection, "info")
-            and hasattr(cursor_or_db.connection.info, "get_parameters")
-            and inspect.isroutine(cursor_or_db.connection.info.get_parameters)
-        )
-        if is_psycopg3:
+        try:
+            # psycopg3
             connection_params = cursor_or_db.connection.info.get_parameters()
-        else:
+        except Exception:
             connection_params = db.get_connection_params()
 
     db_name = connection_params.get("dbname") or connection_params.get("database")

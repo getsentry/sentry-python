@@ -1,5 +1,139 @@
 # Changelog
 
+## 2.7.0
+
+- Add `origin` to spans and transactions (#3133) by @antonpirker
+- OTel: Set up typing for OTel (#3168) by @sentrivana
+- OTel: Auto instrumentation skeleton (#3143) by @sentrivana
+- OpenAI: If there is an internal error, still return a value (#3192) by @colin-sentry
+- MongoDB: Add MongoDB collection span tag (#3182) by @0Calories
+- MongoDB: Change span operation from `db.query` to `db` (#3186) by @0Calories
+- MongoDB: Remove redundant command name in query description (#3189) by @0Calories
+- Apache Spark: Fix spark driver integration (#3162) by @seyoon-lim
+- Apache Spark: Add Spark test suite to tox.ini and to CI (#3199) by @sentrivana
+- Codecov: Add failed test commits in PRs (#3190) by @antonpirker
+- Update library, Python versions in tests (#3202) by @sentrivana
+- Remove Hub from our test suite (#3197) by @antonpirker
+- Use env vars for default CA cert bundle location (#3160) by @DragoonAethis
+- Create a separate test group for AI (#3198) by @sentrivana
+- Add additional stub packages for type checking (#3122) by @Daverball
+- Proper naming of requirements files (#3191) by @antonpirker
+- Pinning pip because new version does not work with some versions of Celery and Httpx (#3195) by @antonpirker
+- build(deps): bump supercharge/redis-github-action from 1.7.0 to 1.8.0 (#3193) by @dependabot
+- build(deps): bump actions/checkout from 4.1.6 to 4.1.7 (#3171) by @dependabot
+- build(deps): update pytest-asyncio requirement (#3087) by @dependabot
+
+## 2.6.0
+
+- Introduce continuous profiling mode (#2830) by @Zylphrex
+- Profiling: Add deprecation comment for profiler internals (#3167) by @sentrivana
+- Profiling: Move thread data to trace context (#3157) by @Zylphrex
+- Explicitly export cron symbols for typecheckers (#3072) by @spladug
+- Cleaning up ASGI tests for Django (#3180) by @antonpirker
+- Celery: Add Celery receive latency (#3174) by @antonpirker
+- Metrics: Update type hints for tag values (#3156) by @elramen
+- Django: Fix psycopg3 reconnect error (#3111) by @szokeasaurusrex
+- Tracing: Keep original function signature when decorated (#3178) by @sentrivana
+- Reapply "Refactor the Celery Beat integration (#3105)" (#3144) (#3175) by @antonpirker
+- Added contributor image to readme (#3183) by @antonpirker
+- bump actions/checkout from 4.1.4 to 4.1.6 (#3147) by @dependabot
+- bump checkouts/data-schemas from `59f9683` to `8c13457` (#3146) by @dependabot
+
+## 2.5.1
+
+This change fixes a regression in our cron monitoring feature, which caused cron checkins not to be sent. The regression appears to have been introduced in version 2.4.0.
+
+**We recommend that all users, who use Cron monitoring and are currently running sentry-python ≥2.4.0, upgrade to this release as soon as possible!**
+
+### Other fixes & improvements
+
+- feat(tracing): Warn if not-started transaction entered (#3003) by @szokeasaurusrex
+- test(scope): Ensure `last_event_id` cleared (#3124) by @szokeasaurusrex
+- fix(scope): Clear last_event_id on scope clear (#3124) by @szokeasaurusrex
+
+## 2.5.0
+
+### Various fixes & improvements
+
+- Allow to configure status codes to report to Sentry in Starlette and FastAPI (#3008) by @sentrivana
+
+  By passing a new option to the FastAPI and Starlette integrations, you're now able to configure what
+  status codes should be sent as events to Sentry. Here's how it works:
+
+  ```python
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+  from sentry_sdk.integrations.fastapi import FastApiIntegration
+  
+  sentry_sdk.init(
+      # ...
+      integrations=[
+          StarletteIntegration(
+              failed_request_status_codes=[403, range(500, 599)],
+          ),
+          FastApiIntegration(
+              failed_request_status_codes=[403, range(500, 599)],
+          ),
+      ]
+  )
+  ```
+
+  `failed_request_status_codes` expects a list of integers or containers (objects that allow membership checks via `in`)
+  of integers. Examples of valid `failed_request_status_codes`:
+
+  - `[500]` will only send events on HTTP 500.
+  - `[400, range(500, 599)]` will send events on HTTP 400 as well as the 500-599 range.
+  - `[500, 503]` will send events on HTTP 500 and 503.
+
+  The default is `[range(500, 599)]`.
+
+  See the [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/) and [Starlette](https://docs.sentry.io/platforms/python/integrations/starlette/) integration docs for more details.
+
+- Support multiple keys with `cache_prefixes` (#3136) by @sentrivana
+- Support integer Redis keys (#3132) by @sentrivana
+- Update SDK version in CONTRIBUTING.md (#3129) by @sentrivana
+- Bump actions/checkout from 4.1.4 to 4.1.5 (#3067) by @dependabot
+
+## 2.4.0
+
+### Various fixes & improvements
+
+- Celery: Made `cache.key` span data field a list (#3110) by @antonpirker
+- Celery Beat: Refactor the Celery Beat integration (#3105) by @antonpirker
+- GRPC: Add None check for grpc.aio interceptor (#3109) by @ordinary-jamie
+- Docs: Remove `last_event_id` from migration guide (#3126) by @szokeasaurusrex
+- fix(django): Proper transaction names for i18n routes (#3104) by @sentrivana
+- fix(scope): Copy `_last_event_id` in `Scope.__copy__` (#3123) by @szokeasaurusrex
+- fix(tests): Adapt to new Anthropic version (#3119) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `4381a97` to `59f9683` (#3066) by @dependabot
+
+## 2.3.1
+
+### Various fixes & improvements
+
+- Handle also byte arras as strings in Redis caches (#3101) by @antonpirker
+- Do not crash exceptiongroup (by patching excepthook and keeping the name of the function) (#3099) by @antonpirker
+
+## 2.3.0
+
+### Various fixes & improvements
+
+- NEW: Redis integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3073) by @antonpirker
+- NEW: Django integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3009) by @antonpirker
+- Fix `cohere` testsuite for new release of `cohere` (#3098) by @antonpirker
+- Fix ClickHouse integration where `_sentry_span` might be missing (#3096) by @sentrivana
+
+## 2.2.1
+
+### Various fixes & improvements
+
+- Add conditional check for delivery_info's existence (#3083) by @cmanallen
+- Updated deps for latest langchain version (#3092) by @antonpirker
+- Fixed grpcio extras to work as described in the docs (#3081) by @antonpirker
+- Use pythons venv instead of virtualenv to create virtual envs (#3077) by @antonpirker
+- Celery: Add comment about kwargs_headers (#3079) by @szokeasaurusrex
+- Celery: Queues module producer implementation (#3079) by @szokeasaurusrex
+- Fix N803 flake8 failures (#3082) by @szokeasaurusrex
+
 ## 2.2.0
 
 ### New features
@@ -11,11 +145,11 @@
 ### Other fixes & improvements
 
 - Add tags + data passing functionality to @ai_track (#3071) by @colin-sentry
-- fix(tracing): Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
-- ref(metrics): Improve type hints for set metrics (#3048) by @elramen
-- ref(scope): Fix `get_client` typing (#3063) by @szokeasaurusrex
+- Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
+- Improve type hints for set metrics (#3048) by @elramen
+- Fix `get_client` typing (#3063) by @szokeasaurusrex
 - Auto-enable Anthropic integration + gate imports (#3054) by @colin-sentry
-- Made MeasurementValue.unit NotRequired (#3051) by @antonpirker
+- Made `MeasurementValue.unit` NotRequired (#3051) by @antonpirker
 
 ## 2.1.1
 

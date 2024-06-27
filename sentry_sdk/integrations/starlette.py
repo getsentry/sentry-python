@@ -7,6 +7,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
+    _in_http_status_code_range,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -30,7 +31,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, HttpStatusCodeRange
 
 try:
     import starlette  # type: ignore
@@ -68,11 +69,12 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class StarletteIntegration(Integration):
     identifier = "starlette"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="url", middleware_spans=True):
-        # type: (str, bool) -> None
+    def __init__(self, transaction_style="url", failed_request_status_codes=None, middleware_spans=True):
+        # type: (str, Optional[list[HttpStatusCodeRange]], bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -80,6 +82,9 @@ class StarletteIntegration(Integration):
             )
         self.transaction_style = transaction_style
         self.middleware_spans = middleware_spans
+        self.failed_request_status_codes = failed_request_status_codes or [
+            range(500, 599)
+        ]
 
     @staticmethod
     def setup_once():
@@ -120,7 +125,9 @@ def _enable_span_for_middleware(middleware_class):
             )
 
         with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
+            op=OP.MIDDLEWARE_STARLETTE,
+            description=middleware_name,
+            origin=StarletteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
@@ -130,6 +137,7 @@ def _enable_span_for_middleware(middleware_class):
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
+                    origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -144,6 +152,7 @@ def _enable_span_for_middleware(middleware_class):
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     description=getattr(send, "__qualname__", str(send)),
+                    origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await send(*args, **kwargs)
@@ -199,12 +208,18 @@ def patch_exception_middleware(middleware_class):
 
             async def _sentry_patched_exception_handler(self, *args, **kwargs):
                 # type: (Any, Any, Any) -> None
+                integration = sentry_sdk.get_client().get_integration(
+                    StarletteIntegration
+                )
+
                 exp = args[0]
 
                 is_http_server_error = (
                     hasattr(exp, "status_code")
                     and isinstance(exp.status_code, int)
-                    and exp.status_code >= 500
+                    and _in_http_status_code_range(
+                        exp.status_code, integration.failed_request_status_codes
+                    )
                 )
                 if is_http_server_error:
                     _capture_exception(exp, handled=True)
@@ -347,6 +362,7 @@ def patch_asgi_app():
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
+            span_origin=StarletteIntegration.origin,
         )
 
         middleware.__call__ = middleware._run_asgi3
