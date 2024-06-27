@@ -637,18 +637,47 @@ def test_middleware_spans(sentry_init, capture_events):
 
     (_, transaction_event) = events
 
-    expected = [
+    expected_middleware_spans = [
         "ServerErrorMiddleware",
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
+        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
+        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
     ]
+
+    assert len(transaction_event["spans"]) == len(expected_middleware_spans)
 
     idx = 0
     for span in transaction_event["spans"]:
-        if span["op"] == "middleware.starlette":
-            assert span["description"] == expected[idx]
-            assert span["tags"]["starlette.middleware_name"] == expected[idx]
+        if span["op"].startswith("middleware.starlette"):
+            assert (
+                span["tags"]["starlette.middleware_name"]
+                == expected_middleware_spans[idx]
+            )
             idx += 1
+
+
+def test_middleware_spans_disabled(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration(middleware_spans=False)],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    assert len(transaction_event["spans"]) == 0
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):

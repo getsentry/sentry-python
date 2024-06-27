@@ -21,8 +21,11 @@ except ImportError:
 
 import sentry_sdk
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.integrations import _processed_integrations  # noqa: F401
-from sentry_sdk.profiler.transaction_profiler import teardown_profiler
+from sentry_sdk.integrations import (  # noqa: F401
+    _DEFAULT_INTEGRATIONS,
+    _processed_integrations,
+)
+from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import reraise
@@ -169,7 +172,13 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _processed_integrations
+    global _DEFAULT_INTEGRATIONS, _processed_integrations
+    try:
+        _DEFAULT_INTEGRATIONS.remove(
+            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
+        )
+    except ValueError:
+        pass
     _processed_integrations.clear()
 
 

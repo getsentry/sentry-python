@@ -7,7 +7,7 @@ from sentry_sdk.scope import Scope
 _SCOPES_KEY = create_key("sentry_scopes")
 
 
-class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):  # type: ignore
+class SentryContextVarsRuntimeContext(ContextVarsRuntimeContext):
     def attach(self, context):
         # type: (Context) -> object
         scopes = get_value(_SCOPES_KEY, context)
