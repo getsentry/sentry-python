@@ -73,7 +73,12 @@ class StarletteIntegration(Integration):
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="url", failed_request_status_codes=None, middleware_spans=True):
+    def __init__(
+        self,
+        transaction_style="url",
+        failed_request_status_codes=None,
+        middleware_spans=True,
+    ):
         # type: (str, Optional[list[HttpStatusCodeRange]], bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
