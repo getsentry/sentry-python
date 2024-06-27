@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.7.1
+
+### Various fixes & improvements
+
+- fix(otel): Fix missing baggage (#3218) by @sentrivana
+- This is the config file of asdf-vm which we do not use. (#3215) by @antonpirker
+- Added option to disable middleware spans in Starlette (#3052) by @antonpirker
+- build: Update tornado version in setup.py to match code check. (#3206) by @aclemons
+
 ## 2.7.0
 
 - Add `origin` to spans and transactions (#3133) by @antonpirker
