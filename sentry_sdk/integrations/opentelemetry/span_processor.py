@@ -159,7 +159,7 @@ class SentrySpanProcessor(SpanProcessor):
                 span_id=trace_data["span_id"],
                 parent_span_id=parent_span_id,
                 trace_id=trace_data["trace_id"],
-                baggage=trace_data["baggage"],
+                baggage=trace_data.get("baggage"),
                 start_timestamp=start_timestamp,
                 instrumenter=INSTRUMENTER.OTEL,
                 origin=SPAN_ORIGIN,
