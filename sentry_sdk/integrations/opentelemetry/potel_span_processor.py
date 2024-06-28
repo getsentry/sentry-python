@@ -64,8 +64,14 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
         if not transaction_event:
             return
 
-        children = self._collect_children(span)
-        # TODO add converted spans
+        spans = []
+        for child in self._collect_children(span):
+            span_json = self._span_to_json(child)
+            if span_json:
+                spans.append(span_json)
+        transaction_event.setdefault("spans", []).extend(spans)
+        # TODO-neel-potel sort and cutoff max spans
+
         capture_event(transaction_event)
 
 
@@ -126,7 +132,37 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
             "contexts": contexts,
             "start_timestamp": convert_otel_timestamp(span.start_time),
             "timestamp": convert_otel_timestamp(span.end_time),
-            "spans": [],
         }  # type: Event
 
         return event
+
+    def _span_to_json(self, span):
+        # type: (ReadableSpan) -> Optional[dict[str, Any]]
+        if not span.context:
+            return None
+        if not span.start_time:
+            return None
+        if not span.end_time:
+            return None
+
+        trace_id = format_trace_id(span.context.trace_id)
+        span_id = format_span_id(span.context.span_id)
+        parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
+
+        span_json = {
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "origin": SPAN_ORIGIN,
+            "op": span.name, # TODO
+            "description": span.name, # TODO
+            "status": "ok", # TODO
+            "start_timestamp": convert_otel_timestamp(span.start_time),
+            "timestamp": convert_otel_timestamp(span.end_time),
+        }  # type: dict[str, Any]
+
+        if parent_span_id:
+            span_json["parent_span_id"] = parent_span_id
+        if span.attributes:
+            span_json["data"] = dict(span.attributes)
+
+        return span_json
