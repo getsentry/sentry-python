@@ -992,7 +992,7 @@ class Scope(object):
 
         client = Scope.get_client()
 
-        if kwargs.get("origin") in IGNORE_ORIGIN:
+        if kwargs.get("origin") in IGNORE_ORIGIN or (transaction is not None and transaction.origin in IGNORE_ORIGIN):
             return NoOpSpan()
 
         try_autostart_continuous_profiler()

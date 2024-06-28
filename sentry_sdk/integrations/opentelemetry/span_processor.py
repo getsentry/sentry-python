@@ -106,10 +106,14 @@ class SentrySpanProcessor(SpanProcessor):
 
     def _instrumentation_info_to_origin(self, otel_span):
         # type: (OTelSpan) -> str
-        if not otel_span.instrumentation_info:
+        # XXX this is wrong for manual otel spans
+        # when we properly proxy start_span & friends to otel, maybe we can
+        # somehow mark manual spans as such
+        if not otel_span.instrumentation_scope:
             return SPAN_ORIGIN
 
-        return f"auto.otel.{otel_span.instrumentation_info.name}"
+        instrumentation = otel_span.instrumentation_scope.name.split('.')[-1]
+        return f"auto.otel.{instrumentation}"
 
     def on_start(self, otel_span, parent_context=None):
         # type: (OTelSpan, Optional[context_api.Context]) -> None
