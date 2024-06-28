@@ -1,21 +1,26 @@
 from collections import deque
-from datetime import datetime
 
-from opentelemetry.trace import INVALID_SPAN, get_current_span, format_trace_id, format_span_id
+from opentelemetry.trace import format_trace_id, format_span_id
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import Span, ReadableSpan, SpanProcessor
 
 from sentry_sdk import capture_event
-from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span, convert_otel_timestamp
-from sentry_sdk.integrations.opentelemetry.consts import OTEL_SENTRY_CONTEXT, SPAN_ORIGIN
+from sentry_sdk.integrations.opentelemetry.utils import (
+    is_sentry_span,
+    convert_otel_timestamp,
+)
+from sentry_sdk.integrations.opentelemetry.consts import (
+    OTEL_SENTRY_CONTEXT,
+    SPAN_ORIGIN,
+)
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, List, Any
+    from typing import Optional, List, Any, Deque
     from sentry_sdk._types import Event
 
 
-class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
+class PotelSentrySpanProcessor(SpanProcessor):
     """
     Converts OTel spans into Sentry spans so they can be sent to the Sentry backend.
     """
@@ -74,21 +79,22 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
 
         capture_event(transaction_event)
 
-
     def _collect_children(self, span):
         # type: (ReadableSpan) -> List[ReadableSpan]
         if not span.context:
             return []
 
         children = []
-        bfs_queue = deque()
+        bfs_queue = deque()  # type: Deque[int]
         bfs_queue.append(span.context.span_id)
 
         while bfs_queue:
             parent_span_id = bfs_queue.popleft()
             node_children = self._children_spans.pop(parent_span_id, [])
             children.extend(node_children)
-            bfs_queue.extend([child.context.span_id for child in node_children if child.context])
+            bfs_queue.extend(
+                [child.context.span_id for child in node_children if child.context]
+            )
 
         return children
 
@@ -112,8 +118,8 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
             "trace_id": trace_id,
             "span_id": span_id,
             "origin": SPAN_ORIGIN,
-            "op": span.name, # TODO
-            "status": "ok", # TODO
+            "op": span.name,  # TODO
+            "status": "ok",  # TODO
         }  # type: dict[str, Any]
 
         if parent_span_id:
@@ -127,8 +133,8 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
 
         event = {
             "type": "transaction",
-            "transaction": span.name, # TODO
-            "transaction_info": {"source": "custom"}, # TODO
+            "transaction": span.name,  # TODO
+            "transaction_info": {"source": "custom"},  # TODO
             "contexts": contexts,
             "start_timestamp": convert_otel_timestamp(span.start_time),
             "timestamp": convert_otel_timestamp(span.end_time),
@@ -153,9 +159,9 @@ class PotelSentrySpanProcessor(SpanProcessor):  # type: ignore
             "trace_id": trace_id,
             "span_id": span_id,
             "origin": SPAN_ORIGIN,
-            "op": span.name, # TODO
-            "description": span.name, # TODO
-            "status": "ok", # TODO
+            "op": span.name,  # TODO
+            "description": span.name,  # TODO
+            "status": "ok",  # TODO
             "start_timestamp": convert_otel_timestamp(span.start_time),
             "timestamp": convert_otel_timestamp(span.end_time),
         }  # type: dict[str, Any]
