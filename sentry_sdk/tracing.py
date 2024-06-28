@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.consts import IGNORE_ORIGIN, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
@@ -347,11 +347,7 @@ class Span:
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
-        configuration_instrumenter = sentry_sdk.Scope.get_client().options[
-            "instrumenter"
-        ]
-
-        if instrumenter != configuration_instrumenter:
+        if kwargs.get("origin") in IGNORE_ORIGIN:
             return NoOpSpan()
 
         kwargs.setdefault("sampled", self.sampled)

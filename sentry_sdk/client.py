@@ -25,7 +25,7 @@ from sentry_sdk.transport import HttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
+    IGNORE_ORIGIN,
     VERSION,
     ClientConstructor,
 )

@@ -88,11 +88,6 @@ FALSE_VALUES = [
 ]
 
 
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
-
-
 class SPANDATA:
     """
     Additional information describing the type of the span.
