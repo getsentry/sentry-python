@@ -16,7 +16,6 @@ from opentelemetry.trace.span import (
     INVALID_TRACE_ID,
 )
 from sentry_sdk import get_client, start_transaction
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -40,8 +39,6 @@ SPAN_ORIGIN = "auto.otel"
 
 def link_trace_context_to_error_event(event, otel_span_map):
     # type: (Event, dict[str, Union[Transaction, SentrySpan]]) -> Event
-    client = get_client()
-
     if hasattr(event, "type") and event["type"] == "transaction":
         return event
 
@@ -107,6 +104,13 @@ class SentrySpanProcessor(SpanProcessor):
                 for span_id in self.open_spans.pop(span_start_minutes):
                     self.otel_span_map.pop(span_id, None)
 
+    def _instrumentation_info_to_origin(self, otel_span):
+        # type: (OTelSpan) -> str
+        if not otel_span.instrumentation_info:
+            return SPAN_ORIGIN
+
+        return f"auto.otel.{otel_span.instrumentation_info.name}"
+
     def on_start(self, otel_span, parent_context=None):
         # type: (OTelSpan, Optional[context_api.Context]) -> None
         client = get_client()
@@ -138,13 +142,15 @@ class SentrySpanProcessor(SpanProcessor):
                 otel_span.start_time / 1e9, timezone.utc
             )  # OTel spans have nanosecond precision
 
+        span_origin = self._instrumentation_info_to_origin(otel_span)
+
         sentry_span = None
         if sentry_parent_span:
             sentry_span = sentry_parent_span.start_child(
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
                 start_timestamp=start_timestamp,
-                origin=SPAN_ORIGIN,
+                origin=span_origin,
             )
         else:
             sentry_span = start_transaction(
@@ -154,7 +160,7 @@ class SentrySpanProcessor(SpanProcessor):
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
                 start_timestamp=start_timestamp,
-                origin=SPAN_ORIGIN,
+                origin=span_origin,
             )
 
         self.otel_span_map[trace_data["span_id"]] = sentry_span
@@ -171,8 +177,6 @@ class SentrySpanProcessor(SpanProcessor):
 
     def on_end(self, otel_span):
         # type: (OTelSpan) -> None
-        client = get_client()
-
         span_context = otel_span.get_span_context()
         if not span_context.is_valid:
             return
