@@ -6,6 +6,7 @@ from grpc.aio import (
     ClientCallDetails,
     UnaryUnaryCall,
     UnaryStreamCall,
+    Metadata,
 )
 from google.protobuf.message import Message
 
@@ -20,20 +21,9 @@ class ClientInterceptor:
     def _update_client_call_details_metadata_from_scope(
         client_call_details: ClientCallDetails,
     ) -> ClientCallDetails:
-        metadata = (
-            list(client_call_details.metadata) if client_call_details.metadata else []
-        )
+        client_call_details.metadata = client_call_details.metadata or Metadata()
         for key, value in Scope.get_current_scope().iter_trace_propagation_headers():
-            metadata.append((key, value))
-
-        client_call_details = ClientCallDetails(
-            method=client_call_details.method,
-            timeout=client_call_details.timeout,
-            metadata=metadata,
-            credentials=client_call_details.credentials,
-            wait_for_ready=client_call_details.wait_for_ready,
-        )
-
+            client_call_details.metadata.add(key, value)
         return client_call_details
 
 
