@@ -2,20 +2,15 @@ import pytest
 import gc
 import uuid
 import os
+from unittest import mock
+from unittest.mock import MagicMock
 
 import sentry_sdk
-from sentry_sdk import Hub, start_span, start_transaction, set_measurement, push_scope
+from sentry_sdk import Scope, start_span, start_transaction, set_measurement
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
-
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
 
 
 def test_span_trimming(sentry_init, capture_events):
@@ -89,7 +84,7 @@ def test_finds_transaction_on_scope(sentry_init):
 
     transaction = start_transaction(name="dogpark")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
 
     # See note in Scope class re: getters and setters of the `transaction`
     # property. For the moment, assigning to scope.transaction merely sets the
@@ -118,7 +113,7 @@ def test_finds_transaction_when_descendent_span_is_on_scope(
     transaction = start_transaction(name="dogpark")
     child_span = transaction.start_child(op="sniffing")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
     scope._span = child_span
 
     # this is the same whether it's the transaction itself or one of its
@@ -141,7 +136,7 @@ def test_finds_orphan_span_on_scope(sentry_init):
 
     span = start_span(op="sniffing")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
     scope._span = span
 
     assert scope._span is not None
@@ -155,7 +150,7 @@ def test_finds_non_orphan_span_on_scope(sentry_init):
     transaction = start_transaction(name="dogpark")
     child_span = transaction.start_child(op="sniffing")
 
-    scope = Hub.current.scope
+    scope = Scope.get_current_scope()
     scope._span = child_span
 
     assert scope._span is not None
@@ -303,17 +298,16 @@ def test_set_meaurement_public_api(sentry_init, capture_events):
 def test_should_propagate_trace(
     trace_propagation_targets, url, expected_propagation_decision
 ):
-    hub = MagicMock()
-    hub.client = MagicMock()
+    client = MagicMock()
 
     # This test assumes the urls are not Sentry URLs. Use test_should_propagate_trace_to_sentry for sentry URLs.
-    hub.is_sentry_url = lambda _: False
+    client.is_sentry_url = lambda _: False
 
-    hub.client.options = {"trace_propagation_targets": trace_propagation_targets}
-    hub.client.transport = MagicMock()
-    hub.client.transport.parsed_dsn = Dsn("https://bla@xxx.sentry.io/12312012")
+    client.options = {"trace_propagation_targets": trace_propagation_targets}
+    client.transport = MagicMock()
+    client.transport.parsed_dsn = Dsn("https://bla@xxx.sentry.io/12312012")
 
-    assert should_propagate_trace(hub, url) == expected_propagation_decision
+    assert should_propagate_trace(client, url) == expected_propagation_decision
 
 
 @pytest.mark.parametrize(
@@ -354,15 +348,72 @@ def test_should_propagate_trace_to_sentry(
         traces_sample_rate=1.0,
     )
 
-    Hub.current.client.transport.parsed_dsn = Dsn(dsn)
+    client = sentry_sdk.get_client()
+    client.transport.parsed_dsn = Dsn(dsn)
 
-    assert should_propagate_trace(Hub.current, url) == expected_propagation_decision
+    assert should_propagate_trace(client, url) == expected_propagation_decision
 
 
 def test_start_transaction_updates_scope_name_source(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    with push_scope() as scope:
-        with start_transaction(name="foobar", source="route"):
-            assert scope._transaction == "foobar"
-            assert scope._transaction_info == {"source": "route"}
+    scope = Scope.get_current_scope()
+
+    with start_transaction(name="foobar", source="route"):
+        assert scope._transaction == "foobar"
+        assert scope._transaction_info == {"source": "route"}
+
+
+@pytest.mark.parametrize("sampled", (True, None))
+def test_transaction_dropped_debug_not_started(sentry_init, sampled):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction(sampled=sampled)
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with tx:
+            pass
+
+    mock_logger.debug.assert_any_call(
+        "Discarding transaction because it was not started with sentry_sdk.start_transaction"
+    )
+
+    with pytest.raises(AssertionError):
+        # We should NOT see the "sampled = False" message here
+        mock_logger.debug.assert_any_call(
+            "Discarding transaction because sampled = False"
+        )
+
+
+def test_transaction_dropeed_sampled_false(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction(sampled=False)
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with sentry_sdk.start_transaction(tx):
+            pass
+
+    mock_logger.debug.assert_any_call("Discarding transaction because sampled = False")
+
+    with pytest.raises(AssertionError):
+        # We should not see the "not started" message here
+        mock_logger.debug.assert_any_call(
+            "Discarding transaction because it was not started with sentry_sdk.start_transaction"
+        )
+
+
+def test_transaction_not_started_warning(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    tx = Transaction()
+
+    with mock.patch("sentry_sdk.tracing.logger") as mock_logger:
+        with tx:
+            pass
+
+    mock_logger.warning.assert_any_call(
+        "Transaction was entered without being started with sentry_sdk.start_transaction."
+        "The transaction will not be sent to Sentry. To fix, start the transaction by"
+        "passing it to sentry_sdk.start_transaction."
+    )

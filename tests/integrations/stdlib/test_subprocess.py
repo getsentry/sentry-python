@@ -2,19 +2,13 @@ import os
 import platform
 import subprocess
 import sys
+from collections.abc import Mapping
 
 import pytest
 
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk._compat import PY2
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from tests.conftest import ApproxDict
-
-
-if PY2:
-    from collections import Mapping
-else:
-    from collections.abc import Mapping
 
 
 class ImmutableDict(Mapping):
@@ -187,3 +181,33 @@ def test_subprocess_invalid_args(sentry_init):
         subprocess.Popen(1)
 
     assert "'int' object is not iterable" in str(excinfo.value)
+
+
+def test_subprocess_span_origin(sentry_init, capture_events):
+    sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="foo"):
+        args = [
+            sys.executable,
+            "-c",
+            "print('hello world')",
+        ]
+        kw = {"args": args, "stdout": subprocess.PIPE}
+
+        popen = subprocess.Popen(**kw)
+        popen.communicate()
+        popen.poll()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    assert event["spans"][0]["op"] == "subprocess"
+    assert event["spans"][0]["origin"] == "auto.subprocess.stdlib.subprocess"
+
+    assert event["spans"][1]["op"] == "subprocess.communicate"
+    assert event["spans"][1]["origin"] == "auto.subprocess.stdlib.subprocess"
+
+    assert event["spans"][2]["op"] == "subprocess.wait"
+    assert event["spans"][2]["origin"] == "auto.subprocess.stdlib.subprocess"

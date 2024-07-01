@@ -53,7 +53,7 @@ def test_dictionary_containing(
     ) is expected_result
 
 
-class Animal(object):  # noqa: B903
+class Animal:  # noqa: B903
     def __init__(self, name=None, age=None, description=None):
         self.name = name
         self.age = age

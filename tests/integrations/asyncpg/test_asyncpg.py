@@ -12,34 +12,26 @@ The tests use the following credentials to establish a database connection.
 import os
 
 
-PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
-PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "foo")
-PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "bar")
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
 PG_PORT = 5432
+PG_USER = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres")
+PG_PASSWORD = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry")
+PG_NAME = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_NAME", "postgres")
 
-
-from sentry_sdk._compat import PY2
 import datetime
+from contextlib import contextmanager
+from unittest import mock
 
 import asyncpg
 import pytest
-
 import pytest_asyncio
-
 from asyncpg import connect, Connection
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk._compat import contextmanager
 from tests.conftest import ApproxDict
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 PG_CONNECTION_URI = "postgresql://{}:{}@{}/{}".format(
@@ -636,9 +628,8 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
 
     assert type(data.get(SPANDATA.CODE_LINENO)) == int
     assert data.get(SPANDATA.CODE_LINENO) > 0
-    if not PY2:
-        assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
-        assert data.get(SPANDATA.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
+    assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
+    assert data.get(SPANDATA.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
 
     is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
     assert is_relative_path
@@ -751,3 +742,27 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
         data.get(SPANDATA.CODE_FUNCTION)
         == "test_query_source_if_duration_over_threshold"
     )
+
+
+@pytest.mark.asyncio
+async def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+
+        await conn.execute("SELECT 1")
+        await conn.fetchrow("SELECT 2")
+        await conn.close()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.db.asyncpg"

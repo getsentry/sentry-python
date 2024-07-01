@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 
-from sentry_sdk import start_transaction, Hub
+from sentry_sdk import get_client, start_transaction
 from sentry_sdk.integrations.arq import ArqIntegration
 
 import arq.worker
@@ -60,7 +60,6 @@ def init_arq(sentry_init):
             integrations=[ArqIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            debug=True,
         )
 
         server = FakeRedis()
@@ -245,10 +244,50 @@ async def test_execute_job_without_integration(init_arq):
 
     pool, worker = init_arq([dummy_job])
     # remove the integration to trigger the edge case
-    Hub.current.client.integrations.pop("arq")
+    get_client().integrations.pop("arq")
 
     job = await pool.enqueue_job("dummy_job")
 
     await worker.run_job(job.job_id, timestamp_ms())
 
     assert await job.result() is None
+
+
+@pytest.mark.parametrize("source", ["cls_functions", "kw_functions"])
+@pytest.mark.asyncio
+async def test_span_origin_producer(capture_events, init_arq, source):
+    async def dummy_job(_):
+        pass
+
+    pool, _ = init_arq(**{source: [dummy_job]})
+
+    events = capture_events()
+
+    with start_transaction():
+        await pool.enqueue_job("dummy_job")
+
+    (event,) = events
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.queue.arq"
+
+
+@pytest.mark.asyncio
+async def test_span_origin_consumer(capture_events, init_arq):
+    async def job(ctx):
+        pass
+
+    job.__qualname__ = job.__name__
+
+    pool, worker = init_arq([job])
+
+    job = await pool.enqueue_job("retry_job")
+
+    events = capture_events()
+
+    await worker.run_job(job.job_id, timestamp_ms())
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.arq"
+    assert event["spans"][0]["origin"] == "auto.db.redis"
+    assert event["spans"][1]["origin"] == "auto.db.redis"

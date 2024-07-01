@@ -4,22 +4,24 @@ import sys
 import time
 
 import pytest
+from sentry_sdk.client import Client
 
 from tests.conftest import patch_start_tracing_child
 
+import sentry_sdk
 from sentry_sdk import (
-    Client,
     push_scope,
     configure_scope,
     capture_event,
     capture_exception,
     capture_message,
     start_transaction,
-    add_breadcrumb,
     last_event_id,
+    add_breadcrumb,
+    isolation_scope,
     Hub,
+    Scope,
 )
-from sentry_sdk._compat import reraise, PY2
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     Integration,
@@ -31,7 +33,7 @@ from sentry_sdk.scope import (  # noqa: F401
     add_global_event_processor,
     global_event_processors,
 )
-from sentry_sdk.utils import get_sdk_name
+from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
 
@@ -107,28 +109,6 @@ def test_auto_enabling_integrations_catches_import_error(sentry_init, caplog):
             )
             for record in caplog.records
         ), "Problem with checking auto enabling {}".format(import_string)
-
-
-def test_event_id(sentry_init, capture_events):
-    sentry_init()
-    events = capture_events()
-
-    try:
-        raise ValueError("aha!")
-    except Exception:
-        event_id = capture_exception()
-        int(event_id, 16)
-        assert len(event_id) == 32
-
-    (event,) = events
-    assert event["event_id"] == event_id
-    assert last_event_id() == event_id
-    assert Hub.current.last_event_id() == event_id
-
-    new_event_id = Hub.current.capture_event({"type": "transaction"})
-    assert new_event_id is not None
-    assert new_event_id != event_id
-    assert Hub.current.last_event_id() == event_id
 
 
 def test_generic_mechanism(sentry_init, capture_events):
@@ -241,7 +221,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     events = capture_events()
 
     monkeypatch.setattr(
-        Hub.current.client.transport, "record_lost_event", record_lost_event
+        sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
     )
 
     def do_this():
@@ -290,7 +270,7 @@ def test_option_enable_tracing(
     updated_traces_sample_rate,
 ):
     sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
-    options = Hub.current.client.options
+    options = sentry_sdk.get_client().options
     assert has_tracing_enabled(options) is tracing_enabled
     assert options["traces_sample_rate"] == updated_traces_sample_rate
 
@@ -332,6 +312,9 @@ def test_push_scope(sentry_init, capture_events):
 
 
 def test_push_scope_null_client(sentry_init, capture_events):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     sentry_init()
     events = capture_events()
 
@@ -347,8 +330,14 @@ def test_push_scope_null_client(sentry_init, capture_events):
     assert len(events) == 0
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
+)
 @pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     sentry_init()
 
     if null_client:
@@ -396,8 +385,7 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    with configure_scope() as scope:
-        scope.clear()
+    Scope.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
@@ -454,10 +442,16 @@ def test_integration_scoping(sentry_init, capture_events):
     assert not events
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
+)
 def test_client_initialized_within_scope(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.WARNING)
 
-    sentry_init(debug=True)
+    sentry_init()
 
     with push_scope():
         Hub.current.bind_client(Client())
@@ -467,10 +461,16 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     assert record.msg.startswith("init() called inside of pushed scope.")
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
+)
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.WARNING)
 
-    sentry_init(debug=True)
+    sentry_init()
 
     old_stack = list(Hub.current._stack)
 
@@ -484,10 +484,16 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
     assert record.message.startswith("Leaked 1 scopes:")
 
 
+@pytest.mark.skip(
+    reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
+)
 def test_scope_popped_too_soon(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.ERROR)
 
-    sentry_init(debug=True)
+    sentry_init()
 
     old_stack = list(Hub.current._stack)
 
@@ -531,7 +537,7 @@ def test_scope_event_processor_order(sentry_init, capture_events):
 
 
 def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
-    sentry_init(debug=True)
+    sentry_init()
     events = capture_events()
     capture_event({}, level="info", extras={"foo": "bar"})
     (event,) = events
@@ -729,7 +735,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
 def test_redis_disabled_when_not_installed(sentry_init):
     sentry_init()
 
-    assert Hub.current.get_integration(RedisIntegration) is None
+    assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
 
 
 def test_multiple_setup_integrations_calls():
@@ -752,18 +758,16 @@ class TracingTestClass:
 
 def test_staticmethod_tracing(sentry_init):
     test_staticmethod_name = "tests.test_basics.TracingTestClass.static"
-    if not PY2:
-        # Skip this check on Python 2 since __qualname__ is available in Python 3 only. Skipping is okay,
-        # since the assertion would be expected to fail in Python 3 if there is any problem.
-        assert (
-            ".".join(
-                [
-                    TracingTestClass.static.__module__,
-                    TracingTestClass.static.__qualname__,
-                ]
-            )
-            == test_staticmethod_name
-        ), "The test static method was moved or renamed. Please update the name accordingly"
+
+    assert (
+        ".".join(
+            [
+                TracingTestClass.static.__module__,
+                TracingTestClass.static.__qualname__,
+            ]
+        )
+        == test_staticmethod_name
+    ), "The test static method was moved or renamed. Please update the name accordingly"
 
     sentry_init(functions_to_trace=[{"qualified_name": test_staticmethod_name}])
 
@@ -775,18 +779,16 @@ def test_staticmethod_tracing(sentry_init):
 
 def test_classmethod_tracing(sentry_init):
     test_classmethod_name = "tests.test_basics.TracingTestClass.class_"
-    if not PY2:
-        # Skip this check on Python 2 since __qualname__ is available in Python 3 only. Skipping is okay,
-        # since the assertion would be expected to fail in Python 3 if there is any problem.
-        assert (
-            ".".join(
-                [
-                    TracingTestClass.class_.__module__,
-                    TracingTestClass.class_.__qualname__,
-                ]
-            )
-            == test_classmethod_name
-        ), "The test class method was moved or renamed. Please update the name accordingly"
+
+    assert (
+        ".".join(
+            [
+                TracingTestClass.class_.__module__,
+                TracingTestClass.class_.__qualname__,
+            ]
+        )
+        == test_classmethod_name
+    ), "The test class method was moved or renamed. Please update the name accordingly"
 
     sentry_init(functions_to_trace=[{"qualified_name": test_classmethod_name}])
 
@@ -794,3 +796,32 @@ def test_classmethod_tracing(sentry_init):
         with patch_start_tracing_child() as fake_start_child:
             assert instance_or_class.class_(1) == (TracingTestClass, 1)
             assert fake_start_child.call_count == 1
+
+
+def test_last_event_id(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert last_event_id() is None
+
+    capture_exception(Exception("test"))
+
+    assert last_event_id() is not None
+
+
+def test_last_event_id_transaction(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert last_event_id() is None
+
+    with start_transaction(name="test"):
+        pass
+
+    assert last_event_id() is None, "Transaction should not set last_event_id"
+
+
+def test_last_event_id_scope(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    # Should not crash
+    with isolation_scope() as scope:
+        assert scope.last_event_id() is None

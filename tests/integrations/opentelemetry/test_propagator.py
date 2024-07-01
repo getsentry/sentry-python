@@ -1,9 +1,7 @@
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
+import pytest
+
+from unittest import mock
+from unittest.mock import MagicMock
 
 from opentelemetry.context import get_current
 from opentelemetry.trace import (
@@ -22,6 +20,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProce
 from sentry_sdk.tracing_utils import Baggage
 
 
+@pytest.mark.forked
 def test_extract_no_context_no_sentry_trace_header():
     """
     No context and NO Sentry trace data in getter.
@@ -37,6 +36,7 @@ def test_extract_no_context_no_sentry_trace_header():
     assert modified_context == {}
 
 
+@pytest.mark.forked
 def test_extract_context_no_sentry_trace_header():
     """
     Context but NO Sentry trace data in getter.
@@ -52,6 +52,7 @@ def test_extract_context_no_sentry_trace_header():
     assert modified_context == context
 
 
+@pytest.mark.forked
 def test_extract_empty_context_sentry_trace_header_no_baggage():
     """
     Empty context but Sentry trace data but NO Baggage in getter.
@@ -81,6 +82,7 @@ def test_extract_empty_context_sentry_trace_header_no_baggage():
     assert span_context.trace_id == int("1234567890abcdef1234567890abcdef", 16)
 
 
+@pytest.mark.forked
 def test_extract_context_sentry_trace_header_baggage():
     """
     Empty context but Sentry trace data and Baggage in getter.
@@ -121,6 +123,7 @@ def test_extract_context_sentry_trace_header_baggage():
     assert span_context.trace_id == int("1234567890abcdef1234567890abcdef", 16)
 
 
+@pytest.mark.forked
 def test_inject_empty_otel_span_map():
     """
     Empty otel_span_map.
@@ -151,6 +154,7 @@ def test_inject_empty_otel_span_map():
         setter.set.assert_not_called()
 
 
+@pytest.mark.forked
 def test_inject_sentry_span_no_baggage():
     """
     Inject a sentry span with no baggage.

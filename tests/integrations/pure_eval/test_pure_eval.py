@@ -1,4 +1,3 @@
-import sys
 from types import SimpleNamespace
 
 import pytest
@@ -64,10 +63,7 @@ def test_include_local_variables_enabled(sentry_init, capture_events, integratio
             "u",
             "y",
         ]
-        if sys.version_info[:2] == (3, 5):
-            assert frame_vars.keys() == set(expected_keys)
-        else:
-            assert list(frame_vars.keys()) == expected_keys
+        assert list(frame_vars.keys()) == expected_keys
         assert frame_vars["namespace.d"] == {"1": "2"}
         assert frame_vars["namespace.d[1]"] == "2"
     else:

@@ -1,9 +1,8 @@
-from __future__ import absolute_import
-
 import logging
+from datetime import datetime, timezone
 from fnmatch import fnmatch
 
-from sentry_sdk.hub import Hub
+import sentry_sdk
 from sentry_sdk.utils import (
     to_string,
     event_from_exception,
@@ -11,8 +10,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 from sentry_sdk.integrations import Integration
-from sentry_sdk._compat import iteritems, utc_from_timestamp
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -104,7 +101,9 @@ class LoggingIntegration(Integration):
                 # into a recursion error when the integration is resolved
                 # (this also is slower).
                 if ignored_loggers is not None and record.name not in ignored_loggers:
-                    integration = Hub.current.get_integration(LoggingIntegration)
+                    integration = sentry_sdk.get_client().get_integration(
+                        LoggingIntegration
+                    )
                     if integration is not None:
                         integration._handle_record(record)
 
@@ -160,7 +159,7 @@ class _BaseHandler(logging.Handler, object):
         # type: (LogRecord) -> MutableMapping[str, object]
         return {
             k: v
-            for k, v in iteritems(vars(record))
+            for k, v in vars(record).items()
             if k not in self.COMMON_RECORD_ATTRS
             and (not isinstance(k, str) or not k.startswith("_"))
         }
@@ -184,11 +183,11 @@ class EventHandler(_BaseHandler):
         if not self._can_record(record):
             return
 
-        hub = Hub.current
-        if hub.client is None:
+        client = sentry_sdk.get_client()
+        if not client.is_active():
             return
 
-        client_options = hub.client.options
+        client_options = client.options
 
         # exc_info might be None or (None, None, None)
         #
@@ -253,7 +252,7 @@ class EventHandler(_BaseHandler):
 
         event["extra"] = self._extra_from_record(record)
 
-        hub.capture_event(event, hint=hint)
+        sentry_sdk.capture_event(event, hint=hint)
 
 
 # Legacy name
@@ -278,7 +277,7 @@ class BreadcrumbHandler(_BaseHandler):
         if not self._can_record(record):
             return
 
-        Hub.current.add_breadcrumb(
+        sentry_sdk.add_breadcrumb(
             self._breadcrumb_from_record(record), hint={"log_record": record}
         )
 
@@ -289,6 +288,6 @@ class BreadcrumbHandler(_BaseHandler):
             "level": self._logging_to_event_level(record),
             "category": record.name,
             "message": record.message,
-            "timestamp": utc_from_timestamp(record.created),
+            "timestamp": datetime.fromtimestamp(record.created, timezone.utc),
             "data": self._extra_from_record(record),
         }

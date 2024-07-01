@@ -1,15 +1,24 @@
+from functools import wraps
+
 from sentry_sdk import consts
 from sentry_sdk._types import TYPE_CHECKING
+from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.consts import SPANDATA
+from sentry_sdk.ai.utils import set_data_normalized
 
 if TYPE_CHECKING:
     from typing import Any, Iterable, List, Optional, Callable, Iterator
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
-from sentry_sdk._functools import wraps
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import logger, capture_internal_exceptions, event_from_exception
+from sentry_sdk.utils import (
+    logger,
+    capture_internal_exceptions,
+    event_from_exception,
+    ensure_integration_enabled,
+)
 
 try:
     from openai.resources.chat.completions import Completions
@@ -42,13 +51,9 @@ except ImportError:
         return 0
 
 
-COMPLETION_TOKENS_USED = "ai.completion_tоkens.used"
-PROMPT_TOKENS_USED = "ai.prompt_tоkens.used"
-TOTAL_TOKENS_USED = "ai.total_tоkens.used"
-
-
 class OpenAIIntegration(Integration):
     identifier = "openai"
+    origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True):
         # type: (OpenAIIntegration, bool) -> None
@@ -61,47 +66,23 @@ class OpenAIIntegration(Integration):
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
 
 
-def _capture_exception(hub, exc):
-    # type: (Hub, Any) -> None
-
-    if hub.client is not None:
-        event, hint = event_from_exception(
-            exc,
-            client_options=hub.client.options,
-            mechanism={"type": "openai", "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
-
-
-def _normalize_data(data):
-    # type: (Any) -> Any
-
-    # convert pydantic data (e.g. OpenAI v1+) to json compatible format
-    if hasattr(data, "model_dump"):
-        try:
-            return data.model_dump()
-        except Exception as e:
-            logger.warning("Could not convert pydantic data to JSON: %s", e)
-            return data
-    if isinstance(data, list):
-        return list(_normalize_data(x) for x in data)
-    if isinstance(data, dict):
-        return {k: _normalize_data(v) for (k, v) in data.items()}
-    return data
-
-
-def set_data_normalized(span, key, value):
-    # type: (Span, str, Any) -> None
-    span.set_data(key, _normalize_data(value))
+def _capture_exception(exc):
+    # type: (Any) -> None
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "openai", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _calculate_chat_completion_usage(
     messages, response, span, streaming_message_responses=None
 ):
     # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]]) -> None
-    completion_tokens = 0
-    prompt_tokens = 0
-    total_tokens = 0
+    completion_tokens = 0  # type: Optional[int]
+    prompt_tokens = 0  # type: Optional[int]
+    total_tokens = 0  # type: Optional[int]
     if hasattr(response, "usage"):
         if hasattr(response.usage, "completion_tokens") and isinstance(
             response.usage.completion_tokens, int
@@ -130,30 +111,21 @@ def _calculate_chat_completion_usage(
                 if hasattr(choice, "message"):
                     completion_tokens += count_tokens(choice.message)
 
+    if prompt_tokens == 0:
+        prompt_tokens = None
+    if completion_tokens == 0:
+        completion_tokens = None
     if total_tokens == 0:
-        total_tokens = prompt_tokens + completion_tokens
-
-    if completion_tokens != 0:
-        set_data_normalized(span, COMPLETION_TOKENS_USED, completion_tokens)
-    if prompt_tokens != 0:
-        set_data_normalized(span, PROMPT_TOKENS_USED, prompt_tokens)
-    if total_tokens != 0:
-        set_data_normalized(span, TOTAL_TOKENS_USED, total_tokens)
+        total_tokens = None
+    record_token_usage(span, prompt_tokens, completion_tokens, total_tokens)
 
 
 def _wrap_chat_completion_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
-    @wraps(f)
+
+    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_chat_completion(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-        hub = Hub.current
-        if not hub:
-            return f(*args, **kwargs)
-
-        integration = hub.get_integration(OpenAIIntegration)  # type: OpenAIIntegration
-        if not integration:
-            return f(*args, **kwargs)
-
         if "messages" not in kwargs:
             # invalid call (in all versions of openai), let it return error
             return f(*args, **kwargs)
@@ -170,25 +142,29 @@ def _wrap_chat_completion_create(f):
         streaming = kwargs.get("stream")
 
         span = sentry_sdk.start_span(
-            op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE, description="Chat Completion"
+            op=consts.OP.OPENAI_CHAT_COMPLETIONS_CREATE,
+            description="Chat Completion",
+            origin=OpenAIIntegration.origin,
         )
         span.__enter__()
         try:
             res = f(*args, **kwargs)
         except Exception as e:
-            _capture_exception(Hub.current, e)
+            _capture_exception(e)
             span.__exit__(None, None, None)
             raise e from None
 
-        with capture_internal_exceptions():
-            if _should_send_default_pii() and integration.include_prompts:
-                set_data_normalized(span, "ai.input_messages", messages)
+        integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
 
-            set_data_normalized(span, "ai.model_id", model)
-            set_data_normalized(span, "ai.streaming", streaming)
+        with capture_internal_exceptions():
+            if should_send_default_pii() and integration.include_prompts:
+                set_data_normalized(span, SPANDATA.AI_INPUT_MESSAGES, messages)
+
+            set_data_normalized(span, SPANDATA.AI_MODEL_ID, model)
+            set_data_normalized(span, SPANDATA.AI_STREAMING, streaming)
 
             if hasattr(res, "choices"):
-                if _should_send_default_pii() and integration.include_prompts:
+                if should_send_default_pii() and integration.include_prompts:
                     set_data_normalized(
                         span,
                         "ai.responses",
@@ -222,10 +198,12 @@ def _wrap_chat_completion_create(f):
                                 map(lambda chunk: "".join(chunk), data_buf)
                             )
                             if (
-                                _should_send_default_pii()
+                                should_send_default_pii()
                                 and integration.include_prompts
                             ):
-                                set_data_normalized(span, "ai.responses", all_responses)
+                                set_data_normalized(
+                                    span, SPANDATA.AI_RESPONSES, all_responses
+                                )
                             _calculate_chat_completion_usage(
                                 messages, res, span, all_responses
                             )
@@ -235,7 +213,7 @@ def _wrap_chat_completion_create(f):
             else:
                 set_data_normalized(span, "unknown_response", True)
                 span.__exit__(None, None, None)
-            return res
+        return res
 
     return new_chat_completion
 
@@ -244,23 +222,17 @@ def _wrap_embeddings_create(f):
     # type: (Callable[..., Any]) -> Callable[..., Any]
 
     @wraps(f)
+    @ensure_integration_enabled(OpenAIIntegration, f)
     def new_embeddings_create(*args, **kwargs):
         # type: (*Any, **Any) -> Any
-
-        hub = Hub.current
-        if not hub:
-            return f(*args, **kwargs)
-
-        integration = hub.get_integration(OpenAIIntegration)  # type: OpenAIIntegration
-        if not integration:
-            return f(*args, **kwargs)
-
         with sentry_sdk.start_span(
             op=consts.OP.OPENAI_EMBEDDINGS_CREATE,
             description="OpenAI Embedding Creation",
+            origin=OpenAIIntegration.origin,
         ) as span:
+            integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
             if "input" in kwargs and (
-                _should_send_default_pii() and integration.include_prompts
+                should_send_default_pii() and integration.include_prompts
             ):
                 if isinstance(kwargs["input"], str):
                     set_data_normalized(span, "ai.input_messages", [kwargs["input"]])
@@ -275,7 +247,7 @@ def _wrap_embeddings_create(f):
             try:
                 response = f(*args, **kwargs)
             except Exception as e:
-                _capture_exception(Hub.current, e)
+                _capture_exception(e)
                 raise e from None
 
             prompt_tokens = 0
@@ -293,11 +265,7 @@ def _wrap_embeddings_create(f):
             if prompt_tokens == 0:
                 prompt_tokens = count_tokens(kwargs["input"] or "")
 
-            if total_tokens == 0:
-                total_tokens = prompt_tokens
-
-            set_data_normalized(span, PROMPT_TOKENS_USED, prompt_tokens)
-            set_data_normalized(span, TOTAL_TOKENS_USED, total_tokens)
+            record_token_usage(span, prompt_tokens, None, total_tokens or prompt_tokens)
 
             return response
 

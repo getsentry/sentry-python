@@ -1,10 +1,13 @@
-import pytest
+import threading
 import re
 import sys
-import threading
 from datetime import timedelta
+from unittest import mock
 
-from sentry_sdk._compat import duration_in_milliseconds
+import pytest
+
+import sentry_sdk
+from sentry_sdk.integrations import Integration
 from sentry_sdk._queue import Queue
 from sentry_sdk.utils import (
     Components,
@@ -23,26 +26,25 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
+    ensure_integration_enabled,
+    ensure_integration_enabled_async,
 )
 
-import sentry_sdk
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+class TestIntegration(Integration):
+    """
+    Test integration for testing ensure_integration_enabled and
+    ensure_integration_enabled_async decorators.
+    """
+
+    identifier = "test"
+    setup_once = mock.MagicMock()
+
 
 try:
     import gevent
 except ImportError:
     gevent = None
-
-try:
-    # Python 3
-    FileNotFoundError
-except NameError:
-    # Python 2
-    FileNotFoundError = IOError
 
 
 def _normalize_distribution_name(name):
@@ -99,12 +101,7 @@ def _normalize_distribution_name(name):
     ],
 )
 def test_sanitize_url(url, expected_result):
-    # sort parts because old Python versions (<3.6) don't preserve order
-    sanitized_url = sanitize_url(url)
-    parts = sorted(re.split(r"\&|\?|\#", sanitized_url))
-    expected_parts = sorted(re.split(r"\&|\?|\#", expected_result))
-
-    assert parts == expected_parts
+    assert sanitize_url(url) == expected_result
 
 
 @pytest.mark.parametrize(
@@ -218,13 +215,10 @@ def test_sanitize_url(url, expected_result):
 )
 def test_sanitize_url_and_split(url, expected_result):
     sanitized_url = sanitize_url(url, split=True)
-    # sort query because old Python versions (<3.6) don't preserve order
-    query = sorted(sanitized_url.query.split("&"))
-    expected_query = sorted(expected_result.query.split("&"))
 
     assert sanitized_url.scheme == expected_result.scheme
     assert sanitized_url.netloc == expected_result.netloc
-    assert query == expected_query
+    assert sanitized_url.query == expected_result.query
     assert sanitized_url.path == expected_result.path
     assert sanitized_url.fragment == expected_result.fragment
 
@@ -351,13 +345,7 @@ def test_sanitize_url_and_split(url, expected_result):
 def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragment):
     assert parse_url(url, sanitize=sanitize).url == expected_url
     assert parse_url(url, sanitize=sanitize).fragment == expected_fragment
-
-    # sort parts because old Python versions (<3.6) don't preserve order
-    sanitized_query = parse_url(url, sanitize=sanitize).query
-    query_parts = sorted(re.split(r"\&|\?|\#", sanitized_query))
-    expected_query_parts = sorted(re.split(r"\&|\?|\#", expected_query))
-
-    assert query_parts == expected_query_parts
+    assert parse_url(url, sanitize=sanitize).query == expected_query
 
 
 @pytest.mark.parametrize(
@@ -463,19 +451,17 @@ def test_parse_version(version, expected_result):
 
 
 @pytest.fixture
-def mock_hub_with_dsn_netloc():
+def mock_client_with_dsn_netloc():
     """
-    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    Returns a mocked Client with a DSN netloc of "abcd1234.ingest.sentry.io".
     """
+    mock_client = mock.Mock(spec=sentry_sdk.Client)
+    mock_client.transport = mock.Mock(spec=sentry_sdk.Transport)
+    mock_client.transport.parsed_dsn = mock.Mock(spec=Dsn)
 
-    mock_hub = mock.Mock(spec=sentry_sdk.Hub)
-    mock_hub.client = mock.Mock(spec=sentry_sdk.Client)
-    mock_hub.client.transport = mock.Mock(spec=sentry_sdk.Transport)
-    mock_hub.client.transport.parsed_dsn = mock.Mock(spec=Dsn)
+    mock_client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
 
-    mock_hub.client.transport.parsed_dsn.netloc = "abcd1234.ingest.sentry.io"
-
-    return mock_hub
+    return mock_client
 
 
 @pytest.mark.parametrize(
@@ -485,19 +471,18 @@ def mock_hub_with_dsn_netloc():
         ["https://asdf@abcd1234.ingest.notsentry.io/123456789", False],
     ],
 )
-def test_is_sentry_url_true(test_url, is_sentry_url_expected, mock_hub_with_dsn_netloc):
-    ret_val = is_sentry_url(mock_hub_with_dsn_netloc, test_url)
+def test_is_sentry_url_true(
+    test_url, is_sentry_url_expected, mock_client_with_dsn_netloc
+):
+    ret_val = is_sentry_url(mock_client_with_dsn_netloc, test_url)
 
     assert ret_val == is_sentry_url_expected
 
 
 def test_is_sentry_url_no_client():
-    hub = mock.Mock()
-    hub.client = None
-
     test_url = "https://asdf@abcd1234.ingest.sentry.io/123456789"
 
-    ret_val = is_sentry_url(hub, test_url)
+    ret_val = is_sentry_url(None, test_url)
 
     assert not ret_val
 
@@ -604,8 +589,162 @@ def test_default_release_empty_string():
     assert release is None
 
 
+def test_ensure_integration_enabled_integration_enabled(sentry_init):
+    def original_function():
+        return "original"
+
+    def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[TestIntegration()])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled(TestIntegration, original_function)(
+        function_to_patch
+    )
+
+    assert patched_function() == "patched"
+    assert patched_function.__name__ == "original_function"
+
+
+def test_ensure_integration_enabled_integration_disabled(sentry_init):
+    def original_function():
+        return "original"
+
+    def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[])  # TestIntegration is disabled
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled(TestIntegration, original_function)(
+        function_to_patch
+    )
+
+    assert patched_function() == "original"
+    assert patched_function.__name__ == "original_function"
+
+
+def test_ensure_integration_enabled_no_original_function_enabled(sentry_init):
+    shared_variable = "original"
+
+    def function_to_patch():
+        nonlocal shared_variable
+        shared_variable = "patched"
+
+    sentry_init(integrations=[TestIntegration])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled(TestIntegration)(function_to_patch)
+    patched_function()
+
+    assert shared_variable == "patched"
+    assert patched_function.__name__ == "function_to_patch"
+
+
+def test_ensure_integration_enabled_no_original_function_disabled(sentry_init):
+    shared_variable = "original"
+
+    def function_to_patch():
+        nonlocal shared_variable
+        shared_variable = "patched"
+
+    sentry_init(integrations=[])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled(TestIntegration)(function_to_patch)
+    patched_function()
+
+    assert shared_variable == "original"
+    assert patched_function.__name__ == "function_to_patch"
+
+
+@pytest.mark.asyncio
+async def test_ensure_integration_enabled_async_integration_enabled(sentry_init):
+    # Setup variables and functions for the test
+    async def original_function():
+        return "original"
+
+    async def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[TestIntegration()])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled_async(
+        TestIntegration, original_function
+    )(function_to_patch)
+
+    assert await patched_function() == "patched"
+    assert patched_function.__name__ == "original_function"
+
+
+@pytest.mark.asyncio
+async def test_ensure_integration_enabled_async_integration_disabled(sentry_init):
+    # Setup variables and functions for the test
+    async def original_function():
+        return "original"
+
+    async def function_to_patch():
+        return "patched"
+
+    sentry_init(integrations=[])  # TestIntegration is disabled
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled_async(
+        TestIntegration, original_function
+    )(function_to_patch)
+
+    assert await patched_function() == "original"
+    assert patched_function.__name__ == "original_function"
+
+
+@pytest.mark.asyncio
+async def test_ensure_integration_enabled_async_no_original_function_enabled(
+    sentry_init,
+):
+    shared_variable = "original"
+
+    async def function_to_patch():
+        nonlocal shared_variable
+        shared_variable = "patched"
+
+    sentry_init(integrations=[TestIntegration])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled_async(TestIntegration)(
+        function_to_patch
+    )
+    await patched_function()
+
+    assert shared_variable == "patched"
+    assert patched_function.__name__ == "function_to_patch"
+
+
+@pytest.mark.asyncio
+async def test_ensure_integration_enabled_async_no_original_function_disabled(
+    sentry_init,
+):
+    shared_variable = "original"
+
+    async def function_to_patch():
+        nonlocal shared_variable
+        shared_variable = "patched"
+
+    sentry_init(integrations=[])
+
+    # Test the decorator by applying to function_to_patch
+    patched_function = ensure_integration_enabled_async(TestIntegration)(
+        function_to_patch
+    )
+    await patched_function()
+
+    assert shared_variable == "original"
+    assert patched_function.__name__ == "function_to_patch"
+
+
 @pytest.mark.parametrize(
-    "timedelta,expected_milliseconds",
+    "delta,expected_milliseconds",
     [
         [timedelta(milliseconds=132), 132.0],
         [timedelta(hours=1, milliseconds=132), float(60 * 60 * 1000 + 132)],
@@ -613,8 +752,8 @@ def test_default_release_empty_string():
         [timedelta(microseconds=100), 0.1],
     ],
 )
-def test_duration_in_milliseconds(timedelta, expected_milliseconds):
-    assert duration_in_milliseconds(timedelta) == expected_milliseconds
+def test_duration_in_milliseconds(delta, expected_milliseconds):
+    assert delta / timedelta(milliseconds=1) == expected_milliseconds
 
 
 def test_get_current_thread_meta_explicit_thread():
@@ -638,9 +777,6 @@ def test_get_current_thread_meta_explicit_thread():
     assert (thread1.ident, thread1.name) == results.get(timeout=1)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
-)
 def test_get_current_thread_meta_bad_explicit_thread():
     thread = "fake thread"
 
@@ -672,7 +808,7 @@ def test_get_current_thread_meta_gevent_in_thread_failed_to_get_hub():
     def target():
         with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
             with mock.patch(
-                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]
+                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake gevent hub"]
             ):
                 job = gevent.spawn(get_current_thread_meta)
                 job.join()
@@ -696,9 +832,6 @@ def test_get_current_thread_meta_running_thread():
     assert (thread.ident, thread.name) == results.get(timeout=1)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
-)
 def test_get_current_thread_meta_bad_running_thread():
     results = Queue(maxsize=1)
 
@@ -714,9 +847,6 @@ def test_get_current_thread_meta_bad_running_thread():
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
-)
 def test_get_current_thread_meta_main_thread():
     results = Queue(maxsize=1)
 
@@ -733,9 +863,6 @@ def test_get_current_thread_meta_main_thread():
     assert (main_thread.ident, main_thread.name) == results.get(timeout=1)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 4), reason="threading.main_thread() Not available"
-)
 def test_get_current_thread_meta_failed_to_get_main_thread():
     results = Queue(maxsize=1)
 

@@ -1,10 +1,9 @@
-from __future__ import absolute_import
-
 import os
+
 import pytest
 from datetime import datetime
+from unittest import mock
 
-from sentry_sdk._compat import PY2
 from django import VERSION as DJANGO_VERSION
 from django.db import connections
 
@@ -15,6 +14,7 @@ except ImportError:
 
 from werkzeug.test import Client
 
+from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -22,11 +22,6 @@ from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
 
 
 @pytest.fixture
@@ -210,10 +205,8 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
 
             assert type(data.get(SPANDATA.CODE_LINENO)) == int
             assert data.get(SPANDATA.CODE_LINENO) > 0
-
-            if not PY2:
-                assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
-                assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
+            assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+            assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
 
             is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
             assert is_relative_path
@@ -463,3 +456,68 @@ def test_query_source_if_duration_over_threshold(sentry_init, client, capture_ev
             break
     else:
         raise AssertionError("No db span found")
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_span_origin_execute(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    client.get(reverse("postgres_select_orm"))
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.http.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_db_span_origin_executemany(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    with start_transaction(name="test_transaction"):
+        from django.db import connection, transaction
+
+        cursor = connection.cursor()
+
+        query = """UPDATE auth_user SET username = %s where id = %s;"""
+        query_list = (
+            (
+                "test1",
+                1,
+            ),
+            (
+                "test2",
+                2,
+            ),
+        )
+        cursor.executemany(query, query_list)
+
+        transaction.commit()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.http.django"

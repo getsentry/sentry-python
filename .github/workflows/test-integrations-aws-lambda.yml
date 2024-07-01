@@ -30,7 +30,7 @@ jobs:
     name: permissions check
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.7
         with:
           persist-credentials: false
       - name: Check permissions on PR
@@ -53,7 +53,6 @@ jobs:
   test-aws_lambda-pinned:
     name: AWS Lambda (pinned)
     timeout-minutes: 30
-    needs: check-permissions
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -64,8 +63,9 @@ jobs:
         # ubuntu-20.04 is the last version that supported python3.6
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-20.04]
+    needs: check-permissions
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.ref }}
       - uses: actions/setup-python@v5
@@ -73,22 +73,30 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
+          pip install coverage tox
       - name: Erase coverage
         run: |
           coverage erase
       - name: Test aws_lambda pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-aws_lambda"
       - name: Generate coverage XML
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v4
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
   check_required_tests:
     name: All AWS Lambda tests passed
     needs: test-aws_lambda-pinned

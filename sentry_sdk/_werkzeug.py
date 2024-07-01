@@ -32,8 +32,6 @@ THIS SOFTWARE AND DOCUMENTATION, EVEN IF ADVISED OF THE POSSIBILITY OF
 SUCH DAMAGE.
 """
 
-from sentry_sdk._compat import iteritems
-
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -54,7 +52,7 @@ def _get_headers(environ):
     """
     Returns only proper HTTP headers.
     """
-    for key, value in iteritems(environ):
+    for key, value in environ.items():
         key = str(key)
         if key.startswith("HTTP_") and key not in (
             "HTTP_CONTENT_TYPE",
