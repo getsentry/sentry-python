@@ -58,6 +58,13 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "AI": [
+        "anthropic",
+        "cohere",
+        "langchain",
+        "openai",
+        "huggingface_hub",
+    ],
     "AWS Lambda": [
         # this is separate from Cloud Computing because only this one test suite
         # needs to run with access to GitHub secrets
@@ -70,16 +77,12 @@ GROUPS = {
         "gcp",
     ],
     "Data Processing": [
-        "anthropic",
         "arq",
         "beam",
         "celery",
-        "cohere",
         "huey",
-        "langchain",
-        "openai",
-        "huggingface_hub",
         "rq",
+        "spark",
     ],
     "Databases": [
         "asyncpg",
@@ -121,6 +124,7 @@ GROUPS = {
     "Miscellaneous": [
         "loguru",
         "opentelemetry",
+        "potel",
         "pure_eval",
         "trytond",
     ],

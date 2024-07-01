@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import io
+import os
 import gzip
 import socket
 import time
@@ -457,7 +458,6 @@ class HttpTransport(Transport):
         options = {
             "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
-            "ca_certs": ca_certs or certifi.where(),
         }
 
         socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
@@ -476,6 +476,13 @@ class HttpTransport(Transport):
 
         if socket_options is not None:
             options["socket_options"] = socket_options
+
+        options["ca_certs"] = (
+            ca_certs  # User-provided bundle from the SDK init
+            or os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("REQUESTS_CA_BUNDLE")
+            or certifi.where()
+        )
 
         return options
 

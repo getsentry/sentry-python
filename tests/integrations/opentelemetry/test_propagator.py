@@ -4,12 +4,13 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 from opentelemetry.context import get_current
-from opentelemetry.trace.propagation import get_current_span
 from opentelemetry.trace import (
-    set_span_in_context,
-    TraceFlags,
     SpanContext,
+    TraceFlags,
+    set_span_in_context,
 )
+from opentelemetry.trace.propagation import get_current_span
+
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -198,7 +199,50 @@ def test_inject_sentry_span_no_baggage():
         )
 
 
-@pytest.mark.forked
+def test_inject_sentry_span_empty_baggage():
+    """
+    Inject a sentry span with no baggage.
+    """
+    carrier = None
+    context = get_current()
+    setter = MagicMock()
+    setter.set = MagicMock()
+
+    trace_id = "1234567890abcdef1234567890abcdef"
+    span_id = "1234567890abcdef"
+
+    span_context = SpanContext(
+        trace_id=int(trace_id, 16),
+        span_id=int(span_id, 16),
+        trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        is_remote=True,
+    )
+    span = MagicMock()
+    span.get_span_context.return_value = span_context
+
+    sentry_span = MagicMock()
+    sentry_span.to_traceparent = mock.Mock(
+        return_value="1234567890abcdef1234567890abcdef-1234567890abcdef-1"
+    )
+    sentry_span.containing_transaction.get_baggage = mock.Mock(return_value=Baggage({}))
+
+    span_processor = SentrySpanProcessor()
+    span_processor.otel_span_map[span_id] = sentry_span
+
+    with mock.patch(
+        "sentry_sdk.integrations.opentelemetry.propagator.trace.get_current_span",
+        return_value=span,
+    ):
+        full_context = set_span_in_context(span, context)
+        SentryPropagator().inject(carrier, full_context, setter)
+
+        setter.set.assert_called_once_with(
+            carrier,
+            "sentry-trace",
+            "1234567890abcdef1234567890abcdef-1234567890abcdef-1",
+        )
+
+
 def test_inject_sentry_span_baggage():
     """
     Inject a sentry span with baggage.

@@ -446,3 +446,18 @@ def test_falcon_custom_error_handler(sentry_init, make_app, capture_events):
     client.simulate_get("/custom-error")
 
     assert len(events) == 0
+
+
+def test_span_origin(sentry_init, capture_events, make_client):
+    sentry_init(
+        integrations=[FalconIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = make_client()
+    client.simulate_get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.falcon"
