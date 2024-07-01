@@ -5,13 +5,18 @@ removed at any time without prior notice.
 """
 
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.integrations.opentelemetry.contextvars_context import (
+    SentryContextVarsRuntimeContext,
+)
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.integrations.opentelemetry.potel_span_processor import (
+    PotelSentrySpanProcessor,
+)
 from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
 
 try:
-    from opentelemetry import trace
+    from opentelemetry import context, trace
     from opentelemetry.instrumentation.distro import BaseDistro  # type: ignore[attr-defined]
     from opentelemetry.propagate import set_global_textmap
     from opentelemetry.sdk.trace import TracerProvider
@@ -45,8 +50,11 @@ CONFIGURABLE_INSTRUMENTATIONS = {
 class _SentryDistro(BaseDistro):  # type: ignore[misc]
     def _configure(self, **kwargs):
         # type: (Any) -> None
+        # TODO-neel-potel make sure lifecycle is correct
+        # TODO-neel-potel contribute upstream so this is not necessary
+        context._RUNTIME_CONTEXT = SentryContextVarsRuntimeContext()
         provider = TracerProvider()
-        provider.add_span_processor(SentrySpanProcessor())
+        provider.add_span_processor(PotelSentrySpanProcessor())
         trace.set_tracer_provider(provider)
         set_global_textmap(SentryPropagator())
 
