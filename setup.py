@@ -131,6 +131,11 @@ setup(
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=6"],
     },
+    entry_points={
+        "opentelemetry_propagator": [
+            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
+        ]
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Environment :: Web Environment",
