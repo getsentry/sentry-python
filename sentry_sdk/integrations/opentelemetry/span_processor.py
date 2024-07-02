@@ -4,12 +4,10 @@ from typing import cast
 
 from opentelemetry.context import get_value
 from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
-from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.trace import (
     format_span_id,
     format_trace_id,
     get_current_span,
-    SpanKind,
 )
 from opentelemetry.trace.span import (
     INVALID_SPAN_ID,
@@ -23,12 +21,14 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
     SPAN_ORIGIN,
 )
-from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
+from sentry_sdk.integrations.opentelemetry.utils import (
+    is_sentry_span,
+    extract_span_data,
+)
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing import Transaction, Span as SentrySpan
 from sentry_sdk._types import TYPE_CHECKING
 
-from urllib3.util import parse_url as urlparse
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
@@ -289,81 +289,19 @@ class SentrySpanProcessor(SpanProcessor):
         """
         sentry_span.set_data("otel.kind", otel_span.kind)
 
-        op = otel_span.name
-        description = otel_span.name
-
         if otel_span.attributes is not None:
             for key, val in otel_span.attributes.items():
                 sentry_span.set_data(key, val)
 
-            http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD)
-            http_method = cast("Optional[str]", http_method)
-
-            db_query = otel_span.attributes.get(SpanAttributes.DB_SYSTEM)
-
-            if http_method:
-                op = "http"
-
-                if otel_span.kind == SpanKind.SERVER:
-                    op += ".server"
-                elif otel_span.kind == SpanKind.CLIENT:
-                    op += ".client"
-
-                description = http_method
-
-                peer_name = otel_span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
-                if peer_name:
-                    description += " {}".format(peer_name)
-
-                target = otel_span.attributes.get(SpanAttributes.HTTP_TARGET, None)
-                if target:
-                    description += " {}".format(target)
-
-                if not peer_name and not target:
-                    url = otel_span.attributes.get(SpanAttributes.HTTP_URL, None)
-                    url = cast("Optional[str]", url)
-                    if url:
-                        parsed_url = urlparse(url)
-                        url = "{}://{}{}".format(
-                            parsed_url.scheme, parsed_url.netloc, parsed_url.path
-                        )
-                        description += " {}".format(url)
-
-                status_code = otel_span.attributes.get(
-                    SpanAttributes.HTTP_STATUS_CODE, None
-                )
-                status_code = cast("Optional[int]", status_code)
-                if status_code:
-                    sentry_span.set_http_status(status_code)
-
-            elif db_query:
-                op = "db"
-                statement = otel_span.attributes.get(SpanAttributes.DB_STATEMENT, None)
-                statement = cast("Optional[str]", statement)
-                if statement:
-                    description = statement
-
+        (op, description, status_code) = extract_span_data(otel_span)
         sentry_span.op = op
         sentry_span.description = description
+        if status_code:
+            sentry_span.set_http_status(status_code)
 
     def _update_transaction_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
-        if otel_span.attributes is None:
-            return
-
-        http_method = otel_span.attributes.get(SpanAttributes.HTTP_METHOD)
-
-        if http_method:
-            status_code = otel_span.attributes.get(SpanAttributes.HTTP_STATUS_CODE)
-            status_code = cast("Optional[int]", status_code)
-            if status_code:
-                sentry_span.set_http_status(status_code)
-
-            op = "http"
-
-            if otel_span.kind == SpanKind.SERVER:
-                op += ".server"
-            elif otel_span.kind == SpanKind.CLIENT:
-                op += ".client"
-
-            sentry_span.op = op
+        (op, _, status_code) = extract_span_data(otel_span)
+        sentry_span.op = op
+        if status_code:
+            sentry_span.set_http_status(status_code)

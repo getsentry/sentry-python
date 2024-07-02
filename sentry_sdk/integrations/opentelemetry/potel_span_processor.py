@@ -8,6 +8,7 @@ from sentry_sdk import capture_event
 from sentry_sdk.integrations.opentelemetry.utils import (
     is_sentry_span,
     convert_otel_timestamp,
+    extract_span_data,
 )
 from sentry_sdk.integrations.opentelemetry.consts import (
     OTEL_SENTRY_CONTEXT,
@@ -100,7 +101,6 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
     # we construct the event from scratch here
     # and not use the current Transaction class for easier refactoring
-    # TODO-neel-potel op, description, status logic
     def _root_span_to_transaction_event(self, span):
         # type: (ReadableSpan) -> Optional[Event]
         if not span.context:
@@ -114,12 +114,14 @@ class PotelSentrySpanProcessor(SpanProcessor):
         span_id = format_span_id(span.context.span_id)
         parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
+        (op, description, _) = extract_span_data(span)
+
         trace_context = {
             "trace_id": trace_id,
             "span_id": span_id,
             "origin": SPAN_ORIGIN,
-            "op": span.name,  # TODO
-            "status": "ok",  # TODO
+            "op": op,
+            "status": "ok",  # TODO-neel-potel span status mapping
         }  # type: dict[str, Any]
 
         if parent_span_id:
@@ -133,8 +135,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         event = {
             "type": "transaction",
-            "transaction": span.name,  # TODO
-            "transaction_info": {"source": "custom"},  # TODO
+            "transaction": description,
+            # TODO-neel-potel tx source based on integration
+            "transaction_info": {"source": "custom"},
             "contexts": contexts,
             "start_timestamp": convert_otel_timestamp(span.start_time),
             "timestamp": convert_otel_timestamp(span.end_time),
@@ -155,13 +158,15 @@ class PotelSentrySpanProcessor(SpanProcessor):
         span_id = format_span_id(span.context.span_id)
         parent_span_id = format_span_id(span.parent.span_id) if span.parent else None
 
+        (op, description, _) = extract_span_data(span)
+
         span_json = {
             "trace_id": trace_id,
             "span_id": span_id,
             "origin": SPAN_ORIGIN,
-            "op": span.name,  # TODO
-            "description": span.name,  # TODO
-            "status": "ok",  # TODO
+            "op": op,
+            "description": description,
+            "status": "ok",  # TODO-neel-potel span status mapping
             "start_timestamp": convert_otel_timestamp(span.start_time),
             "timestamp": convert_otel_timestamp(span.end_time),
         }  # type: dict[str, Any]
