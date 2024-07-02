@@ -95,6 +95,24 @@ def test_resolver_path_multiple_groups():
     django.VERSION < (2, 0),
     reason="Django>=2.0 required for <converter:parameter> patterns",
 )
+def test_resolver_path_complex_path_legacy():
+    class CustomPathConverter(PathConverter):
+        regex = r"[^/]+(/[^/]+){0,2}"
+
+    with mock.patch(
+        "django.urls.resolvers.get_converter",
+        return_value=CustomPathConverter,
+    ):
+        url_conf = (path("api/v3/<custom_path:my_path>", lambda x: ""),)
+        resolver = RavenResolver()
+        result = resolver.resolve("/api/v3/abc/def/ghi", url_conf)
+        assert result == "/api/v3/{my_path}"
+
+
+@pytest.mark.skipif(
+    django.VERSION < (5, 1),
+    reason="get_converters is used in 5.1",
+)
 def test_resolver_path_complex_path():
     class CustomPathConverter(PathConverter):
         regex = r"[^/]+(/[^/]+){0,2}"
