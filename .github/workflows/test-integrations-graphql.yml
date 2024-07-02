@@ -36,6 +36,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Setup Test Env
         run: |
           pip install coverage tox
@@ -92,6 +93,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Setup Test Env
         run: |
           pip install coverage tox

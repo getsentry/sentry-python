@@ -36,6 +36,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
@@ -102,6 +103,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Start Redis
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
