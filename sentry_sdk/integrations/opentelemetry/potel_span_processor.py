@@ -1,4 +1,4 @@
-from collections import deque
+from collections import deque, defaultdict
 
 from opentelemetry.trace import format_trace_id, format_span_id
 from opentelemetry.context import Context
@@ -17,7 +17,7 @@ from sentry_sdk.integrations.opentelemetry.consts import (
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, List, Any, Deque
+    from typing import Optional, List, Any, Deque, DefaultDict
     from sentry_sdk._types import Event
 
 
@@ -35,7 +35,9 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
     def __init__(self):
         # type: () -> None
-        self._children_spans = {}  # type: dict[int, List[ReadableSpan]]
+        self._children_spans = defaultdict(
+            list
+        )  # type: DefaultDict[int, List[ReadableSpan]]
 
     def on_start(self, span, parent_context=None):
         # type: (Span, Optional[Context]) -> None
@@ -48,7 +50,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         # TODO-neel-potel-remote only take parent if not remote
         if span.parent:
-            self._children_spans.setdefault(span.parent.span_id, []).append(span)
+            self._children_spans[span.parent.span_id].append(span)
         else:
             # if have a root span ending, we build a transaction and send it
             self._flush_root_span(span)
@@ -75,7 +77,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
             span_json = self._span_to_json(child)
             if span_json:
                 spans.append(span_json)
-        transaction_event.setdefault("spans", []).extend(spans)
+        transaction_event["spans"] = spans
         # TODO-neel-potel sort and cutoff max spans
 
         capture_event(transaction_event)
