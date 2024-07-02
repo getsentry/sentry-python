@@ -25,7 +25,7 @@ done
 
 searchstring="$1"
 
-export TOX_PARALLEL_NO_SPINNER=1
+# export TOX_PARALLEL_NO_SPINNER=1
 
 if $excludelatest; then
     echo "Excluding latest"
@@ -40,4 +40,4 @@ if [ -z "${ENV}" ]; then
     exit 0
 fi
 
-exec $TOXPATH -p auto -o -e "$ENV" -- "${@:2}"
+exec $TOXPATH -p 0 -o -e "$ENV" -- "${@:2}"
