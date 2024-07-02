@@ -111,7 +111,7 @@ WSGI_APPLICATION = "tests.integrations.django.myapp.wsgi.application"
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 
 try:
-    import psycopg2  # noqa
+    import psycopg  # noqa
 
     db_engine = "django.db.backends.postgresql"
     try:
