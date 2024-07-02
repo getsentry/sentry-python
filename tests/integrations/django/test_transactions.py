@@ -100,7 +100,8 @@ def test_resolver_path_complex_path():
         regex = r"[^/]+(/[^/]+){0,2}"
 
     with mock.patch(
-        "django.urls.resolvers.get_converter", return_value=CustomPathConverter
+        "django.urls.resolvers.get_converters",
+        return_value={"custom_path": CustomPathConverter},
     ):
         url_conf = (path("api/v3/<custom_path:my_path>", lambda x: ""),)
         resolver = RavenResolver()
