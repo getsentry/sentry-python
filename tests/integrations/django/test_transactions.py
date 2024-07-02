@@ -95,6 +95,10 @@ def test_resolver_path_multiple_groups():
     django.VERSION < (2, 0),
     reason="Django>=2.0 required for <converter:parameter> patterns",
 )
+@pytest.mark.skipif(
+    django.VERSION > (5, 0),
+    reason="get_converter removed in 5.1",
+)
 def test_resolver_path_complex_path_legacy():
     class CustomPathConverter(PathConverter):
         regex = r"[^/]+(/[^/]+){0,2}"
