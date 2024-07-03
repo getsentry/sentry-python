@@ -34,9 +34,7 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event
-
-    DataCategory = Optional[str]
+    from sentry_sdk._types import Event, EventDataCategory
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
@@ -133,7 +131,7 @@ class Transport(ABC):
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category=None,  # type: Optional[str]
+        data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
     ):
         # type: (...) -> None
@@ -155,7 +153,7 @@ class Transport(ABC):
 
 
 def _parse_rate_limits(header, now=None):
-    # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
+    # type: (Any, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
     if now is None:
         now = datetime.now(timezone.utc)
 
@@ -195,11 +193,11 @@ class HttpTransport(Transport):
         self.options = options  # type: Dict[str, Any]
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until = {}  # type: Dict[DataCategory, datetime]
+        self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
         self._retry = urllib3.util.Retry()
         self._discarded_events = defaultdict(
             int
-        )  # type: DefaultDict[Tuple[str, str], int]
+        )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
         compresslevel = options.get("_experiments", {}).get(
@@ -224,7 +222,7 @@ class HttpTransport(Transport):
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category=None,  # type: Optional[str]
+        data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
     ):
         # type: (...) -> None
