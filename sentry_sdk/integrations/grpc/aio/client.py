@@ -23,6 +23,10 @@ class ClientInterceptor:
     ) -> ClientCallDetails:
         if client_call_details.metadata is None:
             client_call_details = client_call_details._replace(metadata=Metadata())
+        elif not isinstance(client_call_details.metadata, Metadata):
+            client_call_details = client_call_details._replace(
+                metadata=Metadata.from_tuple(client_call_details.metadata)
+            )
         for key, value in Scope.get_current_scope().iter_trace_propagation_headers():
             client_call_details.metadata.add(key, value)
         return client_call_details
