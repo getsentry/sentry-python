@@ -1,7 +1,7 @@
 import inspect
 from contextlib import contextmanager
 
-from sentry_sdk import tracing_utils, Client
+from sentry_sdk import tracing, tracing_utils, Client
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
@@ -282,15 +282,20 @@ def flush(
     return Scope.get_client().flush(timeout=timeout, callback=callback)
 
 
-@scopemethod
 def start_span(
     **kwargs,  # type: Any
 ):
     # type: (...) -> Span
-    return Scope.get_current_scope().start_span(**kwargs)
+    return tracing.start_span(**kwargs)
 
 
-@scopemethod
+def start_inactive_span(
+    **kwargs,  # type: Any
+):
+    # type: (...) -> Span
+    return tracing.start_inactive_span(**kwargs)
+
+
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
     instrumenter=INSTRUMENTER.SENTRY,  # type: str
@@ -299,6 +304,10 @@ def start_transaction(
 ):
     # type: (...) -> Union[Transaction, NoOpSpan]
     """
+    .. deprecated:: 3.0.0
+        This function is deprecated and will be removed in a future release.
+        Use :py:meth:`sentry_sdk.start_span` instead.
+
     Start and return a transaction on the current scope.
 
     Start an existing transaction if given, otherwise create and start a new
@@ -328,7 +337,7 @@ def start_transaction(
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return Scope.get_current_scope().start_transaction(
+    return tracing.start_transaction(
         transaction, instrumenter, custom_sampling_context, **kwargs
     )
 

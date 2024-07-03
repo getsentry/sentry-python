@@ -2,6 +2,9 @@ import uuid
 import random
 from datetime import datetime, timedelta, timezone
 
+from opentelemetry import trace as otel_trace, context
+from opentelemetry.sdk.trace import ReadableSpan
+
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
@@ -198,6 +201,7 @@ class Span:
     :param start_timestamp: The timestamp when the span started. If omitted, the current time
         will be used.
     :param scope: The scope to use for this span. If not provided, we use the current scope.
+    :param otel_span: The underlying OTel span this span is wrapping.
     """
 
     __slots__ = (
@@ -1156,6 +1160,35 @@ class NoOpSpan(Span):
         pass
 
 
+class OTelSpanWrapper:
+    """
+    Light-weight OTel span wrapper.
+
+    Meant for providing some level of compatibility with the old span interface.
+    """
+
+    def __init__(self, otel_span=None, **kwargs):
+        # type: (Optional[ReadableSpan]) -> None
+        self.description = kwargs.get("description")
+        self._otel_span = otel_span
+
+    def __enter__(self):
+        # type: () -> OTelSpanWrapper
+        # Creates a Context object with parent set as current span
+        ctx = otel_trace.set_span_in_context(self._otel_span)
+        # Set as the implicit current context
+        self._ctx_token = context.attach(ctx)
+        return self
+
+    def __exit__(self, ty, value, tb):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
+        self._otel_span.end()
+        context.detach(self._ctx_token)
+
+    def start_child(self, **kwargs):
+        pass
+
+
 if TYPE_CHECKING:
 
     @overload
@@ -1196,6 +1229,21 @@ def trace(func=None):
         return start_child_span_decorator(func)
     else:
         return start_child_span_decorator
+
+
+def start_span(**kwargs):
+    otel_span = otel_trace.get_tracer(__name__).start_span()
+    span = OTelSpanWrapper(otel_span=otel_span, **kwargs)
+    return span
+
+
+def start_inactive_span(**kwargs):
+    pass
+
+
+def start_transaction(**kwargs):
+    # XXX force_transaction?
+    pass
 
 
 # Circular imports
