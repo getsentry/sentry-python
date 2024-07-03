@@ -96,7 +96,7 @@ def test_resolver_path_multiple_groups():
     reason="Django>=2.0 required for <converter:parameter> patterns",
 )
 @pytest.mark.skipif(
-    django.VERSION > (5, 0),
+    django.VERSION > (5, 1),
     reason="get_converter removed in 5.1",
 )
 def test_resolver_path_complex_path_legacy():
