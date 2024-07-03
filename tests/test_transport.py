@@ -425,9 +425,14 @@ def test_data_category_limits_reporting(
 
     discarded_events = report["discarded_events"]
 
-    assert len(discarded_events) == 2
+    assert len(discarded_events) == 3
     assert {
         "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 2,
+    } in discarded_events
+    assert {
+        "category": "span",
         "reason": "ratelimit_backoff",
         "quantity": 2,
     } in discarded_events
@@ -454,9 +459,19 @@ def test_data_category_limits_reporting(
     envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
+
+    discarded_events = report["discarded_events"]
+    assert len(discarded_events) == 2
+    assert {
+        "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in discarded_events
+    assert {
+        "category": "span",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in discarded_events
 
 
 @pytest.mark.parametrize("response_code", [200, 429])

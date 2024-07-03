@@ -253,8 +253,8 @@ def capture_record_lost_event_calls(monkeypatch):
         calls = []
         test_client = sentry_sdk.get_client()
 
-        def record_lost_event(reason, data_category=None, item=None):
-            calls.append((reason, data_category, item))
+        def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
+            calls.append((reason, data_category, item, quantity))
 
         monkeypatch.setattr(
             test_client.transport, "record_lost_event", record_lost_event
