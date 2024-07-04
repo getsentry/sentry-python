@@ -12,6 +12,7 @@ from urllib.request import getproxies
 import urllib3
 import certifi
 
+import sentry_sdk
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
@@ -36,7 +37,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
     DataCategory = Optional[str]
-
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
@@ -218,9 +218,8 @@ class HttpTransport(Transport):
             proxy_headers=options["proxy_headers"],
         )
 
-        from sentry_sdk import Hub
-
-        self.hub_cls = Hub
+        # Backwards compatibility for deprecated `self.hub_class` attribute
+        self._hub_cls = sentry_sdk.Hub
 
     def record_lost_event(
         self,
@@ -548,14 +547,11 @@ class HttpTransport(Transport):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        hub = self.hub_cls.current
-
         def send_envelope_wrapper():
             # type: () -> None
-            with hub:
-                with capture_internal_exceptions():
-                    self._send_envelope(envelope)
-                    self._flush_client_reports()
+            with capture_internal_exceptions():
+                self._send_envelope(envelope)
+                self._flush_client_reports()
 
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
@@ -578,6 +574,30 @@ class HttpTransport(Transport):
         # type: () -> None
         logger.debug("Killing HTTP transport")
         self._worker.kill()
+
+    @staticmethod
+    def _warn_hub_cls():
+        # type: () -> None
+        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
+        warnings.warn(
+            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    @property
+    def hub_cls(self):
+        # type: () -> type[sentry_sdk.Hub]
+        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
+        HttpTransport._warn_hub_cls()
+        return self._hub_cls
+
+    @hub_cls.setter
+    def hub_cls(self, value):
+        # type: (type[sentry_sdk.Hub]) -> None
+        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
+        HttpTransport._warn_hub_cls()
+        self._hub_cls = value
 
 
 class _FunctionTransport(Transport):
