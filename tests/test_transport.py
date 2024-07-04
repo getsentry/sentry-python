@@ -3,7 +3,7 @@ import pickle
 import gzip
 import io
 import socket
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -16,7 +16,6 @@ from sentry_sdk import Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
-
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
@@ -585,3 +584,21 @@ def test_metric_bucket_limits_with_all_namespaces(
     assert report["discarded_events"] == [
         {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
     ]
+
+
+def test_hub_cls_backwards_compat():
+    class TestCustomHubClass(sentry_sdk.Hub):
+        pass
+
+    transport = sentry_sdk.transport.HttpTransport(
+        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
+    )
+
+    with pytest.deprecated_call():
+        assert transport.hub_cls is sentry_sdk.Hub
+
+    with pytest.deprecated_call():
+        transport.hub_cls = TestCustomHubClass
+
+    with pytest.deprecated_call():
+        assert transport.hub_cls is TestCustomHubClass
