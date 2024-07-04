@@ -11,7 +11,6 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from copy import copy
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
@@ -618,7 +617,7 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = copy(frame.f_locals)
+        rv["vars"] = frame.f_locals.copy()
 
     return rv
 
