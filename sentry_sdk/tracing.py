@@ -1359,17 +1359,17 @@ def trace(func=None):
         return start_child_span_decorator
 
 
-def start_span(**kwargs):
-    return POTelSpan(active=True, **kwargs)
+def start_span(*args, **kwargs):
+    return POTelSpan(*args, active=True, **kwargs)
 
 
-def start_inactive_span(**kwargs):
-    return POTelSpan(active=False, **kwargs)
+def start_inactive_span(*args, **kwargs):
+    return POTelSpan(*args, active=False, **kwargs)
 
 
-def start_transaction(**kwargs):
+def start_transaction(*args, **kwargs):
     # XXX force_transaction?
-    return POTelSpan(active=True, **kwargs)
+    return POTelSpan(*args, active=True, **kwargs)
 
 
 # Circular imports
