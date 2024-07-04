@@ -70,6 +70,7 @@ __all__ = [
     "set_tags",
     "set_user",
     "start_span",
+    "start_inactive_span",
     "start_transaction",
 ]
 
