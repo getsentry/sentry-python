@@ -1170,7 +1170,7 @@ class POTelSpan:
     # XXX Maybe it makes sense to repurpose the existing Span class for this.
     # For now I'm keeping this class separate to have a clean slate.
 
-    # XXX The wrapper itself should have as little state as possible.
+    # XXX The wrapper itself should have as little state as possible
 
     def __init__(
         self,
@@ -1189,12 +1189,21 @@ class POTelSpan:
         origin="manual",  # type: str
     ):
         # type: (...) -> None
-        self._otel_span = tracer.start_span(description or "")
+        from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
+
+        self._otel_span = tracer.start_span(description or op or "")  # XXX
         self._active = active
-        # XXX
+
+        self._otel_span.set_attribute(SentrySpanAttribute.ORIGIN, origin)
+        if op is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.OP, op)
+        if description is not None:
+            self._otel_span.set_attribute(SentrySpanAttribute.DESCRIPTION, description)
 
     def __enter__(self):
         # type: () -> POTelSpan
+        # XXX use_span? https://github.com/open-telemetry/opentelemetry-python/blob/3836da8543ce9751051e38a110c0468724042e62/opentelemetry-api/src/opentelemetry/trace/__init__.py#L547
+        #
         # create a Context object with parent set as current span
         if self._active:
             ctx = otel_trace.set_span_in_context(self._otel_span)
@@ -1206,7 +1215,7 @@ class POTelSpan:
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         self._otel_span.end()
-
+        # XXX set status to error if unset and an exception occurred?
         if self._active:
             context.detach(self._ctx_token)
 

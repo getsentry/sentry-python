@@ -3,7 +3,7 @@ from time import time
 from typing import cast
 
 from opentelemetry.context import get_value
-from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
+from opentelemetry.sdk.trace import SpanProcessor, Span as OTelSpan
 from opentelemetry.trace import (
     format_span_id,
     format_trace_id,

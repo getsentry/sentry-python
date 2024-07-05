@@ -5,7 +5,7 @@ from sentry_sdk import tracing, tracing_utils, Client
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.tracing import NoOpSpan, Transaction
+from sentry_sdk.tracing import POTelSpan, Transaction
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -286,14 +286,14 @@ def flush(
 def start_span(
     **kwargs,  # type: Any
 ):
-    # type: (...) -> Span
+    # type: (...) -> POTelSpan
     return tracing.start_span(**kwargs)
 
 
 def start_inactive_span(
     **kwargs,  # type: Any
 ):
-    # type: (...) -> Span
+    # type: (...) -> POTelSpan
     return tracing.start_inactive_span(**kwargs)
 
 
@@ -303,7 +303,7 @@ def start_transaction(
     custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
-    # type: (...) -> Union[Transaction, NoOpSpan]
+    # type: (...) -> POTelSpan
     """
     .. deprecated:: 3.0.0
         This function is deprecated and will be removed in a future release.
