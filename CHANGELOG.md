@@ -4,13 +4,13 @@
 
 ### Various fixes & improvements
 
-- fix(profiling): profiler_id uses underscore (#3249) by @Zylphrex
-- fix(integrations): don't send full env to subprocess (#3251) by @sentrivana
-- ref(transport): Stop using `Hub` in `HttpTransport` (#3247) by @szokeasaurusrex
-- build: Remove ipdb from test requirements (#3237) by @rominf
-- feat(opentelemetry): Add entry point for SentryPropagator (#3086) by @mender
-- build(deps): bump checkouts/data-schemas from `8c13457` to `88273a9` (#3225) by @dependabot
-- fix(opentelemetry): avoid propagation of empty baggage (#2968) by @hartungstenio
+- `profiler_id` uses underscore (#3249) by @Zylphrex
+- Don't send full env to subprocess (#3251) by @kmichel-aiven
+- Stop using `Hub` in `HttpTransport` (#3247) by @szokeasaurusrex
+- Remove `ipdb` from test requirements (#3237) by @rominf
+- Avoid propagation of empty baggage (#2968) by @hartungstenio
+- Add entry point for `SentryPropagator` (#3086) by @mender
+- Bump checkouts/data-schemas from `8c13457` to `88273a9` (#3225) by @dependabot
 
 ## 2.7.1
 
