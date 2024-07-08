@@ -379,7 +379,7 @@ class SPANDATA:
     Example: "MainThread"
     """
 
-    PROFILER_ID = "profiler.id"
+    PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
     Example: "5249fbada8d5416482c2f6e47e337372"
