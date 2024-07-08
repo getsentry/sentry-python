@@ -422,10 +422,21 @@ def test_data_category_limits_reporting(
     assert envelope.items[0].type == "event"
     assert envelope.items[1].type == "client_report"
     report = parse_json(envelope.items[1].get_bytes())
-    assert sorted(report["discarded_events"], key=lambda x: x["quantity"]) == [
-        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 2},
-        {"category": "attachment", "reason": "ratelimit_backoff", "quantity": 11},
-    ]
+
+    discarded_events = report["discarded_events"]
+
+    assert len(discarded_events) == 2
+    assert {
+        "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 2,
+    } in discarded_events
+    assert {
+        "category": "attachment",
+        "reason": "ratelimit_backoff",
+        "quantity": 11,
+    } in discarded_events
+
     capturing_server.clear_captured()
 
     # here we sent a normal event
