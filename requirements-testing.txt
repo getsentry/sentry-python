@@ -10,5 +10,4 @@ executing
 asttokens
 responses
 pysocks
-ipdb
 setuptools
