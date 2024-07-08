@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.8.0
+
+### Various fixes & improvements
+
+- `profiler_id` uses underscore (#3249) by @Zylphrex
+- Don't send full env to subprocess (#3251) by @kmichel-aiven
+- Stop using `Hub` in `HttpTransport` (#3247) by @szokeasaurusrex
+- Remove `ipdb` from test requirements (#3237) by @rominf
+- Avoid propagation of empty baggage (#2968) by @hartungstenio
+- Add entry point for `SentryPropagator` (#3086) by @mender
+- Bump checkouts/data-schemas from `8c13457` to `88273a9` (#3225) by @dependabot
+
 ## 2.7.1
 
 ### Various fixes & improvements

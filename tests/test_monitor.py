@@ -55,14 +55,14 @@ def test_monitor_unhealthy(sentry_init):
 
 
 def test_transaction_uses_downsampled_rate(
-    sentry_init, capture_client_reports, monkeypatch
+    sentry_init, capture_record_lost_event_calls, monkeypatch
 ):
     sentry_init(
         traces_sample_rate=1.0,
         transport=UnhealthyTestTransport(),
     )
 
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     monitor = sentry_sdk.get_client().monitor
     monitor.interval = 0.1
@@ -79,7 +79,7 @@ def test_transaction_uses_downsampled_rate(
         assert transaction.sampled is False
         assert transaction.sample_rate == 0.5
 
-    assert reports == [("backpressure", "transaction")]
+    assert record_lost_event_calls == [("backpressure", "transaction", None)]
 
 
 def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):

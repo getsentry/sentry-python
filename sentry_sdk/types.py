@@ -11,13 +11,14 @@ releases.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event, Hint
+    from sentry_sdk._types import Event, EventDataCategory, Hint
 else:
     from typing import Any
 
     # The lines below allow the types to be imported from outside `if TYPE_CHECKING`
     # guards. The types in this module are only intended to be used for type hints.
     Event = Any
+    EventDataCategory = Any
     Hint = Any
 
-__all__ = ("Event", "Hint")
+__all__ = ("Event", "EventDataCategory", "Hint")
