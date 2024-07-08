@@ -203,7 +203,6 @@ class Span:
     :param start_timestamp: The timestamp when the span started. If omitted, the current time
         will be used.
     :param scope: The scope to use for this span. If not provided, we use the current scope.
-    :param otel_span: The underlying OTel span this span is wrapping.
     """
 
     __slots__ = (
