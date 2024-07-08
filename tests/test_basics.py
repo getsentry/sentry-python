@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
@@ -544,7 +545,7 @@ def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
 
 
 def test_dedupe_event_processor_drop_records_client_report(
-    sentry_init, capture_events, capture_client_reports
+    sentry_init, capture_events, capture_record_lost_event_calls
 ):
     """
     DedupeIntegration internally has an event_processor that filters duplicate exceptions.
@@ -553,7 +554,7 @@ def test_dedupe_event_processor_drop_records_client_report(
     """
     sentry_init()
     events = capture_events()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     try:
         raise ValueError("aha!")
@@ -565,19 +566,19 @@ def test_dedupe_event_processor_drop_records_client_report(
             capture_exception()
 
     (event,) = events
-    (report,) = reports
+    (lost_event_call,) = record_lost_event_calls
 
     assert event["level"] == "error"
     assert "exception" in event
-    assert report == ("event_processor", "error")
+    assert lost_event_call == ("event_processor", "error", None)
 
 
 def test_event_processor_drop_records_client_report(
-    sentry_init, capture_events, capture_client_reports
+    sentry_init, capture_events, capture_record_lost_event_calls
 ):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     # Ensure full idempotency by restoring the original global event processors list object, not just a copy.
     old_processors = sentry_sdk.scope.global_event_processors
@@ -597,10 +598,14 @@ def test_event_processor_drop_records_client_report(
             pass
 
         assert len(events) == 0
-        assert reports == [
-            ("event_processor", "error"),
-            ("event_processor", "transaction"),
-        ]
+
+        # Using Counter because order of record_lost_event calls does not matter
+        assert Counter(record_lost_event_calls) == Counter(
+            [
+                ("event_processor", "error", None),
+                ("event_processor", "transaction", None),
+            ]
+        )
 
     finally:
         sentry_sdk.scope.global_event_processors = old_processors

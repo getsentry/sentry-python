@@ -126,7 +126,7 @@ def test_profiler_setup_twice(make_options, teardown_profiling):
 def test_profiles_sample_rate(
     sentry_init,
     capture_envelopes,
-    capture_client_reports,
+    capture_record_lost_event_calls,
     teardown_profiling,
     profiles_sample_rate,
     profile_count,
@@ -142,7 +142,7 @@ def test_profiles_sample_rate(
     )
 
     envelopes = capture_envelopes()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
@@ -158,11 +158,11 @@ def test_profiles_sample_rate(
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
     if profiles_sample_rate is None or profiles_sample_rate == 0:
-        assert reports == []
+        assert record_lost_event_calls == []
     elif profile_count:
-        assert reports == []
+        assert record_lost_event_calls == []
     else:
-        assert reports == [("sample_rate", "profile")]
+        assert record_lost_event_calls == [("sample_rate", "profile", None)]
 
 
 @pytest.mark.parametrize(
@@ -201,7 +201,7 @@ def test_profiles_sample_rate(
 def test_profiles_sampler(
     sentry_init,
     capture_envelopes,
-    capture_client_reports,
+    capture_record_lost_event_calls,
     teardown_profiling,
     profiles_sampler,
     profile_count,
@@ -213,7 +213,7 @@ def test_profiles_sampler(
     )
 
     envelopes = capture_envelopes()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     with mock.patch(
         "sentry_sdk.profiler.transaction_profiler.random.random", return_value=0.5
@@ -229,15 +229,15 @@ def test_profiles_sampler(
     assert len(items["transaction"]) == 1
     assert len(items["profile"]) == profile_count
     if profile_count:
-        assert reports == []
+        assert record_lost_event_calls == []
     else:
-        assert reports == [("sample_rate", "profile")]
+        assert record_lost_event_calls == [("sample_rate", "profile", None)]
 
 
 def test_minimum_unique_samples_required(
     sentry_init,
     capture_envelopes,
-    capture_client_reports,
+    capture_record_lost_event_calls,
     teardown_profiling,
 ):
     sentry_init(
@@ -246,7 +246,7 @@ def test_minimum_unique_samples_required(
     )
 
     envelopes = capture_envelopes()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     with start_transaction(name="profiling"):
         pass
@@ -260,7 +260,7 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
-    assert reports == [("insufficient_data", "profile")]
+    assert record_lost_event_calls == [("insufficient_data", "profile", None)]
 
 
 @pytest.mark.forked

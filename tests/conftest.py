@@ -248,20 +248,18 @@ def capture_envelopes(monkeypatch):
 
 
 @pytest.fixture
-def capture_client_reports(monkeypatch):
+def capture_record_lost_event_calls(monkeypatch):
     def inner():
-        reports = []
-        test_client = sentry_sdk.Hub.current.client
+        calls = []
+        test_client = sentry_sdk.get_client()
 
         def record_lost_event(reason, data_category=None, item=None):
-            if data_category is None:
-                data_category = item.data_category
-            return reports.append((reason, data_category))
+            calls.append((reason, data_category, item))
 
         monkeypatch.setattr(
             test_client.transport, "record_lost_event", record_lost_event
         )
-        return reports
+        return calls
 
     return inner
 
