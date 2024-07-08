@@ -9,6 +9,7 @@ from sentry_sdk.client import Client
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
+import sentry_sdk.scope
 from sentry_sdk import (
     push_scope,
     configure_scope,
@@ -29,10 +30,7 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.scope import (  # noqa: F401
-    add_global_event_processor,
-    global_event_processors,
-)
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
@@ -581,21 +579,31 @@ def test_event_processor_drop_records_client_report(
     events = capture_events()
     reports = capture_client_reports()
 
-    global global_event_processors
+    # Ensure full idempotency by restoring the original global event processors list object, not just a copy.
+    old_processors = sentry_sdk.scope.global_event_processors
 
-    @add_global_event_processor
-    def foo(event, hint):
-        return None
+    try:
+        sentry_sdk.scope.global_event_processors = (
+            sentry_sdk.scope.global_event_processors.copy()
+        )
 
-    capture_message("dropped")
+        @add_global_event_processor
+        def foo(event, hint):
+            return None
 
-    with start_transaction(name="dropped"):
-        pass
+        capture_message("dropped")
 
-    assert len(events) == 0
-    assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+        with start_transaction(name="dropped"):
+            pass
 
-    global_event_processors.pop()
+        assert len(events) == 0
+        assert reports == [
+            ("event_processor", "error"),
+            ("event_processor", "transaction"),
+        ]
+
+    finally:
+        sentry_sdk.scope.global_event_processors = old_processors
 
 
 @pytest.mark.parametrize(
