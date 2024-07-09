@@ -89,6 +89,8 @@ def extract_span_data(span):
 
 def span_data_for_http_method(span):
     # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    span_attributes = span.attributes or {}
+
     op = "http"
 
     if span.kind == SpanKind.SERVER:
@@ -96,21 +98,21 @@ def span_data_for_http_method(span):
     elif span.kind == SpanKind.CLIENT:
         op += ".client"
 
-    http_method = span.attributes.get(SpanAttributes.HTTP_METHOD)
-    route = span.attributes.get(SpanAttributes.HTTP_ROUTE, None)
-    target = span.attributes.get(SpanAttributes.HTTP_TARGET, None)
-    peer_name = span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
+    http_method = span_attributes.get(SpanAttributes.HTTP_METHOD)
+    route = span_attributes.get(SpanAttributes.HTTP_ROUTE)
+    target = span_attributes.get(SpanAttributes.HTTP_TARGET)
+    peer_name = span_attributes.get(SpanAttributes.NET_PEER_NAME)
 
-    description = http_method
+    description = f"{http_method}"
 
     if route:
-        description += " {}".format(route)
+        description = f"{http_method} {route}"
     elif target:
-        description += " {}".format(target)
+        description = f"{http_method} {target}"
     elif peer_name:
-        description += " {}".format(peer_name)
+        description = f"{http_method} {peer_name}"
     else:
-        url = span.attributes.get(SpanAttributes.HTTP_URL, None)
+        url = span_attributes.get(SpanAttributes.HTTP_URL)
         url = cast("Optional[str]", url)
 
         if url:
@@ -118,21 +120,24 @@ def span_data_for_http_method(span):
             url = "{}://{}{}".format(
                 parsed_url.scheme, parsed_url.netloc, parsed_url.path
             )
-            description += " {}".format(url)
+            description = f"{http_method} {url}"
 
-    status_code = span.attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE, None)
+    status_code = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
     if status_code is None:
-        # fallback to deprecated `HTTP_STATUS_CODE`
-        status_code = span.attributes.get(SpanAttributes.HTTP_STATUS_CODE, None)
+        status_code = span_attributes.get(SpanAttributes.HTTP_STATUS_CODE)
+
+    status_code = cast("Optional[int]", status_code)
 
     return (op, description, status_code)
 
 
 def span_data_for_db_query(span):
     # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    span_attributes = span.attributes or {}
+
     op = "db"
 
-    statement = span.attributes.get(SpanAttributes.DB_STATEMENT, None)
+    statement = span_attributes.get(SpanAttributes.DB_STATEMENT, None)
     statement = cast("Optional[str]", statement)
 
     description = statement or span.name
