@@ -3,7 +3,7 @@ from time import time
 from typing import cast
 
 from opentelemetry.context import get_value
-from opentelemetry.sdk.trace import SpanProcessor, Span as OTelSpan
+from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
 from opentelemetry.trace import (
     format_span_id,
     format_trace_id,
@@ -253,17 +253,14 @@ class SentrySpanProcessor(SpanProcessor):
         )
         trace_data["parent_span_id"] = parent_span_id
 
-        if parent_context is not None:
-            sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
-            sentry_trace_data = cast(
-                "dict[str, Union[str, bool, None]]", sentry_trace_data
-            )
-            trace_data["parent_sampled"] = (
-                sentry_trace_data["parent_sampled"] if sentry_trace_data else None
-            )
+        sentry_trace_data = get_value(SENTRY_TRACE_KEY, parent_context)
+        sentry_trace_data = cast("dict[str, Union[str, bool, None]]", sentry_trace_data)
+        trace_data["parent_sampled"] = (
+            sentry_trace_data["parent_sampled"] if sentry_trace_data else None
+        )
 
-            baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
-            trace_data["baggage"] = baggage
+        baggage = get_value(SENTRY_BAGGAGE_KEY, parent_context)
+        trace_data["baggage"] = baggage
 
         return trace_data
 

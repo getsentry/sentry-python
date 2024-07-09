@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.7.0",
+    version="2.8.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -131,6 +131,11 @@ setup(
         "starlette": ["starlette>=0.19.1"],
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=6"],
+    },
+    entry_points={
+        "opentelemetry_propagator": [
+            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
+        ]
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

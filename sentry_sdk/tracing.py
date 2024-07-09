@@ -118,7 +118,7 @@ if TYPE_CHECKING:
     ProfileContext = TypedDict(
         "ProfileContext",
         {
-            "profiler.id": str,
+            "profiler_id": str,
         },
     )
 
@@ -698,7 +698,7 @@ class Span:
             return None
 
         return {
-            "profiler.id": profiler_id,
+            "profiler_id": profiler_id,
         }
 
 
