@@ -3,7 +3,7 @@ import pickle
 import gzip
 import io
 import socket
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -16,7 +16,6 @@ from sentry_sdk import Client, add_breadcrumb, capture_message, Scope
 from sentry_sdk.envelope import Envelope, Item, parse_json
 from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
-
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
@@ -423,10 +422,21 @@ def test_data_category_limits_reporting(
     assert envelope.items[0].type == "event"
     assert envelope.items[1].type == "client_report"
     report = parse_json(envelope.items[1].get_bytes())
-    assert sorted(report["discarded_events"], key=lambda x: x["quantity"]) == [
-        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 2},
-        {"category": "attachment", "reason": "ratelimit_backoff", "quantity": 11},
-    ]
+
+    discarded_events = report["discarded_events"]
+
+    assert len(discarded_events) == 2
+    assert {
+        "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 2,
+    } in discarded_events
+    assert {
+        "category": "attachment",
+        "reason": "ratelimit_backoff",
+        "quantity": 11,
+    } in discarded_events
+
     capturing_server.clear_captured()
 
     # here we sent a normal event
@@ -585,3 +595,21 @@ def test_metric_bucket_limits_with_all_namespaces(
     assert report["discarded_events"] == [
         {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
     ]
+
+
+def test_hub_cls_backwards_compat():
+    class TestCustomHubClass(sentry_sdk.Hub):
+        pass
+
+    transport = sentry_sdk.transport.HttpTransport(
+        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
+    )
+
+    with pytest.deprecated_call():
+        assert transport.hub_cls is sentry_sdk.Hub
+
+    with pytest.deprecated_call():
+        transport.hub_cls = TestCustomHubClass
+
+    with pytest.deprecated_call():
+        assert transport.hub_cls is TestCustomHubClass

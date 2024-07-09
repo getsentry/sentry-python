@@ -1,9 +1,9 @@
 import random
+from collections import Counter
 from unittest import mock
 
 import pytest
 
-import sentry_sdk
 from sentry_sdk import Scope, start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
@@ -261,58 +261,52 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
 
 
 @pytest.mark.parametrize(
-    "traces_sample_rate,sampled_output,reports_output",
+    "traces_sample_rate,sampled_output,expected_record_lost_event_calls",
     [
         (None, False, []),
-        (0.0, False, [("sample_rate", "transaction")]),
+        (0.0, False, [("sample_rate", "transaction", None)]),
         (1.0, True, []),
     ],
 )
 def test_records_lost_event_only_if_traces_sample_rate_enabled(
-    sentry_init, traces_sample_rate, sampled_output, reports_output, monkeypatch
+    sentry_init,
+    capture_record_lost_event_calls,
+    traces_sample_rate,
+    sampled_output,
+    expected_record_lost_event_calls,
 ):
-    reports = []
-
-    def record_lost_event(reason, data_category=None, item=None):
-        reports.append((reason, data_category))
-
     sentry_init(traces_sample_rate=traces_sample_rate)
-
-    monkeypatch.setattr(
-        sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
-    )
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     transaction = start_transaction(name="dogpark")
     assert transaction.sampled is sampled_output
     transaction.finish()
 
-    assert reports == reports_output
+    # Use Counter because order of calls does not matter
+    assert Counter(record_lost_event_calls) == Counter(expected_record_lost_event_calls)
 
 
 @pytest.mark.parametrize(
-    "traces_sampler,sampled_output,reports_output",
+    "traces_sampler,sampled_output,expected_record_lost_event_calls",
     [
         (None, False, []),
-        (lambda _x: 0.0, False, [("sample_rate", "transaction")]),
+        (lambda _x: 0.0, False, [("sample_rate", "transaction", None)]),
         (lambda _x: 1.0, True, []),
     ],
 )
 def test_records_lost_event_only_if_traces_sampler_enabled(
-    sentry_init, traces_sampler, sampled_output, reports_output, monkeypatch
+    sentry_init,
+    capture_record_lost_event_calls,
+    traces_sampler,
+    sampled_output,
+    expected_record_lost_event_calls,
 ):
-    reports = []
-
-    def record_lost_event(reason, data_category=None, item=None):
-        reports.append((reason, data_category))
-
     sentry_init(traces_sampler=traces_sampler)
-
-    monkeypatch.setattr(
-        sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
-    )
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     transaction = start_transaction(name="dogpark")
     assert transaction.sampled is sampled_output
     transaction.finish()
 
-    assert reports == reports_output
+    # Use Counter because order of calls does not matter
+    assert Counter(record_lost_event_calls) == Counter(expected_record_lost_event_calls)
