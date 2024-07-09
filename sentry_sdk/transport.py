@@ -213,8 +213,8 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
-            cert_file=options["cert_file"] if "cert_file" in options else None,
-            key_file=options["key_file"] if "key_file" in options else None,
+            cert_file=options["cert_file"],
+            key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
 
@@ -452,7 +452,7 @@ class HttpTransport(Transport):
         )
         return None
 
-    def _get_pool_options(self, ca_certs, cert_file, key_file):
+    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
         options = {
             "num_pools": self._num_pools,
