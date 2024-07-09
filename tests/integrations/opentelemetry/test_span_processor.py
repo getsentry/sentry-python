@@ -10,6 +10,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
+from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
@@ -18,25 +19,24 @@ from sentry_sdk.tracing_utils import extract_sentrytrace_data
 def test_is_sentry_span():
     otel_span = MagicMock()
 
-    span_processor = SentrySpanProcessor()
-    assert not span_processor._is_sentry_span(otel_span)
+    assert not is_sentry_span(otel_span)
 
     client = MagicMock()
     client.options = {"instrumenter": "otel"}
     client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
     Scope.get_global_scope().set_client(client)
 
-    assert not span_processor._is_sentry_span(otel_span)
+    assert not is_sentry_span(otel_span)
 
     otel_span.attributes = {
         "http.url": "https://example.com",
     }
-    assert not span_processor._is_sentry_span(otel_span)
+    assert not is_sentry_span(otel_span)
 
     otel_span.attributes = {
         "http.url": "https://o123456.ingest.sentry.io/api/123/envelope",
     }
-    assert span_processor._is_sentry_span(otel_span)
+    assert is_sentry_span(otel_span)
 
 
 def test_get_otel_context():
