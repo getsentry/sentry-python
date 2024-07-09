@@ -10,7 +10,12 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
-from sentry_sdk.integrations.opentelemetry.utils import is_sentry_span
+from sentry_sdk.integrations.opentelemetry.utils import (
+    extract_span_data,
+    is_sentry_span,
+    span_data_for_db_query,
+    span_data_for_http_method,
+)
 from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
@@ -201,7 +206,7 @@ def test_update_span_with_otel_data_http_method():
     span_processor._update_span_with_otel_data(sentry_span, otel_span)
 
     assert sentry_span.op == "http.client"
-    assert sentry_span.description == "GET example.com /"
+    assert sentry_span.description == "GET /"
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
@@ -606,3 +611,203 @@ def test_pruning_old_spans_on_end():
     span_processor.on_end(otel_span)
     assert sorted(list(span_processor.otel_span_map.keys())) == ["111111111abcdef"]
     assert sorted(list(span_processor.open_spans.values())) == [{"111111111abcdef"}]
+
+
+def test_span_data_for_db_query():
+    otel_span = MagicMock()
+    otel_span.name = "OTel Span"
+    otel_span.attributes = {}
+
+    op, description, status_code = span_data_for_db_query(otel_span)
+    assert op == "db"
+    assert description == "OTel Span"
+    assert status_code is None
+
+    otel_span.attributes = {"db.statement": "SELECT * FROM table;"}
+
+    op, description, status_code = span_data_for_db_query(otel_span)
+    assert op == "db"
+    assert description == "SELECT * FROM table;"
+    assert status_code is None
+
+
+@pytest.mark.parametrize(
+    "kind, attributes, expected",
+    [
+        (
+            SpanKind.SERVER,
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status_code": None,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "http.route": "/some/route",
+                "http.status_code": 502,
+            },
+            {
+                "op": "http.client",
+                "description": "GET /some/route",
+                "status_code": 502,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "http.route": "/some/route",
+                "http.status_code": 502,
+                "http.response.status_code": 503,
+            },
+            {
+                "op": "http.client",
+                "description": "GET /some/route",
+                "status_code": 503,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "http.target": None,
+                "net.peer.name": None,
+                "http.url": None,
+            },
+            {
+                "op": "http.client",
+                "description": "GET",
+                "status_code": None,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "http.target": "/target",
+            },
+            {
+                "op": "http.client",
+                "description": "GET /target",
+                "status_code": None,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "net.peer.name": "example.com",
+            },
+            {
+                "op": "http.client",
+                "description": "GET example.com",
+                "status_code": None,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "http.target": "/target",
+                "net.peer.name": "example.com",
+            },
+            {
+                "op": "http.client",
+                "description": "GET /target",
+                "status_code": None,
+            },
+        ),
+        (
+            SpanKind.CLIENT,
+            {
+                "http.method": "GET",
+                "http.url": "https://username:secretpwd@example.com/bla/?secret=123&anothersecret=456",
+            },
+            {
+                "op": "http.client",
+                "description": "GET https://example.com/bla/",
+                "status_code": None,
+            },
+        ),
+    ],
+)
+def test_span_data_for_http_method(kind, attributes, expected):
+    otel_span = MagicMock()
+    otel_span.kind = kind
+    otel_span.attributes = attributes
+
+    op, description, status_code = span_data_for_http_method(otel_span)
+    result = {
+        "op": op,
+        "description": description,
+        "status_code": status_code,
+    }
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "name, attributes, expected",
+    [
+        (
+            "OTel Span Blank",
+            {},
+            {
+                "op": "OTel Span Blank",
+                "description": "OTel Span Blank",
+                "status_code": None,
+            },
+        ),
+        (
+            "OTel Span RPC",
+            {
+                "rpc.service": "myservice.EchoService",
+            },
+            {
+                "op": "rpc",
+                "description": "OTel Span RPC",
+                "status_code": None,
+            },
+        ),
+        (
+            "OTel Span Messaging",
+            {
+                "messaging.system": "rabbitmq",
+            },
+            {
+                "op": "message",
+                "description": "OTel Span Messaging",
+                "status_code": None,
+            },
+        ),
+        (
+            "OTel Span FaaS",
+            {
+                "faas.trigger": "pubsub",
+            },
+            {
+                "op": "pubsub",
+                "description": "OTel Span FaaS",
+                "status_code": None,
+            },
+        ),
+    ],
+)
+def test_extract_span_data(name, attributes, expected):
+    otel_span = MagicMock()
+    otel_span.name = name
+    otel_span.attributes = attributes
+
+    op, description, status_code = extract_span_data(otel_span)
+    result = {
+        "op": op,
+        "description": description,
+        "status_code": status_code,
+    }
+    assert result == expected

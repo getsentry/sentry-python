@@ -64,42 +64,77 @@ def extract_span_data(span):
 
     http_method = span.attributes.get(SpanAttributes.HTTP_METHOD)
     http_method = cast("Optional[str]", http_method)
-    db_query = span.attributes.get(SpanAttributes.DB_SYSTEM)
-
     if http_method:
-        op = "http"
-        if span.kind == SpanKind.SERVER:
-            op += ".server"
-        elif span.kind == SpanKind.CLIENT:
-            op += ".client"
+        return span_data_for_http_method(span)
 
-        description = http_method
+    db_query = span.attributes.get(SpanAttributes.DB_SYSTEM)
+    if db_query:
+        return span_data_for_db_query(span)
 
-        peer_name = span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
-        if peer_name:
-            description += " {}".format(peer_name)
+    rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
+    if rpc_service:
+        return ("rpc", description, status_code)
 
-        target = span.attributes.get(SpanAttributes.HTTP_TARGET, None)
-        if target:
-            description += " {}".format(target)
+    messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
+    if messaging_system:
+        return ("message", description, status_code)
 
-        if not peer_name and not target:
-            url = span.attributes.get(SpanAttributes.HTTP_URL, None)
-            url = cast("Optional[str]", url)
-            if url:
-                parsed_url = urlparse(url)
-                url = "{}://{}{}".format(
-                    parsed_url.scheme, parsed_url.netloc, parsed_url.path
-                )
-                description += " {}".format(url)
-
-        status_code = span.attributes.get(SpanAttributes.HTTP_STATUS_CODE)
-    elif db_query:
-        op = "db"
-        statement = span.attributes.get(SpanAttributes.DB_STATEMENT, None)
-        statement = cast("Optional[str]", statement)
-        if statement:
-            description = statement
+    faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
+    if faas_trigger:
+        return (str(faas_trigger), description, status_code)
 
     status_code = cast("Optional[int]", status_code)
     return (op, description, status_code)
+
+
+def span_data_for_http_method(span):
+    # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    op = "http"
+
+    if span.kind == SpanKind.SERVER:
+        op += ".server"
+    elif span.kind == SpanKind.CLIENT:
+        op += ".client"
+
+    http_method = span.attributes.get(SpanAttributes.HTTP_METHOD)
+    route = span.attributes.get(SpanAttributes.HTTP_ROUTE, None)
+    target = span.attributes.get(SpanAttributes.HTTP_TARGET, None)
+    peer_name = span.attributes.get(SpanAttributes.NET_PEER_NAME, None)
+
+    description = http_method
+
+    if route:
+        description += " {}".format(route)
+    elif target:
+        description += " {}".format(target)
+    elif peer_name:
+        description += " {}".format(peer_name)
+    else:
+        url = span.attributes.get(SpanAttributes.HTTP_URL, None)
+        url = cast("Optional[str]", url)
+
+        if url:
+            parsed_url = urlparse(url)
+            url = "{}://{}{}".format(
+                parsed_url.scheme, parsed_url.netloc, parsed_url.path
+            )
+            description += " {}".format(url)
+
+    status_code = span.attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE, None)
+    if status_code is None:
+        # fallback to deprecated `HTTP_STATUS_CODE`
+        status_code = span.attributes.get(SpanAttributes.HTTP_STATUS_CODE, None)
+
+    return (op, description, status_code)
+
+
+def span_data_for_db_query(span):
+    # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    op = "db"
+
+    statement = span.attributes.get(SpanAttributes.DB_STATEMENT, None)
+    statement = cast("Optional[str]", statement)
+
+    description = statement or span.name
+
+    return (op, description, None)
