@@ -1205,8 +1205,17 @@ class NoOpSpan(Span):
         # type: () -> Any
         return {}
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
+    def finish(
+        self,
+        scope=None,  # type: Optional[sentry_sdk.Scope]
+        end_timestamp=None,  # type: Optional[Union[float, datetime]]
+        *,
+        hub=None,  # type: Optional[sentry_sdk.Hub]
+    ):
+        # type: (...) -> Optional[str]
+        """
+        The `hub` parameter is deprecated. Please use the `scope` parameter, instead.
+        """
         pass
 
     def set_measurement(self, name, value, unit=""):
