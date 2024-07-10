@@ -4,15 +4,15 @@
 
 ### Various fixes & improvements
 
-- Improved handling of span status (#3261) by @antonpirker
+- ref(transport): Improve event data category typing (#3243) by @szokeasaurusrex
+- ref(tracing): Improved handling of span status (#3261) by @antonpirker
 - test(client): Add tests for dropped span client reports (#3244) by @szokeasaurusrex
 - test(transport): Test new client report features (#3244) by @szokeasaurusrex
 - feat(tracing): Record lost spans in client reports (#3244) by @szokeasaurusrex
 - test(sampling): Replace custom logic with `capture_record_lost_event_calls` (#3257) by @szokeasaurusrex
 - test(transport): Non-order-dependent discarded events assertion (#3255) by @szokeasaurusrex
-- test: Introduce `capture_record_lost_event_calls` fixture (#3254) by @szokeasaurusrex
-- test: Fix non-idempotent test (#3253) by @szokeasaurusrex
-- ref(transport): Improve event data category typing (#3243) by @szokeasaurusrex
+- test(core): Introduce `capture_record_lost_event_calls` fixture (#3254) by @szokeasaurusrex
+- test(core): Fix non-idempotent test (#3253) by @szokeasaurusrex
 
 ## 2.8.0
 
