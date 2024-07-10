@@ -90,7 +90,7 @@ def _init(*args, **kwargs):
     This takes the same arguments as the client constructor.
     """
     client = Client(*args, **kwargs)  # type: ignore
-    Hub.current.bind_client(client)
+    Scope.get_global_scope().set_client(client)
     _check_python_deprecations()
     rv = _InitGuard(client)
     return rv
