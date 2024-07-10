@@ -155,6 +155,7 @@ if TYPE_CHECKING:
         "profile_chunk",
         "metric_bucket",
         "monitor",
+        "span",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
