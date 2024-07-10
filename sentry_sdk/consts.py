@@ -386,6 +386,32 @@ class SPANDATA:
     """
 
 
+class SPANSTATUS:
+    """
+    The status of a Sentry span.
+
+    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
+    """
+
+    ABORTED = "aborted"
+    ALREADY_EXISTS = "already_exists"
+    CANCELLED = "cancelled"
+    DATA_LOSS = "data_loss"
+    DEADLINE_EXCEEDED = "deadline_exceeded"
+    FAILED_PRECONDITION = "failed_precondition"
+    INTERNAL_ERROR = "internal_error"
+    INVALID_ARGUMENT = "invalid_argument"
+    NOT_FOUND = "not_found"
+    OK = "ok"
+    OUT_OF_RANGE = "out_of_range"
+    PERMISSION_DENIED = "permission_denied"
+    RESOURCE_EXHAUSTED = "resource_exhausted"
+    UNAUTHENTICATED = "unauthenticated"
+    UNAVAILABLE = "unavailable"
+    UNIMPLEMENTED = "unimplemented"
+    UNKNOWN_ERROR = "unknown_error"
+
+
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
     CACHE_GET = "cache.get"
@@ -529,4 +555,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.8.0"
+VERSION = "2.9.0"

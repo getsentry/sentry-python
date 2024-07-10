@@ -86,6 +86,20 @@ def make_client(request, capturing_server):
     return inner
 
 
+def mock_transaction_envelope(span_count):
+    # type: (int) -> Envelope
+    event = defaultdict(
+        mock.MagicMock,
+        type="transaction",
+        spans=[mock.MagicMock() for _ in range(span_count)],
+    )
+
+    envelope = Envelope()
+    envelope.add_transaction(event)
+
+    return envelope
+
+
 @pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
@@ -425,9 +439,14 @@ def test_data_category_limits_reporting(
 
     discarded_events = report["discarded_events"]
 
-    assert len(discarded_events) == 2
+    assert len(discarded_events) == 3
     assert {
         "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 2,
+    } in discarded_events
+    assert {
+        "category": "span",
         "reason": "ratelimit_backoff",
         "quantity": 2,
     } in discarded_events
@@ -454,9 +473,19 @@ def test_data_category_limits_reporting(
     envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
+
+    discarded_events = report["discarded_events"]
+    assert len(discarded_events) == 2
+    assert {
+        "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in discarded_events
+    assert {
+        "category": "span",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in discarded_events
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
@@ -613,3 +642,59 @@ def test_hub_cls_backwards_compat():
 
     with pytest.deprecated_call():
         assert transport.hub_cls is TestCustomHubClass
+
+
+@pytest.mark.parametrize("quantity", (1, 2, 10))
+def test_record_lost_event_quantity(capturing_server, make_client, quantity):
+    client = make_client()
+    transport = client.transport
+
+    transport.record_lost_event(reason="test", data_category="span", quantity=quantity)
+    client.flush()
+
+    (captured,) = capturing_server.captured  # Should only be one envelope
+    envelope = captured.envelope
+    (item,) = envelope.items  # Envelope should only have one item
+
+    assert item.type == "client_report"
+
+    report = parse_json(item.get_bytes())
+
+    assert report["discarded_events"] == [
+        {"category": "span", "reason": "test", "quantity": quantity}
+    ]
+
+
+@pytest.mark.parametrize("span_count", (0, 1, 2, 10))
+def test_record_lost_event_transaction_item(capturing_server, make_client, span_count):
+    client = make_client()
+    transport = client.transport
+
+    envelope = mock_transaction_envelope(span_count)
+    (transaction_item,) = envelope.items
+
+    transport.record_lost_event(reason="test", item=transaction_item)
+    client.flush()
+
+    (captured,) = capturing_server.captured  # Should only be one envelope
+    envelope = captured.envelope
+    (item,) = envelope.items  # Envelope should only have one item
+
+    assert item.type == "client_report"
+
+    report = parse_json(item.get_bytes())
+    discarded_events = report["discarded_events"]
+
+    assert len(discarded_events) == 2
+
+    assert {
+        "category": "transaction",
+        "reason": "test",
+        "quantity": 1,
+    } in discarded_events
+
+    assert {
+        "category": "span",
+        "reason": "test",
+        "quantity": span_count + 1,
+    } in discarded_events

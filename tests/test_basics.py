@@ -570,7 +570,7 @@ def test_dedupe_event_processor_drop_records_client_report(
 
     assert event["level"] == "error"
     assert "exception" in event
-    assert lost_event_call == ("event_processor", "error", None)
+    assert lost_event_call == ("event_processor", "error", None, 1)
 
 
 def test_event_processor_drop_records_client_report(
@@ -602,8 +602,9 @@ def test_event_processor_drop_records_client_report(
         # Using Counter because order of record_lost_event calls does not matter
         assert Counter(record_lost_event_calls) == Counter(
             [
-                ("event_processor", "error", None),
-                ("event_processor", "transaction", None),
+                ("event_processor", "error", None, 1),
+                ("event_processor", "transaction", None, 1),
+                ("event_processor", "span", None, 1),
             ]
         )
 

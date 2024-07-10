@@ -1,4 +1,5 @@
 import random
+from collections import Counter
 from unittest import mock
 
 import sentry_sdk
@@ -79,7 +80,12 @@ def test_transaction_uses_downsampled_rate(
         assert transaction.sampled is False
         assert transaction.sample_rate == 0.5
 
-    assert record_lost_event_calls == [("backpressure", "transaction", None)]
+    assert Counter(record_lost_event_calls) == Counter(
+        [
+            ("backpressure", "transaction", None, 1),
+            ("backpressure", "span", None, 1),
+        ]
+    )
 
 
 def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):
