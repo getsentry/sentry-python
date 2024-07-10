@@ -228,13 +228,13 @@ def crons_task_success(sender, **kwargs):
 
     monitor_config = headers.get("sentry-monitor-config", {})
 
-    start_timestamp_s = float(headers["sentry-monitor-start-timestamp-s"])
+    start_timestamp_s = headers.get("sentry-monitor-start-timestamp-s")
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=_now_seconds_since_epoch() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - float(start_timestamp_s) if start_timestamp_s else None,
         status=MonitorStatus.OK,
     )
 
@@ -249,13 +249,13 @@ def crons_task_failure(sender, **kwargs):
 
     monitor_config = headers.get("sentry-monitor-config", {})
 
-    start_timestamp_s = float(headers["sentry-monitor-start-timestamp-s"])
+    start_timestamp_s = headers.get("sentry-monitor-start-timestamp-s")
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=_now_seconds_since_epoch() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - float(start_timestamp_s) if start_timestamp_s else None,
         status=MonitorStatus.ERROR,
     )
 
@@ -270,12 +270,12 @@ def crons_task_retry(sender, **kwargs):
 
     monitor_config = headers.get("sentry-monitor-config", {})
 
-    start_timestamp_s = float(headers["sentry-monitor-start-timestamp-s"])
+    start_timestamp_s = headers.get("sentry-monitor-start-timestamp-s")
 
     capture_checkin(
         monitor_slug=headers["sentry-monitor-slug"],
         monitor_config=monitor_config,
         check_in_id=headers["sentry-monitor-check-in-id"],
-        duration=_now_seconds_since_epoch() - start_timestamp_s,
+        duration=_now_seconds_since_epoch() - float(start_timestamp_s) if start_timestamp_s else None,
         status=MonitorStatus.ERROR,
     )
