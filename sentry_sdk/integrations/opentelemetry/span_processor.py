@@ -290,15 +290,25 @@ class SentrySpanProcessor(SpanProcessor):
             for key, val in otel_span.attributes.items():
                 sentry_span.set_data(key, val)
 
-        (op, description, status_code) = extract_span_data(otel_span)
+        (op, description, status, http_status) = extract_span_data(otel_span)
         sentry_span.op = op
         sentry_span.description = description
-        if status_code:
-            sentry_span.set_http_status(status_code)
+        # TODO: this messes up the status.
+        # because set_http_status also sets the status. and the returned
+        # status and http_status are different, and this should not be
+        if http_status:
+            sentry_span.set_http_status(http_status)
+        if status:
+            sentry_span.set_status(status)
 
     def _update_transaction_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
-        (op, _, status_code) = extract_span_data(otel_span)
+        (op, _, status, http_status) = extract_span_data(otel_span)
         sentry_span.op = op
-        if status_code:
-            sentry_span.set_http_status(status_code)
+        # TODO: this messes up the status.
+        # because set_http_status also sets the status. and the returned
+        # status and http_status are different, and this should not be
+        if http_status:
+            sentry_span.set_http_status(http_status)
+        if status:
+            sentry_span.set_status(status)

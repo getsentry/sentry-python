@@ -1,9 +1,11 @@
 from typing import cast
 from datetime import datetime, timezone
 
-from opentelemetry.trace import SpanKind
+from opentelemetry.trace import SpanKind, StatusCode
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.sdk.trace import ReadableSpan
+from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.tracing import get_span_status_from_http_code
 from urllib3.util import parse_url as urlparse
 
 from sentry_sdk import get_client
@@ -12,7 +14,27 @@ from sentry_sdk.utils import Dsn
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Tuple
+    from typing import Optional, Mapping, Sequence
+
+
+GRPC_ERROR_MAP = {
+    "1": SPANSTATUS.CANCELLED,
+    "2": SPANSTATUS.UNKNOWN_ERROR,
+    "3": SPANSTATUS.INVALID_ARGUMENT,
+    "4": SPANSTATUS.DEADLINE_EXCEEDED,
+    "5": SPANSTATUS.NOT_FOUND,
+    "6": SPANSTATUS.ALREADY_EXISTS,
+    "7": SPANSTATUS.PERMISSION_DENIED,
+    "8": SPANSTATUS.RESOURCE_EXHAUSTED,
+    "9": SPANSTATUS.FAILED_PRECONDITION,
+    "10": SPANSTATUS.ABORTED,
+    "11": SPANSTATUS.OUT_OF_RANGE,
+    "12": SPANSTATUS.UNIMPLEMENTED,
+    "13": SPANSTATUS.INTERNAL_ERROR,
+    "14": SPANSTATUS.UNAVAILABLE,
+    "15": SPANSTATUS.DATA_LOSS,
+    "16": SPANSTATUS.UNAUTHENTICATED,
+}
 
 
 def is_sentry_span(span):
@@ -54,13 +76,13 @@ def convert_otel_timestamp(time):
 
 
 def extract_span_data(span):
-    # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int]]
     op = span.name
     description = span.name
-    status_code = None
+    status, http_status = extract_span_status(span)
 
     if span.attributes is None:
-        return (op, description, status_code)
+        return (op, description, status, http_status)
 
     http_method = span.attributes.get(SpanAttributes.HTTP_METHOD)
     http_method = cast("Optional[str]", http_method)
@@ -73,22 +95,26 @@ def extract_span_data(span):
 
     rpc_service = span.attributes.get(SpanAttributes.RPC_SERVICE)
     if rpc_service:
-        return ("rpc", description, status_code)
+        return ("rpc", description, status, http_status)
 
     messaging_system = span.attributes.get(SpanAttributes.MESSAGING_SYSTEM)
     if messaging_system:
-        return ("message", description, status_code)
+        return ("message", description, status, http_status)
 
     faas_trigger = span.attributes.get(SpanAttributes.FAAS_TRIGGER)
     if faas_trigger:
-        return (str(faas_trigger), description, status_code)
+        return (
+            str(faas_trigger),
+            description,
+            status,
+            http_status,
+        )
 
-    status_code = cast("Optional[int]", status_code)
-    return (op, description, status_code)
+    return (op, description, status, http_status)
 
 
 def span_data_for_http_method(span):
-    # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int]]
     span_attributes = span.attributes or {}
 
     op = "http"
@@ -122,17 +148,13 @@ def span_data_for_http_method(span):
             )
             description = f"{http_method} {url}"
 
-    status_code = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
-    if status_code is None:
-        status_code = span_attributes.get(SpanAttributes.HTTP_STATUS_CODE)
+    status, http_status = extract_span_status(span)
 
-    status_code = cast("Optional[int]", status_code)
-
-    return (op, description, status_code)
+    return (op, description, status, http_status)
 
 
 def span_data_for_db_query(span):
-    # type: (ReadableSpan) -> Tuple[str, str, Optional[int]]
+    # type: (ReadableSpan) -> tuple[str, str, Optional[str], Optional[int]]
     span_attributes = span.attributes or {}
 
     op = "db"
@@ -142,5 +164,53 @@ def span_data_for_db_query(span):
 
     description = statement or span.name
 
-    return (op, description, None)
-  
+    return (op, description, None, None)
+
+
+def extract_span_status(span):
+    # type: (ReadableSpan) -> tuple[Optional[str], Optional[int]]
+    span_attributes = span.attributes or {}
+    status = span.status or None
+
+    # This is different than the JS implementation found here:
+    # https://github.com/getsentry/sentry-javascript/blob/master/packages/opentelemetry/src/utils/mapStatus.ts
+    # did not fully understood the JS implementation because it is quite complex and I think this could be simplified.
+    if status:
+        if status.status_code == StatusCode.OK:
+            return (SPANSTATUS.OK, None)
+        elif status.status_code == StatusCode.ERROR:
+            inferred_status, http_status = infer_status_from_attributes(span_attributes)
+            if inferred_status:
+                return (inferred_status, http_status)
+
+            return (SPANSTATUS.UNKNOWN_ERROR, None)
+
+    # We default to setting the spans status to OK if not set.
+    return (SPANSTATUS.OK, None)
+
+
+def infer_status_from_attributes(span_attributes):
+    # type: (Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]) -> tuple[Optional[str], Optional[int]]
+    http_status = get_http_status_code(span_attributes)
+
+    if http_status:
+        return (get_span_status_from_http_code(http_status), http_status)
+
+    grpc_status = span_attributes.get(SpanAttributes.RPC_GRPC_STATUS_CODE)
+    if grpc_status:
+        return (GRPC_ERROR_MAP.get(str(grpc_status), SPANSTATUS.UNKNOWN_ERROR), None)
+
+    return (None, None)
+
+
+def get_http_status_code(span_attributes):
+    # type: (Mapping[str, str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]]) -> Optional[int]
+    http_status = span_attributes.get(SpanAttributes.HTTP_RESPONSE_STATUS_CODE)
+
+    if http_status is None:
+        # Fall back to the deprecated attribute
+        http_status = span_attributes.get(SpanAttributes.HTTP_STATUS_CODE)
+
+    http_status = cast("Optional[int]", http_status)
+
+    return http_status

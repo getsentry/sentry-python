@@ -618,17 +618,19 @@ def test_span_data_for_db_query():
     otel_span.name = "OTel Span"
     otel_span.attributes = {}
 
-    op, description, status_code = span_data_for_db_query(otel_span)
+    op, description, status, http_status = span_data_for_db_query(otel_span)
     assert op == "db"
     assert description == "OTel Span"
-    assert status_code is None
+    assert status is None
+    assert http_status is None
 
     otel_span.attributes = {"db.statement": "SELECT * FROM table;"}
 
-    op, description, status_code = span_data_for_db_query(otel_span)
+    op, description, status, http_status = span_data_for_db_query(otel_span)
     assert op == "db"
     assert description == "SELECT * FROM table;"
-    assert status_code is None
+    assert status is None
+    assert http_status is None
 
 
 @pytest.mark.parametrize(
@@ -643,7 +645,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.server",
                 "description": "POST /some/route",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -656,7 +659,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET /some/route",
-                "status_code": 502,
+                "status": "internal_error",
+                "http_status_code": 502,
             },
         ),
         (
@@ -670,7 +674,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET /some/route",
-                "status_code": 503,
+                "status": "unavailable",
+                "http_status_code": 503,
             },
         ),
         (
@@ -684,7 +689,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -696,7 +702,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET /target",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -708,7 +715,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET example.com",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -721,7 +729,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET /target",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -733,7 +742,8 @@ def test_span_data_for_db_query():
             {
                 "op": "http.client",
                 "description": "GET https://example.com/bla/",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
     ],
@@ -743,11 +753,12 @@ def test_span_data_for_http_method(kind, attributes, expected):
     otel_span.kind = kind
     otel_span.attributes = attributes
 
-    op, description, status_code = span_data_for_http_method(otel_span)
+    op, description, status, http_status_code = span_data_for_http_method(otel_span)
     result = {
         "op": op,
         "description": description,
-        "status_code": status_code,
+        "status": status,
+        "http_status_code": http_status_code,
     }
     assert result == expected
 
@@ -761,7 +772,8 @@ def test_span_data_for_http_method(kind, attributes, expected):
             {
                 "op": "OTel Span Blank",
                 "description": "OTel Span Blank",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -772,7 +784,8 @@ def test_span_data_for_http_method(kind, attributes, expected):
             {
                 "op": "rpc",
                 "description": "OTel Span RPC",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -783,7 +796,8 @@ def test_span_data_for_http_method(kind, attributes, expected):
             {
                 "op": "message",
                 "description": "OTel Span Messaging",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
         (
@@ -794,7 +808,8 @@ def test_span_data_for_http_method(kind, attributes, expected):
             {
                 "op": "pubsub",
                 "description": "OTel Span FaaS",
-                "status_code": None,
+                "status": "ok",
+                "http_status_code": None,
             },
         ),
     ],
@@ -804,10 +819,11 @@ def test_extract_span_data(name, attributes, expected):
     otel_span.name = name
     otel_span.attributes = attributes
 
-    op, description, status_code = extract_span_data(otel_span)
+    op, description, status, http_status_code = extract_span_data(otel_span)
     result = {
         "op": op,
         "description": description,
-        "status_code": status_code,
+        "status": status,
+        "http_status_code": http_status_code,
     }
     assert result == expected
