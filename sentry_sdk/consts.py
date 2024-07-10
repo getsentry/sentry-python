@@ -504,8 +504,6 @@ class ClientConstructor:
         debug=None,  # type: Optional[bool]
         attach_stacktrace=False,  # type: bool
         ca_certs=None,  # type: Optional[str]
-        cert_file=None,  # type: Optional[str]
-        key_file=None,  # type: Optional[str]
         propagate_traces=True,  # type: bool
         traces_sample_rate=None,  # type: Optional[float]
         traces_sampler=None,  # type: Optional[TracesSampler]
@@ -534,6 +532,8 @@ class ClientConstructor:
         enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
+        cert_file=None,  # type: Optional[str]
+        key_file=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
