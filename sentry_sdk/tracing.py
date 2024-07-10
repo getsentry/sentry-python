@@ -1,5 +1,6 @@
 import uuid
 import random
+import warnings
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
@@ -286,13 +287,23 @@ class Span:
         self.op = op
         self.description = description
         self.status = status
-        self.hub = hub
+        self.hub = hub  # backwards compatibility
         self.scope = scope
         self.origin = origin
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
+
+        if hub is not None:
+            warnings.warn(
+                "The `hub` parameter is deprecated. Please use `scope` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+            self.scope = self.scope or hub.scope
+
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
         elif isinstance(start_timestamp, float):
@@ -823,15 +834,57 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
+    def _get_scope_from_finish_args(
+        self,
+        scope_arg,  # type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]
+        hub_arg,  # type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]
+    ):
+        # type: (...) -> Optional[sentry_sdk.Scope]
+        """
+        Logic to get the scope from the arguments passed to finish. This
+        function exists for backwards compatibility with the old finish.
+
+        TODO: Remove this function in the next major version.
+        """
+        scope_or_hub = scope_arg
+        if hub_arg is not None:
+            warnings.warn(
+                "The `hub` parameter is deprecated. Please use the `scope` parameter, instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+
+            scope_or_hub = hub_arg
+
+        if isinstance(scope_or_hub, sentry_sdk.Hub):
+            warnings.warn(
+                "Passing a Hub to finish is deprecated. Please pass a Scope, instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+
+            return scope_or_hub.scope
+
+        return scope_or_hub
+
+    def finish(
+        self,
+        scope=None,  # type: Optional[sentry_sdk.Scope]
+        end_timestamp=None,  # type: Optional[Union[float, datetime]]
+        *,
+        hub=None,  # type: Optional[sentry_sdk.Hub]
+    ):
+        # type: (...) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
 
-        :param hub: The hub to use for this transaction.
-            If not provided, the current hub will be used.
+        :param scope: The Scope to use for this transaction.
+            If not provided, the current Scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
+        :param hub: The hub to use for this transaction.
+            This argument is DEPRECATED. Please use the `scope`
+            parameter, instead.
 
         :return: The event ID if the transaction was sent to Sentry,
             otherwise None.
@@ -840,7 +893,13 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
-        hub = hub or self.hub or sentry_sdk.Hub.current
+        # For backwards compatibility, we must handle the case where `scope`
+        # or `hub` could both either be a `Scope` or a `Hub`.
+        scope = self._get_scope_from_finish_args(
+            scope, hub
+        )  # type: Optional[sentry_sdk.Scope]
+
+        scope = scope or self.scope or sentry_sdk.Scope.get_current_scope()
         client = sentry_sdk.Scope.get_client()
 
         if not client.is_active():
@@ -877,7 +936,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        super().finish(hub, end_timestamp)
+        super().finish(scope, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -930,7 +989,7 @@ class Transaction(Span):
             if metrics_summary:
                 event["_metrics_summary"] = metrics_summary
 
-        return hub.capture_event(event)
+        return scope.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
