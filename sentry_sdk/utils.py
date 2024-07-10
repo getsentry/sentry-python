@@ -1019,7 +1019,14 @@ def exc_info_from_error(error):
     else:
         raise ValueError("Expected Exception object to report, got %s!" % type(error))
 
-    return exc_type, exc_value, tb
+    exc_info = (exc_type, exc_value, tb)
+
+    if TYPE_CHECKING:
+        # This cast is safe because exc_type and exc_value are either both
+        # None or both not None.
+        exc_info = cast(ExcInfo, exc_info)
+
+    return exc_info
 
 
 def event_from_exception(
