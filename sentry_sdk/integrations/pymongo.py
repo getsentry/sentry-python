@@ -1,7 +1,7 @@
 import copy
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA, OP
+from sentry_sdk.consts import SPANSTATUS, SPANDATA, OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Span
@@ -181,7 +181,7 @@ class CommandTracer(monitoring.CommandListener):
 
         try:
             span = self._ongoing_operations.pop(self._operation_key(event))
-            span.set_status("internal_error")
+            span.set_status(SPANSTATUS.INTERNAL_ERROR)
             span.__exit__(None, None, None)
         except KeyError:
             return
@@ -193,7 +193,7 @@ class CommandTracer(monitoring.CommandListener):
 
         try:
             span = self._ongoing_operations.pop(self._operation_key(event))
-            span.set_status("ok")
+            span.set_status(SPANSTATUS.OK)
             span.__exit__(None, None, None)
         except KeyError:
             pass
