@@ -119,10 +119,8 @@ if TYPE_CHECKING:
         },
     )
 
-
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
-
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
@@ -869,6 +867,8 @@ class Transaction(Span):
 
                 client.transport.record_lost_event(reason, data_category="transaction")
 
+                # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+                client.transport.record_lost_event(reason, data_category="span")
             return None
 
         if not self.name:

@@ -162,7 +162,7 @@ def test_profiles_sample_rate(
     elif profile_count:
         assert record_lost_event_calls == []
     else:
-        assert record_lost_event_calls == [("sample_rate", "profile", None)]
+        assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
 @pytest.mark.parametrize(
@@ -231,7 +231,7 @@ def test_profiles_sampler(
     if profile_count:
         assert record_lost_event_calls == []
     else:
-        assert record_lost_event_calls == [("sample_rate", "profile", None)]
+        assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
 def test_minimum_unique_samples_required(
@@ -260,7 +260,7 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
-    assert record_lost_event_calls == [("insufficient_data", "profile", None)]
+    assert record_lost_event_calls == [("insufficient_data", "profile", None, 1)]
 
 
 @pytest.mark.forked
