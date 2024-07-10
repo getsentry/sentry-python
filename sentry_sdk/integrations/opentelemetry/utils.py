@@ -143,3 +143,4 @@ def span_data_for_db_query(span):
     description = statement or span.name
 
     return (op, description, None)
+  

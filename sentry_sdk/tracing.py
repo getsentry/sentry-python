@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
@@ -115,14 +115,12 @@ if TYPE_CHECKING:
     ProfileContext = TypedDict(
         "ProfileContext",
         {
-            "profiler.id": str,
+            "profiler_id": str,
         },
     )
 
-
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
-
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
@@ -149,6 +147,45 @@ SOURCE_FOR_STYLE = {
     "uri_template": TRANSACTION_SOURCE_ROUTE,
     "url": TRANSACTION_SOURCE_ROUTE,
 }
+
+
+def get_span_status_from_http_code(http_status_code):
+    # type: (int) -> str
+    """
+    Returns the Sentry status corresponding to the given HTTP status code.
+
+    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
+    """
+    if http_status_code < 400:
+        return SPANSTATUS.OK
+
+    elif 400 <= http_status_code < 500:
+        if http_status_code == 403:
+            return SPANSTATUS.PERMISSION_DENIED
+        elif http_status_code == 404:
+            return SPANSTATUS.NOT_FOUND
+        elif http_status_code == 429:
+            return SPANSTATUS.RESOURCE_EXHAUSTED
+        elif http_status_code == 413:
+            return SPANSTATUS.FAILED_PRECONDITION
+        elif http_status_code == 401:
+            return SPANSTATUS.UNAUTHENTICATED
+        elif http_status_code == 409:
+            return SPANSTATUS.ALREADY_EXISTS
+        else:
+            return SPANSTATUS.INVALID_ARGUMENT
+
+    elif 500 <= http_status_code < 600:
+        if http_status_code == 504:
+            return SPANSTATUS.DEADLINE_EXCEEDED
+        elif http_status_code == 501:
+            return SPANSTATUS.UNIMPLEMENTED
+        elif http_status_code == 503:
+            return SPANSTATUS.UNAVAILABLE
+        else:
+            return SPANSTATUS.INTERNAL_ERROR
+
+    return SPANSTATUS.UNKNOWN_ERROR
 
 
 class _SpanRecorder:
@@ -319,7 +356,7 @@ class Span:
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
-            self.set_status("internal_error")
+            self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         scope, old_span = self._context_manager_state
         del self._context_manager_state
@@ -542,37 +579,9 @@ class Span:
         # type: (int) -> None
         self.set_tag(
             "http.status_code", str(http_status)
-        )  # we keep this for backwards compatability
+        )  # we keep this for backwards compatibility
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
-
-        if http_status < 400:
-            self.set_status("ok")
-        elif 400 <= http_status < 500:
-            if http_status == 403:
-                self.set_status("permission_denied")
-            elif http_status == 404:
-                self.set_status("not_found")
-            elif http_status == 429:
-                self.set_status("resource_exhausted")
-            elif http_status == 413:
-                self.set_status("failed_precondition")
-            elif http_status == 401:
-                self.set_status("unauthenticated")
-            elif http_status == 409:
-                self.set_status("already_exists")
-            else:
-                self.set_status("invalid_argument")
-        elif 500 <= http_status < 600:
-            if http_status == 504:
-                self.set_status("deadline_exceeded")
-            elif http_status == 501:
-                self.set_status("unimplemented")
-            elif http_status == 503:
-                self.set_status("unavailable")
-            else:
-                self.set_status("internal_error")
-        else:
-            self.set_status("unknown_error")
+        self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):
         # type: () -> bool
@@ -693,7 +702,7 @@ class Span:
             return None
 
         return {
-            "profiler.id": profiler_id,
+            "profiler_id": profiler_id,
         }
 
 
@@ -858,6 +867,8 @@ class Transaction(Span):
 
                 client.transport.record_lost_event(reason, data_category="transaction")
 
+                # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+                client.transport.record_lost_event(reason, data_category="span")
             return None
 
         if not self.name:

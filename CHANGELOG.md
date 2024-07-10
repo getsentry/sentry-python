@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.8.0
+
+### Various fixes & improvements
+
+- `profiler_id` uses underscore (#3249) by @Zylphrex
+- Don't send full env to subprocess (#3251) by @kmichel-aiven
+- Stop using `Hub` in `HttpTransport` (#3247) by @szokeasaurusrex
+- Remove `ipdb` from test requirements (#3237) by @rominf
+- Avoid propagation of empty baggage (#2968) by @hartungstenio
+- Add entry point for `SentryPropagator` (#3086) by @mender
+- Bump checkouts/data-schemas from `8c13457` to `88273a9` (#3225) by @dependabot
+
+## 2.7.1
+
+### Various fixes & improvements
+
+- fix(otel): Fix missing baggage (#3218) by @sentrivana
+- This is the config file of asdf-vm which we do not use. (#3215) by @antonpirker
+- Added option to disable middleware spans in Starlette (#3052) by @antonpirker
+- build: Update tornado version in setup.py to match code check. (#3206) by @aclemons
+
 ## 2.7.0
 
 - Add `origin` to spans and transactions (#3133) by @antonpirker
