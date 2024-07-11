@@ -1190,10 +1190,9 @@ class Scope(object):
 
         return None
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
+    @staticmethod
+    def _capture_internal_exception(exc_info):
+        # type: (ExcInfo) -> None
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.

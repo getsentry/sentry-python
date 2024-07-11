@@ -414,24 +414,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         return last_event_id
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
-        """
-        .. deprecated:: 2.0.0
-            This function is deprecated and will be removed in a future release.
-            Please use :py:meth:`sentry_sdk.client._Client._capture_internal_exception` instead.
-
-        Capture an exception that is likely caused by a bug in the SDK
-        itself.
-
-        Duplicated in :py:meth:`sentry_sdk.client._Client._capture_internal_exception`.
-
-        These exceptions do not end up in Sentry and are just logged instead.
-        """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
-
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
         """

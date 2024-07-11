@@ -78,7 +78,8 @@ def internal_exceptions(request, monkeypatch):
     if "tests_internal_exceptions" in request.keywords:
         return
 
-    def _capture_internal_exception(self, exc_info):
+    @staticmethod
+    def _capture_internal_exception(exc_info):
         errors.append(exc_info)
 
     @request.addfinalizer
@@ -89,7 +90,7 @@ def internal_exceptions(request, monkeypatch):
             reraise(*e)
 
     monkeypatch.setattr(
-        sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
+        sentry_sdk.Scope, "_capture_internal_exception", _capture_internal_exception
     )
 
     return errors
