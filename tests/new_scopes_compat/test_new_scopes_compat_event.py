@@ -32,10 +32,10 @@ def expected_error():
                         "stacktrace": {
                             "frames": [
                                 {
-                                    "filename": "tests/test_new_scopes_compat_event.py",
+                                    "filename": "tests/new_scopes_compat/test_new_scopes_compat_event.py",
                                     "abs_path": mock.ANY,
                                     "function": "_faulty_function",
-                                    "module": "tests.test_new_scopes_compat_event",
+                                    "module": "tests.new_scopes_compat.test_new_scopes_compat_event",
                                     "lineno": mock.ANY,
                                     "pre_context": [
                                         "    return create_expected_transaction_event",

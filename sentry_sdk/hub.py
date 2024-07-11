@@ -59,16 +59,6 @@ else:
 _local = ContextVar("sentry_current_hub")
 
 
-def _should_send_default_pii():
-    # type: () -> bool
-    # TODO: Migrate existing code to `scope.should_send_default_pii()` and remove this function.
-    # New code should not use this function!
-    client = Hub.current.client
-    if not client:
-        return False
-    return client.should_send_default_pii()
-
-
 class _InitGuard:
     def __init__(self, client):
         # type: (Client) -> None
@@ -100,7 +90,7 @@ def _init(*args, **kwargs):
     This takes the same arguments as the client constructor.
     """
     client = Client(*args, **kwargs)  # type: ignore
-    Hub.current.bind_client(client)
+    Scope.get_global_scope().set_client(client)
     _check_python_deprecations()
     rv = _InitGuard(client)
     return rv
