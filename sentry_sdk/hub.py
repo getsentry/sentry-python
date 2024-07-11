@@ -1,3 +1,4 @@
+import warnings
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
@@ -55,6 +56,23 @@ else:
         return x
 
 
+_HUB_DEPRECATION_MESSAGE = (
+    "`sentry_sdk.Hub` is deprecated and will be removed in a future major release. "
+    "Please consult our 1.x to 2.x migration guide for details on how to migrate "
+    "`Hub` usage to the new API: "
+    "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x"
+)
+
+
+@contextmanager
+def _suppress_hub_deprecation_warning():
+    # type: () -> Generator[None, None, None]
+    """Utility function to suppress deprecation warnings for the Hub."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", _HUB_DEPRECATION_MESSAGE, DeprecationWarning)
+        yield
+
+
 _local = ContextVar("sentry_current_hub")
 
 
@@ -63,9 +81,12 @@ class HubMeta(type):
     def current(cls):
         # type: () -> Hub
         """Returns the current instance of the hub."""
+        warnings.warn(_HUB_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
         rv = _local.get(None)
         if rv is None:
-            rv = Hub(GLOBAL_HUB)
+            with _suppress_hub_deprecation_warning():
+                # This will raise a deprecation warning; supress it since we already warned above.
+                rv = Hub(GLOBAL_HUB)
             _local.set(rv)
         return rv
 
@@ -73,6 +94,7 @@ class HubMeta(type):
     def main(cls):
         # type: () -> Hub
         """Returns the main instance of the hub."""
+        warnings.warn(_HUB_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
         return GLOBAL_HUB
 
 
@@ -103,6 +125,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
+        warnings.warn(_HUB_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
 
         current_scope = None
 
@@ -689,7 +712,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         )
 
 
-GLOBAL_HUB = Hub()
+with _suppress_hub_deprecation_warning():
+    # Suppress deprecation warning for the Hub here, since we still always
+    # import this module.
+    GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
 
 

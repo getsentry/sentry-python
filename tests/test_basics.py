@@ -839,3 +839,21 @@ def test_last_event_id_scope(sentry_init):
     # Should not crash
     with isolation_scope() as scope:
         assert scope.last_event_id() is None
+
+
+def test_hub_constructor_deprecation_warning():
+    with pytest.warns(DeprecationWarning):
+        Hub()
+
+
+def test_hub_current_deprecation_warning():
+    with pytest.warns(DeprecationWarning) as warning_records:
+        Hub.current
+
+    # Make sure we only issue one deprecation warning
+    assert len(warning_records) == 1
+
+
+def test_hub_main_deprecation_warnings():
+    with pytest.warns(DeprecationWarning):
+        Hub.main

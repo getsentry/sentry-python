@@ -817,7 +817,7 @@ def test_profile_processing(
             assert processed["samples"] == expected["samples"]
 
 
-def test_hub_backwards_compatibility():
+def test_hub_backwards_compatibility(suppress_deprecation_warnings):
     hub = sentry_sdk.Hub()
 
     with pytest.warns(DeprecationWarning):
