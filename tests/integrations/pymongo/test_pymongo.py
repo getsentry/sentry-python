@@ -61,23 +61,23 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.SERVER_PORT] == mongo_server.port
         for field, value in common_tags.items():
-            assert span["tags"][field] == value
+            assert span["data"][field] == value
 
     assert find["op"] == "db"
     assert insert_success["op"] == "db"
     assert insert_fail["op"] == "db"
 
-    assert find["tags"]["db.operation"] == "find"
-    assert insert_success["tags"]["db.operation"] == "insert"
-    assert insert_fail["tags"]["db.operation"] == "insert"
+    assert find["data"]["db.operation"] == "find"
+    assert insert_success["data"]["db.operation"] == "insert"
+    assert insert_fail["data"]["db.operation"] == "insert"
 
     assert find["description"].startswith("{'find")
     assert insert_success["description"].startswith("{'insert")
     assert insert_fail["description"].startswith("{'insert")
 
-    assert find["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
-    assert insert_success["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
-    assert insert_fail["tags"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
+    assert find["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
+    assert insert_success["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
+    assert insert_fail["data"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
     if with_pii:
         assert "1" in find["description"]
         assert "2" in insert_success["description"]
