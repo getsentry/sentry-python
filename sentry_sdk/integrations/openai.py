@@ -197,7 +197,11 @@ def _wrap_chat_completion_create(f):
                                     span, SPANDATA.AI_RESPONSES, all_responses
                                 )
                             _calculate_chat_completion_usage(
-                                messages, res, span, all_responses
+                                messages,
+                                res,
+                                span,
+                                all_responses,
+                                integration.count_tokens,
                             )
                     span.__exit__(None, None, None)
 
