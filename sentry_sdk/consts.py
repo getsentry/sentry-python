@@ -1,3 +1,5 @@
+import itertools
+
 from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -479,6 +481,7 @@ class ClientConstructor:
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
+        *,
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
@@ -540,7 +543,7 @@ class ClientConstructor:
 
 
 def _get_default_options():
-    # type: () -> Dict[str, Any]
+    # type: () -> dict[str, Any]
     import inspect
 
     if hasattr(inspect, "getfullargspec"):
@@ -550,7 +553,14 @@ def _get_default_options():
 
     a = getargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
-    return dict(zip(a.args[-len(defaults) :], defaults))
+    kwonlydefaults = a.kwonlydefaults or {}
+
+    return dict(
+        itertools.chain(
+            zip(a.args[-len(defaults) :], defaults),
+            kwonlydefaults.items(),
+        )
+    )
 
 
 DEFAULT_OPTIONS = _get_default_options()
