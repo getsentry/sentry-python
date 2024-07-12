@@ -546,12 +546,7 @@ def _get_default_options():
     # type: () -> dict[str, Any]
     import inspect
 
-    if hasattr(inspect, "getfullargspec"):
-        getargspec = inspect.getfullargspec
-    else:
-        getargspec = inspect.getargspec  # type: ignore
-
-    a = getargspec(ClientConstructor.__init__)
+    a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
     kwonlydefaults = a.kwonlydefaults or {}
 
