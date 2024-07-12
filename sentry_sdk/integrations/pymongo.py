@@ -162,7 +162,7 @@ class CommandTracer(monitoring.CommandListener):
             )
 
             for tag, value in tags.items():
-                span.set_tag(tag, value)
+                span.set_data(tag, value)
 
             for key, value in data.items():
                 span.set_data(key, value)
