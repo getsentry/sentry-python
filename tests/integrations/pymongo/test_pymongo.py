@@ -49,7 +49,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     (event,) = events
     (find, insert_success, insert_fail) = event["spans"]
 
-    common_tags = {
+    common_data = {
         "db.name": "test_db",
         "db.system": "mongodb",
         "net.peer.name": mongo_server.host,
@@ -60,7 +60,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
         assert span["data"][SPANDATA.DB_NAME] == "test_db"
         assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.SERVER_PORT] == mongo_server.port
-        for field, value in common_tags.items():
+        for field, value in common_data.items():
             assert span["data"][field] == value
 
     assert find["op"] == "db"
