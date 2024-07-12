@@ -155,7 +155,7 @@ class CommandTracer(monitoring.CommandListener):
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = json.dumps(command)
+            query = json.dumps(command, default=str)
             span = sentry_sdk.start_span(
                 op=OP.DB,
                 description=query,
