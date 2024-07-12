@@ -33,13 +33,19 @@ try:
     import tiktoken  # type: ignore
 
     enc = None  # lazy initialize
+    tried_enc_init = False
 
     def count_tokens(s):
         # type: (str) -> int
-        global enc
-        if enc is None:
-            enc = tiktoken.get_encoding("cl100k_base")
-        return len(enc.encode_ordinary(s))
+        global enc, tried_enc_init
+        if enc is None and not tried_enc_init:
+            tried_enc_init = True
+            with capture_internal_exceptions():  # this can fail if tiktoken tries to download something and fails.
+                enc = tiktoken.get_encoding("cl100k_base")
+        if enc is not None:
+            with capture_internal_exceptions():
+                return len(enc.encode_ordinary(s))
+        return 0
 
     logger.debug("[OpenAI] using tiktoken to count tokens")
 except ImportError:
