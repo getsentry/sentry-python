@@ -78,6 +78,15 @@ def test_nonstreaming_chat_completion(
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
 
 
+def tiktoken_encoding_if_installed():
+    try:
+        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+        return "cl100k_base"
+    except ImportError:
+        return None
+
+
 # noinspection PyTypeChecker
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -87,7 +96,12 @@ def test_streaming_chat_completion(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[
+            OpenAIIntegration(
+                include_prompts=include_prompts,
+                tiktoken_encoding_name=tiktoken_encoding_if_installed(),
+            )
+        ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )

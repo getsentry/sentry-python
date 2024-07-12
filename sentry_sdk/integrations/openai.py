@@ -14,7 +14,6 @@ import sentry_sdk
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import (
-    logger,
     capture_internal_exceptions,
     event_from_exception,
     ensure_integration_enabled,
@@ -29,44 +28,32 @@ try:
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
 
-try:
-    import tiktoken  # type: ignore
-
-    enc = None  # lazy initialize
-
-    def count_tokens(s):
-        # type: (str) -> int
-        global enc
-        if enc is None:
-            enc = tiktoken.get_encoding("cl100k_base")
-        return len(enc.encode_ordinary(s))
-
-    logger.debug("[OpenAI] using tiktoken to count tokens")
-except ImportError:
-    logger.info(
-        "The Sentry Python SDK requires 'tiktoken' in order to measure token usage from some OpenAI APIs"
-        "Please install 'tiktoken' if you aren't receiving token usage in Sentry."
-        "See https://docs.sentry.io/platforms/python/integrations/openai/ for more information."
-    )
-
-    def count_tokens(s):
-        # type: (str) -> int
-        return 0
-
 
 class OpenAIIntegration(Integration):
     identifier = "openai"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self, include_prompts=True):
-        # type: (OpenAIIntegration, bool) -> None
+    def __init__(self, include_prompts=True, tiktoken_encoding_name=None):
+        # type: (OpenAIIntegration, bool, Optional[str]) -> None
         self.include_prompts = include_prompts
+
+        self.tiktoken_encoding = None
+        if tiktoken_encoding_name is not None:
+            import tiktoken  # type: ignore
+
+            self.tiktoken_encoding = tiktoken.get_encoding(tiktoken_encoding_name)
 
     @staticmethod
     def setup_once():
         # type: () -> None
         Completions.create = _wrap_chat_completion_create(Completions.create)
         Embeddings.create = _wrap_embeddings_create(Embeddings.create)
+
+    def count_tokens(self, s):
+        # type: (OpenAIIntegration, str) -> int
+        if self.tiktoken_encoding is not None:
+            return len(self.tiktoken_encoding.encode_ordinary(s))
+        return 0
 
 
 def _capture_exception(exc):
@@ -80,9 +67,9 @@ def _capture_exception(exc):
 
 
 def _calculate_chat_completion_usage(
-    messages, response, span, streaming_message_responses=None
+    messages, response, span, streaming_message_responses, count_tokens
 ):
-    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]]) -> None
+    # type: (Iterable[ChatCompletionMessageParam], Any, Span, Optional[List[str]], Callable[..., Any]) -> None
     completion_tokens = 0  # type: Optional[int]
     prompt_tokens = 0  # type: Optional[int]
     total_tokens = 0  # type: Optional[int]
@@ -173,7 +160,9 @@ def _wrap_chat_completion_create(f):
                         "ai.responses",
                         list(map(lambda x: x.message, res.choices)),
                     )
-                _calculate_chat_completion_usage(messages, res, span)
+                _calculate_chat_completion_usage(
+                    messages, res, span, None, integration.count_tokens
+                )
                 span.__exit__(None, None, None)
             elif hasattr(res, "_iterator"):
                 data_buf: list[list[str]] = []  # one for each choice
@@ -266,7 +255,7 @@ def _wrap_embeddings_create(f):
                     total_tokens = response.usage.total_tokens
 
             if prompt_tokens == 0:
-                prompt_tokens = count_tokens(kwargs["input"] or "")
+                prompt_tokens = integration.count_tokens(kwargs["input"] or "")
 
             record_token_usage(span, prompt_tokens, None, total_tokens or prompt_tokens)
 
