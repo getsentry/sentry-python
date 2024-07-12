@@ -532,6 +532,8 @@ class ClientConstructor:
         enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
+        cert_file=None,  # type: Optional[str]
+        key_file=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
