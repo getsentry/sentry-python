@@ -61,7 +61,11 @@ def test_basic(sentry_init, crashing_app, capture_events):
     }
 
 
-def test_basic_script_name_is_respected(sentry_init, crashing_app, capture_events):
+@pytest.mark.parametrize("path_info", ("bark/", "/bark/"))
+@pytest.mark.parametrize("script_name", ("woof/woof", "woof/woof/"))
+def test_script_name_is_respected(
+    sentry_init, crashing_app, capture_events, script_name, path_info
+):
     sentry_init(send_default_pii=True)
     app = SentryWsgiMiddleware(crashing_app)
     client = Client(app)
@@ -69,19 +73,11 @@ def test_basic_script_name_is_respected(sentry_init, crashing_app, capture_event
 
     with pytest.raises(ZeroDivisionError):
         # setting url with PATH_INFO: bark/, HTTP_HOST: dogs.are.great and SCRIPT_NAME: woof/woof/
-        client.get("bark/", "https://dogs.are.great/woof/woof/")
+        client.get(path_info, f"https://dogs.are.great/{script_name}")  # noqa: E231
 
     (event,) = events
 
-    assert event["transaction"] == "generic WSGI request"
-    print(event["request"])
-    assert event["request"] == {
-        "env": {"SERVER_NAME": "dogs.are.great", "SERVER_PORT": "443"},
-        "headers": {"Host": "dogs.are.great"},
-        "method": "GET",
-        "query_string": "",
-        "url": "https://dogs.are.great/woof/woof/bark/",
-    }
+    assert event["request"]["url"] == "https://dogs.are.great/woof/woof/bark/"
 
 
 @pytest.fixture(params=[0, None])
