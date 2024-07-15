@@ -1,4 +1,5 @@
 import copy
+import json
 
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA, OP
@@ -154,7 +155,7 @@ class CommandTracer(monitoring.CommandListener):
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = "{}".format(command)
+            query = json.dumps(command, default=str)
             span = sentry_sdk.start_span(
                 op=OP.DB,
                 description=query,
