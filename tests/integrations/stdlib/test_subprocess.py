@@ -174,6 +174,19 @@ def test_subprocess_basic(
         assert sys.executable + " -c" in subprocess_init_span["description"]
 
 
+def test_subprocess_empty_env(sentry_init, monkeypatch):
+    monkeypatch.setenv("TEST_MARKER", "should_not_be_seen")
+    sentry_init(integrations=[StdlibIntegration()], traces_sample_rate=1.0)
+    with start_transaction(name="foo"):
+        args = [
+            sys.executable,
+            "-c",
+            "import os; print(os.environ.get('TEST_MARKER', None))",
+        ]
+        output = subprocess.check_output(args, env={}, universal_newlines=True)
+    assert "should_not_be_seen" not in output
+
+
 def test_subprocess_invalid_args(sentry_init):
     sentry_init(integrations=[StdlibIntegration()])
 

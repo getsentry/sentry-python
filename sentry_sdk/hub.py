@@ -59,16 +59,6 @@ else:
 _local = ContextVar("sentry_current_hub")
 
 
-def _should_send_default_pii():
-    # type: () -> bool
-    # TODO: Migrate existing code to `scope.should_send_default_pii()` and remove this function.
-    # New code should not use this function!
-    client = Hub.current.client
-    if not client:
-        return False
-    return client.should_send_default_pii()
-
-
 class _InitGuard:
     def __init__(self, client):
         # type: (Client) -> None
@@ -99,8 +89,8 @@ def _init(*args, **kwargs):
 
     This takes the same arguments as the client constructor.
     """
-    client = Client(*args, **kwargs)  # type: ignore
-    Hub.current.bind_client(client)
+    client = Client(*args, **kwargs)
+    Scope.get_global_scope().set_client(client)
     _check_python_deprecations()
     rv = _InitGuard(client)
     return rv
@@ -413,24 +403,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             self._last_event_id = last_event_id
 
         return last_event_id
-
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
-        """
-        .. deprecated:: 2.0.0
-            This function is deprecated and will be removed in a future release.
-            Please use :py:meth:`sentry_sdk.client._Client._capture_internal_exception` instead.
-
-        Capture an exception that is likely caused by a bug in the SDK
-        itself.
-
-        Duplicated in :py:meth:`sentry_sdk.client._Client._capture_internal_exception`.
-
-        These exceptions do not end up in Sentry and are just logged instead.
-        """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
