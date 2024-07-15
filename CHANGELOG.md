@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.10.0
+
+### Various fixes & improvements
+
+- feat(openai): Make tiktoken encoding name configurable + tiktoken usage opt-in (#3289) by @colin-sentry
+- feat(pymongo): Send query description as valid JSON (#3291) by @0Calories
+- OpenAI: Lazy initialize tiktoken to avoid http at import time (#3287) by @colin-sentry
+- ref(consts): Remove Python 2 compatibility code (#3284) by @szokeasaurusrex
+- docs(init): Fix `sentry_sdk.init` type hint (#3283) by @szokeasaurusrex
+- Add the client cert and key support to HttpTransport (#3258) by @grammy-jiang
+- ref(profiling): Deprecate `hub` in `Profile` (#3270) by @szokeasaurusrex
+- ref(init): Stop using `Hub` in `init` (#3275) by @szokeasaurusrex
+- ref(hub): Delete `_should_send_default_pii` (#3274) by @szokeasaurusrex
+- test: Remove `Hub` usage in `conftest` (#3273) by @szokeasaurusrex
+- ref(debug): Rename debug logging filter (#3260) by @szokeasaurusrex
+- ref(tracing): Update `NoOpSpan.finish` signature (#3267) by @szokeasaurusrex
+- ref(tracing): Remove `Hub` in `Transaction.finish` (#3267) by @szokeasaurusrex
+- ref: Remove Hub from `capture_internal_exception` logic (#3264) by @szokeasaurusrex
+- ref(scope): Improve `Scope._capture_internal_exception` type hint (#3264) by @szokeasaurusrex
+- ref(types): Correct `ExcInfo` type (#3266) by @szokeasaurusrex
+- ref: Stop using `Hub` in `tracing_utils` (#3269) by @szokeasaurusrex
+
 ## 2.9.0
 
 ### Various fixes & improvements
