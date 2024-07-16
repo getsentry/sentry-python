@@ -1330,14 +1330,18 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if hasattr(func, "_partialmethod") and isinstance(
-        func._partialmethod, partialmethod
-    ):
-        prefix, suffix = "partialmethod(<function ", ">)"
-        func = func._partialmethod.func
-    elif isinstance(func, partial) and hasattr(func.func, "__name__"):
+    if isinstance(func, partial) and hasattr(func.func, "__name__"):
         prefix, suffix = "partial(<function ", ">)"
         func = func.func
+    else:
+        # The _partialmethod attribute of methods wrapped with partialmethod() was renamed to __partialmethod__ in CPython 3.13:
+        # https://github.com/python/cpython/pull/16600
+        partial_method = getattr(func, "_partialmethod", None) or getattr(
+            func, "__partialmethod__", None
+        )
+        if isinstance(partial_method, partialmethod):
+            prefix, suffix = "partialmethod(<function ", ">)"
+            func = partial_method.func
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
