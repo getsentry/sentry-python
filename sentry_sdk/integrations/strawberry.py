@@ -203,14 +203,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
             if self.execution_context.operation_name:
                 transaction.name = self.execution_context.operation_name
                 transaction.source = TRANSACTION_SOURCE_COMPONENT
-            if operation_type:
-                op = {
-                    "query": OP.GRAPHQL_QUERY,
-                    "mutation": OP.GRAPHQL_MUTATION,
-                    "subscription": OP.GRAPHQL_SUBSCRIPTION,
-                }.get(operation_type)
-                if op is not None:
-                    transaction.op = op
+                transaction.op = op
 
         self.graphql_span.finish()
 
