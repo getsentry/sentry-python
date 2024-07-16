@@ -118,6 +118,7 @@ class PotelSentrySpanProcessor(SpanProcessor):
 
         (op, description, _) = extract_span_data(span)
 
+        # TODO-neel-potel DSC
         trace_context = {
             "trace_id": trace_id,
             "span_id": span_id,
