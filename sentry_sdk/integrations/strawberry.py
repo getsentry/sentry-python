@@ -199,11 +199,10 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         yield
 
         transaction = self.graphql_span.containing_transaction
-        if transaction:
-            if self.execution_context.operation_name:
-                transaction.name = self.execution_context.operation_name
-                transaction.source = TRANSACTION_SOURCE_COMPONENT
-                transaction.op = op
+        if transaction and self.execution_context.operation_name:
+            transaction.name = self.execution_context.operation_name
+            transaction.source = TRANSACTION_SOURCE_COMPONENT
+            transaction.op = op
 
         self.graphql_span.finish()
 
