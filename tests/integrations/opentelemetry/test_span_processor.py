@@ -474,7 +474,6 @@ def test_on_end_sentry_span():
     span_processor._update_span_with_otel_data.assert_called_once_with(
         fake_sentry_span, otel_span
     )
-    fake_sentry_span.set_status.assert_called_once_with("ok")
     fake_sentry_span.finish.assert_called_once()
 
 
@@ -634,10 +633,25 @@ def test_span_data_for_db_query():
 
 
 @pytest.mark.parametrize(
-    "kind, attributes, expected",
+    "kind, status, attributes, expected",
     [
         (
+            SpanKind.CLIENT,
+            None,  # None means unknown error
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+            },
+            {
+                "op": "http.client",
+                "description": "POST /some/route",
+                "status": "unknown_error",
+                "http_status_code": None,
+            },
+        ),
+        (
             SpanKind.SERVER,
+            Status(StatusCode.UNSET),  # Unset defaults to OK
             {
                 "http.method": "POST",
                 "http.route": "/some/route",
@@ -650,39 +664,152 @@ def test_span_data_for_db_query():
             },
         ),
         (
-            SpanKind.CLIENT,
+            SpanKind.SERVER,
+            None,
             {
-                "http.method": "GET",
+                "http.method": "POST",
                 "http.route": "/some/route",
-                "http.status_code": 502,
+                "http.status_code": 502,  # Take this status in case of None status
             },
             {
-                "op": "http.client",
-                "description": "GET /some/route",
+                "op": "http.server",
+                "description": "POST /some/route",
                 "status": "internal_error",
                 "http_status_code": 502,
             },
         ),
         (
-            SpanKind.CLIENT,
+            SpanKind.SERVER,
+            Status(StatusCode.UNSET),
             {
-                "http.method": "GET",
+                "http.method": "POST",
                 "http.route": "/some/route",
-                "http.status_code": 502,
-                "http.response.status_code": 503,
+                "http.status_code": 502,  # Take this status in case of UNSET status
             },
             {
-                "op": "http.client",
-                "description": "GET /some/route",
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "internal_error",
+                "http_status_code": 502,
+            },
+        ),
+        (
+            SpanKind.SERVER,
+            None,
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+                "http.status_code": 502,
+                "http.response.status_code": 503,  # this takes precedence over deprecated http.status_code
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
                 "status": "unavailable",
                 "http_status_code": 503,
             },
         ),
         (
+            SpanKind.SERVER,
+            Status(StatusCode.UNSET),
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+                "http.status_code": 502,
+                "http.response.status_code": 503,  # this takes precedence over deprecated http.status_code
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "unavailable",
+                "http_status_code": 503,
+            },
+        ),
+        (
+            SpanKind.SERVER,
+            Status(StatusCode.OK),  # OK status is taken right away
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "ok",
+                "http_status_code": None,
+            },
+        ),
+        (
+            SpanKind.SERVER,
+            Status(StatusCode.OK),  # OK status is taken right away
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+                "http.response.status_code": 200,
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "ok",
+                "http_status_code": 200,
+            },
+        ),
+        (
+            SpanKind.SERVER,
+            Status(
+                StatusCode.ERROR
+            ),  # Error status without description gets the http status from attributes
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+                "http.response.status_code": 401,
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "unauthenticated",
+                "http_status_code": 401,
+            },
+        ),
+        (
+            SpanKind.SERVER,
+            Status(
+                StatusCode.ERROR, "I'm a teapot"
+            ),  # Error status with unknown description is an unknown error
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+                "http.response.status_code": 418,
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "unknown_error",
+                "http_status_code": None,
+            },
+        ),
+        (
+            SpanKind.SERVER,
+            Status(
+                StatusCode.ERROR, "unimplemented"
+            ),  # Error status with known description is taken (grpc errors)
+            {
+                "http.method": "POST",
+                "http.route": "/some/route",
+            },
+            {
+                "op": "http.server",
+                "description": "POST /some/route",
+                "status": "unimplemented",
+                "http_status_code": None,
+            },
+        ),
+        (
             SpanKind.CLIENT,
+            Status(StatusCode.OK),
             {
                 "http.method": "GET",
-                "http.target": None,
+                "http.target": None,  # no location for description
                 "net.peer.name": None,
                 "http.url": None,
             },
@@ -695,9 +822,10 @@ def test_span_data_for_db_query():
         ),
         (
             SpanKind.CLIENT,
+            Status(StatusCode.OK),
             {
                 "http.method": "GET",
-                "http.target": "/target",
+                "http.target": "/target",  # this can be the location in the description
             },
             {
                 "op": "http.client",
@@ -708,9 +836,10 @@ def test_span_data_for_db_query():
         ),
         (
             SpanKind.CLIENT,
+            Status(StatusCode.OK),
             {
                 "http.method": "GET",
-                "net.peer.name": "example.com",
+                "net.peer.name": "example.com",  # this can be the location in the description
             },
             {
                 "op": "http.client",
@@ -721,9 +850,10 @@ def test_span_data_for_db_query():
         ),
         (
             SpanKind.CLIENT,
+            Status(StatusCode.OK),
             {
                 "http.method": "GET",
-                "http.target": "/target",
+                "http.target": "/target",  # target takes precedence over net.peer.name
                 "net.peer.name": "example.com",
             },
             {
@@ -735,9 +865,10 @@ def test_span_data_for_db_query():
         ),
         (
             SpanKind.CLIENT,
+            Status(StatusCode.OK),
             {
                 "http.method": "GET",
-                "http.url": "https://username:secretpwd@example.com/bla/?secret=123&anothersecret=456",
+                "http.url": "https://username:secretpwd@example.com/bla/?secret=123&anothersecret=456",  # sensitive data is stripped
             },
             {
                 "op": "http.client",
@@ -748,9 +879,10 @@ def test_span_data_for_db_query():
         ),
     ],
 )
-def test_span_data_for_http_method(kind, attributes, expected):
+def test_span_data_for_http_method(kind, status, attributes, expected):
     otel_span = MagicMock()
     otel_span.kind = kind
+    otel_span.status = status
     otel_span.attributes = attributes
 
     op, description, status, http_status_code = span_data_for_http_method(otel_span)

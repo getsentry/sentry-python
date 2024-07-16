@@ -190,8 +190,6 @@ class SentrySpanProcessor(SpanProcessor):
 
         sentry_span.op = otel_span.name
 
-        self._update_span_with_otel_status(sentry_span, otel_span)
-
         if isinstance(sentry_span, Transaction):
             sentry_span.name = otel_span.name
             sentry_span.set_context(
@@ -298,8 +296,9 @@ class SentrySpanProcessor(SpanProcessor):
         # status and http_status are different, and this should not be
         if http_status:
             sentry_span.set_http_status(http_status)
-        if status:
-            sentry_span.set_status(status)
+        else:
+            if status:
+                sentry_span.set_status(status)
 
     def _update_transaction_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
@@ -310,5 +309,6 @@ class SentrySpanProcessor(SpanProcessor):
         # status and http_status are different, and this should not be
         if http_status:
             sentry_span.set_http_status(http_status)
-        if status:
-            sentry_span.set_status(status)
+        else:
+            if status:
+                sentry_span.set_status(status)

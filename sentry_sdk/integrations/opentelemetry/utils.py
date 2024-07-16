@@ -172,21 +172,32 @@ def extract_span_status(span):
     span_attributes = span.attributes or {}
     status = span.status or None
 
-    # This is different than the JS implementation found here:
-    # https://github.com/getsentry/sentry-javascript/blob/master/packages/opentelemetry/src/utils/mapStatus.ts
-    # did not fully understood the JS implementation because it is quite complex and I think this could be simplified.
     if status:
+        inferred_status, http_status = infer_status_from_attributes(span_attributes)
+
         if status.status_code == StatusCode.OK:
-            return (SPANSTATUS.OK, None)
+            return (SPANSTATUS.OK, http_status)
         elif status.status_code == StatusCode.ERROR:
-            inferred_status, http_status = infer_status_from_attributes(span_attributes)
-            if inferred_status:
-                return (inferred_status, http_status)
+            if status.description is None:
+                if inferred_status:
+                    return (inferred_status, http_status)
 
-            return (SPANSTATUS.UNKNOWN_ERROR, None)
+            if (
+                status.description is not None
+                and status.description in GRPC_ERROR_MAP.values()
+            ):
+                return (status.description, None)
+            else:
+                return (SPANSTATUS.UNKNOWN_ERROR, None)
 
-    # We default to setting the spans status to OK if not set.
-    return (SPANSTATUS.OK, None)
+    inferred_status, http_status = infer_status_from_attributes(span_attributes)
+    if inferred_status:
+        return (inferred_status, http_status)
+
+    if status and status.status_code == StatusCode.UNSET:
+        return (SPANSTATUS.OK, None)
+    else:
+        return (SPANSTATUS.UNKNOWN_ERROR, None)
 
 
 def infer_status_from_attributes(span_attributes):
