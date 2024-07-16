@@ -33,6 +33,12 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event
 
 
+maximum_python_312 = pytest.mark.skipif(
+    sys.version_info > (3, 12),
+    reason="Since Python 3.13, `FrameLocalsProxy` skips items of `locals()` that have non-`str` keys; this is a CPython implementation detail: https://github.com/python/cpython/blame/7b413952e817ae87bfda2ac85dd84d30a6ce743b/Objects/frameobject.c#L148",
+)
+
+
 class EnvelopeCapturedError(Exception):
     pass
 
@@ -889,6 +895,7 @@ def test_errno_errors(sentry_init, capture_events):
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
 
 
+@maximum_python_312
 def test_non_string_variables(sentry_init, capture_events):
     """There is some extremely terrible code in the wild that
     inserts non-strings as variable names into `locals()`."""
