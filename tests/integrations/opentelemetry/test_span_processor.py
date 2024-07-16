@@ -430,13 +430,14 @@ def test_on_end_sentry_transaction():
     span_processor = SentrySpanProcessor()
     span_processor._get_otel_context = MagicMock()
     span_processor._update_span_with_otel_data = MagicMock()
+    span_processor._update_transaction_with_otel_data = MagicMock()
     span_processor.otel_span_map["1234567890abcdef"] = fake_sentry_span
 
     span_processor.on_end(otel_span)
 
     fake_sentry_span.set_context.assert_called_once()
     span_processor._update_span_with_otel_data.assert_not_called()
-    fake_sentry_span.set_status.assert_called_once_with("ok")
+    span_processor._update_transaction_with_otel_data.assert_called_once()
     fake_sentry_span.finish.assert_called_once()
 
 
