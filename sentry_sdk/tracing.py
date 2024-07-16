@@ -1,9 +1,10 @@
 import uuid
 import random
+import warnings
 from datetime import datetime, timedelta, timezone
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS, SPANDATA
+from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
@@ -375,8 +376,8 @@ class Span:
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> Span
+    def start_child(self, instrumenter=None, **kwargs):
+        # type: (Optional[str], **Any) -> Span
         """
         Start a sub-span from the current span or transaction.
 
@@ -384,12 +385,12 @@ class Span:
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
         """
-        configuration_instrumenter = sentry_sdk.Scope.get_client().options[
-            "instrumenter"
-        ]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
+        if instrumenter is not None:
+            warnings.warn(
+                "The `instrumenter` parameter is deprecated.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         kwargs.setdefault("sampled", self.sampled)
 
@@ -1094,8 +1095,8 @@ class NoOpSpan(Span):
         # type: () -> Optional[Transaction]
         return None
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> NoOpSpan
+    def start_child(self, instrumenter=None, **kwargs):
+        # type: (Optional[str], **Any) -> NoOpSpan
         return NoOpSpan()
 
     def to_traceparent(self):

@@ -22,7 +22,6 @@ def test_is_sentry_span():
     assert not is_sentry_span(otel_span)
 
     client = MagicMock()
-    client.options = {"instrumenter": "otel"}
     client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
     Scope.get_global_scope().set_client(client)
 
@@ -305,7 +304,6 @@ def test_on_start_transaction():
     fake_start_transaction = MagicMock()
 
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel"}
     fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
     Scope.get_global_scope().set_client(fake_client)
 
@@ -325,7 +323,6 @@ def test_on_start_transaction():
             start_timestamp=datetime.fromtimestamp(
                 otel_span.start_time / 1e9, timezone.utc
             ),
-            instrumenter="otel",
             origin="auto.otel",
         )
 
@@ -349,7 +346,6 @@ def test_on_start_child():
     parent_context = {}
 
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel"}
     fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
     Scope.get_global_scope().set_client(fake_client)
 
@@ -365,7 +361,6 @@ def test_on_start_child():
         start_timestamp=datetime.fromtimestamp(
             otel_span.start_time / 1e9, timezone.utc
         ),
-        instrumenter="otel",
         origin="auto.otel",
     )
 
@@ -415,7 +410,6 @@ def test_on_end_sentry_transaction():
     otel_span.get_span_context.return_value = span_context
 
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel"}
     Scope.get_global_scope().set_client(fake_client)
 
     fake_sentry_span = MagicMock(spec=Transaction)
@@ -451,7 +445,6 @@ def test_on_end_sentry_span():
     otel_span.get_span_context.return_value = span_context
 
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel"}
     Scope.get_global_scope().set_client(fake_client)
 
     fake_sentry_span = MagicMock(spec=Span)
@@ -478,7 +471,6 @@ def test_link_trace_context_to_error_event():
     Test that the trace context is added to the error event.
     """
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel"}
     Scope.get_global_scope().set_client(fake_client)
 
     span_id = "1234567890abcdef"
@@ -535,7 +527,7 @@ def test_pruning_old_spans_on_start():
 
     parent_context = {}
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel", "debug": False}
+    fake_client.options = {"debug": False}
     fake_client.dsn = "https://1234567890abcdef@o123456.ingest.sentry.io/123456"
     Scope.get_global_scope().set_client(fake_client)
 
@@ -578,7 +570,6 @@ def test_pruning_old_spans_on_end():
     otel_span.parent.span_id = int("abcdef1234567890", 16)
 
     fake_client = MagicMock()
-    fake_client.options = {"instrumenter": "otel"}
     Scope.get_global_scope().set_client(fake_client)
 
     fake_sentry_span = MagicMock(spec=Span)

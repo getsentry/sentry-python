@@ -1,7 +1,13 @@
+import warnings
+
 from contextlib import contextmanager
 
+
+# Omitting the following line causes circular import when making apidocs
+from sentry_sdk.consts import INSTRUMENTER as _  # noqa: F401, N811
+
+
 from sentry_sdk._compat import with_metaclass
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
@@ -448,8 +454,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
-    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, Any) -> Span
+    def start_span(self, instrumenter=None, **kwargs):
+        # type: (Optional[str], Any) -> Span
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -469,17 +475,24 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
+        if instrumenter is not None:
+            warnings.warn(
+                "The `instrumenter` parameter is deprecated and will be removed in the future.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         scope = Scope.get_current_scope()
-        return scope.start_span(instrumenter=instrumenter, **kwargs)
+        return scope.start_span(**kwargs)
 
     def start_transaction(
         self,
         transaction=None,
-        instrumenter=INSTRUMENTER.SENTRY,
+        instrumenter=None,
         custom_sampling_context=None,
         **kwargs
     ):
-        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], Optional[str], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -508,6 +521,13 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Transaction`.
         """
+        if instrumenter is not None:
+            warnings.warn(
+                "The `instrumenter` parameter is deprecated and will be removed in the future.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         scope = Scope.get_current_scope()
 
         # For backwards compatibility, we allow passing the scope as the hub.
@@ -516,7 +536,9 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         kwargs["hub"] = scope  # type: ignore
 
         return scope.start_transaction(
-            transaction, instrumenter, custom_sampling_context, **kwargs
+            transaction=transaction,
+            custom_sampling_context=custom_sampling_context,
+            **kwargs
         )
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):

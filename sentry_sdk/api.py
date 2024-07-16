@@ -1,9 +1,9 @@
 import inspect
+import warnings
 from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
 from sentry_sdk.tracing import NoOpSpan, Transaction
 
@@ -293,7 +293,7 @@ def start_span(
 @scopemethod
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    instrumenter=INSTRUMENTER.SENTRY,  # type: str
+    instrumenter=None,  # type: Optional[str]
     custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
@@ -322,14 +322,23 @@ def start_transaction(
 
     :param transaction: The transaction to start. If omitted, we create and
         start a new transaction.
-    :param instrumenter: This parameter is meant for internal use only.
+    :param instrumenter: DEPRECATED: This parameter is meant for internal use only.
     :param custom_sampling_context: The transaction's custom sampling context.
     :param kwargs: Optional keyword arguments to be passed to the Transaction
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
+    if instrumenter is not None:
+        warnings.warn(
+            "The 'instrumenter' parameter is deprecated.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     return Scope.get_current_scope().start_transaction(
-        transaction, instrumenter, custom_sampling_context, **kwargs
+        transaction=transaction,
+        custom_sampling_context=custom_sampling_context,
+        **kwargs,
     )
 
 
