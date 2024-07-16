@@ -896,10 +896,11 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
 
 
 @pytest.mark.parametrize(
-    "name, attributes, expected",
+    "name, status, attributes, expected",
     [
         (
             "OTel Span Blank",
+            Status(StatusCode.UNSET),  # Unset defaults to OK
             {},
             {
                 "op": "OTel Span Blank",
@@ -910,6 +911,7 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
         ),
         (
             "OTel Span RPC",
+            Status(StatusCode.UNSET),  # Unset defaults to OK
             {
                 "rpc.service": "myservice.EchoService",
             },
@@ -922,6 +924,7 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
         ),
         (
             "OTel Span Messaging",
+            Status(StatusCode.UNSET),  # Unset defaults to OK
             {
                 "messaging.system": "rabbitmq",
             },
@@ -934,6 +937,7 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
         ),
         (
             "OTel Span FaaS",
+            Status(StatusCode.UNSET),  # Unset defaults to OK
             {
                 "faas.trigger": "pubsub",
             },
@@ -946,9 +950,10 @@ def test_span_data_for_http_method(kind, status, attributes, expected):
         ),
     ],
 )
-def test_extract_span_data(name, attributes, expected):
+def test_extract_span_data(name, status, attributes, expected):
     otel_span = MagicMock()
     otel_span.name = name
+    otel_span.status = Status(StatusCode.UNSET)
     otel_span.attributes = attributes
 
     op, description, status, http_status_code = extract_span_data(otel_span)
