@@ -178,14 +178,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         )
 
         span = sentry_sdk.get_current_span()
-
         if span:
-            if self._operation_name:
-                transaction = span.containing_transaction
-                if transaction:
-                    transaction.name = self._operation_name
-                    transaction.source = TRANSACTION_SOURCE_COMPONENT
-
             self.graphql_span = span.start_child(
                 op=op,
                 description=description,
@@ -204,6 +197,11 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         self.graphql_span.set_data("graphql.resource_name", self._resource_name)
 
         yield
+
+        transaction = self.graphql_span.containing_transaction
+        if transaction and self.execution_context.operation_name:
+            transaction.name = self.execution_context.operation_name
+            transaction.source = TRANSACTION_SOURCE_COMPONENT
 
         self.graphql_span.finish()
 
