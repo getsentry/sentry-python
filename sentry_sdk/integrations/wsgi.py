@@ -55,10 +55,14 @@ def get_request_url(environ, use_x_forwarded_for=False):
     # type: (Dict[str, str], bool) -> str
     """Return the absolute URL without query string for the given WSGI
     environment."""
+    script_name = environ.get("SCRIPT_NAME", "").rstrip("/")
+    path_info = environ.get("PATH_INFO", "").lstrip("/")
+    path = f"{script_name}/{path_info}"
+
     return "%s://%s/%s" % (
         environ.get("wsgi.url_scheme"),
         get_host(environ, use_x_forwarded_for),
-        wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
+        wsgi_decoding_dance(path).lstrip("/"),
     )
 
 

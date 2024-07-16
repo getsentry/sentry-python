@@ -626,7 +626,9 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
             assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
             )
-            assert data.get(SPANDATA.SERVER_PORT) == "5432"
+            assert data.get(SPANDATA.SERVER_PORT) == os.environ.get(
+                "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
+            )
 
 
 def test_set_db_data_custom_backend():
