@@ -121,8 +121,9 @@ if TYPE_CHECKING:
         total=False,
     )
 
-    ExcInfo = Tuple[
-        Optional[Type[BaseException]], Optional[BaseException], Optional[TracebackType]
+    ExcInfo = Union[
+        tuple[Type[BaseException], BaseException, Optional[TracebackType]],
+        tuple[None, None, None],
     ]
 
     Hint = Dict[str, Any]
@@ -155,6 +156,7 @@ if TYPE_CHECKING:
         "profile_chunk",
         "metric_bucket",
         "monitor",
+        "span",
     ]
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 

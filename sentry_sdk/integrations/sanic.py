@@ -28,13 +28,12 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Optional
     from typing import Union
-    from typing import Tuple
     from typing import Dict
 
     from sanic.request import Request, RequestParameters
     from sanic.response import BaseHTTPResponse
 
-    from sentry_sdk._types import Event, EventProcessor, Hint
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
     from sanic.router import Route
 
 try:
@@ -325,7 +324,7 @@ def _legacy_router_get(self, *args):
 
 @ensure_integration_enabled(SanicIntegration)
 def _capture_exception(exception):
-    # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
+    # type: (Union[ExcInfo, BaseException]) -> None
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,

@@ -3,7 +3,7 @@ import weakref
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope
@@ -133,7 +133,7 @@ class AioHttpIntegration(Integration):
                             transaction.set_http_status(e.status_code)
                             raise
                         except (asyncio.CancelledError, ConnectionResetError):
-                            transaction.set_status("cancelled")
+                            transaction.set_status(SPANSTATUS.CANCELLED)
                             raise
                         except Exception:
                             # This will probably map to a 500 but seems like we

@@ -80,12 +80,6 @@ def json_dumps(data):
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
 
 
-def _get_debug_hub():
-    # type: () -> Optional[sentry_sdk.Hub]
-    # This function is replaced by debug.py
-    pass
-
-
 def get_git_revision():
     # type: () -> Optional[str]
     try:
@@ -197,9 +191,8 @@ def capture_internal_exceptions():
 
 def capture_internal_exception(exc_info):
     # type: (ExcInfo) -> None
-    hub = _get_debug_hub()
-    if hub is not None:
-        hub._capture_internal_exception(exc_info)
+    if sentry_sdk.get_client().is_active():
+        sentry_sdk.Scope._capture_internal_exception(exc_info)
 
 
 def to_timestamp(value):
@@ -1018,7 +1011,14 @@ def exc_info_from_error(error):
     else:
         raise ValueError("Expected Exception object to report, got %s!" % type(error))
 
-    return exc_type, exc_value, tb
+    exc_info = (exc_type, exc_value, tb)
+
+    if TYPE_CHECKING:
+        # This cast is safe because exc_type and exc_value are either both
+        # None or both not None.
+        exc_info = cast(ExcInfo, exc_info)
+
+    return exc_info
 
 
 def event_from_exception(
