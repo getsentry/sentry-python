@@ -182,8 +182,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         if span:
             if self._operation_name:
                 transaction = span.containing_transaction
-                transaction.name = self._operation_name
-                transaction.source = TRANSACTION_SOURCE_COMPONENT
+                if transaction:
+                    transaction.name = self._operation_name
+                    transaction.source = TRANSACTION_SOURCE_COMPONENT
 
             self.graphql_span = span.start_child(
                 op=op,
