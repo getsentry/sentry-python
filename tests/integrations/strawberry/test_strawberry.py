@@ -325,6 +325,7 @@ def test_capture_transaction_on_error(
     (_, transaction_event) = events
 
     assert transaction_event["transaction"] == "ErrorQuery"
+    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
     assert transaction_event["spans"]
 
     query_spans = [
@@ -401,6 +402,7 @@ def test_capture_transaction_on_success(
     (transaction_event,) = events
 
     assert transaction_event["transaction"] == "GreetingQuery"
+    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
     assert transaction_event["spans"]
 
     query_spans = [
@@ -557,6 +559,7 @@ def test_transaction_mutation(
     (transaction_event,) = events
 
     assert transaction_event["transaction"] == "Change"
+    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_MUTATION
     assert transaction_event["spans"]
 
     query_spans = [
