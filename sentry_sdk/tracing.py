@@ -1272,7 +1272,7 @@ class POTelSpan:
 
     def set_data(self, key, value):
         # type: (str, Any) -> None
-        pass
+        self._otel_span.set_attribute(key, value)
 
     def set_status(self, status):
         # type: (str) -> None

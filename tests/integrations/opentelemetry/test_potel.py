@@ -208,3 +208,45 @@ def test_children_span_nesting_mixed(capture_envelopes):
     assert db_span["parent_span_id"] == payload["contexts"]["trace"]["span_id"]
     assert http_span["parent_span_id"] == payload["contexts"]["trace"]["span_id"]
     assert redis_span["parent_span_id"] == db_span["span_id"]
+
+
+def test_span_attributes_in_data_started_with_otel(capture_envelopes):
+    envelopes = capture_envelopes()
+
+    with tracer.start_as_current_span("request") as request_span:
+        request_span.set_attributes({"foo": "bar", "baz": 42})
+        with tracer.start_as_current_span("db") as db_span:
+            db_span.set_attributes({"abc": 99, "def": "moo"})
+
+    (envelope,) = envelopes
+    (item,) = envelope.items
+    payload = item.payload.json
+
+    assert payload["contexts"]["trace"]["data"] == {"foo": "bar", "baz": 42}
+    assert payload["spans"][0]["data"] == {"abc": 99, "def": "moo"}
+
+
+def test_span_data_started_with_sentry(capture_envelopes):
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.start_span(op="http", description="request") as request_span:
+        request_span.set_data("foo", "bar")
+        with sentry_sdk.start_span(op="db", description="statement") as db_span:
+            db_span.set_data("baz", 42)
+
+    (envelope,) = envelopes
+    (item,) = envelope.items
+    payload = item.payload.json
+
+    assert payload["contexts"]["trace"]["data"] == {
+        "foo": "bar",
+        "sentry.origin": "manual",
+        "sentry.description": "request",
+        "sentry.op": "http",
+    }
+    assert payload["spans"][0]["data"] == {
+        "baz": 42,
+        "sentry.origin": "manual",
+        "sentry.description": "statement",
+        "sentry.op": "db",
+    }
