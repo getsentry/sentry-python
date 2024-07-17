@@ -324,11 +324,8 @@ def test_capture_transaction_on_error(
     assert len(events) == 2
     (_, transaction_event) = events
 
-    if async_execution:
-        assert transaction_event["transaction"] == "/graphql"
-    else:
-        assert transaction_event["transaction"] == "graphql_view"
-
+    assert transaction_event["transaction"] == "ErrorQuery"
+    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
     assert transaction_event["spans"]
 
     query_spans = [
@@ -404,11 +401,8 @@ def test_capture_transaction_on_success(
     assert len(events) == 1
     (transaction_event,) = events
 
-    if async_execution:
-        assert transaction_event["transaction"] == "/graphql"
-    else:
-        assert transaction_event["transaction"] == "graphql_view"
-
+    assert transaction_event["transaction"] == "GreetingQuery"
+    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_QUERY
     assert transaction_event["spans"]
 
     query_spans = [
@@ -564,11 +558,8 @@ def test_transaction_mutation(
     assert len(events) == 1
     (transaction_event,) = events
 
-    if async_execution:
-        assert transaction_event["transaction"] == "/graphql"
-    else:
-        assert transaction_event["transaction"] == "graphql_view"
-
+    assert transaction_event["transaction"] == "Change"
+    assert transaction_event["contexts"]["trace"]["op"] == OP.GRAPHQL_MUTATION
     assert transaction_event["spans"]
 
     query_spans = [
