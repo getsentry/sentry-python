@@ -394,6 +394,10 @@ class Span:
         Takes the same arguments as the initializer of :py:class:`Span`. The
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
+
+        The instrumenter parameter is deprecated for user code, and it will
+        be removed in the next major version. Going forward, it should only
+        be used by the SDK itself.
         """
         configuration_instrumenter = sentry_sdk.Scope.get_client().options[
             "instrumenter"
