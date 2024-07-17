@@ -56,12 +56,21 @@ else:
         return x
 
 
-_HUB_DEPRECATION_MESSAGE = (
-    "`sentry_sdk.Hub` is deprecated and will be removed in a future major release. "
-    "Please consult our 1.x to 2.x migration guide for details on how to migrate "
-    "`Hub` usage to the new API: "
-    "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x"
-)
+class SentryHubDeprecationWarning(DeprecationWarning):
+    """
+    A custom deprecation warning to inform users that the Hub is deprecated.
+    """
+
+    _MESSAGE = (
+        "`sentry_sdk.Hub` is deprecated and will be removed in a future major release. "
+        "Please consult our 1.x to 2.x migration guide for details on how to migrate "
+        "`Hub` usage to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x"
+    )
+
+    def __init__(self, *_):
+        # type: (*object) -> None
+        super().__init__(self._MESSAGE)
 
 
 @contextmanager
@@ -69,7 +78,7 @@ def _suppress_hub_deprecation_warning():
     # type: () -> Generator[None, None, None]
     """Utility function to suppress deprecation warnings for the Hub."""
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", _HUB_DEPRECATION_MESSAGE, DeprecationWarning)
+        warnings.filterwarnings("ignore", category=SentryHubDeprecationWarning)
         yield
 
 
@@ -81,7 +90,7 @@ class HubMeta(type):
     def current(cls):
         # type: () -> Hub
         """Returns the current instance of the hub."""
-        warnings.warn(_HUB_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
+        warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
         rv = _local.get(None)
         if rv is None:
             with _suppress_hub_deprecation_warning():
@@ -94,7 +103,7 @@ class HubMeta(type):
     def main(cls):
         # type: () -> Hub
         """Returns the main instance of the hub."""
-        warnings.warn(_HUB_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
+        warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
         return GLOBAL_HUB
 
 
@@ -125,7 +134,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
-        warnings.warn(_HUB_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
+        warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
 
         current_scope = None
 

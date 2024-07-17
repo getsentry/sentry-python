@@ -842,12 +842,12 @@ def test_last_event_id_scope(sentry_init):
 
 
 def test_hub_constructor_deprecation_warning():
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
         Hub()
 
 
 def test_hub_current_deprecation_warning():
-    with pytest.warns(DeprecationWarning) as warning_records:
+    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning) as warning_records:
         Hub.current
 
     # Make sure we only issue one deprecation warning
@@ -855,5 +855,5 @@ def test_hub_current_deprecation_warning():
 
 
 def test_hub_main_deprecation_warnings():
-    with pytest.warns(DeprecationWarning):
+    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
         Hub.main
