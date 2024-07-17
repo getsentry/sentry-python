@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -176,9 +177,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
             },
         )
 
-        scope = Scope.get_isolation_scope()
-        if scope.span:
-            self.graphql_span = scope.span.start_child(
+        span = sentry_sdk.get_current_span()
+        if span:
+            self.graphql_span = span.start_child(
                 op=op,
                 description=description,
                 origin=StrawberryIntegration.origin,
@@ -196,6 +197,12 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         self.graphql_span.set_data("graphql.resource_name", self._resource_name)
 
         yield
+
+        transaction = self.graphql_span.containing_transaction
+        if transaction and self.execution_context.operation_name:
+            transaction.name = self.execution_context.operation_name
+            transaction.source = TRANSACTION_SOURCE_COMPONENT
+            transaction.op = op
 
         self.graphql_span.finish()
 
