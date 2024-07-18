@@ -1,5 +1,79 @@
 # Changelog
 
+## 2.10.0
+
+### Various fixes & improvements
+
+- Add client cert and key support to `HttpTransport` (#3258) by @grammy-jiang
+
+  Add `cert_file` and `key_file` to your `sentry_sdk.init` to use a custom client cert and key. Alternatively, the environment variables `CLIENT_CERT_FILE` and `CLIENT_KEY_FILE` can be used as well.
+
+- OpenAI: Lazy initialize tiktoken to avoid http at import time (#3287) by @colin-sentry
+- OpenAI, Langchain: Make tiktoken encoding name configurable + tiktoken usage opt-in (#3289) by @colin-sentry
+
+  Fixed a bug where having certain packages installed along the Sentry SDK caused an HTTP request to be made to OpenAI infrastructure when the Sentry SDK was initialized. The request was made when the `tiktoken` package and at least one of the `openai` or `langchain` packages were installed.
+
+  The request was fetching a `tiktoken` encoding in order to correctly measure token usage in some OpenAI and Langchain calls. This behavior is now opt-in. The choice of encoding to use was made configurable as well. To opt in, set the `tiktoken_encoding_name` parameter in the OpenAPI or Langchain integration.
+
+  ```python
+  sentry_sdk.init(
+      integrations=[
+          OpenAIIntegration(tiktoken_encoding_name="cl100k_base"),
+          LangchainIntegration(tiktoken_encoding_name="cl100k_base"),
+      ],
+  )
+  ``` 
+
+- PyMongo: Send query description as valid JSON (#3291) by @0Calories
+- Remove Python 2 compatibility code (#3284) by @szokeasaurusrex
+- Fix `sentry_sdk.init` type hint (#3283) by @szokeasaurusrex
+- Deprecate `hub` in `Profile` (#3270) by @szokeasaurusrex
+- Stop using `Hub` in `init` (#3275) by @szokeasaurusrex
+- Delete `_should_send_default_pii` (#3274) by @szokeasaurusrex
+- Remove `Hub` usage in `conftest` (#3273) by @szokeasaurusrex
+- Rename debug logging filter (#3260) by @szokeasaurusrex
+- Update `NoOpSpan.finish` signature (#3267) by @szokeasaurusrex
+- Remove `Hub` in `Transaction.finish` (#3267) by @szokeasaurusrex
+- Remove Hub from `capture_internal_exception` logic (#3264) by @szokeasaurusrex
+- Improve `Scope._capture_internal_exception` type hint (#3264) by @szokeasaurusrex
+- Correct `ExcInfo` type (#3266) by @szokeasaurusrex
+- Stop using `Hub` in `tracing_utils` (#3269) by @szokeasaurusrex
+
+## 2.9.0
+
+### Various fixes & improvements
+
+- ref(transport): Improve event data category typing (#3243) by @szokeasaurusrex
+- ref(tracing): Improved handling of span status (#3261) by @antonpirker
+- test(client): Add tests for dropped span client reports (#3244) by @szokeasaurusrex
+- test(transport): Test new client report features (#3244) by @szokeasaurusrex
+- feat(tracing): Record lost spans in client reports (#3244) by @szokeasaurusrex
+- test(sampling): Replace custom logic with `capture_record_lost_event_calls` (#3257) by @szokeasaurusrex
+- test(transport): Non-order-dependent discarded events assertion (#3255) by @szokeasaurusrex
+- test(core): Introduce `capture_record_lost_event_calls` fixture (#3254) by @szokeasaurusrex
+- test(core): Fix non-idempotent test (#3253) by @szokeasaurusrex
+
+## 2.8.0
+
+### Various fixes & improvements
+
+- `profiler_id` uses underscore (#3249) by @Zylphrex
+- Don't send full env to subprocess (#3251) by @kmichel-aiven
+- Stop using `Hub` in `HttpTransport` (#3247) by @szokeasaurusrex
+- Remove `ipdb` from test requirements (#3237) by @rominf
+- Avoid propagation of empty baggage (#2968) by @hartungstenio
+- Add entry point for `SentryPropagator` (#3086) by @mender
+- Bump checkouts/data-schemas from `8c13457` to `88273a9` (#3225) by @dependabot
+
+## 2.7.1
+
+### Various fixes & improvements
+
+- fix(otel): Fix missing baggage (#3218) by @sentrivana
+- This is the config file of asdf-vm which we do not use. (#3215) by @antonpirker
+- Added option to disable middleware spans in Starlette (#3052) by @antonpirker
+- build: Update tornado version in setup.py to match code check. (#3206) by @aclemons
+
 ## 2.7.0
 
 - Add `origin` to spans and transactions (#3133) by @antonpirker

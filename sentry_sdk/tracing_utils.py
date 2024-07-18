@@ -492,9 +492,9 @@ class Baggage:
         third_party_items = ""
         mutable = False
 
-        client = sentry_sdk.Hub.current.client
+        client = sentry_sdk.get_client()
 
-        if client is None or scope._propagation_context is None:
+        if not client.is_active() or scope._propagation_context is None:
             return Baggage(sentry_items)
 
         options = client.options

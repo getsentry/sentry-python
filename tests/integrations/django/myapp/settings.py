@@ -122,7 +122,7 @@ try:
     DATABASES["postgres"] = {
         "ENGINE": db_engine,
         "HOST": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"),
-        "PORT": 5432,
+        "PORT": int(os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432")),
         "USER": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_USER", "postgres"),
         "PASSWORD": os.environ.get("SENTRY_PYTHON_TEST_POSTGRES_PASSWORD", "sentry"),
         "NAME": os.environ.get(

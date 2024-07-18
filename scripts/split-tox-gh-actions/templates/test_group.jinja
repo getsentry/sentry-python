@@ -49,6 +49,7 @@
       - uses: actions/setup-python@v5
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
+          allow-prereleases: true
       {% if needs_clickhouse %}
       - uses: getsentry/action-clickhouse-in-ci@v1
       {% endif %}
@@ -95,3 +96,4 @@
         uses: codecov/test-results-action@v1
         with:
           token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
+          files: .junitxml

@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
@@ -9,6 +10,7 @@ from sentry_sdk.client import Client
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
+import sentry_sdk.scope
 from sentry_sdk import (
     push_scope,
     configure_scope,
@@ -29,10 +31,7 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.scope import (  # noqa: F401
-    add_global_event_processor,
-    global_event_processors,
-)
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
@@ -546,7 +545,7 @@ def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
 
 
 def test_dedupe_event_processor_drop_records_client_report(
-    sentry_init, capture_events, capture_client_reports
+    sentry_init, capture_events, capture_record_lost_event_calls
 ):
     """
     DedupeIntegration internally has an event_processor that filters duplicate exceptions.
@@ -555,7 +554,7 @@ def test_dedupe_event_processor_drop_records_client_report(
     """
     sentry_init()
     events = capture_events()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     try:
         raise ValueError("aha!")
@@ -567,35 +566,50 @@ def test_dedupe_event_processor_drop_records_client_report(
             capture_exception()
 
     (event,) = events
-    (report,) = reports
+    (lost_event_call,) = record_lost_event_calls
 
     assert event["level"] == "error"
     assert "exception" in event
-    assert report == ("event_processor", "error")
+    assert lost_event_call == ("event_processor", "error", None, 1)
 
 
 def test_event_processor_drop_records_client_report(
-    sentry_init, capture_events, capture_client_reports
+    sentry_init, capture_events, capture_record_lost_event_calls
 ):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
-    global global_event_processors
+    # Ensure full idempotency by restoring the original global event processors list object, not just a copy.
+    old_processors = sentry_sdk.scope.global_event_processors
 
-    @add_global_event_processor
-    def foo(event, hint):
-        return None
+    try:
+        sentry_sdk.scope.global_event_processors = (
+            sentry_sdk.scope.global_event_processors.copy()
+        )
 
-    capture_message("dropped")
+        @add_global_event_processor
+        def foo(event, hint):
+            return None
 
-    with start_transaction(name="dropped"):
-        pass
+        capture_message("dropped")
 
-    assert len(events) == 0
-    assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+        with start_transaction(name="dropped"):
+            pass
 
-    global_event_processors.pop()
+        assert len(events) == 0
+
+        # Using Counter because order of record_lost_event calls does not matter
+        assert Counter(record_lost_event_calls) == Counter(
+            [
+                ("event_processor", "error", None, 1),
+                ("event_processor", "transaction", None, 1),
+                ("event_processor", "span", None, 1),
+            ]
+        )
+
+    finally:
+        sentry_sdk.scope.global_event_processors = old_processors
 
 
 @pytest.mark.parametrize(

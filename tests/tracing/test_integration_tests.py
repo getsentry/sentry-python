@@ -10,6 +10,7 @@ from sentry_sdk import (
     start_span,
     start_transaction,
 )
+from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
 
@@ -20,7 +21,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
     events = capture_events()
 
     with start_transaction(name="hi") as transaction:
-        transaction.set_status("ok")
+        transaction.set_status(SPANSTATUS.OK)
         with pytest.raises(ZeroDivisionError):
             with start_span(op="foo", description="foodesc"):
                 1 / 0

@@ -207,7 +207,11 @@ def _install_subprocess():
             ):
                 if env is None:
                     env = _init_argument(
-                        a, kw, "env", 10, lambda x: dict(x or os.environ)
+                        a,
+                        kw,
+                        "env",
+                        10,
+                        lambda x: dict(x if x is not None else os.environ),
                     )
                 env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
