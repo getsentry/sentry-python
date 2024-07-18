@@ -22,6 +22,7 @@ from sentry_sdk.utils import (
     is_sentry_url,
     _is_external_source,
     _module_in_list,
+    _is_in_project_root,
 )
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -218,21 +219,14 @@ def add_query_source(span):
         is_sentry_sdk_frame = namespace is not None and namespace.startswith(
             "sentry_sdk."
         )
+        should_be_included = _module_in_list(namespace, in_app_include)
+        should_be_excluded = _is_external_source(abs_path) or _module_in_list(
+            namespace, in_app_exclude
+        )
 
-        should_be_included = not _is_external_source(abs_path)
-        if namespace is not None:
-            if in_app_exclude and _module_in_list(namespace, in_app_exclude):
-                should_be_included = False
-            if in_app_include and _module_in_list(namespace, in_app_include):
-                # in_app_include takes precedence over in_app_exclude, so doing it
-                # at the end
-                should_be_included = True
-
-        if (
-            abs_path is not None
-            and abs_path.startswith(project_root)
-            and should_be_included
-            and not is_sentry_sdk_frame
+        if not is_sentry_sdk_frame and (
+            should_be_included
+            or (_is_in_project_root(abs_path, project_root) and not should_be_excluded)
         ):
             break
 
