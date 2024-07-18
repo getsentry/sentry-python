@@ -5,7 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
@@ -317,7 +317,7 @@ def _wrap_tracer(task, f):
                     origin=CeleryIntegration.origin,
                 )
                 transaction.name = task.name
-                transaction.set_status("ok")
+                transaction.set_status(SPANSTATUS.OK)
 
             if transaction is None:
                 return f(*args, **kwargs)

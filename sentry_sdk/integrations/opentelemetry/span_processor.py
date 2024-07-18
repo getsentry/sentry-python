@@ -16,7 +16,7 @@ from opentelemetry.trace.span import (
     INVALID_TRACE_ID,
 )
 from sentry_sdk import get_client, start_transaction
-from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -299,10 +299,10 @@ class SentrySpanProcessor(SpanProcessor):
             return
 
         if otel_span.status.is_ok:
-            sentry_span.set_status("ok")
+            sentry_span.set_status(SPANSTATUS.OK)
             return
 
-        sentry_span.set_status("internal_error")
+        sentry_span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     def _update_span_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None

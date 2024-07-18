@@ -1031,9 +1031,8 @@ class Scope(object):
 
             transaction._profile = profile
 
-        # we don't bother to keep spans if we already know we're not going to
-        # send the transaction
-        if transaction.sampled:
+            # we don't bother to keep spans if we already know we're not going to
+            # send the transaction
             max_spans = (client.options["_experiments"].get("max_spans")) or 1000
             transaction.init_span_recorder(maxlen=max_spans)
 
@@ -1190,10 +1189,9 @@ class Scope(object):
 
         return None
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
+    @staticmethod
+    def _capture_internal_exception(exc_info):
+        # type: (ExcInfo) -> None
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.

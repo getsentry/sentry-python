@@ -133,10 +133,23 @@ class Transport(ABC):
         reason,  # type: str
         data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
+        *,
+        quantity=1,  # type: int
     ):
         # type: (...) -> None
         """This increments a counter for event loss by reason and
-        data category.
+        data category by the given positive-int quantity (default 1).
+
+        If an item is provided, the data category and quantity are
+        extracted from the item, and the values passed for
+        data_category and quantity are ignored.
+
+        When recording a lost transaction via data_category="transaction",
+        the calling code should also record the lost spans via this method.
+        When recording lost spans, `quantity` should be set to the number
+        of contained spans, plus one for the transaction itself. When
+        passing an Item containing a transaction via the `item` parameter,
+        this method automatically records the lost spans.
         """
         return None
 
@@ -213,6 +226,8 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            cert_file=options["cert_file"],
+            key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
 
@@ -224,15 +239,26 @@ class HttpTransport(Transport):
         reason,  # type: str
         data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
+        *,
+        quantity=1,  # type: int
     ):
         # type: (...) -> None
         if not self.options["send_client_reports"]:
             return
 
-        quantity = 1
         if item is not None:
             data_category = item.data_category
-            if data_category == "attachment":
+            quantity = 1  # If an item is provided, we always count it as 1 (except for attachments, handled below).
+
+            if data_category == "transaction":
+                # Also record the lost spans
+                event = item.get_transaction_event() or {}
+
+                # +1 for the transaction itself
+                span_count = len(event.get("spans") or []) + 1
+                self.record_lost_event(reason, "span", quantity=span_count)
+
+            elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
                 quantity = len(item.get_bytes()) or 1
@@ -450,8 +476,8 @@ class HttpTransport(Transport):
         )
         return None
 
-    def _get_pool_options(self, ca_certs):
-        # type: (Optional[Any]) -> Dict[str, Any]
+    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
         options = {
             "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
@@ -481,6 +507,9 @@ class HttpTransport(Transport):
             or certifi.where()
         )
 
+        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
+        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
+
         return options
 
     def _in_no_proxy(self, parsed_dsn):
@@ -500,6 +529,8 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        cert_file,  # type: Optional[Any]
+        key_file,  # type: Optional[Any]
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
@@ -514,7 +545,7 @@ class HttpTransport(Transport):
         if not proxy and (http_proxy != ""):
             proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
-        opts = self._get_pool_options(ca_certs)
+        opts = self._get_pool_options(ca_certs, cert_file, key_file)
 
         if proxy:
             if proxy_headers:
