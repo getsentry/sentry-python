@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     to_string,
     is_sentry_url,
     _is_external_source,
+    _is_in_project_root,
     _module_in_list,
 )
 from sentry_sdk._types import TYPE_CHECKING
@@ -170,6 +171,14 @@ def maybe_create_breadcrumbs_from_span(scope, span):
         )
 
 
+def _get_frame_module_abs_path(frame):
+    # type: (FrameType) -> Optional[str]
+    try:
+        return frame.f_code.co_filename
+    except Exception:
+        return None
+
+
 def add_query_source(span):
     # type: (sentry_sdk.tracing.Span) -> None
     """
@@ -200,10 +209,7 @@ def add_query_source(span):
     # Find the correct frame
     frame = sys._getframe()  # type: Union[FrameType, None]
     while frame is not None:
-        try:
-            abs_path = frame.f_code.co_filename
-        except Exception:
-            abs_path = ""
+        abs_path = _get_frame_module_abs_path(frame)
 
         try:
             namespace = frame.f_globals.get("__name__")  # type: Optional[str]
@@ -215,16 +221,15 @@ def add_query_source(span):
         )
 
         should_be_included = not _is_external_source(abs_path)
-        if namespace is not None:
-            if in_app_exclude and _module_in_list(namespace, in_app_exclude):
-                should_be_included = False
-            if in_app_include and _module_in_list(namespace, in_app_include):
-                # in_app_include takes precedence over in_app_exclude, so doing it
-                # at the end
-                should_be_included = True
+        if _module_in_list(namespace, in_app_exclude):
+            should_be_included = False
+        if _module_in_list(namespace, in_app_include):
+            # in_app_include takes precedence over in_app_exclude, so doing it
+            # at the end
+            should_be_included = True
 
         if (
-            abs_path.startswith(project_root)
+            _is_in_project_root(abs_path, project_root)
             and should_be_included
             and not is_sentry_sdk_frame
         ):
@@ -250,10 +255,7 @@ def add_query_source(span):
         if namespace is not None:
             span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
 
-        try:
-            filepath = frame.f_code.co_filename
-        except Exception:
-            filepath = None
+        filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
             if namespace is not None:
                 in_app_path = filename_for_module(namespace, filepath)
