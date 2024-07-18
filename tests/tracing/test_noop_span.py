@@ -1,9 +1,9 @@
 import sentry_sdk
 from sentry_sdk.tracing import NoOpSpan
 
-# This tests make sure, that the examples from the documentation [1]
-# are working when OTel (OpenTelementry) instrumentation is turned on
-# and therefore the Senntry tracing should not do anything.
+# These tests make sure that the examples from the documentation [1]
+# are working when OTel (OpenTelemetry) instrumentation is turned on,
+# and therefore, the Sentry tracing should not do anything.
 #
 # 1: https://docs.sentry.io/platforms/python/performance/instrumentation/custom-instrumentation/
 

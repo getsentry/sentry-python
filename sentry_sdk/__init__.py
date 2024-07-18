@@ -1,7 +1,8 @@
-from sentry_sdk.hub import Hub, init
+from sentry_sdk.hub import Hub
 from sentry_sdk.scope import Scope
 from sentry_sdk.transport import Transport, HttpTransport
 from sentry_sdk.client import Client
+from sentry_sdk._init_implementation import init
 
 from sentry_sdk.api import *  # noqa
 
