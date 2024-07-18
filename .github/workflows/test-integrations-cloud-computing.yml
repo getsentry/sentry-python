@@ -75,6 +75,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   test-cloud_computing-pinned:
     name: Cloud Computing (pinned)
     timeout-minutes: 30
@@ -132,6 +133,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   check_required_tests:
     name: All Cloud Computing tests passed
     needs: test-cloud_computing-pinned
