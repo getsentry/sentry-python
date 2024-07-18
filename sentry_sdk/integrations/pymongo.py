@@ -1,4 +1,5 @@
 import copy
+import json
 
 import sentry_sdk
 from sentry_sdk.consts import SPANSTATUS, SPANDATA, OP
@@ -154,7 +155,7 @@ class CommandTracer(monitoring.CommandListener):
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
-            query = "{}".format(command)
+            query = json.dumps(command, default=str)
             span = sentry_sdk.start_span(
                 op=OP.DB,
                 description=query,
@@ -162,7 +163,11 @@ class CommandTracer(monitoring.CommandListener):
             )
 
             for tag, value in tags.items():
+                # set the tag for backwards-compatibility.
+                # TODO: remove the set_tag call in the next major release!
                 span.set_tag(tag, value)
+
+                span.set_data(tag, value)
 
             for key, value in data.items():
                 span.set_data(key, value)

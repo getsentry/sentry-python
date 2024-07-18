@@ -226,6 +226,8 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            cert_file=options["cert_file"],
+            key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
 
@@ -474,8 +476,8 @@ class HttpTransport(Transport):
         )
         return None
 
-    def _get_pool_options(self, ca_certs):
-        # type: (Optional[Any]) -> Dict[str, Any]
+    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
         options = {
             "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
@@ -505,6 +507,9 @@ class HttpTransport(Transport):
             or certifi.where()
         )
 
+        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
+        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
+
         return options
 
     def _in_no_proxy(self, parsed_dsn):
@@ -524,6 +529,8 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        cert_file,  # type: Optional[Any]
+        key_file,  # type: Optional[Any]
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
@@ -538,7 +545,7 @@ class HttpTransport(Transport):
         if not proxy and (http_proxy != ""):
             proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
-        opts = self._get_pool_options(ca_certs)
+        opts = self._get_pool_options(ca_certs, cert_file, key_file)
 
         if proxy:
             if proxy_headers:

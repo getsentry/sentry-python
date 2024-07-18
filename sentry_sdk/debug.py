@@ -8,7 +8,7 @@ from sentry_sdk.utils import logger
 from logging import LogRecord
 
 
-class _HubBasedClientFilter(logging.Filter):
+class _DebugFilter(logging.Filter):
     def filter(self, record):
         # type: (LogRecord) -> bool
         if _client_init_debug.get(False):
@@ -29,7 +29,7 @@ def configure_logger():
     _handler.setFormatter(logging.Formatter(" [sentry] %(levelname)s: %(message)s"))
     logger.addHandler(_handler)
     logger.setLevel(logging.DEBUG)
-    logger.addFilter(_HubBasedClientFilter())
+    logger.addFilter(_DebugFilter())
 
 
 def configure_debug_hub():
