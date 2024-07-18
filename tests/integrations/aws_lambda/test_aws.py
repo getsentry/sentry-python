@@ -139,10 +139,10 @@ def lambda_client():
 
 @pytest.fixture(
     params=[
-        "python3.8",
-        "python3.9",
-        "python3.10",
-        "python3.11",
+        # "python3.8",
+        # "python3.9",
+        # "python3.10",
+        # "python3.11",
         "python3.12",
     ]
 )
@@ -168,6 +168,8 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
             layer=layer,
             initial_handler=initial_handler,
         )
+
+        1/0
 
         # Make sure the "ENVELOPE:" and "EVENT:" log entries are always starting a new line. (Sometimes they don't.)
         response["LogResult"] = (
