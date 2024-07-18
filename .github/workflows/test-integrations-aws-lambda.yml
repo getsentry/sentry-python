@@ -97,7 +97,9 @@ jobs:
         if: ${{ !cancelled() }}
         uses: codecov/test-results-action@v1
         with:
+          files: .junitxml
           token: ${{ secrets.CODECOV_TOKEN }}
+
   check_required_tests:
     name: All AWS Lambda tests passed
     needs: test-aws_lambda-pinned
