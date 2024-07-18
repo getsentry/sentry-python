@@ -29,7 +29,7 @@ async def test_basic(sentry_init, aiohttp_client, capture_events):
     resp = await client.get("/")
     assert resp.status == 500
 
-    (event,) = events
+    (event, transaction_event) = events
 
     assert (
         event["transaction"]

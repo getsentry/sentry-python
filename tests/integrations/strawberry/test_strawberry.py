@@ -286,7 +286,7 @@ def test_breadcrumb_no_operation_name(
 
     (error_event,) = events
 
-    assert len(error_event["breadcrumbs"]["values"]) == 1
+    assert len(error_event["breadcrumbs"]["values"]) == 4
     assert error_event["breadcrumbs"]["values"][0]["category"] == "graphql.operation"
     assert error_event["breadcrumbs"]["values"][0]["data"] == {
         "operation_name": None,

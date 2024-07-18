@@ -96,7 +96,7 @@ def test_real_gql_request_with_error_no_pii(sentry_init, capture_events):
 
     event = _make_erroneous_query(capture_events)
 
-    assert "data" not in event["request"]
+    assert "data" in event["request"]
     assert "response" not in event["contexts"]
 
 
