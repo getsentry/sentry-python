@@ -73,7 +73,7 @@ class ShouldBeIncludedTestCase:
             ),
             False,
         ),
-        pytest.param(
+        (
             ShouldBeIncludedTestCase(
                 id="Frame from system-wide installed Django with `django` in `in_app_include`",
                 is_sentry_sdk_frame=False,
@@ -83,9 +83,6 @@ class ShouldBeIncludedTestCase:
                 in_app_include=["django"],
             ),
             True,
-            marks=pytest.mark.xfail(
-                reason="Bug, see https://github.com/getsentry/sentry-python/issues/3312"
-            ),
         ),
     ],
     ids=id_function,
