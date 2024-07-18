@@ -16,6 +16,16 @@ try:
 except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
+try:
+    from opentelemetry.instrumentation.django import DjangoInstrumentor
+except ImportError:
+    DjangoInstrumentor = None
+
+
+CONFIGURABLE_INSTRUMENTATIONS = {
+    DjangoInstrumentor: {"is_sql_commentor_enabled": True},
+}
+
 
 class OpenTelemetryIntegration(Integration):
     identifier = "opentelemetry"
@@ -29,6 +39,7 @@ class OpenTelemetryIntegration(Integration):
         )
 
         _setup_sentry_tracing()
+        # _setup_instrumentors()
 
         logger.debug("[OTel] Finished setting up OpenTelemetry integration")
 
@@ -39,3 +50,8 @@ def _setup_sentry_tracing():
     provider.add_span_processor(SentrySpanProcessor())
     trace.set_tracer_provider(provider)
     set_global_textmap(SentryPropagator())
+
+
+def _setup_instrumentors():
+    for instrumentor, kwargs in CONFIGURABLE_INSTRUMENTATIONS.items():
+        instrumentor().instrument(**kwargs)
