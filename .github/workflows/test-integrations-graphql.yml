@@ -75,6 +75,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   test-graphql-pinned:
     name: GraphQL (pinned)
     timeout-minutes: 30
@@ -132,6 +133,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   check_required_tests:
     name: All GraphQL tests passed
     needs: test-graphql-pinned

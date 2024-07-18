@@ -102,6 +102,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   test-databases-pinned:
     name: Databases (pinned)
     timeout-minutes: 30
@@ -186,6 +187,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   check_required_tests:
     name: All Databases tests passed
     needs: test-databases-pinned

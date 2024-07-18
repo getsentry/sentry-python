@@ -79,6 +79,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   test-miscellaneous-pinned:
     name: Miscellaneous (pinned)
     timeout-minutes: 30
@@ -140,6 +141,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   check_required_tests:
     name: All Miscellaneous tests passed
     needs: test-miscellaneous-pinned
