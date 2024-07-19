@@ -397,9 +397,9 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
     events = capture_events()
 
     timestamps = [
-        datetime.datetime.now() - datetime.timedelta(minutes=10),
-        datetime.datetime.now() - datetime.timedelta(minutes=8),
-        datetime.datetime.now() - datetime.timedelta(minutes=12),
+        datetime.datetime.now() - datetime.timedelta(days=10),
+        datetime.datetime.now() - datetime.timedelta(days=8),
+        datetime.datetime.now() - datetime.timedelta(days=12),
     ]
 
     for timestamp in timestamps:
@@ -415,7 +415,7 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.datetime.fromisoformat(x["timestamp"]).replace(tzinfo=None)
+        datetime.datetime.strptime(x["timestamp"].replace("Z",""), "%Y-%m-%dT%H:%M:%S.%f")
         for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
