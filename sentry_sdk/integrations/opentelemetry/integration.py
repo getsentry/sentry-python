@@ -17,7 +17,7 @@ except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
 try:
-    from opentelemetry.instrumentation.django import DjangoInstrumentor
+    from opentelemetry.instrumentation.django import DjangoInstrumentor  # type: ignore[import-not-found]
 except ImportError:
     DjangoInstrumentor = None
 
@@ -53,5 +53,6 @@ def _setup_sentry_tracing():
 
 
 def _setup_instrumentors():
+    # type: () -> None
     for instrumentor, kwargs in CONFIGURABLE_INSTRUMENTATIONS.items():
         instrumentor().instrument(**kwargs)
