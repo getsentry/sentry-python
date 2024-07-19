@@ -1298,7 +1298,7 @@ class Scope(object):
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
-        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb['timestamp'])
+        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
