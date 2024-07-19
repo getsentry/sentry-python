@@ -415,7 +415,9 @@ def test_breadcrumb_ordering(sentry_init, capture_events):
 
     assert len(event["breadcrumbs"]["values"]) == len(timestamps)
     timestamps_from_event = [
-        datetime.datetime.strptime(x["timestamp"].replace("Z",""), "%Y-%m-%dT%H:%M:%S.%f")
+        datetime.datetime.strptime(
+            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+        )
         for x in event["breadcrumbs"]["values"]
     ]
     assert timestamps_from_event == sorted(timestamps)
