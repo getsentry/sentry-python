@@ -839,3 +839,8 @@ def test_last_event_id_scope(sentry_init):
     # Should not crash
     with isolation_scope() as scope:
         assert scope.last_event_id() is None
+
+
+def test_instrumenter_deprecation_warning(sentry_init):
+    with pytest.warns(DeprecationWarning):
+        sentry_init(instrumenter="blahblahblah")

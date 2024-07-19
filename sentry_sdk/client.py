@@ -2,6 +2,7 @@ import os
 import uuid
 import random
 import socket
+import warnings
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from importlib import import_module
@@ -115,6 +116,12 @@ def _get_options(*args, **kwargs):
 
     if rv["instrumenter"] is None:
         rv["instrumenter"] = INSTRUMENTER.SENTRY
+    else:
+        warnings.warn(
+            "The `instrumenter` option will be removed in the next major version.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
 
     if rv["project_root"] is None:
         try:
