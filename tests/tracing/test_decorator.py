@@ -33,13 +33,13 @@ def test_trace_decorator():
 
 def test_trace_decorator_no_trx():
     with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_warning:
+        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
             result = my_example_function()
-            fake_warning.assert_not_called()
+            fake_debug.assert_not_called()
             assert result == "return_of_sync_function"
 
             result2 = start_child_span_decorator(my_example_function)()
-            fake_warning.assert_called_once_with(
+            fake_debug.assert_called_once_with(
                 "Cannot create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 "test_decorator.my_example_function",
@@ -66,13 +66,13 @@ async def test_trace_decorator_async():
 @pytest.mark.asyncio
 async def test_trace_decorator_async_no_trx():
     with patch_start_tracing_child(fake_transaction_is_none=True):
-        with mock.patch.object(logger, "debug", mock.Mock()) as fake_warning:
+        with mock.patch.object(logger, "debug", mock.Mock()) as fake_debug:
             result = await my_async_example_function()
-            fake_warning.assert_not_called()
+            fake_debug.assert_not_called()
             assert result == "return_of_async_function"
 
             result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_warning.assert_called_once_with(
+            fake_debug.assert_called_once_with(
                 "Cannot create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 "test_decorator.my_async_example_function",
