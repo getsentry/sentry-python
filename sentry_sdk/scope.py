@@ -255,12 +255,20 @@ class Scope(object):
 
         Returns the current scope.
         """
-        current_scope = _current_scope.get()
+        current_scope = cls._get_current_scope()
         if current_scope is None:
             current_scope = Scope(ty=ScopeType.CURRENT)
             _current_scope.set(current_scope)
 
         return current_scope
+
+    @classmethod
+    def _get_current_scope(cls):
+        # type: () -> Optional[Scope]
+        """
+        Returns the current scope without creating a new one. Internal use only.
+        """
+        return _current_scope.get()
 
     @classmethod
     def set_current_scope(cls, new_current_scope):
@@ -281,12 +289,21 @@ class Scope(object):
 
         Returns the isolation scope.
         """
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = cls._get_isolation_scope()
         if isolation_scope is None:
             isolation_scope = Scope(ty=ScopeType.ISOLATION)
             _isolation_scope.set(isolation_scope)
 
         return isolation_scope
+
+    @classmethod
+    def _get_isolation_scope(cls):
+        # type: () -> Optional[Scope]
+        """
+        Returns the isolation scope without creating a new one. Internal use only.
+        """
+        return _isolation_scope.get()
+
 
     @classmethod
     def set_isolation_scope(cls, new_isolation_scope):
@@ -342,11 +359,11 @@ class Scope(object):
         final_scope = copy(_global_scope) if _global_scope is not None else Scope()
         final_scope._type = ScopeType.MERGED
 
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = self._get_isolation_scope()
         if isolation_scope is not None:
             final_scope.update_from_scope(isolation_scope)
 
-        current_scope = _current_scope.get()
+        current_scope = self._get_current_scope()
         if current_scope is not None:
             final_scope.update_from_scope(current_scope)
 
@@ -374,7 +391,7 @@ class Scope(object):
         This checks the current scope, the isolation scope and the global scope for a client.
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
-        current_scope = _current_scope.get()
+        current_scope = cls._get_current_scope()
         try:
             client = current_scope.client
         except AttributeError:
@@ -383,7 +400,7 @@ class Scope(object):
         if client is not None and client.is_active():
             return client
 
-        isolation_scope = _isolation_scope.get()
+        isolation_scope = cls._get_isolation_scope()
         try:
             client = isolation_scope.client
         except AttributeError:
@@ -1361,8 +1378,8 @@ class Scope(object):
 
         if not is_check_in:
             # Get scopes without creating them to prevent infinite recursion
-            isolation_scope = _isolation_scope.get()
-            current_scope = _current_scope.get()
+            isolation_scope = self._get_isolation_scope()
+            current_scope = self._get_current_scope()
 
             event_processors = chain(
                 global_event_processors,
