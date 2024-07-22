@@ -1,8 +1,11 @@
 import warnings
+
+# Importing sentry_sdk.consts here prevents a circular import, even though it's not used in this file.
+import sentry_sdk.consts  # noqa: F401
+
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.scope import Scope, _ScopeManager
 from sentry_sdk.client import Client
 from sentry_sdk.tracing import (
@@ -394,8 +397,8 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         """
         Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
-    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, Any) -> Span
+    def start_span(self, **kwargs):
+        # type: (Any) -> Span
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -416,16 +419,12 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
         """
         scope = Scope.get_current_scope()
-        return scope.start_span(instrumenter=instrumenter, **kwargs)
+        return scope.start_span(**kwargs)
 
     def start_transaction(
-        self,
-        transaction=None,
-        instrumenter=INSTRUMENTER.SENTRY,
-        custom_sampling_context=None,
-        **kwargs
+        self, transaction=None, custom_sampling_context=None, **kwargs
     ):
-        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         .. deprecated:: 2.0.0
             This function is deprecated and will be removed in a future release.
@@ -461,9 +460,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         # Type checking disabled for this line because deprecated keys are not allowed in the type signature.
         kwargs["hub"] = scope  # type: ignore
 
-        return scope.start_transaction(
-            transaction, instrumenter, custom_sampling_context, **kwargs
-        )
+        return scope.start_transaction(transaction, custom_sampling_context, **kwargs)
 
     def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
         # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction

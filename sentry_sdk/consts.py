@@ -85,11 +85,6 @@ FALSE_VALUES = [
 ]
 
 
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
-
-
 class SPANDATA:
     """
     Additional information describing the type of the span.
@@ -518,7 +513,6 @@ class ClientConstructor:
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
