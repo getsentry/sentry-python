@@ -481,7 +481,10 @@ def test_db_span_origin_execute(sentry_init, client, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.django"
 
     for span in event["spans"]:
-        assert span["origin"] == "auto.http.django"
+        if span["op"] == "db":
+            assert span["origin"] == "auto.db.django"
+        else:
+            assert span["origin"] == "auto.http.django"
 
 
 @pytest.mark.forked
@@ -520,4 +523,4 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.http.django"
+    assert event["spans"][0]["origin"] == "auto.db.django"
