@@ -524,3 +524,60 @@ def test_db_span_origin_executemany(sentry_init, client, capture_events):
 
     assert event["contexts"]["trace"]["origin"] == "manual"
     assert event["spans"][0]["origin"] == "auto.db.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_no_explain_plan(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={},
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
+
+    (event,) = events
+    db_span = event["spans"][-1]
+
+    assert "db.explain_plan" not in db_span["data"]
+
+
+# @pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+def test_explain_plan(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "attach_explain_plans": {
+                "explain_cache_size": 10,  # Run explain plan for the 10 most run queries
+                "explain_cache_timeout_seconds": 60 * 60 * 24,  # Run the explain plan for each statement only every 24 hours
+                "use_explain_analyze": True,  # Run "explain analyze" instead of only "explain"
+            }
+        },
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    events = capture_events()
+
+    unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
+
+    (event,) = events
+    db_span = event["spans"][-1]
+
+    assert "db.explain_plan" in db_span["data"]
+    assert len(db_span["data"]["db.explain_plan"]) > 0
