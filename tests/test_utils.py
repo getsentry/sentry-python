@@ -26,6 +26,7 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
+    _generate_installed_modules,
     ensure_integration_enabled,
     ensure_integration_enabled_async,
 )
@@ -523,7 +524,7 @@ def test_installed_modules():
 
     installed_distributions = {
         _normalize_distribution_name(dist): version
-        for dist, version in _get_installed_modules().items()
+        for dist, version in _generate_installed_modules()
     }
 
     if importlib_available:

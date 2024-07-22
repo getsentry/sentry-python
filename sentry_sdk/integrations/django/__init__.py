@@ -116,6 +116,7 @@ class DjangoIntegration(Integration):
 
     identifier = "django"
     origin = f"auto.http.{identifier}"
+    origin_db = f"auto.db.{identifier}"
 
     transaction_style = ""
     middleware_spans = None
@@ -630,7 +631,7 @@ def install_sql_hook():
             params_list=params,
             paramstyle="format",
             executemany=False,
-            span_origin=DjangoIntegration.origin,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
             options = (
@@ -663,7 +664,7 @@ def install_sql_hook():
             params_list=param_list,
             paramstyle="format",
             executemany=True,
-            span_origin=DjangoIntegration.origin,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
 
@@ -683,7 +684,7 @@ def install_sql_hook():
         with sentry_sdk.start_span(
             op=OP.DB,
             description="connect",
-            origin=DjangoIntegration.origin,
+            origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
             return real_connect(self)
