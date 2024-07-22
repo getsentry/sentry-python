@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import sys
@@ -389,6 +390,37 @@ def test_breadcrumbs(sentry_init, capture_events):
     capture_exception(ValueError())
     (event,) = events
     assert len(event["breadcrumbs"]["values"]) == 0
+
+
+def test_breadcrumb_ordering(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    timestamps = [
+        datetime.datetime.now() - datetime.timedelta(days=10),
+        datetime.datetime.now() - datetime.timedelta(days=8),
+        datetime.datetime.now() - datetime.timedelta(days=12),
+    ]
+
+    for timestamp in timestamps:
+        add_breadcrumb(
+            message="Authenticated at %s" % timestamp,
+            category="auth",
+            level="info",
+            timestamp=timestamp,
+        )
+
+    capture_exception(ValueError())
+    (event,) = events
+
+    assert len(event["breadcrumbs"]["values"]) == len(timestamps)
+    timestamps_from_event = [
+        datetime.datetime.strptime(
+            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+        )
+        for x in event["breadcrumbs"]["values"]
+    ]
+    assert timestamps_from_event == sorted(timestamps)
 
 
 def test_attachments(sentry_init, capture_envelopes):
