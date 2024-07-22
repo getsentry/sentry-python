@@ -1,7 +1,7 @@
 from typing import cast
 from contextlib import contextmanager
 
-from opentelemetry.context import get_value, set_value, attach, detach
+from opentelemetry.context import get_value, set_value, attach, detach, get_current
 
 from sentry_sdk.scope import Scope, ScopeType
 from sentry_sdk.integrations.opentelemetry.consts import (
@@ -60,36 +60,21 @@ class PotelScope(Scope):
 
 
 @contextmanager
-def _otel_context(key, value):
-    token = attach(set_value(key, value))
+def isolation_scope():
+    # type: () -> Generator[Scope, None, None]
+    context = set_value(SENTRY_FORK_ISOLATION_SCOPE_KEY, True)
+    token = attach(context)
     try:
-        yield
+        yield PotelScope.get_isolation_scope()
     finally:
         detach(token)
 
 
 @contextmanager
-def isolation_scope():
+def new_scope():
     # type: () -> Generator[Scope, None, None]
-    """
-    .. versionadded:: 2.0.0
-
-    Context manager that forks the current isolation scope and runs the wrapped code in it.
-    The current scope is also forked to not bleed data into the existing current scope.
-    After the wrapped code is executed, the original scopes are restored.
-
-    Example Usage:
-
-    .. code-block:: python
-
-        import sentry_sdk
-
-        with sentry_sdk.isolation_scope() as scope:
-            scope.set_tag("color", "green")
-            sentry_sdk.capture_message("hello") # will include `color` tag.
-
-        sentry_sdk.capture_message("hello, again") # will NOT include `color` tag.
-
-    """
-    with _otel_context(SENTRY_FORK_ISOLATION_SCOPE_KEY, True):
-        yield PotelScope.get_isolation_scope()
+    token = attach(get_current())
+    try:
+        yield PotelScope.get_current_scope()
+    finally:
+        detach(token)
