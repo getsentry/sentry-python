@@ -41,7 +41,7 @@ jobs:
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
         run: |
-          pip install coverage[toml] tox
+          pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -109,7 +109,7 @@ jobs:
         uses: supercharge/redis-github-action@1.8.0
       - name: Setup Test Env
         run: |
-          pip install coverage[toml] tox
+          pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase

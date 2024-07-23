@@ -9,6 +9,6 @@ extend-exclude = '''
 )
 '''
 [tool.coverage.report]
-exclude_also = [
-    "if TYPE_CHECKING:",
+    exclude_also = [
+        "if TYPE_CHECKING:",
     ]
