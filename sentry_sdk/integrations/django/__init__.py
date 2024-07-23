@@ -115,6 +115,8 @@ class DjangoIntegration(Integration):
     """
 
     identifier = "django"
+    origin = f"auto.http.{identifier}"
+    origin_db = f"auto.db.{identifier}"
 
     transaction_style = ""
     middleware_spans = None
@@ -171,9 +173,12 @@ class DjangoIntegration(Integration):
 
             use_x_forwarded_for = settings.USE_X_FORWARDED_HOST
 
-            return SentryWsgiMiddleware(bound_old_app, use_x_forwarded_for)(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                bound_old_app,
+                use_x_forwarded_for,
+                span_origin=DjangoIntegration.origin,
             )
+            return middleware(environ, start_response)
 
         WSGIHandler.__call__ = sentry_patched_wsgi_handler
 
@@ -621,7 +626,12 @@ def install_sql_hook():
     def execute(self, sql, params=None):
         # type: (CursorWrapper, Any, Optional[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, params, paramstyle="format", executemany=False
+            cursor=self.cursor,
+            query=sql,
+            params_list=params,
+            paramstyle="format",
+            executemany=False,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
             options = (
@@ -649,7 +659,12 @@ def install_sql_hook():
     def executemany(self, sql, param_list):
         # type: (CursorWrapper, Any, List[Any]) -> Any
         with record_sql_queries(
-            self.cursor, sql, param_list, paramstyle="format", executemany=True
+            cursor=self.cursor,
+            query=sql,
+            params_list=param_list,
+            paramstyle="format",
+            executemany=True,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
 
@@ -666,7 +681,11 @@ def install_sql_hook():
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        with sentry_sdk.start_span(op=OP.DB, description="connect") as span:
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            description="connect",
+            origin=DjangoIntegration.origin_db,
+        ) as span:
             _set_db_data(span, self)
             return real_connect(self)
 

@@ -2,7 +2,7 @@ import sys
 
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
@@ -39,6 +39,7 @@ ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 
 class ArqIntegration(Integration):
     identifier = "arq"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -76,7 +77,9 @@ def patch_enqueue_job():
         if integration is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
-        with sentry_sdk.start_span(op=OP.QUEUE_SUBMIT_ARQ, description=function):
+        with sentry_sdk.start_span(
+            op=OP.QUEUE_SUBMIT_ARQ, description=function, origin=ArqIntegration.origin
+        ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
     ArqRedis.enqueue_job = _sentry_enqueue_job
@@ -101,6 +104,7 @@ def patch_run_job():
                 status="ok",
                 op=OP.QUEUE_TASK_ARQ,
                 source=TRANSACTION_SOURCE_TASK,
+                origin=ArqIntegration.origin,
             )
 
             with sentry_sdk.start_transaction(transaction):
@@ -115,10 +119,10 @@ def _capture_exception(exc_info):
 
     if scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
-            scope.transaction.set_status("aborted")
+            scope.transaction.set_status(SPANSTATUS.ABORTED)
             return
 
-        scope.transaction.set_status("internal_error")
+        scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     event, hint = event_from_exception(
         exc_info,

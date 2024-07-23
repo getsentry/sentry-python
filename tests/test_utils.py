@@ -26,6 +26,7 @@ from sentry_sdk.utils import (
     serialize_frame,
     is_sentry_url,
     _get_installed_modules,
+    _generate_installed_modules,
     ensure_integration_enabled,
     ensure_integration_enabled_async,
 )
@@ -453,7 +454,7 @@ def test_parse_version(version, expected_result):
 @pytest.fixture
 def mock_client_with_dsn_netloc():
     """
-    Returns a mocked hub with a DSN netloc of "abcd1234.ingest.sentry.io".
+    Returns a mocked Client with a DSN netloc of "abcd1234.ingest.sentry.io".
     """
     mock_client = mock.Mock(spec=sentry_sdk.Client)
     mock_client.transport = mock.Mock(spec=sentry_sdk.Transport)
@@ -523,7 +524,7 @@ def test_installed_modules():
 
     installed_distributions = {
         _normalize_distribution_name(dist): version
-        for dist, version in _get_installed_modules().items()
+        for dist, version in _generate_installed_modules()
     }
 
     if importlib_available:
@@ -808,7 +809,7 @@ def test_get_current_thread_meta_gevent_in_thread_failed_to_get_hub():
     def target():
         with mock.patch("sentry_sdk.utils.is_gevent", side_effect=[True]):
             with mock.patch(
-                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake hub"]
+                "sentry_sdk.utils.get_gevent_hub", side_effect=["fake gevent hub"]
             ):
                 job = gevent.spawn(get_current_thread_meta)
                 job.join()

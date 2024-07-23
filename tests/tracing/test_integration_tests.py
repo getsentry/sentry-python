@@ -6,11 +6,11 @@ import random
 
 from sentry_sdk import (
     capture_message,
-    Hub,
     Scope,
     start_span,
     start_transaction,
 )
+from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport
 from sentry_sdk.tracing import Transaction
 
@@ -21,7 +21,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
     events = capture_events()
 
     with start_transaction(name="hi") as transaction:
-        transaction.set_status("ok")
+        transaction.set_status(SPANSTATUS.OK)
         with pytest.raises(ZeroDivisionError):
             with start_span(op="foo", description="foodesc"):
                 1 / 0
@@ -65,7 +65,9 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     with start_transaction(name="hi", sampled=True if sample_rate == 0 else None):
         with start_span() as old_span:
             old_span.sampled = sampled
-            headers = dict(Hub.current.iter_trace_propagation_headers(old_span))
+            headers = dict(
+                Scope.get_current_scope().iter_trace_propagation_headers(old_span)
+            )
             headers["baggage"] = (
                 "other-vendor-value-1=foo;bar;baz, "
                 "sentry-trace_id=771a43a4192642f0b136d5159a501700, "
@@ -269,7 +271,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     with start_transaction(transaction):
         with start_span(op="foo", description="foodesc") as current_span:
             span = current_span
-            meta = Hub.current.trace_propagation_meta()
+            meta = Scope.get_current_scope().trace_propagation_meta()
 
     ind = meta.find(">") + 1
     sentry_trace, baggage = meta[:ind], meta[ind:]

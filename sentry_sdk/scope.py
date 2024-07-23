@@ -987,7 +987,8 @@ class Scope(object):
 
         :param transaction: The transaction to start. If omitted, we create and
             start a new transaction.
-        :param instrumenter: This parameter is meant for internal use only.
+        :param instrumenter: This parameter is meant for internal use only. It
+            will be removed in the next major version.
         :param custom_sampling_context: The transaction's custom sampling context.
         :param kwargs: Optional keyword arguments to be passed to the Transaction
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
@@ -1031,9 +1032,8 @@ class Scope(object):
 
             transaction._profile = profile
 
-        # we don't bother to keep spans if we already know we're not going to
-        # send the transaction
-        if transaction.sampled:
+            # we don't bother to keep spans if we already know we're not going to
+            # send the transaction
             max_spans = (client.options["_experiments"].get("max_spans")) or 1000
             transaction.init_span_recorder(maxlen=max_spans)
 
@@ -1055,6 +1055,10 @@ class Scope(object):
         one is not already in progress.
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
+
+        The instrumenter parameter is deprecated for user code, and it will
+        be removed in the next major version. Going forward, it should only
+        be used by the SDK itself.
         """
         with new_scope():
             kwargs.setdefault("scope", self)
@@ -1083,8 +1087,10 @@ class Scope(object):
 
             return span
 
-    def continue_trace(self, environ_or_headers, op=None, name=None, source=None):
-        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str]) -> Transaction
+    def continue_trace(
+        self, environ_or_headers, op=None, name=None, source=None, origin="manual"
+    ):
+        # type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -> Transaction
         """
         Sets the propagation context from environment or headers and returns a transaction.
         """
@@ -1093,6 +1099,7 @@ class Scope(object):
         transaction = Transaction.continue_from_headers(
             normalize_incoming_data(environ_or_headers),
             op=op,
+            origin=origin,
             name=name,
             source=source,
         )
@@ -1187,10 +1194,9 @@ class Scope(object):
 
         return None
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
+    @staticmethod
+    def _capture_internal_exception(exc_info):
+        # type: (ExcInfo) -> None
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.
@@ -1297,6 +1303,7 @@ class Scope(object):
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
+        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None

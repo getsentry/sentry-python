@@ -1,7 +1,8 @@
 import random
+from collections import Counter
 from unittest import mock
 
-from sentry_sdk import Hub, start_transaction
+import sentry_sdk
 from sentry_sdk.transport import Transport
 
 
@@ -24,13 +25,13 @@ def test_no_monitor_if_disabled(sentry_init):
         enable_backpressure_handling=False,
     )
 
-    assert Hub.current.client.monitor is None
+    assert sentry_sdk.get_client().monitor is None
 
 
 def test_monitor_if_enabled(sentry_init):
     sentry_init(transport=HealthyTestTransport())
 
-    monitor = Hub.current.client.monitor
+    monitor = sentry_sdk.get_client().monitor
     assert monitor is not None
     assert monitor._thread is None
 
@@ -43,7 +44,7 @@ def test_monitor_if_enabled(sentry_init):
 def test_monitor_unhealthy(sentry_init):
     sentry_init(transport=UnhealthyTestTransport())
 
-    monitor = Hub.current.client.monitor
+    monitor = sentry_sdk.get_client().monitor
     monitor.interval = 0.1
 
     assert monitor.is_healthy() is True
@@ -55,16 +56,16 @@ def test_monitor_unhealthy(sentry_init):
 
 
 def test_transaction_uses_downsampled_rate(
-    sentry_init, capture_client_reports, monkeypatch
+    sentry_init, capture_record_lost_event_calls, monkeypatch
 ):
     sentry_init(
         traces_sample_rate=1.0,
         transport=UnhealthyTestTransport(),
     )
 
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
-    monitor = Hub.current.client.monitor
+    monitor = sentry_sdk.get_client().monitor
     monitor.interval = 0.1
 
     # make sure rng doesn't sample
@@ -75,11 +76,16 @@ def test_transaction_uses_downsampled_rate(
     assert monitor.is_healthy() is False
     assert monitor.downsample_factor == 1
 
-    with start_transaction(name="foobar") as transaction:
+    with sentry_sdk.start_transaction(name="foobar") as transaction:
         assert transaction.sampled is False
         assert transaction.sample_rate == 0.5
 
-    assert reports == [("backpressure", "transaction")]
+    assert Counter(record_lost_event_calls) == Counter(
+        [
+            ("backpressure", "transaction", None, 1),
+            ("backpressure", "span", None, 1),
+        ]
+    )
 
 
 def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):
@@ -90,7 +96,7 @@ def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        monitor = Hub.current.client.monitor
+        monitor = sentry_sdk.get_client().monitor
         assert monitor is not None
         assert monitor._thread is None
         monitor.run()

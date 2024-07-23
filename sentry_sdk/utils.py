@@ -11,7 +11,6 @@ import sys
 import threading
 import time
 from collections import namedtuple
-from copy import copy
 from datetime import datetime
 from decimal import Decimal
 from functools import partial, partialmethod, wraps
@@ -54,6 +53,8 @@ if TYPE_CHECKING:
         Union,
     )
 
+    from gevent.hub import Hub
+
     import sentry_sdk.integrations
     from sentry_sdk._types import Event, ExcInfo
 
@@ -77,12 +78,6 @@ def json_dumps(data):
     # type: (Any) -> bytes
     """Serialize data into a compact JSON representation encoded as UTF-8."""
     return json.dumps(data, allow_nan=False, separators=(",", ":")).encode("utf-8")
-
-
-def _get_debug_hub():
-    # type: () -> Optional[sentry_sdk.Hub]
-    # This function is replaced by debug.py
-    pass
 
 
 def get_git_revision():
@@ -196,9 +191,8 @@ def capture_internal_exceptions():
 
 def capture_internal_exception(exc_info):
     # type: (ExcInfo) -> None
-    hub = _get_debug_hub()
-    if hub is not None:
-        hub._capture_internal_exception(exc_info)
+    if sentry_sdk.get_client().is_active():
+        sentry_sdk.Scope._capture_internal_exception(exc_info)
 
 
 def to_timestamp(value):
@@ -616,7 +610,7 @@ def serialize_frame(
         )
 
     if include_local_variables:
-        rv["vars"] = copy(frame.f_locals)
+        rv["vars"] = frame.f_locals.copy()
 
     return rv
 
@@ -1017,7 +1011,14 @@ def exc_info_from_error(error):
     else:
         raise ValueError("Expected Exception object to report, got %s!" % type(error))
 
-    return exc_type, exc_value, tb
+    exc_info = (exc_type, exc_value, tb)
+
+    if TYPE_CHECKING:
+        # This cast is safe because exc_type and exc_value are either both
+        # None or both not None.
+        exc_info = cast(ExcInfo, exc_info)
+
+    return exc_info
 
 
 def event_from_exception(
@@ -1182,8 +1183,8 @@ def _is_contextvars_broken():
     Returns whether gevent/eventlet have patched the stdlib in a way where thread locals are now more "correct" than contextvars.
     """
     try:
-        import gevent  # type: ignore
-        from gevent.monkey import is_object_patched  # type: ignore
+        import gevent
+        from gevent.monkey import is_object_patched
 
         # Get the MAJOR and MINOR version numbers of Gevent
         version_tuple = tuple(
@@ -1209,7 +1210,7 @@ def _is_contextvars_broken():
         pass
 
     try:
-        import greenlet  # type: ignore
+        import greenlet
         from eventlet.patcher import is_monkey_patched  # type: ignore
 
         greenlet_version = parse_version(greenlet.__version__)
@@ -1328,14 +1329,18 @@ def qualname_from_function(func):
 
     prefix, suffix = "", ""
 
-    if hasattr(func, "_partialmethod") and isinstance(
-        func._partialmethod, partialmethod
-    ):
-        prefix, suffix = "partialmethod(<function ", ">)"
-        func = func._partialmethod.func
-    elif isinstance(func, partial) and hasattr(func.func, "__name__"):
+    if isinstance(func, partial) and hasattr(func.func, "__name__"):
         prefix, suffix = "partial(<function ", ">)"
         func = func.func
+    else:
+        # The _partialmethod attribute of methods wrapped with partialmethod() was renamed to __partialmethod__ in CPython 3.13:
+        # https://github.com/python/cpython/pull/16600
+        partial_method = getattr(func, "_partialmethod", None) or getattr(
+            func, "__partialmethod__", None
+        )
+        if isinstance(partial_method, partialmethod):
+            prefix, suffix = "partialmethod(<function ", ">)"
+            func = partial_method.func
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
@@ -1794,12 +1799,14 @@ try:
     from gevent.monkey import is_module_patched
 except ImportError:
 
-    def get_gevent_hub():
-        # type: () -> Any
+    # it's not great that the signatures are different, get_hub can't return None
+    # consider adding an if TYPE_CHECKING to change the signature to Optional[Hub]
+    def get_gevent_hub():  # type: ignore[misc]
+        # type: () -> Optional[Hub]
         return None
 
-    def is_module_patched(*args, **kwargs):
-        # type: (*Any, **Any) -> bool
+    def is_module_patched(mod_name):
+        # type: (str) -> bool
         # unable to import from gevent means no modules have been patched
         return False
 

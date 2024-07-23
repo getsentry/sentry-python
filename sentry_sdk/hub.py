@@ -1,3 +1,4 @@
+import warnings
 from contextlib import contextmanager
 
 from sentry_sdk._compat import with_metaclass
@@ -44,7 +45,6 @@ if TYPE_CHECKING:
         LogLevelStr,
         SamplingContext,
     )
-    from sentry_sdk.consts import ClientConstructor
     from sentry_sdk.tracing import TransactionKwargs
 
     T = TypeVar("T")
@@ -56,74 +56,33 @@ else:
         return x
 
 
-_local = ContextVar("sentry_current_hub")
-
-
-def _should_send_default_pii():
-    # type: () -> bool
-    # TODO: Migrate existing code to `scope.should_send_default_pii()` and remove this function.
-    # New code should not use this function!
-    client = Hub.current.client
-    if not client:
-        return False
-    return client.should_send_default_pii()
-
-
-class _InitGuard:
-    def __init__(self, client):
-        # type: (Client) -> None
-        self._client = client
-
-    def __enter__(self):
-        # type: () -> _InitGuard
-        return self
-
-    def __exit__(self, exc_type, exc_value, tb):
-        # type: (Any, Any, Any) -> None
-        c = self._client
-        if c is not None:
-            c.close()
-
-
-def _check_python_deprecations():
-    # type: () -> None
-    # Since we're likely to deprecate Python versions in the future, I'm keeping
-    # this handy function around. Use this to detect the Python version used and
-    # to output logger.warning()s if it's deprecated.
-    pass
-
-
-def _init(*args, **kwargs):
-    # type: (*Optional[str], **Any) -> ContextManager[Any]
-    """Initializes the SDK and optionally integrations.
-
-    This takes the same arguments as the client constructor.
+class SentryHubDeprecationWarning(DeprecationWarning):
     """
-    client = Client(*args, **kwargs)  # type: ignore
-    Hub.current.bind_client(client)
-    _check_python_deprecations()
-    rv = _InitGuard(client)
-    return rv
+    A custom deprecation warning to inform users that the Hub is deprecated.
+    """
+
+    _MESSAGE = (
+        "`sentry_sdk.Hub` is deprecated and will be removed in a future major release. "
+        "Please consult our 1.x to 2.x migration guide for details on how to migrate "
+        "`Hub` usage to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x"
+    )
+
+    def __init__(self, *_):
+        # type: (*object) -> None
+        super().__init__(self._MESSAGE)
 
 
-from sentry_sdk._types import TYPE_CHECKING
+@contextmanager
+def _suppress_hub_deprecation_warning():
+    # type: () -> Generator[None, None, None]
+    """Utility function to suppress deprecation warnings for the Hub."""
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=SentryHubDeprecationWarning)
+        yield
 
-if TYPE_CHECKING:
-    # Make mypy, PyCharm and other static analyzers think `init` is a type to
-    # have nicer autocompletion for params.
-    #
-    # Use `ClientConstructor` to define the argument types of `init` and
-    # `ContextManager[Any]` to tell static analyzers about the return type.
 
-    class init(ClientConstructor, _InitGuard):  # noqa: N801
-        pass
-
-else:
-    # Alias `init` for actual usage. Go through the lambda indirection to throw
-    # PyCharm off of the weakly typed signature (it would otherwise discover
-    # both the weakly typed signature of `_init` and our faked `init` type).
-
-    init = (lambda: _init)()
+_local = ContextVar("sentry_current_hub")
 
 
 class HubMeta(type):
@@ -131,9 +90,12 @@ class HubMeta(type):
     def current(cls):
         # type: () -> Hub
         """Returns the current instance of the hub."""
+        warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
         rv = _local.get(None)
         if rv is None:
-            rv = Hub(GLOBAL_HUB)
+            with _suppress_hub_deprecation_warning():
+                # This will raise a deprecation warning; supress it since we already warned above.
+                rv = Hub(GLOBAL_HUB)
             _local.set(rv)
         return rv
 
@@ -141,6 +103,7 @@ class HubMeta(type):
     def main(cls):
         # type: () -> Hub
         """Returns the main instance of the hub."""
+        warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
         return GLOBAL_HUB
 
 
@@ -171,6 +134,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         scope=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
+        warnings.warn(SentryHubDeprecationWarning(), stacklevel=2)
 
         current_scope = None
 
@@ -413,24 +377,6 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
             self._last_event_id = last_event_id
 
         return last_event_id
-
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
-        """
-        .. deprecated:: 2.0.0
-            This function is deprecated and will be removed in a future release.
-            Please use :py:meth:`sentry_sdk.client._Client._capture_internal_exception` instead.
-
-        Capture an exception that is likely caused by a bug in the SDK
-        itself.
-
-        Duplicated in :py:meth:`sentry_sdk.client._Client._capture_internal_exception`.
-
-        These exceptions do not end up in Sentry and are just logged instead.
-        """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def add_breadcrumb(self, crumb=None, hint=None, **kwargs):
         # type: (Optional[Breadcrumb], Optional[BreadcrumbHint], Any) -> None
@@ -775,7 +721,10 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
         )
 
 
-GLOBAL_HUB = Hub()
+with _suppress_hub_deprecation_warning():
+    # Suppress deprecation warning for the Hub here, since we still always
+    # import this module.
+    GLOBAL_HUB = Hub()
 _local.set(GLOBAL_HUB)
 
 

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import io
+import os
 import gzip
 import socket
 import time
@@ -11,6 +12,7 @@ from urllib.request import getproxies
 import urllib3
 import certifi
 
+import sentry_sdk
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
@@ -32,10 +34,7 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event
-
-    DataCategory = Optional[str]
-
+    from sentry_sdk._types import Event, EventDataCategory
 
 KEEP_ALIVE_SOCKET_OPTIONS = []
 for option in [
@@ -132,12 +131,25 @@ class Transport(ABC):
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category=None,  # type: Optional[str]
+        data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
+        *,
+        quantity=1,  # type: int
     ):
         # type: (...) -> None
         """This increments a counter for event loss by reason and
-        data category.
+        data category by the given positive-int quantity (default 1).
+
+        If an item is provided, the data category and quantity are
+        extracted from the item, and the values passed for
+        data_category and quantity are ignored.
+
+        When recording a lost transaction via data_category="transaction",
+        the calling code should also record the lost spans via this method.
+        When recording lost spans, `quantity` should be set to the number
+        of contained spans, plus one for the transaction itself. When
+        passing an Item containing a transaction via the `item` parameter,
+        this method automatically records the lost spans.
         """
         return None
 
@@ -154,7 +166,7 @@ class Transport(ABC):
 
 
 def _parse_rate_limits(header, now=None):
-    # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
+    # type: (Any, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
     if now is None:
         now = datetime.now(timezone.utc)
 
@@ -194,11 +206,11 @@ class HttpTransport(Transport):
         self.options = options  # type: Dict[str, Any]
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until = {}  # type: Dict[DataCategory, datetime]
+        self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
         self._retry = urllib3.util.Retry()
         self._discarded_events = defaultdict(
             int
-        )  # type: DefaultDict[Tuple[str, str], int]
+        )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
         compresslevel = options.get("_experiments", {}).get(
@@ -214,27 +226,39 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            cert_file=options["cert_file"],
+            key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
 
-        from sentry_sdk import Hub
-
-        self.hub_cls = Hub
+        # Backwards compatibility for deprecated `self.hub_class` attribute
+        self._hub_cls = sentry_sdk.Hub
 
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category=None,  # type: Optional[str]
+        data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
+        *,
+        quantity=1,  # type: int
     ):
         # type: (...) -> None
         if not self.options["send_client_reports"]:
             return
 
-        quantity = 1
         if item is not None:
             data_category = item.data_category
-            if data_category == "attachment":
+            quantity = 1  # If an item is provided, we always count it as 1 (except for attachments, handled below).
+
+            if data_category == "transaction":
+                # Also record the lost spans
+                event = item.get_transaction_event() or {}
+
+                # +1 for the transaction itself
+                span_count = len(event.get("spans") or []) + 1
+                self.record_lost_event(reason, "span", quantity=span_count)
+
+            elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
                 quantity = len(item.get_bytes()) or 1
@@ -452,12 +476,11 @@ class HttpTransport(Transport):
         )
         return None
 
-    def _get_pool_options(self, ca_certs):
-        # type: (Optional[Any]) -> Dict[str, Any]
+    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
         options = {
             "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
-            "ca_certs": ca_certs or certifi.where(),
         }
 
         socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
@@ -476,6 +499,16 @@ class HttpTransport(Transport):
 
         if socket_options is not None:
             options["socket_options"] = socket_options
+
+        options["ca_certs"] = (
+            ca_certs  # User-provided bundle from the SDK init
+            or os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("REQUESTS_CA_BUNDLE")
+            or certifi.where()
+        )
+
+        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
+        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
 
         return options
 
@@ -496,6 +529,8 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        cert_file,  # type: Optional[Any]
+        key_file,  # type: Optional[Any]
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
@@ -510,7 +545,7 @@ class HttpTransport(Transport):
         if not proxy and (http_proxy != ""):
             proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
-        opts = self._get_pool_options(ca_certs)
+        opts = self._get_pool_options(ca_certs, cert_file, key_file)
 
         if proxy:
             if proxy_headers:
@@ -541,14 +576,11 @@ class HttpTransport(Transport):
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        hub = self.hub_cls.current
-
         def send_envelope_wrapper():
             # type: () -> None
-            with hub:
-                with capture_internal_exceptions():
-                    self._send_envelope(envelope)
-                    self._flush_client_reports()
+            with capture_internal_exceptions():
+                self._send_envelope(envelope)
+                self._flush_client_reports()
 
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
@@ -571,6 +603,30 @@ class HttpTransport(Transport):
         # type: () -> None
         logger.debug("Killing HTTP transport")
         self._worker.kill()
+
+    @staticmethod
+    def _warn_hub_cls():
+        # type: () -> None
+        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
+        warnings.warn(
+            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    @property
+    def hub_cls(self):
+        # type: () -> type[sentry_sdk.Hub]
+        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
+        HttpTransport._warn_hub_cls()
+        return self._hub_cls
+
+    @hub_cls.setter
+    def hub_cls(self, value):
+        # type: (type[sentry_sdk.Hub]) -> None
+        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
+        HttpTransport._warn_hub_cls()
+        self._hub_cls = value
 
 
 class _FunctionTransport(Transport):

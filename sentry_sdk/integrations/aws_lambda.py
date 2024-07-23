@@ -139,6 +139,7 @@ def _wrap_handler(handler):
                 op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
                 source=TRANSACTION_SOURCE_COMPONENT,
+                origin=AwsLambdaIntegration.origin,
             )
             with sentry_sdk.start_transaction(
                 transaction,
@@ -178,6 +179,7 @@ def _drain_queue():
 
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
+    origin = f"auto.function.{identifier}"
 
     def __init__(self, timeout_warning=False):
         # type: (bool) -> None

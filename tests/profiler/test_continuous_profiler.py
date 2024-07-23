@@ -101,16 +101,16 @@ def assert_single_transaction_with_profile_chunks(envelopes, thread):
     )
 
     profile_context = transaction["contexts"]["profile"]
-    profiler_id = profile_context["profiler.id"]
+    profiler_id = profile_context["profiler_id"]
 
-    assert profile_context == ApproxDict({"profiler.id": profiler_id})
+    assert profile_context == ApproxDict({"profiler_id": profiler_id})
 
     spans = transaction["spans"]
     assert len(spans) > 0
     for span in spans:
         assert span["data"] == ApproxDict(
             {
-                "profiler.id": profiler_id,
+                "profiler_id": profiler_id,
                 "thread.id": str(thread.ident),
                 "thread.name": thread.name,
             }

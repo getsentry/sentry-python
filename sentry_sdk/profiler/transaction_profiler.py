@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 
@@ -61,6 +62,7 @@ if TYPE_CHECKING:
     from typing import List
     from typing import Optional
     from typing import Set
+    from typing import Type
     from typing_extensions import TypedDict
 
     from sentry_sdk.profiler.utils import (
@@ -95,9 +97,10 @@ if TYPE_CHECKING:
 
 
 try:
-    from gevent.monkey import get_original  # type: ignore
-    from gevent.threadpool import ThreadPool  # type: ignore
+    from gevent.monkey import get_original
+    from gevent.threadpool import ThreadPool as _ThreadPool
 
+    ThreadPool = _ThreadPool  # type: Optional[Type[_ThreadPool]]
     thread_sleep = get_original("time", "sleep")
 except ImportError:
     thread_sleep = time.sleep
@@ -211,7 +214,6 @@ class Profile:
     ):
         # type: (...) -> None
         self.scheduler = _scheduler if scheduler is None else scheduler
-        self.hub = hub
 
         self.event_id = uuid.uuid4().hex  # type: str
 
@@ -237,6 +239,16 @@ class Profile:
         self.samples = []  # type: List[ProcessedSample]
 
         self.unique_samples = 0
+
+        # Backwards compatibility with the old hub property
+        self._hub = None  # type: Optional[sentry_sdk.Hub]
+        if hub is not None:
+            self._hub = hub
+            warnings.warn(
+                "The `hub` parameter is deprecated. Please do not use it.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def update_active_thread_id(self):
         # type: () -> None
@@ -504,6 +516,26 @@ class Profile:
 
         return True
 
+    @property
+    def hub(self):
+        # type: () -> Optional[sentry_sdk.Hub]
+        warnings.warn(
+            "The `hub` attribute is deprecated. Please do not access it.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._hub
+
+    @hub.setter
+    def hub(self, value):
+        # type: (Optional[sentry_sdk.Hub]) -> None
+        warnings.warn(
+            "The `hub` attribute is deprecated. Please do not set it.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._hub = value
+
 
 class Scheduler(ABC):
     mode = "unknown"  # type: ProfilerMode
@@ -738,7 +770,7 @@ class GeventScheduler(Scheduler):
 
         # used to signal to the thread that it should stop
         self.running = False
-        self.thread = None  # type: Optional[ThreadPool]
+        self.thread = None  # type: Optional[_ThreadPool]
         self.pid = None  # type: Optional[int]
 
         # This intentionally uses the gevent patched threading.Lock.
@@ -775,7 +807,7 @@ class GeventScheduler(Scheduler):
             self.pid = pid
             self.running = True
 
-            self.thread = ThreadPool(1)
+            self.thread = ThreadPool(1)  # type: ignore[misc]
             try:
                 self.thread.spawn(self.run)
             except RuntimeError:

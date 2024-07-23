@@ -265,3 +265,18 @@ def test_job_with_retries(sentry_init, capture_events):
     worker.work(burst=True)
 
     assert len(events) == 1
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(do_trick, "Maisey", trick="kangaroo")
+    worker.work(burst=True)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.rq"
