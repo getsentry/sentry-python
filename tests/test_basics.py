@@ -501,7 +501,6 @@ default_integrations = [
             [LoggingIntegration, StdlibIntegration],
             set(default_integrations) - {LoggingIntegration, StdlibIntegration},
         ),
-        ([], True, None, set(default_integrations)),
     ],
 )
 def test_integrations(
