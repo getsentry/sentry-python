@@ -1,4 +1,5 @@
 import datetime
+import importlib
 import logging
 import os
 import sys
@@ -7,12 +8,12 @@ from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
-
 from tests.conftest import patch_start_tracing_child
 
 import sentry_sdk
 import sentry_sdk.scope
 from sentry_sdk import (
+    get_client,
     push_scope,
     configure_scope,
     capture_event,
@@ -27,11 +28,13 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
+    _DEFAULT_INTEGRATIONS,
     Integration,
     setup_integrations,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
@@ -471,6 +474,51 @@ def test_integration_scoping(sentry_init, capture_events):
     events = capture_events()
     logger.warning("This is not a warning")
     assert not events
+
+
+default_integrations = [
+    getattr(
+        importlib.import_module(integration.rsplit(".", 1)[0]),
+        integration.rsplit(".", 1)[1],
+    )
+    for integration in _DEFAULT_INTEGRATIONS
+]
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "provided_integrations,default_integrations,disabled_integrations,expected_integrations",
+    [
+        ([], False, None, set()),
+        ([], False, [], set()),
+        ([LoggingIntegration()], False, None, {LoggingIntegration}),
+        ([], True, None, set(default_integrations)),
+        (
+            [],
+            True,
+            [LoggingIntegration(), StdlibIntegration],
+            set(default_integrations) - {LoggingIntegration, StdlibIntegration},
+        ),
+    ],
+)
+def test_integrations(
+    sentry_init,
+    provided_integrations,
+    default_integrations,
+    disabled_integrations,
+    expected_integrations,
+    reset_integrations,
+):
+    sentry_init(
+        integrations=provided_integrations,
+        default_integrations=default_integrations,
+        disabled_integrations=disabled_integrations,
+        auto_enabling_integrations=False,
+        debug=True,
+    )
+    assert {
+        type(integration) for integration in get_client().integrations.values()
+    } == expected_integrations
 
 
 @pytest.mark.skip(
