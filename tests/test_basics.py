@@ -491,14 +491,12 @@ default_integrations = [
     [
         ([], False, None, set()),
         ([], False, [], set()),
-        ([LoggingIntegration()], False, [LoggingIntegration], set()),
         ([LoggingIntegration()], False, None, {LoggingIntegration}),
-        ([LoggingIntegration()], False, [LoggingIntegration()], set()),
         ([], True, None, set(default_integrations)),
         (
             [],
             True,
-            [LoggingIntegration, StdlibIntegration],
+            [LoggingIntegration(), StdlibIntegration],
             set(default_integrations) - {LoggingIntegration, StdlibIntegration},
         ),
     ],

@@ -6,12 +6,12 @@ from sentry_sdk.utils import logger
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from typing import Callable
     from typing import Dict
     from typing import Iterator
     from typing import List
     from typing import Optional
-    from typing import Sequence
     from typing import Set
     from typing import Type
 
@@ -128,9 +128,8 @@ def setup_integrations(
     When `with_defaults` is set to `True` all default integrations are added
     unless they were already provided before.
 
-    `disabled_integrations` takes precedence over other options. The provided
-    integrations will always be disabled, regardless of integrations provided
-    explicitly, as well as `with_defaults` and `with_auto_enabling_integrations`.
+    `disabled_integrations` takes precedence over `with_defaults` and
+    `with_auto_enabling_integrations`.
     """
     integrations = dict(
         (integration.identifier, integration) for integration in integrations or ()
