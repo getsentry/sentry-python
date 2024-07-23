@@ -39,7 +39,7 @@ jobs:
           allow-prereleases: true
       - name: Setup Test Env
         run: |
-          pip install coverage tox
+          pip install coverage[toml] tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -97,7 +97,7 @@ jobs:
           allow-prereleases: true
       - name: Setup Test Env
         run: |
-          pip install coverage tox
+          pip install coverage[toml] tox
       - name: Erase coverage
         run: |
           coverage erase
