@@ -160,7 +160,7 @@ def setup_integrations(
         with _installer_lock:
             if identifier not in _processed_integrations:
                 if type(integration) in disabled_integrations:
-                    logger.debug("Ignoring integration %s", integration_cls)
+                    logger.debug("Ignoring integration %s", identifier)
                 else:
                     logger.debug(
                         "Setting up previously not enabled integration %s", identifier

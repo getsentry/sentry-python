@@ -24,6 +24,7 @@ import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
     _DEFAULT_INTEGRATIONS,
+    _installed_integrations,
     _processed_integrations,
 )
 from sentry_sdk.profiler import teardown_profiler
@@ -182,6 +183,7 @@ def reset_integrations():
     except ValueError:
         pass
     _processed_integrations.clear()
+    _installed_integrations.clear()
 
 
 @pytest.fixture
