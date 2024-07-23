@@ -551,16 +551,17 @@ def test_no_explain_plan(sentry_init, client, capture_events):
     assert "db.explain_plan" not in db_span["data"]
 
 
-# @pytest.mark.forked
+@pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 def test_explain_plan(sentry_init, client, capture_events):
+    one_day = 60 * 60 * 24
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         _experiments={
             "attach_explain_plans": {
                 "explain_cache_size": 10,  # Run explain plan for the 10 most run queries
-                "explain_cache_timeout_seconds": 60 * 60 * 24,  # Run the explain plan for each statement only every 24 hours
+                "explain_cache_timeout_seconds": one_day,  # Run the explain plan for each statement only every 24 hours
                 "use_explain_analyze": True,  # Run "explain analyze" instead of only "explain"
             }
         },
