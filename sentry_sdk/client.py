@@ -271,7 +271,6 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-
             except module_not_found_error:
                 try:
                     # Try to import a class
@@ -372,6 +371,7 @@ class _Client(BaseClient):
                 with_auto_enabling_integrations=self.options[
                     "auto_enabling_integrations"
                 ],
+                disabled_integrations=self.options["disabled_integrations"],
             )
 
             self.spotlight = None

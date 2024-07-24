@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.11.0
+
+### Various fixes & improvements
+
+- Add `disabled_integrations` (#3328) by @sentrivana
+
+  Disabling individual integrations is now much easier.
+  Instead of disabling all automatically enabled integrations and specifying the ones
+  you want to keep, you can now use the new
+  [`disabled_integrations`](https://docs.sentry.io/platforms/python/configuration/options/#auto-enabling-integrations)
+  config option to provide a list of integrations to disable:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.flask import FlaskIntegration
+  
+  sentry_sdk.init(
+      # Do not use the Flask integration even if Flask is installed.
+      disabled_integrations=[
+          FlaskIntegration(),
+      ],
+  )
+  ```
+
+- Use operation name as transaction name in Strawberry (#3294) by @sentrivana
+- WSGI integrations respect `SCRIPT_NAME` env variable (#2622) by @sarvaSanjay
+- Make Django DB spans have origin `auto.db.django` (#3319) by @antonpirker
+- Sort breadcrumbs by time before sending (#3307) by @antonpirker
+- Fix `KeyError('sentry-monitor-start-timestamp-s')` (#3278) by @Mohsen-Khodabakhshi
+- Set MongoDB tags directly on span data (#3290) by @0Calories
+- Lower logger level for some messages (#3305) by @sentrivana and @antonpirker
+- Emit deprecation warnings from `Hub` API (#3280) by @szokeasaurusrex
+- Clarify that `instrumenter` is internal-only (#3299) by @szokeasaurusrex
+- Support Django 5.1 (#3207) by @sentrivana
+- Remove apparently unnecessary `if` (#3298) by @szokeasaurusrex
+- Preliminary support for Python 3.13 (#3200) by @sentrivana
+- Move `sentry_sdk.init` out of `hub.py` (#3276) by @szokeasaurusrex
+- Unhardcode integration list (#3240) by @rominf
+- Allow passing of PostgreSQL port in tests (#3281) by @rominf
+- Add tests for `@ai_track` decorator (#3325) by @colin-sentry
+- Do not include type checking code in coverage report (#3327) by @antonpirker
+- Fix test_installed_modules (#3309) by @szokeasaurusrex
+- Fix typos and grammar in a comment (#3293) by @szokeasaurusrex
+- Fixed failed tests setup (#3303) by @antonpirker
+- Only assert warnings we are interested in (#3314) by @szokeasaurusrex
+
 ## 2.10.0
 
 ### Various fixes & improvements
