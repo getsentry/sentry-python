@@ -4,29 +4,47 @@
 
 ### Various fixes & improvements
 
-- feat(tests): Do not include type checking code in coverage report (#3327) by @antonpirker
-- feat(integrations): Add `disabled_integrations` (#3328) by @sentrivana
-- Add tests for @ai_track decorator (#3325) by @colin-sentry
-- ref(logging): Lower logger level for some messages (#3305) by @sentrivana
-- feat(hub): Emit deprecation warnings from `Hub` API (#3280) by @szokeasaurusrex
-- meta: Allow blank GitHub issues (#3311) by @szokeasaurusrex
-- test: Only assert warnings we are interested in (#3314) by @szokeasaurusrex
-- Make Django db spans have origin auto.db.django (#3319) by @antonpirker
-- docs: Clarify that `instrumenter` is internal-only (#3299) by @szokeasaurusrex
-- Sort breadcrumbs before sending (#3307) by @antonpirker
-- test: fix test_installed_modules (#3309) by @szokeasaurusrex
-- fix(integrations): KeyError('sentry-monitor-start-timestamp-s') (#3278) by @Mohsen-Khodabakhshi
+- Add `disabled_integrations` (#3328) by @sentrivana
+
+  Disabling specific auto-enabled integrations is now much easier.
+  Instead of disabling all auto-enabled integrations and specifying the ones
+  you want to keep, you can now use the new
+  [`disabled_integrations`](https://docs.sentry.io/platforms/python/configuration/options/#auto-enabling-integrations)
+  config option to provide a list of integrations to disable:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.flask import FlaskIntegration
+  
+  sentry_sdk.init(
+      # Do not use the Flask integration even if Flask is installed.
+      disabled_integrations=[
+          FlaskIntegration(),
+      ],
+  )
+  ```
+
+- Use operation name as transaction name in Strawberry (#3294) by @sentrivana
+- WSGI integrations respect `SCRIPT_NAME` env variable (#2622) by @sarvaSanjay
+- Make Django DB spans have origin `auto.db.django` (#3319) by @antonpirker
+- Sort breadcrumbs by time before sending (#3307) by @antonpirker
+- Fix `KeyError('sentry-monitor-start-timestamp-s')` (#3278) by @Mohsen-Khodabakhshi
+- Set MongoDB tags directly on span data (#3290) by @0Calories
+- Lower logger level for some messages (#3305) by @sentrivana and @antonpirker
+- Emit deprecation warnings from `Hub` API (#3280) by @szokeasaurusrex
+- Clarify that `instrumenter` is internal-only (#3299) by @szokeasaurusrex
+- Support Django 5.1 (#3207) by @sentrivana
+- Remove apparently unnecessary `if` (#3298) by @szokeasaurusrex
+- Preliminary support for Python 3.13 (#3200) by @sentrivana
+- Move `sentry_sdk.init` out of `hub.py` (#3276) by @szokeasaurusrex
+- Unhardcode integration list (#3240) by @rominf
+- Allow passing of PostgreSQL port in tests (#3281) by @rominf
+- Add tests for `@ai_track` decorator (#3325) by @colin-sentry
+- Do not include type checking code in coverage report (#3327) by @antonpirker
+- Fix test_installed_modules (#3309) by @szokeasaurusrex
+- Fix typos and grammar in a comment (#3293) by @szokeasaurusrex
 - Fixed failed tests setup (#3303) by @antonpirker
-- feat(pymongo): Set MongoDB tags directly on span data (#3290) by @0Calories
-- feat(integrations): Support Django 5.1 (#3207) by @sentrivana
-- ref(scope): Remove apparently unnecessary `if` (#3298) by @szokeasaurusrex
-- test: Allow passing of PostgreSQL port (#3281) by @rominf
-- feat: Preliminary support for Python 3.13 (#3200) by @sentrivana
-- feat(strawberry): Use operation name as transaction name (#3294) by @sentrivana
-- docs: Fix typos and grammar in a comment (#3293) by @szokeasaurusrex
-- ref(tests): Unhardcode integration list (#3240) by @rominf
-- ref(init): Move `sentry_sdk.init` out of `hub.py` (#3276) by @szokeasaurusrex
-- fix(wsgi): WSGI integrations respect SCRIPT_NAME env variable (#2622) by @sarvaSanjay
+- Only assert warnings we are interested in (#3314) by @szokeasaurusrex
 
 ## 2.10.0
 
