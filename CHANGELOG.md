@@ -1,5 +1,33 @@
 # Changelog
 
+## 2.11.0
+
+### Various fixes & improvements
+
+- feat(tests): Do not include type checking code in coverage report (#3327) by @antonpirker
+- feat(integrations): Add `disabled_integrations` (#3328) by @sentrivana
+- Add tests for @ai_track decorator (#3325) by @colin-sentry
+- ref(logging): Lower logger level for some messages (#3305) by @sentrivana
+- feat(hub): Emit deprecation warnings from `Hub` API (#3280) by @szokeasaurusrex
+- meta: Allow blank GitHub issues (#3311) by @szokeasaurusrex
+- test: Only assert warnings we are interested in (#3314) by @szokeasaurusrex
+- Make Django db spans have origin auto.db.django (#3319) by @antonpirker
+- docs: Clarify that `instrumenter` is internal-only (#3299) by @szokeasaurusrex
+- Sort breadcrumbs before sending (#3307) by @antonpirker
+- test: fix test_installed_modules (#3309) by @szokeasaurusrex
+- fix(integrations): KeyError('sentry-monitor-start-timestamp-s') (#3278) by @Mohsen-Khodabakhshi
+- Fixed failed tests setup (#3303) by @antonpirker
+- feat(pymongo): Set MongoDB tags directly on span data (#3290) by @0Calories
+- feat(integrations): Support Django 5.1 (#3207) by @sentrivana
+- ref(scope): Remove apparently unnecessary `if` (#3298) by @szokeasaurusrex
+- test: Allow passing of PostgreSQL port (#3281) by @rominf
+- feat: Preliminary support for Python 3.13 (#3200) by @sentrivana
+- feat(strawberry): Use operation name as transaction name (#3294) by @sentrivana
+- docs: Fix typos and grammar in a comment (#3293) by @szokeasaurusrex
+- ref(tests): Unhardcode integration list (#3240) by @rominf
+- ref(init): Move `sentry_sdk.init` out of `hub.py` (#3276) by @szokeasaurusrex
+- fix(wsgi): WSGI integrations respect SCRIPT_NAME env variable (#2622) by @sarvaSanjay
+
 ## 2.10.0
 
 ### Various fixes & improvements
