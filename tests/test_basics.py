@@ -459,6 +459,22 @@ def test_attachments(sentry_init, capture_envelopes):
         assert pyfile.payload.get_bytes() == f.read()
 
 
+@pytest.mark.tests_internal_exceptions
+def test_attachments_graceful_failure(
+    sentry_init, capture_envelopes, internal_exceptions
+):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    with configure_scope() as scope:
+        scope.add_attachment(path="non_existent")
+    capture_exception(ValueError())
+
+    (envelope,) = envelopes
+    assert len(envelope.items) == 2
+    assert envelope.items[1].payload.get_bytes() == b""
+
+
 def test_integration_scoping(sentry_init, capture_events):
     logger = logging.getLogger("test_basics")
 
