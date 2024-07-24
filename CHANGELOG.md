@@ -6,8 +6,8 @@
 
 - Add `disabled_integrations` (#3328) by @sentrivana
 
-  Disabling specific auto-enabled integrations is now much easier.
-  Instead of disabling all auto-enabled integrations and specifying the ones
+  Disabling individual integrations is now much easier.
+  Instead of disabling all automatically enabled integrations and specifying the ones
   you want to keep, you can now use the new
   [`disabled_integrations`](https://docs.sentry.io/platforms/python/configuration/options/#auto-enabling-integrations)
   config option to provide a list of integrations to disable:
