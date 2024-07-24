@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.api - sentry-python 2.10.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.api - sentry-python 2.11.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=397bb51e" />
@@ -472,84 +472,85 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="322">
 </span><span data-line="323"><span class="sd">    :param transaction: The transaction to start. If omitted, we create and</span>
 </span><span data-line="324"><span class="sd">        start a new transaction.</span>
-</span><span data-line="325"><span class="sd">    :param instrumenter: This parameter is meant for internal use only.</span>
-</span><span data-line="326"><span class="sd">    :param custom_sampling_context: The transaction&#39;s custom sampling context.</span>
-</span><span data-line="327"><span class="sd">    :param kwargs: Optional keyword arguments to be passed to the Transaction</span>
-</span><span data-line="328"><span class="sd">        constructor. See :py:class:`sentry_sdk.tracing.Transaction` for</span>
-</span><span data-line="329"><span class="sd">        available arguments.</span>
-</span><span data-line="330"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="331">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span>
-</span><span data-line="332">        <span class="n">transaction</span><span class="p">,</span> <span class="n">instrumenter</span><span class="p">,</span> <span class="n">custom_sampling_context</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
-</span><span data-line="333">    <span class="p">)</span></div>
+</span><span data-line="325"><span class="sd">    :param instrumenter: This parameter is meant for internal use only. It</span>
+</span><span data-line="326"><span class="sd">        will be removed in the next major version.</span>
+</span><span data-line="327"><span class="sd">    :param custom_sampling_context: The transaction&#39;s custom sampling context.</span>
+</span><span data-line="328"><span class="sd">    :param kwargs: Optional keyword arguments to be passed to the Transaction</span>
+</span><span data-line="329"><span class="sd">        constructor. See :py:class:`sentry_sdk.tracing.Transaction` for</span>
+</span><span data-line="330"><span class="sd">        available arguments.</span>
+</span><span data-line="331"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="332">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">start_transaction</span><span class="p">(</span>
+</span><span data-line="333">        <span class="n">transaction</span><span class="p">,</span> <span class="n">instrumenter</span><span class="p">,</span> <span class="n">custom_sampling_context</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+</span><span data-line="334">    <span class="p">)</span></div>
 
-</span><span data-line="334">
 </span><span data-line="335">
-</span><span data-line="336"><span class="nd">@scopemethod</span>
-</span><span data-line="337"><span class="k">def</span> <span class="nf">last_event_id</span><span class="p">():</span>
-</span><span data-line="338">    <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span data-line="339"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="340"><span class="sd">    See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding</span>
-</span><span data-line="341"><span class="sd">    this method&#39;s limitations.</span>
-</span><span data-line="342"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="343">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span>
-</span><span data-line="344">
+</span><span data-line="336">
+</span><span data-line="337"><span class="nd">@scopemethod</span>
+</span><span data-line="338"><span class="k">def</span> <span class="nf">last_event_id</span><span class="p">():</span>
+</span><span data-line="339">    <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span data-line="340"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="341"><span class="sd">    See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding</span>
+</span><span data-line="342"><span class="sd">    this method&#39;s limitations.</span>
+</span><span data-line="343"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="344">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">last_event_id</span><span class="p">()</span>
 </span><span data-line="345">
-</span><span data-line="346"><span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
-</span><span data-line="347">    <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
-</span><span data-line="348">    <span class="n">transaction</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">transaction</span>
-</span><span data-line="349">    <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="350">        <span class="n">transaction</span><span class="o">.</span><span class="n">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
-</span><span data-line="351">
+</span><span data-line="346">
+</span><span data-line="347"><span class="k">def</span> <span class="nf">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+</span><span data-line="348">    <span class="c1"># type: (str, float, MeasurementUnit) -&gt; None</span>
+</span><span data-line="349">    <span class="n">transaction</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">transaction</span>
+</span><span data-line="350">    <span class="k">if</span> <span class="n">transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="351">        <span class="n">transaction</span><span class="o">.</span><span class="n">set_measurement</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
 </span><span data-line="352">
+</span><span data-line="353">
 <div class="viewcode-block" id="get_current_span">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_current_span">[docs]</a>
-</span><span data-line="353"><span class="k">def</span> <span class="nf">get_current_span</span><span class="p">(</span><span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-</span><span data-line="354">    <span class="c1"># type: (Optional[Scope]) -&gt; Optional[Span]</span>
-</span><span data-line="355"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="356"><span class="sd">    Returns the currently active span if there is one running, otherwise `None`</span>
-</span><span data-line="357"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="358">    <span class="k">return</span> <span class="n">tracing_utils</span><span class="o">.</span><span class="n">get_current_span</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span></div>
+</span><span data-line="354"><span class="k">def</span> <span class="nf">get_current_span</span><span class="p">(</span><span class="n">scope</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+</span><span data-line="355">    <span class="c1"># type: (Optional[Scope]) -&gt; Optional[Span]</span>
+</span><span data-line="356"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="357"><span class="sd">    Returns the currently active span if there is one running, otherwise `None`</span>
+</span><span data-line="358"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="359">    <span class="k">return</span> <span class="n">tracing_utils</span><span class="o">.</span><span class="n">get_current_span</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span></div>
 
-</span><span data-line="359">
 </span><span data-line="360">
+</span><span data-line="361">
 <div class="viewcode-block" id="get_traceparent">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_traceparent">[docs]</a>
-</span><span data-line="361"><span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">():</span>
-</span><span data-line="362">    <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span data-line="363"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="364"><span class="sd">    Returns the traceparent either from the active span or from the scope.</span>
-</span><span data-line="365"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="366">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
+</span><span data-line="362"><span class="k">def</span> <span class="nf">get_traceparent</span><span class="p">():</span>
+</span><span data-line="363">    <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span data-line="364"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="365"><span class="sd">    Returns the traceparent either from the active span or from the scope.</span>
+</span><span data-line="366"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="367">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">get_traceparent</span><span class="p">()</span></div>
 
-</span><span data-line="367">
 </span><span data-line="368">
+</span><span data-line="369">
 <div class="viewcode-block" id="get_baggage">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.get_baggage">[docs]</a>
-</span><span data-line="369"><span class="k">def</span> <span class="nf">get_baggage</span><span class="p">():</span>
-</span><span data-line="370">    <span class="c1"># type: () -&gt; Optional[str]</span>
-</span><span data-line="371"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="372"><span class="sd">    Returns Baggage either from the active span or from the scope.</span>
-</span><span data-line="373"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="374">    <span class="n">baggage</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
-</span><span data-line="375">    <span class="k">if</span> <span class="n">baggage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="376">        <span class="k">return</span> <span class="n">baggage</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
-</span><span data-line="377">
-</span><span data-line="378">    <span class="k">return</span> <span class="kc">None</span></div>
+</span><span data-line="370"><span class="k">def</span> <span class="nf">get_baggage</span><span class="p">():</span>
+</span><span data-line="371">    <span class="c1"># type: () -&gt; Optional[str]</span>
+</span><span data-line="372"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="373"><span class="sd">    Returns Baggage either from the active span or from the scope.</span>
+</span><span data-line="374"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="375">    <span class="n">baggage</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">get_baggage</span><span class="p">()</span>
+</span><span data-line="376">    <span class="k">if</span> <span class="n">baggage</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="377">        <span class="k">return</span> <span class="n">baggage</span><span class="o">.</span><span class="n">serialize</span><span class="p">()</span>
+</span><span data-line="378">
+</span><span data-line="379">    <span class="k">return</span> <span class="kc">None</span></div>
 
-</span><span data-line="379">
 </span><span data-line="380">
+</span><span data-line="381">
 <div class="viewcode-block" id="continue_trace">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.continue_trace">[docs]</a>
-</span><span data-line="381"><span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span>
-</span><span data-line="382">    <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;manual&quot;</span>
-</span><span data-line="383"><span class="p">):</span>
-</span><span data-line="384">    <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -&gt; Transaction</span>
-</span><span data-line="385"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="386"><span class="sd">    Sets the propagation context from environment or headers and returns a transaction.</span>
-</span><span data-line="387"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="388">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">continue_trace</span><span class="p">(</span>
-</span><span data-line="389">        <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">origin</span>
-</span><span data-line="390">    <span class="p">)</span></div>
+</span><span data-line="382"><span class="k">def</span> <span class="nf">continue_trace</span><span class="p">(</span>
+</span><span data-line="383">    <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">origin</span><span class="o">=</span><span class="s2">&quot;manual&quot;</span>
+</span><span data-line="384"><span class="p">):</span>
+</span><span data-line="385">    <span class="c1"># type: (Dict[str, Any], Optional[str], Optional[str], Optional[str], str) -&gt; Transaction</span>
+</span><span data-line="386"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="387"><span class="sd">    Sets the propagation context from environment or headers and returns a transaction.</span>
+</span><span data-line="388"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="389">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">continue_trace</span><span class="p">(</span>
+</span><span data-line="390">        <span class="n">environ_or_headers</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">origin</span>
+</span><span data-line="391">    <span class="p">)</span></div>
 
 </span></pre></div>
         </article><button class="back-to-top" type="button">
@@ -579,7 +580,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=67920a36"></script>
+      <script src="../../_static/documentation_options.js?v=1647406f"></script>
       <script src="../../_static/doctools.js?v=888ff710"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=3cc430e2"></script></body>
