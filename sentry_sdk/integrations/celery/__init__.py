@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 
 try:
     from celery import VERSION as CELERY_VERSION  # type: ignore
+    from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
         Ignore,
@@ -261,8 +262,6 @@ def _wrap_task_run(f):
         if not propagate_traces:
             return f(*args, **kwargs)
 
-        from celery.app.task import Task  # type: ignore
-
         if isinstance(args[0], Task):
             task_name = args[0].name
         else:
@@ -445,14 +444,12 @@ def _patch_build_tracer():
 
 def _patch_task_apply_async():
     # type: () -> None
-    from celery.app.task import Task  # type: ignore
-
     Task.apply_async = _wrap_task_run(Task.apply_async)
 
 
 def _patch_celery_send_task():
     # type: () -> None
-    from celery import Celery  # type: ignore
+    from celery import Celery
 
     Celery.send_task = _wrap_task_run(Celery.send_task)
 
