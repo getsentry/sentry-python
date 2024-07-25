@@ -154,4 +154,4 @@ def graphql_span(schema, source, kwargs):
     try:
         yield
     finally:
-         _graphql_span.finish()
+        _graphql_span.finish()
