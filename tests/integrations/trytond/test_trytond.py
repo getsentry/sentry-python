@@ -124,7 +124,7 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     (event,) = events
     if hasattr(response, "status"):
         status = response.status
-        data = response.get_data()
+        data = json.loads(response.get_data())
         headers = response.headers
     else:
         (content, status, headers) = response
