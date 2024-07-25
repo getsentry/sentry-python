@@ -105,7 +105,6 @@ def celery(init_celery):
             task.apply_async(kwargs=dict(x=x, y=y)),
             {"args": [], "kwargs": {"x": x, "y": y}},
         ),
-        "call_celery_send_task",
     ]
 )
 def celery_invocation(request, init_celery):
@@ -114,19 +113,7 @@ def celery_invocation(request, init_celery):
 
     Currently limited to a task signature of the form foo(x, y)
     """
-    if request.param == "call_celery_send_task":
-        def call_celery_send_task(task, x, y):
-            celery = init_celery(traces_sample_rate=1.0, backend="redis")
-            return (
-                celery.send_task(task.__name__, kwargs={"x": x, "y": y}), 
-                {"args": [], "kwargs": {"x": x, "y": y}},
-            )
-                        
-        return call_celery_send_task
-
-    else:
-        return request.param
-
+    return request.param
 
 
 def test_simple_with_performance(capture_events, init_celery, celery_invocation):
@@ -142,7 +129,6 @@ def test_simple_with_performance(capture_events, init_celery, celery_invocation)
         celery_invocation(dummy_task, 1, 2)
         _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-    import ipdb; ipdb.set_trace()
     (_, error_event, _, _) = events
 
     assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
@@ -362,13 +348,13 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
     runs = []
 
     @celery.task(name="dummy_task", bind=True)
-    def dummy_task(self, x, y):
+    def dummy_task(self):
         runs.append(1)
         1 / 0
 
     with start_transaction(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-        res = dummy_task.apply_async(kwargs={"x": 1, "y": 0})
+        res = dummy_task.apply_async()
 
     with pytest.raises(Exception):  # noqa: B017
         # Celery 4.1 raises a gibberish exception
@@ -799,3 +785,29 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
         assert span["origin"] == "auto.queue.celery"
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+# @pytest.mark.forked
+# @pytest.mark.parametrize("execution_way", ["apply_async", "send_task"])
+# def test_redis_backend_trace_propagation(
+#     init_celery, capture_events_forksafe, execution_way
+# ):
+#     celery = init_celery(traces_sample_rate=1.0, backend="redis")
+
+#     events = capture_events_forksafe()
+
+#     runs = []
+
+#     @celery.task(name="dummy_task", bind=True)
+#     def dummy_task(self, x, y):
+#         runs.append(1)
+#         1 / 0
+
+#     with start_transaction(name="submit_celery"):
+#         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
+#         if execution_way == "apply_async":
+#             res = dummy_task.apply_async(kwargs={"x": 1, "y": 0})
+#         elif execution_way == "send_task":
+#             res = celery.send_task("dummy_task", kwargs={"x": 1, "y": 0})
+#         else:  # pragma: no cover
+#             raise ValueError(execution_way)
