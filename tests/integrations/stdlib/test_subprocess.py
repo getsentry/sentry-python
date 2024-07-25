@@ -189,7 +189,7 @@ def test_subprocess_empty_env(sentry_init, monkeypatch):
             "-c",
             "import os; print(os.environ.get('TEST_MARKER', None))",
         ]
-        output = subprocess.check_output(args, env={}, text=True)
+        output = subprocess.check_output(args, env={}, universal_newlines=True)
     assert "should_not_be_seen" not in output
 
 
