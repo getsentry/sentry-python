@@ -893,7 +893,7 @@ class Scope(object):
 
     def add_attachment(
         self,
-        bytes=None,  # type: Optional[bytes]
+        bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
         filename=None,  # type: Optional[str]
         path=None,  # type: Optional[str]
         content_type=None,  # type: Optional[str]
