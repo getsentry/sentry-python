@@ -570,7 +570,9 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     assert output.count(b"HI") == num_messages
 
 
-def test_configure_scope_available(sentry_init, request, monkeypatch):
+def test_configure_scope_available(
+    sentry_init, request, monkeypatch, suppress_deprecation_warnings
+):
     """
     Test that scope is configured if client is configured
 

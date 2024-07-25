@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
@@ -185,6 +186,14 @@ def configure_scope(  # noqa: F811
 
     :returns: If no callback is provided, returns a context manager that returns the scope.
     """
+    warnings.warn(
+        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
+        "Please consult our migration guide to learn how to migrate to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     scope = Scope.get_isolation_scope()
     scope.generate_propagation_context()
 
