@@ -107,7 +107,7 @@ def celery(init_celery):
         ),
     ]
 )
-def celery_invocation(request, init_celery):
+def celery_invocation(request):
     """
     Invokes a task in multiple ways Celery allows you to (testing our apply_async monkeypatch).
 
@@ -785,29 +785,3 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
         assert span["origin"] == "auto.queue.celery"
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
-
-
-# @pytest.mark.forked
-# @pytest.mark.parametrize("execution_way", ["apply_async", "send_task"])
-# def test_redis_backend_trace_propagation(
-#     init_celery, capture_events_forksafe, execution_way
-# ):
-#     celery = init_celery(traces_sample_rate=1.0, backend="redis")
-
-#     events = capture_events_forksafe()
-
-#     runs = []
-
-#     @celery.task(name="dummy_task", bind=True)
-#     def dummy_task(self, x, y):
-#         runs.append(1)
-#         1 / 0
-
-#     with start_transaction(name="submit_celery"):
-#         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
-#         if execution_way == "apply_async":
-#             res = dummy_task.apply_async(kwargs={"x": 1, "y": 0})
-#         elif execution_way == "send_task":
-#             res = celery.send_task("dummy_task", kwargs={"x": 1, "y": 0})
-#         else:  # pragma: no cover
-#             raise ValueError(execution_way)
