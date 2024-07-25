@@ -145,7 +145,6 @@ def graphql_span(schema, source, kwargs):
         _graphql_span = scope.span.start_child(op=op, description=operation_name)
     else:
         _graphql_span = sentry_sdk.start_span(op=op, description=operation_name)
-    scope.add_event_processor(_event_processor)
 
     _graphql_span.set_data("graphql.document", source)
     _graphql_span.set_data("graphql.operation.name", operation_name)
