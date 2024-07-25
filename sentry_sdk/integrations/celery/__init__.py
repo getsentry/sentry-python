@@ -262,10 +262,11 @@ def _wrap_task_run(f):
             return f(*args, **kwargs)
 
         from celery.app.task import Task  # type: ignore
+
         if isinstance(args[0], Task):
             task_name = args[0].name
         else:
-            task_name = args[1]        
+            task_name = args[1]
 
         task_started_from_beat = (
             sentry_sdk.Scope.get_isolation_scope()._name == "celery-beat"
@@ -450,9 +451,10 @@ def _patch_task_apply_async():
 
 
 def _patch_celery_send_task():
+    # type: () -> None
     from celery import Celery  # type: ignore
 
-    Celery.send_task = _wrap_task_run(Celery.send_task)    
+    Celery.send_task = _wrap_task_run(Celery.send_task)
 
 
 def _patch_worker_exit():
