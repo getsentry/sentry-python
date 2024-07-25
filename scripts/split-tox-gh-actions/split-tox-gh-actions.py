@@ -35,6 +35,10 @@ FRAMEWORKS_NEEDING_POSTGRES = {
     "asyncpg",
 }
 
+FRAMEWORKS_NEEDING_REDIS = {
+    "celery",
+}
+
 FRAMEWORKS_NEEDING_CLICKHOUSE = {
     "clickhouse_driver",
 }
@@ -54,6 +58,13 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "AI": [
+        "anthropic",
+        "cohere",
+        "langchain",
+        "openai",
+        "huggingface_hub",
+    ],
     "AWS Lambda": [
         # this is separate from Cloud Computing because only this one test suite
         # needs to run with access to GitHub secrets
@@ -71,13 +82,14 @@ GROUPS = {
         "celery",
         "huey",
         "rq",
+        "spark",
     ],
     "Databases": [
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
         "redis",
-        "rediscluster",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "GraphQL": [
@@ -94,9 +106,9 @@ GROUPS = {
     ],
     "Web Frameworks 1": [
         "django",
-        "fastapi",
         "flask",
         "starlette",
+        "fastapi",
     ],
     "Web Frameworks 2": [
         "aiohttp",
@@ -112,6 +124,7 @@ GROUPS = {
     "Miscellaneous": [
         "loguru",
         "opentelemetry",
+        "potel",
         "pure_eval",
         "trytond",
     ],
@@ -262,11 +275,6 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         if py_versions_latest[framework]:
             categories.add("latest")
             py_versions["latest"] |= set(py_versions_latest[framework])
-        if "2.7" in py_versions_pinned[framework]:
-            categories.add("py27")
-
-    py_versions["pinned"].discard("2.7")
-    py_versions["latest"].discard("2.7")
 
     context = {
         "group": group,
@@ -275,6 +283,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
+        "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "needs_github_secrets": bool(
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),

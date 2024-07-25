@@ -1,13 +1,8 @@
 import json
+from unittest import mock
+from unittest.mock import MagicMock
 
 import pytest
-
-try:
-    from unittest import mock  # python 3.3 and above
-    from unittest.mock import MagicMock
-except ImportError:
-    import mock  # python < 3.3
-    from mock import MagicMock
 
 from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
@@ -32,16 +27,11 @@ AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD = {
     "version": "2017-09-30",
 }
 
-try:
-    # Python 3
-    AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD_BYTES = bytes(
-        json.dumps(AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD), "utf-8"
-    )
-except TypeError:
-    # Python 2
-    AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD_BYTES = bytes(
-        json.dumps(AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD)
-    ).encode("utf-8")
+
+AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD_BYTES = bytes(
+    json.dumps(AWS_EC2_EXAMPLE_IMDSv2_PAYLOAD), "utf-8"
+)
+
 
 GCP_GCE_EXAMPLE_METADATA_PLAYLOAD = {
     "instance": {
@@ -404,7 +394,17 @@ def test_setup_once(
             else:
                 fake_set_context.assert_not_called()
 
-            if warning_called:
-                assert fake_warning.call_count == 1
-            else:
-                fake_warning.assert_not_called()
+            def invalid_value_warning_calls():
+                """
+                Iterator that yields True if the warning was called with the expected message.
+                Written as a generator function, rather than a list comprehension, to allow
+                us to handle exceptions that might be raised during the iteration if the
+                warning call was not as expected.
+                """
+                for call in fake_warning.call_args_list:
+                    try:
+                        yield call[0][0].startswith("Invalid value for cloud_provider:")
+                    except (IndexError, KeyError, TypeError, AttributeError):
+                        ...
+
+            assert warning_called == any(invalid_value_warning_calls())

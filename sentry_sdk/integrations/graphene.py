@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
     from graphql.type import GraphQLSchema  # type: ignore
+    from sentry_sdk._types import Event
 
 
 class GrapheneIntegration(Integration):
@@ -51,6 +52,9 @@ def _patch_graphql():
     @ensure_integration_enabled(GrapheneIntegration, old_graphql_sync)
     def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
+        scope = Scope.get_isolation_scope()
+        scope.add_event_processor(_event_processor)
+
         with graphql_span(schema, source, kwargs):
             result = old_graphql_sync(schema, source, *args, **kwargs)
 
@@ -75,6 +79,9 @@ def _patch_graphql():
         if integration is None:
             return await old_graphql_async(schema, source, *args, **kwargs)
 
+        scope = Scope.get_isolation_scope()
+        scope.add_event_processor(_event_processor)
+
         with graphql_span(schema, source, kwargs):
             result = await old_graphql_async(schema, source, *args, **kwargs)
 
@@ -85,7 +92,7 @@ def _patch_graphql():
                     error,
                     client_options=client.options,
                     mechanism={
-                        "type": integration.identifier,
+                        "type": GrapheneIntegration.identifier,
                         "handled": False,
                     },
                 )
@@ -98,7 +105,7 @@ def _patch_graphql():
 
 
 def _event_processor(event, hint):
-    # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+    # type: (Event, Dict[str, Any]) -> Event
     if should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"

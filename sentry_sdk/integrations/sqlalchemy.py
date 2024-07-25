@@ -1,13 +1,14 @@
-from __future__ import absolute_import
-
-from sentry_sdk._compat import text_type
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
-from sentry_sdk.utils import capture_internal_exceptions, parse_version
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    parse_version,
+)
 
 try:
     from sqlalchemy.engine import Engine  # type: ignore
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 
 class SqlalchemyIntegration(Integration):
     identifier = "sqlalchemy"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -46,21 +48,18 @@ class SqlalchemyIntegration(Integration):
         listen(Engine, "handle_error", _handle_error)
 
 
+@ensure_integration_enabled(SqlalchemyIntegration)
 def _before_cursor_execute(
     conn, cursor, statement, parameters, context, executemany, *args
 ):
     # type: (Any, Any, Any, Any, Any, bool, *Any) -> None
-    hub = Hub.current
-    if hub.get_integration(SqlalchemyIntegration) is None:
-        return
-
     ctx_mgr = record_sql_queries(
-        hub,
         cursor,
         statement,
         parameters,
         paramstyle=context and context.dialect and context.dialect.paramstyle or None,
         executemany=executemany,
+        span_origin=SqlalchemyIntegration.origin,
     )
     context._sentry_sql_span_manager = ctx_mgr
 
@@ -68,25 +67,23 @@ def _before_cursor_execute(
 
     if span is not None:
         _set_db_data(span, conn)
-        if hub.client:
-            options = hub.client.options["_experiments"].get("attach_explain_plans")
-            if options is not None:
-                attach_explain_plan_to_span(
-                    span,
-                    conn,
-                    statement,
-                    parameters,
-                    options,
-                )
+        options = (
+            sentry_sdk.get_client().options["_experiments"].get("attach_explain_plans")
+        )
+        if options is not None:
+            attach_explain_plan_to_span(
+                span,
+                conn,
+                statement,
+                parameters,
+                options,
+            )
         context._sentry_sql_span = span
 
 
+@ensure_integration_enabled(SqlalchemyIntegration)
 def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     # type: (Any, Any, Any, Any, Any, *Any) -> None
-    hub = Hub.current
-    if hub.get_integration(SqlalchemyIntegration) is None:
-        return
-
     ctx_mgr = getattr(
         context, "_sentry_sql_span_manager", None
     )  # type: Optional[ContextManager[Any]]
@@ -98,7 +95,7 @@ def _after_cursor_execute(conn, cursor, statement, parameters, context, *args):
     span = getattr(context, "_sentry_sql_span", None)  # type: Optional[Span]
     if span is not None:
         with capture_internal_exceptions():
-            add_query_source(hub, span)
+            add_query_source(span)
 
 
 def _handle_error(context, *args):
@@ -110,7 +107,7 @@ def _handle_error(context, *args):
     span = getattr(execution_context, "_sentry_sql_span", None)  # type: Optional[Span]
 
     if span is not None:
-        span.set_status("internal_error")
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this
@@ -127,7 +124,7 @@ def _handle_error(context, *args):
 # See: https://docs.sqlalchemy.org/en/20/dialects/index.html
 def _get_db_system(name):
     # type: (str) -> Optional[str]
-    name = text_type(name)
+    name = str(name)
 
     if "sqlite" in name:
         return "sqlite"

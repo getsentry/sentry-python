@@ -1,26 +1,21 @@
-# coding: utf-8
 import logging
 import pickle
 import gzip
 import io
 import socket
-from collections import namedtuple
-from datetime import datetime, timedelta
+from collections import defaultdict, namedtuple
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
-from sentry_sdk import Hub, Client, add_breadcrumb, capture_message, Scope
-from sentry_sdk._compat import datetime_utcnow
-from sentry_sdk.transport import _parse_rate_limits
-from sentry_sdk.envelope import Envelope, parse_json
-from sentry_sdk.integrations.logging import LoggingIntegration
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+import sentry_sdk
+from sentry_sdk import Client, add_breadcrumb, capture_message, Scope
+from sentry_sdk.envelope import Envelope, Item, parse_json
+from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
@@ -91,6 +86,20 @@ def make_client(request, capturing_server):
     return inner
 
 
+def mock_transaction_envelope(span_count):
+    # type: (int) -> Envelope
+    event = defaultdict(
+        mock.MagicMock,
+        type="transaction",
+        spans=[mock.MagicMock() for _ in range(span_count)],
+    )
+
+    envelope = Envelope()
+    envelope.add_transaction(event)
+
+    return envelope
+
+
 @pytest.mark.forked
 @pytest.mark.parametrize("debug", (True, False))
 @pytest.mark.parametrize("client_flush_method", ["close", "flush"])
@@ -119,10 +128,12 @@ def test_transport_works(
     if use_pickle:
         client = pickle.loads(pickle.dumps(client))
 
-    Hub.current.bind_client(client)
-    request.addfinalizer(lambda: Hub.current.bind_client(None))
+    sentry_sdk.Scope.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.Scope.get_global_scope().set_client(None))
 
-    add_breadcrumb(level="info", message="i like bread", timestamp=datetime_utcnow())
+    add_breadcrumb(
+        level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
+    )
     capture_message("löl")
 
     getattr(client, client_flush_method)()
@@ -132,7 +143,7 @@ def test_transport_works(
     assert capturing_server.captured
     assert capturing_server.captured[0].compressed == (compressionlevel > 0)
 
-    assert any("Sending event" in record.msg for record in caplog.records) == debug
+    assert any("Sending envelope" in record.msg for record in caplog.records) == debug
 
 
 @pytest.mark.parametrize(
@@ -154,6 +165,18 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
+def test_two_way_ssl_authentication(make_client):
+    _experiments = {}
+
+    client = make_client(_experiments=_experiments)
+
+    options = client.transport._get_pool_options(
+        [], "/path/to/cert.pem", "/path/to/key.pem"
+    )
+    assert options["cert_file"] == "/path/to/cert.pem"
+    assert options["key_file"] == "/path/to/key.pem"
+
+
 def test_socket_options(make_client):
     socket_options = [
         (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
@@ -167,6 +190,66 @@ def test_socket_options(make_client):
     assert options["socket_options"] == socket_options
 
 
+def test_keep_alive_true(make_client):
+    client = make_client(keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == KEEP_ALIVE_SOCKET_OPTIONS
+
+
+def test_keep_alive_off_by_default(make_client):
+    client = make_client()
+    options = client.transport._get_pool_options([])
+    assert "socket_options" not in options
+
+
+def test_socket_options_override_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 10),
+        (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=False)
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == socket_options
+
+
+def test_socket_options_merge_with_keep_alive(make_client):
+    socket_options = [
+        (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+        (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+    ]
+
+    client = make_client(socket_options=socket_options, keep_alive=True)
+
+    options = client.transport._get_pool_options([])
+    try:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPIDLE, 45),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+    except AttributeError:
+        assert options["socket_options"] == [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPINTVL, 42),
+            (socket.SOL_TCP, socket.TCP_KEEPCNT, 6),
+        ]
+
+
+def test_socket_options_override_defaults(make_client):
+    # If socket_options are set to [], this doesn't mean the user doesn't want
+    # any custom socket_options, but rather that they want to disable the urllib3
+    # socket option defaults, so we need to set this and not ignore it.
+    client = make_client(socket_options=[])
+
+    options = client.transport._get_pool_options([])
+    assert options["socket_options"] == []
+
+
 def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
@@ -174,7 +257,15 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
     )
 
-    with Hub(client):
+    # I am not sure why, but "werkzeug" logger makes an INFO log on sending
+    # the message "hi" and does creates an infinite look.
+    # Ignoring this for breaking the infinite loop and still we can test
+    # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
+    # to an infinite loop
+    ignore_logger("werkzeug")
+
+    sentry_sdk.Scope.get_global_scope().set_client(client)
+    with sentry_sdk.isolation_scope():
         capture_message("hi")
         client.flush()
 
@@ -189,7 +280,8 @@ def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        with Hub(client):
+        sentry_sdk.Scope.get_global_scope().set_client(client)
+        with sentry_sdk.isolation_scope():
             capture_message("hi")
 
     # nothing exploded but also no events can be sent anymore
@@ -290,7 +382,7 @@ def test_data_category_limits(
     client.flush()
 
     assert len(capturing_server.captured) == 1
-    assert capturing_server.captured[0].path == "/api/132/store/"
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
 
     assert captured_outcomes == [
         ("ratelimit_backoff", "transaction"),
@@ -356,10 +448,26 @@ def test_data_category_limits_reporting(
     assert envelope.items[0].type == "event"
     assert envelope.items[1].type == "client_report"
     report = parse_json(envelope.items[1].get_bytes())
-    assert sorted(report["discarded_events"], key=lambda x: x["quantity"]) == [
-        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 2},
-        {"category": "attachment", "reason": "ratelimit_backoff", "quantity": 11},
-    ]
+
+    discarded_events = report["discarded_events"]
+
+    assert len(discarded_events) == 3
+    assert {
+        "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 2,
+    } in discarded_events
+    assert {
+        "category": "span",
+        "reason": "ratelimit_backoff",
+        "quantity": 2,
+    } in discarded_events
+    assert {
+        "category": "attachment",
+        "reason": "ratelimit_backoff",
+        "quantity": 11,
+    } in discarded_events
+
     capturing_server.clear_captured()
 
     # here we sent a normal event
@@ -369,16 +477,27 @@ def test_data_category_limits_reporting(
 
     assert len(capturing_server.captured) == 2
 
-    event = capturing_server.captured[0].event
+    assert len(capturing_server.captured[0].envelope.items) == 1
+    event = capturing_server.captured[0].envelope.items[0].get_event()
     assert event["type"] == "error"
     assert event["release"] == "foo"
 
     envelope = capturing_server.captured[1].envelope
     assert envelope.items[0].type == "client_report"
     report = parse_json(envelope.items[0].get_bytes())
-    assert report["discarded_events"] == [
-        {"category": "transaction", "reason": "ratelimit_backoff", "quantity": 1},
-    ]
+
+    discarded_events = report["discarded_events"]
+    assert len(discarded_events) == 2
+    assert {
+        "category": "transaction",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in discarded_events
+    assert {
+        "category": "span",
+        "reason": "ratelimit_backoff",
+        "quantity": 1,
+    } in discarded_events
 
 
 @pytest.mark.parametrize("response_code", [200, 429])
@@ -406,3 +525,188 @@ def test_complex_limits_without_data_category(
     client.flush()
 
     assert len(capturing_server.captured) == 0
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_metric_bucket_limits(capturing_server, response_code, make_client):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded:custom"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="statsd"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set(["metric_bucket"])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "transaction"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "client_report"
+    report = parse_json(envelope.items[0].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
+    ]
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_metric_bucket_limits_with_namespace(
+    capturing_server, response_code, make_client
+):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded:foo"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="statsd"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set([])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "statsd"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "transaction"
+
+
+@pytest.mark.parametrize("response_code", [200, 429])
+def test_metric_bucket_limits_with_all_namespaces(
+    capturing_server, response_code, make_client
+):
+    client = make_client()
+    capturing_server.respond_with(
+        code=response_code,
+        headers={
+            "X-Sentry-Rate-Limits": "4711:metric_bucket:organization:quota_exceeded"
+        },
+    )
+
+    envelope = Envelope()
+    envelope.add_item(Item(payload=b"{}", type="statsd"))
+    client.transport.capture_envelope(envelope)
+    client.flush()
+
+    assert len(capturing_server.captured) == 1
+    assert capturing_server.captured[0].path == "/api/132/envelope/"
+    capturing_server.clear_captured()
+
+    assert set(client.transport._disabled_until) == set(["metric_bucket"])
+
+    client.transport.capture_envelope(envelope)
+    client.capture_event({"type": "transaction"})
+    client.flush()
+
+    assert len(capturing_server.captured) == 2
+
+    envelope = capturing_server.captured[0].envelope
+    assert envelope.items[0].type == "transaction"
+    envelope = capturing_server.captured[1].envelope
+    assert envelope.items[0].type == "client_report"
+    report = parse_json(envelope.items[0].get_bytes())
+    assert report["discarded_events"] == [
+        {"category": "metric_bucket", "reason": "ratelimit_backoff", "quantity": 1},
+    ]
+
+
+def test_hub_cls_backwards_compat():
+    class TestCustomHubClass(sentry_sdk.Hub):
+        pass
+
+    transport = sentry_sdk.transport.HttpTransport(
+        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
+    )
+
+    with pytest.deprecated_call():
+        assert transport.hub_cls is sentry_sdk.Hub
+
+    with pytest.deprecated_call():
+        transport.hub_cls = TestCustomHubClass
+
+    with pytest.deprecated_call():
+        assert transport.hub_cls is TestCustomHubClass
+
+
+@pytest.mark.parametrize("quantity", (1, 2, 10))
+def test_record_lost_event_quantity(capturing_server, make_client, quantity):
+    client = make_client()
+    transport = client.transport
+
+    transport.record_lost_event(reason="test", data_category="span", quantity=quantity)
+    client.flush()
+
+    (captured,) = capturing_server.captured  # Should only be one envelope
+    envelope = captured.envelope
+    (item,) = envelope.items  # Envelope should only have one item
+
+    assert item.type == "client_report"
+
+    report = parse_json(item.get_bytes())
+
+    assert report["discarded_events"] == [
+        {"category": "span", "reason": "test", "quantity": quantity}
+    ]
+
+
+@pytest.mark.parametrize("span_count", (0, 1, 2, 10))
+def test_record_lost_event_transaction_item(capturing_server, make_client, span_count):
+    client = make_client()
+    transport = client.transport
+
+    envelope = mock_transaction_envelope(span_count)
+    (transaction_item,) = envelope.items
+
+    transport.record_lost_event(reason="test", item=transaction_item)
+    client.flush()
+
+    (captured,) = capturing_server.captured  # Should only be one envelope
+    envelope = captured.envelope
+    (item,) = envelope.items  # Envelope should only have one item
+
+    assert item.type == "client_report"
+
+    report = parse_json(item.get_bytes())
+    discarded_events = report["discarded_events"]
+
+    assert len(discarded_events) == 2
+
+    assert {
+        "category": "transaction",
+        "reason": "test",
+        "quantity": 1,
+    } in discarded_events
+
+    assert {
+        "category": "span",
+        "reason": "test",
+        "quantity": span_count + 1,
+    } in discarded_events

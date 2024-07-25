@@ -11,6 +11,12 @@ API Docs
 .. autoclass:: sentry_sdk.Client
     :members:
 
+.. autoclass:: sentry_sdk.client.BaseClient
+    :members:
+
+.. autoclass:: sentry_sdk.client.NonRecordingClient
+    :members:
+
 .. autoclass:: sentry_sdk.client._Client
     :members:
 
@@ -26,7 +32,7 @@ API Docs
 .. autoclass:: sentry_sdk.tracing.Span
    :members:
 
-.. autoclass:: sentry_sdk.profiler.Profile
+.. autoclass:: sentry_sdk.profiler.transaction_profiler.Profile
    :members:
 
 .. autoclass:: sentry_sdk.session.Session

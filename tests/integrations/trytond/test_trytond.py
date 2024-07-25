@@ -11,8 +11,9 @@ from trytond.exceptions import LoginException
 from trytond.wsgi import app as trytond_app
 
 from werkzeug.test import Client
-from sentry_sdk import last_event_id
+
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration
+from tests.conftest import unpack_werkzeug_response
 
 
 @pytest.fixture(scope="function")
@@ -79,13 +80,12 @@ def test_trytonderrors_not_captured(
 @pytest.mark.skipif(
     trytond.__version__.split(".") < ["5", "4"], reason="At least Trytond-5.4 required"
 )
-def test_rpc_error_page(sentry_init, app, capture_events, get_client):
+def test_rpc_error_page(sentry_init, app, get_client):
     """Test that, after initializing the Trytond-SentrySDK integration
     a custom error handler can be registered to the Trytond WSGI app so as to
     inform the event identifiers to the Tryton RPC client"""
 
     sentry_init(integrations=[TrytondWSGIIntegration()])
-    events = capture_events()
 
     @app.route("/rpcerror", methods=["POST"])
     def _(request):
@@ -96,8 +96,7 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
         if isinstance(e, TrytondBaseException):
             return
         else:
-            event_id = last_event_id()
-            data = TrytondUserError(str(event_id), str(e))
+            data = TrytondUserError("Sentry error.", str(e))
             return app.make_response(request, data)
 
     client = get_client()
@@ -121,9 +120,27 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
         "/rpcerror", content_type="application/json", data=json.dumps(_data)
     )
 
-    (event,) = events
-    (content, status, headers) = response
-    data = json.loads(next(content))
+    (content, status, headers) = unpack_werkzeug_response(response)
+    data = json.loads(content)
     assert status == "200 OK"
     assert headers.get("Content-Type") == "application/json"
-    assert data == dict(id=42, error=["UserError", [event["event_id"], "foo", None]])
+    assert data == dict(id=42, error=["UserError", ["Sentry error.", "foo", None]])
+
+
+def test_span_origin(sentry_init, app, capture_events, get_client):
+    sentry_init(
+        integrations=[TrytondWSGIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    @app.route("/something")
+    def _(request):
+        return "ok"
+
+    client = get_client()
+    client.get("/something")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.trytond_wsgi"

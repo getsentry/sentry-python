@@ -1,17 +1,14 @@
-# coding: utf-8
-import pytest
 import sys
 import time
 import linecache
+from unittest import mock
 
-from sentry_sdk import Hub, metrics, push_scope, start_transaction
+import pytest
+
+import sentry_sdk
+from sentry_sdk import Scope, metrics
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 try:
     import gevent
@@ -58,7 +55,7 @@ def parse_metrics(bytes):
 
 @minimum_python_37_with_gevent
 @pytest.mark.forked
-def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
+def test_increment(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     sentry_init(
         release="fun-release",
         environment="not-fun-env",
@@ -67,9 +64,10 @@ def test_incr(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     ts = time.time()
     envelopes = capture_envelopes()
 
-    metrics.incr("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    metrics.increment("foobar", 1.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
+    # python specific alias
     metrics.incr("foobar", 2.0, tags={"foo": "bar", "blub": "blah"}, timestamp=ts)
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
@@ -122,7 +120,7 @@ def test_timing(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
 
     with metrics.timing("whatever", tags={"blub": "blah"}, timestamp=ts):
         time.sleep(0.1)
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
@@ -194,7 +192,7 @@ def test_timing_decorator(
 
     assert amazing() == 42
     assert amazing_nano() == 23
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
@@ -281,7 +279,7 @@ def test_timing_basic(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     metrics.timing("timing", 2.0, tags={"a": "b"}, timestamp=ts)
     metrics.timing("timing", 2.0, tags={"a": "b"}, timestamp=ts)
     metrics.timing("timing", 3.0, tags={"a": "b"}, timestamp=ts)
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
@@ -336,7 +334,7 @@ def test_distribution(sentry_init, capture_envelopes, maybe_monkeypatched_thread
     metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
     metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
     metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
@@ -398,7 +396,7 @@ def test_set(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     metrics.set("my-set", "peter", tags={"magic": "puff"}, timestamp=ts)
     metrics.set("my-set", "paul", tags={"magic": "puff"}, timestamp=ts)
     metrics.set("my-set", "mary", tags={"magic": "puff"}, timestamp=ts)
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     statsd_item, meta_item = envelope.items
@@ -452,7 +450,7 @@ def test_gauge(sentry_init, capture_envelopes, maybe_monkeypatched_threading):
     metrics.gauge("my-gauge", 10.0, tags={"x": "y"}, timestamp=ts)
     metrics.gauge("my-gauge", 20.0, tags={"x": "y"}, timestamp=ts)
     metrics.gauge("my-gauge", 30.0, tags={"x": "y"}, timestamp=ts)
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
 
@@ -487,10 +485,10 @@ def test_multiple(sentry_init, capture_envelopes):
     metrics.gauge("my-gauge", 20.0, tags={"x": "y"}, timestamp=ts)
     metrics.gauge("my-gauge", 30.0, tags={"x": "y"}, timestamp=ts)
     for _ in range(10):
-        metrics.incr("counter-1", 1.0, timestamp=ts)
-    metrics.incr("counter-2", 1.0, timestamp=ts)
+        metrics.increment("counter-1", 1.0, timestamp=ts)
+    metrics.increment("counter-2", 1.0, timestamp=ts)
 
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
 
@@ -540,14 +538,14 @@ def test_transaction_name(
     ts = time.time()
     envelopes = capture_envelopes()
 
-    with push_scope() as scope:
-        scope.set_transaction_name("/user/{user_id}", source="route")
-        metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
-        metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
+    scope = Scope.get_current_scope()
+    scope.set_transaction_name("/user/{user_id}", source="route")
+    metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
+    metrics.distribution("dist", 3.0, tags={"a": "b"}, timestamp=ts)
 
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
 
@@ -570,31 +568,26 @@ def test_transaction_name(
 
 @minimum_python_37_with_gevent
 @pytest.mark.forked
-@pytest.mark.parametrize("sample_rate", [1.0, None])
 def test_metric_summaries(
-    sentry_init, capture_envelopes, sample_rate, maybe_monkeypatched_threading
+    sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
     sentry_init(
         release="fun-release@1.0.0",
         environment="not-fun-env",
         enable_tracing=True,
-        _experiments={
-            "enable_metrics": True,
-            "metrics_summary_sample_rate": sample_rate,
-        },
     )
     ts = time.time()
     envelopes = capture_envelopes()
 
-    with start_transaction(
+    with sentry_sdk.start_transaction(
         op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
     ) as transaction:
-        metrics.incr("root-counter", timestamp=ts)
+        metrics.increment("root-counter", timestamp=ts)
         with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
             for x in range(10):
                 metrics.distribution("my-dist", float(x), timestamp=ts)
 
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (transaction, envelope) = envelopes
 
@@ -681,171 +674,98 @@ def test_metric_summaries(
 
 @minimum_python_37_with_gevent
 @pytest.mark.forked
-def test_metrics_summary_disabled(
-    sentry_init, capture_envelopes, maybe_monkeypatched_threading
+@pytest.mark.parametrize(
+    "metric_name,metric_unit,expected_name",
+    [
+        ("first-metric", "nano-second", "first-metric@nanosecond"),
+        ("another_metric?", "nano second", "another_metric_@nanosecond"),
+        (
+            "metric",
+            "nanosecond",
+            "metric@nanosecond",
+        ),
+        (
+            "my.amaze.metric I guess",
+            "nano|\nsecond",
+            "my.amaze.metric_I_guess@nanosecond",
+        ),
+        ("métríc", "nanöseconď", "m_tr_c@nansecon"),
+    ],
+)
+def test_metric_name_normalization(
+    sentry_init,
+    capture_envelopes,
+    metric_name,
+    metric_unit,
+    expected_name,
+    maybe_monkeypatched_threading,
 ):
     sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
-        enable_tracing=True,
-        _experiments={"enable_metrics": True, "metrics_summary_sample_rate": 0.0},
-    )
-    ts = time.time()
-    envelopes = capture_envelopes()
-
-    with start_transaction(
-        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
-    ) as transaction:
-        with metrics.timing("my-timer-metric", tags={"a": "b"}, timestamp=ts):
-            pass
-
-    Hub.current.flush()
-
-    (transaction, envelope) = envelopes
-
-    # Metrics Emission
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
-
-    assert len(m) == 1
-    assert m[0][1] == "my-timer-metric@second"
-    assert m[0][2] == "d"
-    assert len(m[0][3]) == 1
-    assert m[0][4] == {
-        "a": "b",
-        "transaction": "/foo",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
-
-    # Measurement Attachment
-    t = transaction.items[0].get_transaction_event()
-    assert "_metrics_summary" not in t
-    assert "_metrics_summary" not in t["spans"][0]
-
-
-@minimum_python_37_with_gevent
-@pytest.mark.forked
-def test_metrics_summary_filtered(
-    sentry_init, capture_envelopes, maybe_monkeypatched_threading
-):
-    def should_summarize_metric(key, tags):
-        return key == "foo"
-
-    sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
-        enable_tracing=True,
-        _experiments={
-            "enable_metrics": True,
-            "metrics_summary_sample_rate": 1.0,
-            "should_summarize_metric": should_summarize_metric,
-        },
-    )
-    ts = time.time()
-    envelopes = capture_envelopes()
-
-    with start_transaction(
-        op="stuff", name="/foo", source=TRANSACTION_SOURCE_ROUTE
-    ) as transaction:
-        metrics.timing("foo", value=3.0, tags={"a": "b"}, timestamp=ts)
-        metrics.timing("foo", value=2.0, tags={"b": "c"}, timestamp=ts)
-        metrics.timing("bar", value=1.0, tags={"a": "b"}, timestamp=ts)
-
-    Hub.current.flush()
-
-    (transaction, envelope) = envelopes
-
-    # Metrics Emission
-    assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
-
-    assert len(m) == 3
-    assert m[0][1] == "bar@second"
-    assert m[1][1] == "foo@second"
-    assert m[2][1] == "foo@second"
-
-    # Measurement Attachment
-    t = transaction.items[0].get_transaction_event()["_metrics_summary"]
-    assert len(t["d:foo@second"]) == 2
-    assert {
-        "tags": {
-            "a": "b",
-            "environment": "not-fun-env",
-            "release": "fun-release@1.0.0",
-            "transaction": "/foo",
-        },
-        "min": 3.0,
-        "max": 3.0,
-        "count": 1,
-        "sum": 3.0,
-    } in t["d:foo@second"]
-    assert {
-        "tags": {
-            "b": "c",
-            "environment": "not-fun-env",
-            "release": "fun-release@1.0.0",
-            "transaction": "/foo",
-        },
-        "min": 2.0,
-        "max": 2.0,
-        "count": 1,
-        "sum": 2.0,
-    } in t["d:foo@second"]
-
-
-@minimum_python_37_with_gevent
-@pytest.mark.forked
-def test_tag_normalization(
-    sentry_init, capture_envelopes, maybe_monkeypatched_threading
-):
-    sentry_init(
-        release="fun-release@1.0.0",
-        environment="not-fun-env",
         _experiments={"enable_metrics": True, "metric_code_locations": False},
     )
-    ts = time.time()
     envelopes = capture_envelopes()
 
-    # fmt: off
-    metrics.distribution("a", 1.0, tags={"foo-bar": "%$foo"}, timestamp=ts)
-    metrics.distribution("b", 1.0, tags={"foo$$$bar": "blah{}"}, timestamp=ts)
-    metrics.distribution("c", 1.0, tags={u"foö-bar": u"snöwmän"}, timestamp=ts)
-    metrics.distribution("d", 1.0, tags={"route": "GET /foo"}, timestamp=ts)
-    # fmt: on
-    Hub.current.flush()
+    metrics.distribution(metric_name, 1.0, unit=metric_unit)
+
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
 
     assert len(envelope.items) == 1
     assert envelope.items[0].headers["type"] == "statsd"
-    m = parse_metrics(envelope.items[0].payload.get_bytes())
 
-    assert len(m) == 4
-    assert m[0][4] == {
-        "foo-bar": "$foo",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
+    parsed_metrics = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert len(parsed_metrics) == 1
 
-    assert m[1][4] == {
-        "foo_bar": "blah{}",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
+    name = parsed_metrics[0][1]
+    assert name == expected_name
 
-    # fmt: off
-    assert m[2][4] == {
-        "fo_-bar": u"snöwmän",
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-    }
-    assert m[3][4] == {
-        "release": "fun-release@1.0.0",
-        "environment": "not-fun-env",
-        "route": "GET /foo",
-    }
-    # fmt: on
+
+@minimum_python_37_with_gevent
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "metric_tag,expected_tag",
+    [
+        ({"f-oo|bar": "%$foo/"}, {"f-oobar": "%$foo/"}),
+        ({"foo$.$.$bar": "blah{}"}, {"foo..bar": "blah{}"}),
+        (
+            {"foö-bar": "snöwmän"},
+            {"fo-bar": "snöwmän"},
+        ),
+        ({"route": "GET /foo"}, {"route": "GET /foo"}),
+        ({"__bar__": "this | or , that"}, {"__bar__": "this \\u{7c} or \\u{2c} that"}),
+        ({"foo/": "hello!\n\r\t\\"}, {"foo/": "hello!\\n\\r\\t\\\\"}),
+    ],
+)
+def test_metric_tag_normalization(
+    sentry_init,
+    capture_envelopes,
+    metric_tag,
+    expected_tag,
+    maybe_monkeypatched_threading,
+):
+    sentry_init(
+        _experiments={"enable_metrics": True, "metric_code_locations": False},
+    )
+    envelopes = capture_envelopes()
+
+    metrics.distribution("a", 1.0, tags=metric_tag)
+
+    sentry_sdk.flush()
+
+    (envelope,) = envelopes
+
+    assert len(envelope.items) == 1
+    assert envelope.items[0].headers["type"] == "statsd"
+
+    parsed_metrics = parse_metrics(envelope.items[0].payload.get_bytes())
+    assert len(parsed_metrics) == 1
+
+    tags = parsed_metrics[0][4]
+
+    expected_tag_key, expected_tag_value = expected_tag.popitem()
+    assert expected_tag_key in tags
+    assert tags[expected_tag_key] == expected_tag_value
 
 
 @minimum_python_37_with_gevent
@@ -853,13 +773,14 @@ def test_tag_normalization(
 def test_before_emit_metric(
     sentry_init, capture_envelopes, maybe_monkeypatched_threading
 ):
-    def before_emit(key, tags):
-        if key == "removed-metric":
+    def before_emit(key, value, unit, tags):
+        if key == "removed-metric" or value == 47 or unit == "unsupported":
             return False
+
         tags["extra"] = "foo"
         del tags["release"]
         # this better be a noop!
-        metrics.incr("shitty-recursion")
+        metrics.increment("shitty-recursion")
         return True
 
     sentry_init(
@@ -873,9 +794,11 @@ def test_before_emit_metric(
     )
     envelopes = capture_envelopes()
 
-    metrics.incr("removed-metric", 1.0)
-    metrics.incr("actual-metric", 1.0)
-    Hub.current.flush()
+    metrics.increment("removed-metric", 1.0)
+    metrics.increment("another-removed-metric", 47)
+    metrics.increment("yet-another-removed-metric", 1.0, unit="unsupported")
+    metrics.increment("actual-metric", 1.0)
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
 
@@ -906,11 +829,11 @@ def test_aggregator_flush(
     )
     envelopes = capture_envelopes()
 
-    metrics.incr("a-metric", 1.0)
-    Hub.current.flush()
+    metrics.increment("a-metric", 1.0)
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
-    assert Hub.current.client.metrics_aggregator.buckets == {}
+    assert sentry_sdk.get_client().metrics_aggregator.buckets == {}
 
 
 @minimum_python_37_with_gevent
@@ -925,7 +848,7 @@ def test_tag_serialization(
     )
     envelopes = capture_envelopes()
 
-    metrics.incr(
+    metrics.increment(
         "counter",
         tags={
             "no-value": None,
@@ -935,7 +858,7 @@ def test_tag_serialization(
             "more-than-one": [1, "zwei", "3.0", None],
         },
     )
-    Hub.current.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
 
@@ -965,21 +888,21 @@ def test_flush_recursion_protection(
         _experiments={"enable_metrics": True},
     )
     envelopes = capture_envelopes()
-    test_client = Hub.current.client
+    test_client = sentry_sdk.get_client()
 
     real_capture_envelope = test_client.transport.capture_envelope
 
     def bad_capture_envelope(*args, **kwargs):
-        metrics.incr("bad-metric")
+        metrics.increment("bad-metric")
         return real_capture_envelope(*args, **kwargs)
 
     monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
 
-    metrics.incr("counter")
+    metrics.increment("counter")
 
     # flush twice to see the inner metric
-    Hub.current.flush()
-    Hub.current.flush()
+    sentry_sdk.flush()
+    sentry_sdk.flush()
 
     (envelope,) = envelopes
     m = parse_metrics(envelope.items[0].payload.get_bytes())
@@ -999,20 +922,20 @@ def test_flush_recursion_protection_background_flush(
         _experiments={"enable_metrics": True},
     )
     envelopes = capture_envelopes()
-    test_client = Hub.current.client
+    test_client = sentry_sdk.get_client()
 
     real_capture_envelope = test_client.transport.capture_envelope
 
     def bad_capture_envelope(*args, **kwargs):
-        metrics.incr("bad-metric")
+        metrics.increment("bad-metric")
         return real_capture_envelope(*args, **kwargs)
 
     monkeypatch.setattr(test_client.transport, "capture_envelope", bad_capture_envelope)
 
-    metrics.incr("counter")
+    metrics.increment("counter")
 
     # flush via sleep and flag
-    Hub.current.client.metrics_aggregator._force_flush = True
+    sentry_sdk.get_client().metrics_aggregator._force_flush = True
     time.sleep(0.5)
 
     (envelope,) = envelopes
@@ -1041,7 +964,7 @@ def test_disable_metrics_for_old_python_with_gevent(
 
     metrics.incr("counter")
 
-    Hub.current.flush()
+    sentry_sdk.flush()
 
-    assert Hub.current.client.metrics_aggregator is None
+    assert sentry_sdk.get_client().metrics_aggregator is None
     assert not envelopes

@@ -14,8 +14,6 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-from __future__ import absolute_import
-
 try:
     from django.urls import path
 except ImportError:

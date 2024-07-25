@@ -1,15 +1,11 @@
+from unittest import mock
+
 import pytest
+from fakeredis import FakeStrictRedis
 
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-
-from fakeredis import FakeStrictRedis
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 MOCK_CONNECTION_POOL = mock.MagicMock()
@@ -89,7 +85,8 @@ def test_redis_pipeline(
 def test_sensitive_data(sentry_init, capture_events):
     # fakeredis does not support the AUTH command, so we need to mock it
     with mock.patch(
-        "sentry_sdk.integrations.redis._COMMANDS_INCLUDING_SENSITIVE_DATA", ["get"]
+        "sentry_sdk.integrations.redis.utils._COMMANDS_INCLUDING_SENSITIVE_DATA",
+        ["get"],
     ):
         sentry_init(
             integrations=[RedisIntegration()],
@@ -296,3 +293,29 @@ def test_db_connection_attributes_pipeline(sentry_init, capture_events):
     assert span["data"][SPANDATA.DB_NAME] == "1"
     assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
     assert span["data"][SPANDATA.SERVER_PORT] == 63791
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    connection = FakeStrictRedis()
+    with start_transaction(name="custom_transaction"):
+        # default case
+        connection.set("somekey", "somevalue")
+
+        # pipeline
+        pipeline = connection.pipeline(transaction=False)
+        pipeline.get("somekey")
+        pipeline.set("anotherkey", 1)
+        pipeline.execute()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.db.redis"

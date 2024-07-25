@@ -366,9 +366,9 @@ def test_error_in_authenticated_userid(
     )
     logger = logging.getLogger("test_pyramid")
 
-    class AuthenticationPolicy(object):
+    class AuthenticationPolicy:
         def authenticated_userid(self, request):
-            logger.error("failed to identify user")
+            logger.warning("failed to identify user")
 
     pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
     pyramid_config.set_authentication_policy(AuthenticationPolicy())
@@ -379,6 +379,16 @@ def test_error_in_authenticated_userid(
     client.get("/message")
 
     assert len(events) == 1
+
+    # In `authenticated_userid` there used to be a call to `logging.error`. This would print this error in the
+    # event processor of the Pyramid integration and the logging integration would capture this and send it to Sentry.
+    # This is not possible anymore, because capturing that error in the logging integration would again run all the
+    # event processors (from the global, isolation and current scope) and thus would again run the same pyramid
+    # event processor that raised the error in the first place, leading on an infinite loop.
+    # This test here is now deactivated and always passes, but it is kept here to document the problem.
+    # This change in behavior is also mentioned in the migration documentation for Python SDK 2.0
+
+    # assert "message" not in events[0].keys()
 
 
 def tween_factory(handler, registry):
@@ -411,3 +421,18 @@ def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_cl
     client.get("/")
 
     assert not errors
+
+
+def test_span_origin(sentry_init, capture_events, get_client):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = get_client()
+    client.get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.pyramid"

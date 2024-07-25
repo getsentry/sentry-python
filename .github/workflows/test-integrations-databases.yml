@@ -46,56 +46,63 @@ jobs:
         ports:
           - 5432:5432
     env:
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
-          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase
       - name: Test asyncpg latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-asyncpg-latest"
       - name: Test clickhouse_driver latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-clickhouse_driver-latest"
       - name: Test pymongo latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-pymongo-latest"
       - name: Test redis latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rediscluster latest
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis-latest"
+      - name: Test redis_py_cluster_legacy latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-rediscluster-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-redis_py_cluster_legacy-latest"
       - name: Test sqlalchemy latest
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-sqlalchemy-latest"
       - name: Generate coverage XML
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v4
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   test-databases-pinned:
     name: Databases (pinned)
     timeout-minutes: 30
@@ -124,135 +131,71 @@ jobs:
         ports:
           - 5432:5432
     env:
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: localhost
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.1.7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
-          pip install coverage "tox>=3,<4"
-          psql postgresql://postgres:sentry@localhost:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@localhost:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
+          pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase
       - name: Test asyncpg pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-asyncpg"
       - name: Test clickhouse_driver pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-clickhouse_driver"
       - name: Test pymongo pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-pymongo"
       - name: Test redis pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rediscluster pinned
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis"
+      - name: Test redis_py_cluster_legacy pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-redis_py_cluster_legacy"
       - name: Test sqlalchemy pinned
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
+          ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-sqlalchemy"
       - name: Generate coverage XML
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage*
           coverage xml -i
-      - uses: codecov/codecov-action@v4
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
-  test-databases-py27:
-    name: Databases (py27)
-    timeout-minutes: 30
-    runs-on: ubuntu-20.04
-    container: python:2.7
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: sentry
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        # Maps tcp port 5432 on service container to the host
-        ports:
-          - 5432:5432
-    env:
-      SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
-      SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_POSTGRES_NAME: ci_test
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: postgres
-    steps:
-      - uses: actions/checkout@v4.1.1
-      - uses: getsentry/action-clickhouse-in-ci@v1
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-          psql postgresql://postgres:sentry@postgres:5432 -c "create database ${SENTRY_PYTHON_TEST_POSTGRES_NAME};" || true
-          psql postgresql://postgres:sentry@postgres:5432 -c "grant all privileges on database ${SENTRY_PYTHON_TEST_POSTGRES_NAME} to ${SENTRY_PYTHON_TEST_POSTGRES_USER};" || true
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test asyncpg py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-asyncpg" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test clickhouse_driver py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-clickhouse_driver" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test pymongo py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-pymongo" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test redis py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-redis" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rediscluster py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-rediscluster" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test sqlalchemy py27
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh --exclude-latest "py2.7-sqlalchemy" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Generate coverage XML
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-      - uses: codecov/codecov-action@v4
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
+          files: .junitxml
   check_required_tests:
     name: All Databases tests passed
-    needs: [test-databases-pinned, test-databases-py27]
+    needs: test-databases-pinned
     # Always run this, even if a dependent job failed
     if: always()
     runs-on: ubuntu-20.04
     steps:
       - name: Check for failures
         if: contains(needs.test-databases-pinned.result, 'failure') || contains(needs.test-databases-pinned.result, 'skipped')
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
-      - name: Check for 2.7 failures
-        if: contains(needs.test-databases-py27.result, 'failure') || contains(needs.test-databases-py27.result, 'skipped')
         run: |
           echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1

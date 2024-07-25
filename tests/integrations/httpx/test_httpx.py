@@ -1,17 +1,15 @@
 import asyncio
+from unittest import mock
 
-import pytest
 import httpx
+import pytest
 import responses
 
+import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.httpx import HttpxIntegration
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from tests.conftest import ApproxDict
 
 
 @pytest.mark.parametrize(
@@ -46,15 +44,17 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client):
         crumb = event["breadcrumbs"]["values"][0]
         assert crumb["type"] == "http"
         assert crumb["category"] == "httplib"
-        assert crumb["data"] == {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-            "extra": "foo",
-        }
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "reason": "OK",
+                "extra": "foo",
+            }
+        )
 
 
 @pytest.mark.parametrize(
@@ -259,10 +259,11 @@ def test_option_trace_propagation_targets(
         integrations=[HttpxIntegration()],
     )
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.start_transaction():  # Must be in a transaction to propagate headers
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     request_headers = httpx_mock.get_request().headers
 
@@ -270,6 +271,22 @@ def test_option_trace_propagation_targets(
         assert "sentry-trace" in request_headers
     else:
         assert "sentry-trace" not in request_headers
+
+
+def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
+    httpx_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_propagation_targets=[MATCH_ALL],
+        integrations=[HttpxIntegration()],
+    )
+
+    httpx_client = httpx.Client()
+    httpx_client.get("http://example.com/")
+
+    request_headers = httpx_mock.get_request().headers
+    assert "sentry-trace" not in request_headers
 
 
 @pytest.mark.tests_internal_exceptions
@@ -291,9 +308,42 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == {
-        SPANDATA.HTTP_METHOD: "GET",
-        SPANDATA.HTTP_STATUS_CODE: 200,
-        "reason": "OK",
-        # no url related data
-    }
+    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            # no url related data
+        }
+    )
+
+    assert "url" not in event["breadcrumbs"]["values"][0]["data"]
+    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
+    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+def test_span_origin(sentry_init, capture_events, httpx_client):
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    url = "http://example.com/"
+    responses.add(responses.GET, url, status=200)
+
+    with start_transaction(name="test_transaction"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.http.httpx"
