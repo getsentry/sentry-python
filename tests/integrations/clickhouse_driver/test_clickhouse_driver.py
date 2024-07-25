@@ -4,11 +4,13 @@ Tests need a local clickhouse instance running, this can best be done using
 docker run -d -p 18123:8123 -p9000:9000 --name clickhouse-test --ulimit nofile=262144:262144 --rm clickhouse/clickhouse-server
 ```
 """
+
 import clickhouse_driver
 from clickhouse_driver import Client, connect
 
 from sentry_sdk import start_transaction, capture_message
 from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
+from tests.conftest import ApproxDict
 
 EXPECT_PARAMS_IN_SELECT = True
 if clickhouse_driver.VERSION < (0, 2, 6):
@@ -100,6 +102,9 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
+
+    for crumb in expected_breadcrumbs:
+        crumb["data"] = ApproxDict(crumb["data"])
 
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
@@ -200,6 +205,9 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
 
+    for crumb in expected_breadcrumbs:
+        crumb["data"] = ApproxDict(crumb["data"])
+
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
 
@@ -239,6 +247,7 @@ def test_clickhouse_client_spans(
     expected_spans = [
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -253,6 +262,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -267,6 +277,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -281,6 +292,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -295,6 +307,7 @@ def test_clickhouse_client_spans(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -311,6 +324,9 @@ def test_clickhouse_client_spans(
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
+
+    for span in expected_spans:
+        span["data"] = ApproxDict(span["data"])
 
     for span in event["spans"]:
         span.pop("span_id", None)
@@ -354,6 +370,7 @@ def test_clickhouse_client_spans_with_pii(
     expected_spans = [
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -369,6 +386,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -384,6 +402,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -399,6 +418,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -414,6 +434,7 @@ def test_clickhouse_client_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -432,6 +453,9 @@ def test_clickhouse_client_spans_with_pii(
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
+
+    for span in expected_spans:
+        span["data"] = ApproxDict(span["data"])
 
     for span in event["spans"]:
         span.pop("span_id", None)
@@ -527,6 +551,9 @@ def test_clickhouse_dbapi_breadcrumbs(sentry_init, capture_events) -> None:
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
+
+    for crumb in expected_breadcrumbs:
+        crumb["data"] = ApproxDict(crumb["data"])
 
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
@@ -628,6 +655,9 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
     if not EXPECT_PARAMS_IN_SELECT:
         expected_breadcrumbs[-1]["data"].pop("db.params", None)
 
+    for crumb in expected_breadcrumbs:
+        crumb["data"] = ApproxDict(crumb["data"])
+
     for crumb in event["breadcrumbs"]["values"]:
         crumb.pop("timestamp", None)
 
@@ -665,6 +695,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
     expected_spans = [
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -679,6 +710,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -693,6 +725,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -707,6 +740,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -721,6 +755,7 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -737,6 +772,9 @@ def test_clickhouse_dbapi_spans(sentry_init, capture_events, capture_envelopes) 
 
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
+
+    for span in expected_spans:
+        span["data"] = ApproxDict(span["data"])
 
     for span in event["spans"]:
         span.pop("span_id", None)
@@ -780,6 +818,7 @@ def test_clickhouse_dbapi_spans_with_pii(
     expected_spans = [
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "DROP TABLE IF EXISTS test",
             "data": {
                 "db.system": "clickhouse",
@@ -795,6 +834,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "CREATE TABLE test (x Int32) ENGINE = Memory",
             "data": {
                 "db.system": "clickhouse",
@@ -810,6 +850,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -825,6 +866,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "INSERT INTO test (x) VALUES",
             "data": {
                 "db.system": "clickhouse",
@@ -840,6 +882,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         },
         {
             "op": "db",
+            "origin": "auto.db.clickhouse_driver",
             "description": "SELECT sum(x) FROM test WHERE x > 150",
             "data": {
                 "db.system": "clickhouse",
@@ -859,9 +902,31 @@ def test_clickhouse_dbapi_spans_with_pii(
     if not EXPECT_PARAMS_IN_SELECT:
         expected_spans[-1]["data"].pop("db.params", None)
 
+    for span in expected_spans:
+        span["data"] = ApproxDict(span["data"])
+
     for span in event["spans"]:
         span.pop("span_id", None)
         span.pop("start_timestamp", None)
         span.pop("timestamp", None)
 
     assert event["spans"] == expected_spans
+
+
+def test_span_origin(sentry_init, capture_events, capture_envelopes) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    events = capture_events()
+
+    with start_transaction(name="test_clickhouse_transaction"):
+        conn = connect("clickhouse://localhost")
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.db.clickhouse_driver"

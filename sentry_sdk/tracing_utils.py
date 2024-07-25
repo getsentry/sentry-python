@@ -1,32 +1,31 @@
 import contextlib
+import inspect
 import os
 import re
 import sys
+from collections.abc import Mapping
+from datetime import timedelta
+from functools import wraps
+from urllib.parse import quote, unquote
+import uuid
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    filename_for_module,
     Dsn,
+    logger,
     match_regex_list,
+    qualname_from_function,
     to_string,
     is_sentry_url,
     _is_external_source,
     _module_in_list,
 )
-from sentry_sdk._compat import PY2, iteritems
 from sentry_sdk._types import TYPE_CHECKING
 
-if PY2:
-    from collections import Mapping
-    from urllib import quote, unquote
-else:
-    from collections.abc import Mapping
-    from urllib.parse import quote, unquote
-
 if TYPE_CHECKING:
-    import typing
-
     from typing import Any
     from typing import Dict
     from typing import Generator
@@ -59,7 +58,7 @@ base64_stripped = (
 class EnvironHeaders(Mapping):  # type: ignore
     def __init__(
         self,
-        environ,  # type: typing.Mapping[str, str]
+        environ,  # type: Mapping[str, str]
         prefix="HTTP_",  # type: str
     ):
         # type: (...) -> None
@@ -107,20 +106,18 @@ def has_tracing_enabled(options):
 
 @contextlib.contextmanager
 def record_sql_queries(
-    hub,  # type: sentry_sdk.Hub
     cursor,  # type: Any
     query,  # type: Any
     params_list,  # type:  Any
     paramstyle,  # type: Optional[str]
     executemany,  # type: bool
     record_cursor_repr=False,  # type: bool
+    span_origin="manual",  # type: str
 ):
     # type: (...) -> Generator[sentry_sdk.tracing.Span, None, None]
 
     # TODO: Bring back capturing of params by default
-    if hub.client and hub.client.options["_experiments"].get(
-        "record_sql_params", False
-    ):
+    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
         if not params_list or params_list == [None]:
             params_list = None
 
@@ -143,24 +140,29 @@ def record_sql_queries(
         data["db.cursor"] = cursor
 
     with capture_internal_exceptions():
-        hub.add_breadcrumb(message=query, category="query", data=data)
+        sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with hub.start_span(op=OP.DB, description=query) as span:
+    with sentry_sdk.start_span(
+        op=OP.DB,
+        description=query,
+        origin=span_origin,
+    ) as span:
         for k, v in data.items():
             span.set_data(k, v)
         yield span
 
 
-def maybe_create_breadcrumbs_from_span(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def maybe_create_breadcrumbs_from_span(scope, span):
+    # type: (sentry_sdk.Scope, sentry_sdk.tracing.Span) -> None
+
     if span.op == OP.DB_REDIS:
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             message=span.description, type="redis", category="redis", data=span._tags
         )
     elif span.op == OP.HTTP_CLIENT:
-        hub.add_breadcrumb(type="http", category="httplib", data=span._data)
+        scope.add_breadcrumb(type="http", category="httplib", data=span._data)
     elif span.op == "subprocess":
-        hub.add_breadcrumb(
+        scope.add_breadcrumb(
             type="subprocess",
             category="subprocess",
             message=span.description,
@@ -168,25 +170,25 @@ def maybe_create_breadcrumbs_from_span(hub, span):
         )
 
 
-def add_query_source(hub, span):
-    # type: (sentry_sdk.Hub, sentry_sdk.tracing.Span) -> None
+def add_query_source(span):
+    # type: (sentry_sdk.tracing.Span) -> None
     """
     Adds OTel compatible source code information to the span
     """
-    client = hub.client
-    if client is None:
+    client = sentry_sdk.get_client()
+    if not client.is_active():
         return
 
     if span.timestamp is None or span.start_timestamp is None:
         return
 
-    should_add_query_source = client.options.get("enable_db_query_source", False)
+    should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
     duration = span.timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
-    slow_query = duration.microseconds > threshold * 1000
+    slow_query = duration / timedelta(milliseconds=1) > threshold
 
     if not slow_query:
         return
@@ -200,8 +202,6 @@ def add_query_source(hub, span):
     while frame is not None:
         try:
             abs_path = frame.f_code.co_filename
-            if abs_path and PY2:
-                abs_path = os.path.abspath(abs_path)
         except Exception:
             abs_path = ""
 
@@ -255,7 +255,9 @@ def add_query_source(hub, span):
         except Exception:
             filepath = None
         if filepath is not None:
-            if project_root is not None and filepath.startswith(project_root):
+            if namespace is not None:
+                in_app_path = filename_for_module(namespace, filepath)
+            elif project_root is not None and filepath.startswith(project_root):
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
@@ -322,7 +324,120 @@ def _format_sql(cursor, sql):
     return real_sql or to_string(sql)
 
 
-class Baggage(object):
+class PropagationContext:
+    """
+    The PropagationContext represents the data of a trace in Sentry.
+    """
+
+    __slots__ = (
+        "_trace_id",
+        "_span_id",
+        "parent_span_id",
+        "parent_sampled",
+        "dynamic_sampling_context",
+    )
+
+    def __init__(
+        self,
+        trace_id=None,  # type: Optional[str]
+        span_id=None,  # type: Optional[str]
+        parent_span_id=None,  # type: Optional[str]
+        parent_sampled=None,  # type: Optional[bool]
+        dynamic_sampling_context=None,  # type: Optional[Dict[str, str]]
+    ):
+        # type: (...) -> None
+        self._trace_id = trace_id
+        """The trace id of the Sentry trace."""
+
+        self._span_id = span_id
+        """The span id of the currently executing span."""
+
+        self.parent_span_id = parent_span_id
+        """The id of the parent span that started this span.
+        The parent span could also be a span in an upstream service."""
+
+        self.parent_sampled = parent_sampled
+        """Boolean indicator if the parent span was sampled.
+        Important when the parent span originated in an upstream service,
+        because we watn to sample the whole trace, or nothing from the trace."""
+
+        self.dynamic_sampling_context = dynamic_sampling_context
+        """Data that is used for dynamic sampling decisions."""
+
+    @classmethod
+    def from_incoming_data(cls, incoming_data):
+        # type: (Dict[str, Any]) -> Optional[PropagationContext]
+        propagation_context = None
+
+        normalized_data = normalize_incoming_data(incoming_data)
+        baggage_header = normalized_data.get(BAGGAGE_HEADER_NAME)
+        if baggage_header:
+            propagation_context = PropagationContext()
+            propagation_context.dynamic_sampling_context = Baggage.from_incoming_header(
+                baggage_header
+            ).dynamic_sampling_context()
+
+        sentry_trace_header = normalized_data.get(SENTRY_TRACE_HEADER_NAME)
+        if sentry_trace_header:
+            sentrytrace_data = extract_sentrytrace_data(sentry_trace_header)
+            if sentrytrace_data is not None:
+                if propagation_context is None:
+                    propagation_context = PropagationContext()
+                propagation_context.update(sentrytrace_data)
+
+        return propagation_context
+
+    @property
+    def trace_id(self):
+        # type: () -> str
+        """The trace id of the Sentry trace."""
+        if not self._trace_id:
+            self._trace_id = uuid.uuid4().hex
+
+        return self._trace_id
+
+    @trace_id.setter
+    def trace_id(self, value):
+        # type: (str) -> None
+        self._trace_id = value
+
+    @property
+    def span_id(self):
+        # type: () -> str
+        """The span id of the currently executed span."""
+        if not self._span_id:
+            self._span_id = uuid.uuid4().hex[16:]
+
+        return self._span_id
+
+    @span_id.setter
+    def span_id(self, value):
+        # type: (str) -> None
+        self._span_id = value
+
+    def update(self, other_dict):
+        # type: (Dict[str, Any]) -> None
+        """
+        Updates the PropagationContext with data from the given dictionary.
+        """
+        for key, value in other_dict.items():
+            try:
+                setattr(self, key, value)
+            except AttributeError:
+                pass
+
+    def __repr__(self):
+        # type: (...) -> str
+        return "<PropagationContext _trace_id={} _span_id={} parent_span_id={} parent_sampled={} dynamic_sampling_context={}>".format(
+            self._trace_id,
+            self._span_id,
+            self.parent_span_id,
+            self.parent_sampled,
+            self.dynamic_sampling_context,
+        )
+
+
+class Baggage:
     """
     The W3C Baggage header information (see https://www.w3.org/TR/baggage/).
     """
@@ -377,16 +492,16 @@ class Baggage(object):
         third_party_items = ""
         mutable = False
 
-        client = sentry_sdk.Hub.current.client
+        client = sentry_sdk.get_client()
 
-        if client is None or scope._propagation_context is None:
+        if not client.is_active() or scope._propagation_context is None:
             return Baggage(sentry_items)
 
         options = client.options
         propagation_context = scope._propagation_context
 
-        if propagation_context is not None and "trace_id" in propagation_context:
-            sentry_items["trace_id"] = propagation_context["trace_id"]
+        if propagation_context is not None:
+            sentry_items["trace_id"] = propagation_context.trace_id
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -400,10 +515,6 @@ class Baggage(object):
         if options.get("traces_sample_rate"):
             sentry_items["sample_rate"] = options["traces_sample_rate"]
 
-        user = (scope and scope._user) or {}
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
-
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
@@ -413,15 +524,13 @@ class Baggage(object):
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-        hub = transaction.hub or sentry_sdk.Hub.current
-        client = hub.client
+        client = sentry_sdk.Scope.get_client()
         sentry_items = {}  # type: Dict[str, str]
 
-        if not client:
+        if not client.is_active():
             return Baggage(sentry_items)
 
         options = client.options or {}
-        user = (hub.scope and hub.scope._user) or {}
 
         sentry_items["trace_id"] = transaction.trace_id
 
@@ -439,9 +548,6 @@ class Baggage(object):
             and transaction.source not in LOW_QUALITY_TRANSACTION_SOURCES
         ):
             sentry_items["transaction"] = transaction.name
-
-        if user.get("segment"):
-            sentry_items["user_segment"] = user["segment"]
 
         if transaction.sample_rate is not None:
             sentry_items["sample_rate"] = str(transaction.sample_rate)
@@ -465,7 +571,7 @@ class Baggage(object):
         # type: () -> Dict[str, str]
         header = {}
 
-        for key, item in iteritems(self.sentry_items):
+        for key, item in self.sentry_items.items():
             header[key] = item
 
         return header
@@ -474,7 +580,7 @@ class Baggage(object):
         # type: (bool) -> str
         items = []
 
-        for key, val in iteritems(self.sentry_items):
+        for key, val in self.sentry_items.items():
             with capture_internal_exceptions():
                 item = Baggage.SENTRY_PREFIX + quote(key) + "=" + quote(str(val))
                 items.append(item)
@@ -485,15 +591,14 @@ class Baggage(object):
         return ",".join(items)
 
 
-def should_propagate_trace(hub, url):
-    # type: (sentry_sdk.Hub, str) -> bool
+def should_propagate_trace(client, url):
+    # type: (sentry_sdk.client.BaseClient, str) -> bool
     """
-    Returns True if url matches trace_propagation_targets configured in the given hub. Otherwise, returns False.
+    Returns True if url matches trace_propagation_targets configured in the given client. Otherwise, returns False.
     """
-    client = hub.client  # type: Any
     trace_propagation_targets = client.options["trace_propagation_targets"]
 
-    if is_sentry_url(hub, url):
+    if is_sentry_url(client, url):
         return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
@@ -515,5 +620,88 @@ def normalize_incoming_data(incoming_data):
     return data
 
 
+def start_child_span_decorator(func):
+    # type: (Any) -> Any
+    """
+    Decorator to add child spans for functions.
+
+    See also ``sentry_sdk.tracing.trace()``.
+    """
+    # Asynchronous case
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span()
+
+            if span is None:
+                logger.debug(
+                    "Cannot create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return await func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return await func(*args, **kwargs)
+
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    # Synchronous case
+    else:
+
+        @wraps(func)
+        def func_with_tracing(*args, **kwargs):
+            # type: (*Any, **Any) -> Any
+
+            span = get_current_span()
+
+            if span is None:
+                logger.debug(
+                    "Cannot create a child span for %s. "
+                    "Please start a Sentry transaction before calling this function.",
+                    qualname_from_function(func),
+                )
+                return func(*args, **kwargs)
+
+            with span.start_child(
+                op=OP.FUNCTION,
+                description=qualname_from_function(func),
+            ):
+                return func(*args, **kwargs)
+
+        try:
+            func_with_tracing.__signature__ = inspect.signature(func)  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    return func_with_tracing
+
+
+def get_current_span(scope=None):
+    # type: (Optional[sentry_sdk.Scope]) -> Optional[Span]
+    """
+    Returns the currently active span if there is one running, otherwise `None`
+    """
+    scope = scope or sentry_sdk.Scope.get_current_scope()
+    current_span = scope.span
+    return current_span
+
+
 # Circular imports
-from sentry_sdk.tracing import LOW_QUALITY_TRANSACTION_SOURCES
+from sentry_sdk.tracing import (
+    BAGGAGE_HEADER_NAME,
+    LOW_QUALITY_TRANSACTION_SOURCES,
+    SENTRY_TRACE_HEADER_NAME,
+)
+
+if TYPE_CHECKING:
+    from sentry_sdk.tracing import Span

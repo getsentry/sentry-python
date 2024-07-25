@@ -1,18 +1,12 @@
-import sys
-
-from werkzeug.test import Client
+from collections import Counter
+from unittest import mock
 
 import pytest
+from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from collections import Counter
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @pytest.fixture
@@ -23,7 +17,7 @@ def crashing_app():
     return app
 
 
-class IterableApp(object):
+class IterableApp:
     def __init__(self, iterable):
         self.iterable = iterable
 
@@ -31,7 +25,7 @@ class IterableApp(object):
         return self.iterable
 
 
-class ExitingIterable(object):
+class ExitingIterable:
     def __init__(self, exc_func):
         self._exc_func = exc_func
 
@@ -65,6 +59,25 @@ def test_basic(sentry_init, crashing_app, capture_events):
         "query_string": "",
         "url": "http://localhost/",
     }
+
+
+@pytest.mark.parametrize("path_info", ("bark/", "/bark/"))
+@pytest.mark.parametrize("script_name", ("woof/woof", "woof/woof/"))
+def test_script_name_is_respected(
+    sentry_init, crashing_app, capture_events, script_name, path_info
+):
+    sentry_init(send_default_pii=True)
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        # setting url with PATH_INFO: bark/, HTTP_HOST: dogs.are.great and SCRIPT_NAME: woof/woof/
+        client.get(path_info, f"https://dogs.are.great/{script_name}")  # noqa: E231
+
+    (event,) = events
+
+    assert event["request"]["url"] == "https://dogs.are.great/woof/woof/bark/"
 
 
 @pytest.fixture(params=[0, None])
@@ -418,10 +431,7 @@ def test_auto_session_tracking_with_aggregates(sentry_init, capture_envelopes):
     assert len(session_aggregates) == 1
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 3), reason="Profiling is only supported in Python >= 3.3"
-)
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_profile_sent(
     sentry_init,
     capture_envelopes,
@@ -446,3 +456,42 @@ def test_profile_sent(
 
     profiles = [item for item in envelopes[0].items if item.type == "profile"]
     assert len(profiles) == 1
+
+
+def test_span_origin_manual(sentry_init, capture_events):
+    def dogpark(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(dogpark)
+
+    events = capture_events()
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+
+def test_span_origin_custom(sentry_init, capture_events):
+    def dogpark(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryWsgiMiddleware(
+        dogpark,
+        span_origin="auto.dogpark.deluxe",
+    )
+
+    events = capture_events()
+
+    client = Client(app)
+    client.get("/dogs/are/great/")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.dogpark.deluxe"

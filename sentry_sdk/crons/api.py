@@ -1,22 +1,23 @@
 import uuid
 
-from sentry_sdk import Hub
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional
+    from typing import Optional
+    from sentry_sdk._types import Event, MonitorConfig
 
 
 def _create_check_in_event(
-    monitor_slug=None,
-    check_in_id=None,
-    status=None,
-    duration_s=None,
-    monitor_config=None,
+    monitor_slug=None,  # type: Optional[str]
+    check_in_id=None,  # type: Optional[str]
+    status=None,  # type: Optional[str]
+    duration_s=None,  # type: Optional[float]
+    monitor_config=None,  # type: Optional[MonitorConfig]
 ):
-    # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> Dict[str, Any]
-    options = Hub.current.client.options if Hub.current.client else {}
+    # type: (...) -> Event
+    options = sentry_sdk.get_client().options
     check_in_id = check_in_id or uuid.uuid4().hex  # type: str
 
     check_in = {
@@ -27,7 +28,7 @@ def _create_check_in_event(
         "duration": duration_s,
         "environment": options.get("environment", None),
         "release": options.get("release", None),
-    }
+    }  # type: Event
 
     if monitor_config:
         check_in["monitor_config"] = monitor_config
@@ -36,13 +37,13 @@ def _create_check_in_event(
 
 
 def capture_checkin(
-    monitor_slug=None,
-    check_in_id=None,
-    status=None,
-    duration=None,
-    monitor_config=None,
+    monitor_slug=None,  # type: Optional[str]
+    check_in_id=None,  # type: Optional[str]
+    status=None,  # type: Optional[str]
+    duration=None,  # type: Optional[float]
+    monitor_config=None,  # type: Optional[MonitorConfig]
 ):
-    # type: (Optional[str], Optional[str], Optional[str], Optional[float], Optional[Dict[str, Any]]) -> str
+    # type: (...) -> str
     check_in_event = _create_check_in_event(
         monitor_slug=monitor_slug,
         check_in_id=check_in_id,
@@ -51,7 +52,6 @@ def capture_checkin(
         monitor_config=monitor_config,
     )
 
-    hub = Hub.current
-    hub.capture_event(check_in_event)
+    sentry_sdk.capture_event(check_in_event)
 
     return check_in_event["check_in_id"]

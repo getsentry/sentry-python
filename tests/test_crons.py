@@ -1,15 +1,11 @@
-import pytest
 import uuid
+from unittest import mock
+
+import pytest
 
 import sentry_sdk
+
 from sentry_sdk.crons import capture_checkin
-
-from sentry_sdk import Hub, configure_scope, set_level
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
 
 
 @sentry_sdk.monitor(monitor_slug="abc123")
@@ -34,27 +30,73 @@ def _break_world_contextmanager(name):
         return "Hello, {}".format(name)
 
 
+@sentry_sdk.monitor(monitor_slug="abc123")
+async def _hello_world_async(name):
+    return "Hello, {}".format(name)
+
+
+@sentry_sdk.monitor(monitor_slug="def456")
+async def _break_world_async(name):
+    1 / 0
+    return "Hello, {}".format(name)
+
+
+async def my_coroutine():
+    return
+
+
+async def _hello_world_contextmanager_async(name):
+    with sentry_sdk.monitor(monitor_slug="abc123"):
+        await my_coroutine()
+        return "Hello, {}".format(name)
+
+
+async def _break_world_contextmanager_async(name):
+    with sentry_sdk.monitor(monitor_slug="def456"):
+        await my_coroutine()
+        1 / 0
+        return "Hello, {}".format(name)
+
+
+@sentry_sdk.monitor(monitor_slug="ghi789", monitor_config=None)
+def _no_monitor_config():
+    return
+
+
+@sentry_sdk.monitor(
+    monitor_slug="ghi789",
+    monitor_config={
+        "schedule": {"type": "crontab", "value": "0 0 * * *"},
+        "failure_issue_threshold": 5,
+    },
+)
+def _with_monitor_config():
+    return
+
+
 def test_decorator(sentry_init):
     sentry_init()
 
     with mock.patch(
         "sentry_sdk.crons.decorator.capture_checkin"
-    ) as fake_capture_checking:
+    ) as fake_capture_checkin:
         result = _hello_world("Grace")
         assert result == "Hello, Grace"
 
         # Check for initial checkin
-        fake_capture_checking.assert_has_calls(
+        fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="abc123", status="in_progress"),
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
         # Check for final checkin
-        assert fake_capture_checking.call_args[1]["monitor_slug"] == "abc123"
-        assert fake_capture_checking.call_args[1]["status"] == "ok"
-        assert fake_capture_checking.call_args[1]["duration"]
-        assert fake_capture_checking.call_args[1]["check_in_id"]
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checkin.call_args[1]["status"] == "ok"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
 
 
 def test_decorator_error(sentry_init):
@@ -62,24 +104,26 @@ def test_decorator_error(sentry_init):
 
     with mock.patch(
         "sentry_sdk.crons.decorator.capture_checkin"
-    ) as fake_capture_checking:
+    ) as fake_capture_checkin:
         with pytest.raises(ZeroDivisionError):
             result = _break_world("Grace")
 
         assert "result" not in locals()
 
         # Check for initial checkin
-        fake_capture_checking.assert_has_calls(
+        fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="def456", status="in_progress"),
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
         # Check for final checkin
-        assert fake_capture_checking.call_args[1]["monitor_slug"] == "def456"
-        assert fake_capture_checking.call_args[1]["status"] == "error"
-        assert fake_capture_checking.call_args[1]["duration"]
-        assert fake_capture_checking.call_args[1]["check_in_id"]
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checkin.call_args[1]["status"] == "error"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
 
 
 def test_contextmanager(sentry_init):
@@ -87,22 +131,24 @@ def test_contextmanager(sentry_init):
 
     with mock.patch(
         "sentry_sdk.crons.decorator.capture_checkin"
-    ) as fake_capture_checking:
+    ) as fake_capture_checkin:
         result = _hello_world_contextmanager("Grace")
         assert result == "Hello, Grace"
 
         # Check for initial checkin
-        fake_capture_checking.assert_has_calls(
+        fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="abc123", status="in_progress"),
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
         # Check for final checkin
-        assert fake_capture_checking.call_args[1]["monitor_slug"] == "abc123"
-        assert fake_capture_checking.call_args[1]["status"] == "ok"
-        assert fake_capture_checking.call_args[1]["duration"]
-        assert fake_capture_checking.call_args[1]["check_in_id"]
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checkin.call_args[1]["status"] == "ok"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
 
 
 def test_contextmanager_error(sentry_init):
@@ -110,24 +156,26 @@ def test_contextmanager_error(sentry_init):
 
     with mock.patch(
         "sentry_sdk.crons.decorator.capture_checkin"
-    ) as fake_capture_checking:
+    ) as fake_capture_checkin:
         with pytest.raises(ZeroDivisionError):
             result = _break_world_contextmanager("Grace")
 
         assert "result" not in locals()
 
         # Check for initial checkin
-        fake_capture_checking.assert_has_calls(
+        fake_capture_checkin.assert_has_calls(
             [
-                mock.call(monitor_slug="def456", status="in_progress"),
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
             ]
         )
 
         # Check for final checkin
-        assert fake_capture_checking.call_args[1]["monitor_slug"] == "def456"
-        assert fake_capture_checking.call_args[1]["status"] == "error"
-        assert fake_capture_checking.call_args[1]["duration"]
-        assert fake_capture_checking.call_args[1]["check_in_id"]
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checkin.call_args[1]["status"] == "error"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
 
 
 def test_capture_checkin_simple(sentry_init):
@@ -195,6 +243,8 @@ def test_monitor_config(sentry_init, capture_envelopes):
 
     monitor_config = {
         "schedule": {"type": "crontab", "value": "0 0 * * *"},
+        "failure_issue_threshold": 5,
+        "recovery_threshold": 5,
     }
 
     capture_checkin(monitor_slug="abc123", monitor_config=monitor_config)
@@ -210,6 +260,41 @@ def test_monitor_config(sentry_init, capture_envelopes):
 
     assert check_in["monitor_slug"] == "abc123"
     assert "monitor_config" not in check_in
+
+
+def test_decorator_monitor_config(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    _with_monitor_config()
+
+    assert len(envelopes) == 2
+
+    for check_in_envelope in envelopes:
+        assert len(check_in_envelope.items) == 1
+        check_in = check_in_envelope.items[0].payload.json
+
+        assert check_in["monitor_slug"] == "ghi789"
+        assert check_in["monitor_config"] == {
+            "schedule": {"type": "crontab", "value": "0 0 * * *"},
+            "failure_issue_threshold": 5,
+        }
+
+
+def test_decorator_no_monitor_config(sentry_init, capture_envelopes):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    _no_monitor_config()
+
+    assert len(envelopes) == 2
+
+    for check_in_envelope in envelopes:
+        assert len(check_in_envelope.items) == 1
+        check_in = check_in_envelope.items[0].payload.json
+
+        assert check_in["monitor_slug"] == "ghi789"
+        assert "monitor_config" not in check_in
 
 
 def test_capture_checkin_sdk_not_initialized():
@@ -237,6 +322,8 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         # Optional event keys
         "release",
         "environment",
+        "server_name",
+        "sdk",
         # Mandatory check-in specific keys
         "check_in_id",
         "monitor_slug",
@@ -245,39 +332,138 @@ def test_scope_data_in_checkin(sentry_init, capture_envelopes):
         "duration",
         "monitor_config",
         "contexts",  # an event processor adds this
-        # TODO: These fields need to be checked if valid for checkin:
-        "_meta",
-        "tags",
-        "extra",  # an event processor adds this
-        "modules",
-        "server_name",
-        "sdk",
     ]
 
-    hub = Hub.current
-    with configure_scope() as scope:
-        # Add some data to the scope
-        set_level("warning")
-        hub.add_breadcrumb(message="test breadcrumb")
-        scope.set_tag("test_tag", "test_value")
-        scope.set_extra("test_extra", "test_value")
-        scope.set_context("test_context", {"test_key": "test_value"})
+    # Add some data to the scope
+    sentry_sdk.add_breadcrumb(message="test breadcrumb")
+    sentry_sdk.set_context("test_context", {"test_key": "test_value"})
+    sentry_sdk.set_extra("test_extra", "test_value")
+    sentry_sdk.set_level("warning")
+    sentry_sdk.set_tag("test_tag", "test_value")
 
-        capture_checkin(
-            monitor_slug="abc123",
-            check_in_id="112233",
-            status="ok",
-            duration=123,
+    capture_checkin(
+        monitor_slug="abc123",
+        check_in_id="112233",
+        status="ok",
+        duration=123,
+    )
+
+    (envelope,) = envelopes
+    check_in_event = envelope.items[0].payload.json
+
+    invalid_keys = []
+    for key in check_in_event.keys():
+        if key not in valid_keys:
+            invalid_keys.append(key)
+
+    assert len(invalid_keys) == 0, "Unexpected keys found in checkin: {}".format(
+        invalid_keys
+    )
+
+
+@pytest.mark.asyncio
+async def test_decorator_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        result = await _hello_world_async("Grace")
+        assert result == "Hello, Grace"
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
+            ]
         )
 
-        (envelope,) = envelopes
-        check_in_event = envelope.items[0].payload.json
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checkin.call_args[1]["status"] == "ok"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
 
-        invalid_keys = []
-        for key in check_in_event.keys():
-            if key not in valid_keys:
-                invalid_keys.append(key)
 
-        assert len(invalid_keys) == 0, "Unexpected keys found in checkin: {}".format(
-            invalid_keys
+@pytest.mark.asyncio
+async def test_decorator_error_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        with pytest.raises(ZeroDivisionError):
+            result = await _break_world_async("Grace")
+
+        assert "result" not in locals()
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
+            ]
         )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checkin.call_args[1]["status"] == "error"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.asyncio
+async def test_contextmanager_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        result = await _hello_world_contextmanager_async("Grace")
+        assert result == "Hello, Grace"
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="abc123", status="in_progress", monitor_config=None
+                ),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "abc123"
+        assert fake_capture_checkin.call_args[1]["status"] == "ok"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]
+
+
+@pytest.mark.asyncio
+async def test_contextmanager_error_async(sentry_init):
+    sentry_init()
+
+    with mock.patch(
+        "sentry_sdk.crons.decorator.capture_checkin"
+    ) as fake_capture_checkin:
+        with pytest.raises(ZeroDivisionError):
+            result = await _break_world_contextmanager_async("Grace")
+
+        assert "result" not in locals()
+
+        # Check for initial checkin
+        fake_capture_checkin.assert_has_calls(
+            [
+                mock.call(
+                    monitor_slug="def456", status="in_progress", monitor_config=None
+                ),
+            ]
+        )
+
+        # Check for final checkin
+        assert fake_capture_checkin.call_args[1]["monitor_slug"] == "def456"
+        assert fake_capture_checkin.call_args[1]["status"] == "error"
+        assert fake_capture_checkin.call_args[1]["duration"]
+        assert fake_capture_checkin.call_args[1]["check_in_id"]

@@ -36,7 +36,7 @@ def _install_dependencies(base_dir, subprocess_kwargs):
             "pip",
             "install",
             "-r",
-            "aws-lambda-layer-requirements.txt",
+            "requirements-aws-lambda-layer.txt",
             "--target",
             base_dir,
         ],
@@ -68,7 +68,7 @@ def _install_dependencies(base_dir, subprocess_kwargs):
         **subprocess_kwargs,
     )
     # Install the created Sentry SDK source distribution into the target directory
-    # Do not install the dependencies of the SDK, because they where installed by aws-lambda-layer-requirements.txt above
+    # Do not install the dependencies of the SDK, because they where installed by requirements-aws-lambda-layer.txt above
     source_distribution_archive = glob.glob(
         "{}/*.tar.gz".format(os.path.dirname(base_dir))
     )[0]
@@ -386,12 +386,14 @@ else:
                 _REPL_CODE.format(line=line),
                 b"",
                 cleanup.append,
-                subprocess_kwargs={
-                    "stdout": subprocess.DEVNULL,
-                    "stderr": subprocess.DEVNULL,
-                }
-                if not verbose
-                else {},
+                subprocess_kwargs=(
+                    {
+                        "stdout": subprocess.DEVNULL,
+                        "stderr": subprocess.DEVNULL,
+                    }
+                    if not verbose
+                    else {}
+                ),
             )
 
             for line in base64.b64decode(response["LogResult"]).splitlines():

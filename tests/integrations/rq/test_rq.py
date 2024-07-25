@@ -1,15 +1,13 @@
+from unittest import mock
+
 import pytest
-from fakeredis import FakeStrictRedis
-from sentry_sdk import configure_scope, start_transaction
-from sentry_sdk.integrations.rq import RqIntegration
-from sentry_sdk.utils import parse_version
-
 import rq
+from fakeredis import FakeStrictRedis
 
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
+from sentry_sdk import start_transaction
+from sentry_sdk.integrations.rq import RqIntegration
+from sentry_sdk.scope import Scope
+from sentry_sdk.utils import parse_version
 
 
 @pytest.fixture(autouse=True)
@@ -19,8 +17,10 @@ def _patch_rq_get_server_version(monkeypatch):
 
     https://github.com/jamesls/fakeredis/issues/273
     """
-
-    from distutils.version import StrictVersion
+    try:
+        from distutils.version import StrictVersion
+    except ImportError:
+        return
 
     if parse_version(rq.VERSION) <= (1, 5, 1):
         for k in (
@@ -181,19 +181,17 @@ def test_tracing_disabled(
     queue = rq.Queue(connection=FakeStrictRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
-    with configure_scope() as scope:
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
+    scope = Scope.get_isolation_scope()
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
 
-        (error_event,) = events
+    (error_event,) = events
 
-        assert (
-            error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-        )
-        assert (
-            error_event["contexts"]["trace"]["trace_id"]
-            == scope._propagation_context["trace_id"]
-        )
+    assert error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == scope._propagation_context.trace_id
+    )
 
 
 def test_transaction_no_error(
@@ -267,3 +265,18 @@ def test_job_with_retries(sentry_init, capture_events):
     worker.work(burst=True)
 
     assert len(events) == 1
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(integrations=[RqIntegration()], traces_sample_rate=1.0)
+    events = capture_events()
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    queue.enqueue(do_trick, "Maisey", trick="kangaroo")
+    worker.work(burst=True)
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.rq"

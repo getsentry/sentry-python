@@ -1,0 +1,16 @@
+mypy
+black
+flake8==5.0.4  # flake8 depends on pyflakes>=3.0.0 and this dropped support for Python 2 "# type:" comments
+types-certifi
+types-protobuf
+types-gevent
+types-greenlet
+types-redis
+types-setuptools
+types-webob
+opentelemetry-distro
+pymongo # There is no separate types module.
+loguru # There is no separate types module.
+flake8-bugbear
+pep8-naming
+pre-commit # local linting

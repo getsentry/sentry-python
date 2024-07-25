@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 import logging
 
 import pytest
@@ -9,6 +7,7 @@ import falcon.testing
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.scope import Scope
 from sentry_sdk.utils import parse_version
 
 
@@ -113,7 +112,7 @@ def test_transaction_style(
 
 
 def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -141,7 +140,7 @@ def test_unhandled_errors(sentry_init, capture_exceptions, capture_events):
 
 
 def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -165,7 +164,7 @@ def test_raised_5xx_errors(sentry_init, capture_exceptions, capture_events):
 
 
 def test_raised_4xx_errors(sentry_init, capture_exceptions, capture_events):
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -189,7 +188,7 @@ def test_http_status(sentry_init, capture_exceptions, capture_events):
     This just demonstrates, that if Falcon raises a HTTPStatus with code 500
     (instead of a HTTPError with code 500) Sentry will not capture it.
     """
-    sentry_init(integrations=[FalconIntegration()], debug=True)
+    sentry_init(integrations=[FalconIntegration()])
 
     class Resource:
         def on_get(self, req, resp):
@@ -305,7 +304,7 @@ def test_logging(sentry_init, capture_events):
     assert event["level"] == "error"
 
 
-def test_500(sentry_init, capture_events):
+def test_500(sentry_init):
     sentry_init(integrations=[FalconIntegration()])
 
     app = falcon.API()
@@ -318,17 +317,14 @@ def test_500(sentry_init, capture_events):
 
     def http500_handler(ex, req, resp, params):
         sentry_sdk.capture_exception(ex)
-        resp.media = {"message": "Sentry error: %s" % sentry_sdk.last_event_id()}
+        resp.media = {"message": "Sentry error."}
 
     app.add_error_handler(Exception, http500_handler)
-
-    events = capture_events()
 
     client = falcon.testing.TestClient(app)
     response = client.simulate_get("/")
 
-    (event,) = events
-    assert response.json == {"message": "Sentry error: %s" % event["event_id"]}
+    assert response.json == {"message": "Sentry error."}
 
 
 def test_error_in_errorhandler(sentry_init, capture_events):
@@ -384,20 +380,17 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     sentry_init(integrations=[FalconIntegration()])
     events = capture_events()
 
-    with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("request_data", False)
+    Scope.get_isolation_scope().set_tag("request_data", False)
 
     app = falcon.API()
 
     class Resource:
         def on_get(self, req, resp):
-            with sentry_sdk.configure_scope() as scope:
-                scope.set_tag("request_data", True)
+            Scope.get_isolation_scope().set_tag("request_data", True)
 
             def generator():
                 for row in range(1000):
-                    with sentry_sdk.configure_scope() as scope:
-                        assert scope._tags["request_data"]
+                    assert Scope.get_isolation_scope()._tags["request_data"]
 
                     yield (str(row) + "\n").encode()
 
@@ -411,9 +404,7 @@ def test_does_not_leak_scope(sentry_init, capture_events):
     expected_response = "".join(str(row) + "\n" for row in range(1000))
     assert response.text == expected_response
     assert not events
-
-    with sentry_sdk.configure_scope() as scope:
-        assert not scope._tags["request_data"]
+    assert not Scope.get_isolation_scope()._tags["request_data"]
 
 
 @pytest.mark.skipif(
@@ -455,3 +446,18 @@ def test_falcon_custom_error_handler(sentry_init, make_app, capture_events):
     client.simulate_get("/custom-error")
 
     assert len(events) == 0
+
+
+def test_span_origin(sentry_init, capture_events, make_client):
+    sentry_init(
+        integrations=[FalconIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = make_client()
+    client.simulate_get("/message")
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.falcon"

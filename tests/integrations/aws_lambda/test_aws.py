@@ -43,7 +43,7 @@ import sentry_sdk
 import json
 import time
 
-from sentry_sdk.transport import HttpTransport
+from sentry_sdk.transport import Transport
 
 def truncate_data(data):
     # AWS Lambda truncates the log output to 4kb, which is small enough to miss
@@ -114,14 +114,10 @@ def envelope_processor(envelope):
     return truncate_data(item_json)
 
 
-class TestTransport(HttpTransport):
-    def _send_event(self, event):
-        event = event_processor(event)
-        print("\\nEVENT: {}\\n".format(json.dumps(event)))
-
-    def _send_envelope(self, envelope):
-        envelope = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope)))
+class TestTransport(Transport):
+    def capture_envelope(self, envelope):
+        envelope_items = envelope_processor(envelope)
+        print("\\nENVELOPE: {}\\n".format(json.dumps(envelope_items)))
 
 def init_sdk(timeout_warning=False, **extra_init_args):
     sentry_sdk.init(
@@ -143,11 +139,11 @@ def lambda_client():
 
 @pytest.fixture(
     params=[
-        "python3.7",
         "python3.8",
         "python3.9",
         "python3.10",
         "python3.11",
+        "python3.12",
     ]
 )
 def lambda_runtime(request):
@@ -183,27 +179,23 @@ def run_lambda_function(request, lambda_client, lambda_runtime):
         response["Payload"] = json.loads(response["Payload"].read().decode("utf-8"))
         del response["ResponseMetadata"]
 
-        events = []
-        envelopes = []
+        envelope_items = []
 
         for line in response["LogResult"]:
             print("AWS:", line)
-            if line.startswith(b"EVENT: "):
-                line = line[len(b"EVENT: ") :]
-                events.append(json.loads(line.decode("utf-8")))
-            elif line.startswith(b"ENVELOPE: "):
+            if line.startswith(b"ENVELOPE: "):
                 line = line[len(b"ENVELOPE: ") :]
-                envelopes.append(json.loads(line.decode("utf-8")))
+                envelope_items.append(json.loads(line.decode("utf-8")))
             else:
                 continue
 
-        return envelopes, events, response
+        return envelope_items, response
 
     return inner
 
 
 def test_basic(run_lambda_function):
-    _, events, response = run_lambda_function(
+    envelope_items, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -218,7 +210,7 @@ def test_basic(run_lambda_function):
 
     assert response["FunctionError"] == "Unhandled"
 
-    (event,) = events
+    (event,) = envelope_items
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
@@ -254,7 +246,7 @@ def test_initialization_order(run_lambda_function):
     as seen by AWS already runs. At this point at least draining the queue
     should work."""
 
-    _, events, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -266,7 +258,7 @@ def test_initialization_order(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
-    (event,) = events
+    (event,) = envelope_items
 
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
@@ -275,7 +267,7 @@ def test_initialization_order(run_lambda_function):
 
 
 def test_request_data(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -312,7 +304,7 @@ def test_request_data(run_lambda_function):
         """,
     )
 
-    (event,) = events
+    (event,) = envelope_items
 
     assert event["request"] == {
         "headers": {
@@ -327,7 +319,7 @@ def test_request_data(run_lambda_function):
 
 
 def test_init_error(run_lambda_function, lambda_runtime):
-    _, events, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -339,12 +331,12 @@ def test_init_error(run_lambda_function, lambda_runtime):
         syntax_check=False,
     )
 
-    (event,) = events
+    (event,) = envelope_items
     assert event["exception"]["values"][0]["value"] == "name 'func' is not defined"
 
 
 def test_timeout_error(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -359,7 +351,7 @@ def test_timeout_error(run_lambda_function):
         timeout=2,
     )
 
-    (event,) = events
+    (event,) = envelope_items
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ServerlessTimeoutWarning"
@@ -387,7 +379,7 @@ def test_timeout_error(run_lambda_function):
 
 
 def test_performance_no_error(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -400,7 +392,7 @@ def test_performance_no_error(run_lambda_function):
         b'{"foo": "bar"}',
     )
 
-    (envelope,) = envelopes
+    (envelope,) = envelope_items
 
     assert envelope["type"] == "transaction"
     assert envelope["contexts"]["trace"]["op"] == "function.aws"
@@ -409,7 +401,7 @@ def test_performance_no_error(run_lambda_function):
 
 
 def test_performance_error(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -425,7 +417,7 @@ def test_performance_error(run_lambda_function):
     (
         error_event,
         transaction_event,
-    ) = envelopes
+    ) = envelope_items
 
     assert error_event["level"] == "error"
     (exception,) = error_event["exception"]["values"]
@@ -462,23 +454,23 @@ def test_performance_error(run_lambda_function):
             [
                 {
                     "headers": {
-                        "Host": "x.io",
-                        "X-Forwarded-Proto": "http"
+                        "Host": "x1.io",
+                        "X-Forwarded-Proto": "https"
                     },
                     "httpMethod": "GET",
-                    "path": "/somepath",
+                    "path": "/path1",
                     "queryStringParameters": {
-                        "done": "true"
+                        "done": "false"
                     },
                     "dog": "Maisey"
                 },
                 {
                     "headers": {
-                        "Host": "x.io",
+                        "Host": "x2.io",
                         "X-Forwarded-Proto": "http"
                     },
-                    "httpMethod": "GET",
-                    "path": "/somepath",
+                    "httpMethod": "POST",
+                    "path": "/path2",
                     "queryStringParameters": {
                         "done": "true"
                     },
@@ -489,6 +481,7 @@ def test_performance_error(run_lambda_function):
             True,
             2,
         ),
+        (b"[]", False, 1),
     ],
 )
 def test_non_dict_event(
@@ -498,7 +491,7 @@ def test_non_dict_event(
     batch_size,
     DictionaryContaining,  # noqa:N803
 ):
-    envelopes, _, response = run_lambda_function(
+    envelope_items, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -516,7 +509,7 @@ def test_non_dict_event(
     (
         error_event,
         transaction_event,
-    ) = envelopes
+    ) = envelope_items
     assert error_event["level"] == "error"
     assert error_event["contexts"]["trace"]["op"] == "function.aws"
 
@@ -539,11 +532,11 @@ def test_non_dict_event(
 
     if has_request_data:
         request_data = {
-            "headers": {"Host": "x.io", "X-Forwarded-Proto": "http"},
+            "headers": {"Host": "x1.io", "X-Forwarded-Proto": "https"},
             "method": "GET",
-            "url": "http://x.io/somepath",
+            "url": "https://x1.io/path1",
             "query_string": {
-                "done": "true",
+                "done": "false",
             },
         }
     else:
@@ -561,9 +554,9 @@ def test_non_dict_event(
 
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     run_lambda_function,
-    DictionaryContaining,  # noqa:N803
-    ObjectDescribedBy,
-    StringContaining,
+    DictionaryContaining,  # noqa: N803
+    ObjectDescribedBy,  # noqa: N803
+    StringContaining,  # noqa: N803
 ):
     # TODO: This whole thing is a little hacky, specifically around the need to
     # get `conftest.py` code into the AWS runtime, which is why there's both
@@ -593,17 +586,14 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    _, _, response = run_lambda_function(
+    _, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(inspect.getsource(StringContaining))
         + dedent(inspect.getsource(DictionaryContaining))
         + dedent(inspect.getsource(ObjectDescribedBy))
         + dedent(
             """
-            try:
-                from unittest import mock  # python 3.3 and above
-            except ImportError:
-                import mock  # python < 3.3
+            from unittest import mock
 
             def _safe_is_equal(x, y):
                 # copied from conftest.py - see docstring and comments there
@@ -661,6 +651,9 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     assert response["Payload"]["AssertionError raised"] is False
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_serverless_no_code_instrumentation(run_lambda_function):
     """
     Test that ensures that just by adding a lambda layer containing the
@@ -673,15 +666,15 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         "test_dir.test_lambda.test_handler",
     ]:
         print("Testing Initial Handler ", initial_handler)
-        _, _, response = run_lambda_function(
+        _, response = run_lambda_function(
             dedent(
                 """
             import sentry_sdk
 
             def test_handler(event, context):
-                current_client = sentry_sdk.Hub.current.client
+                current_client = sentry_sdk.get_client()
 
-                assert current_client is not None
+                assert current_client.is_active()
 
                 assert len(current_client.options['integrations']) == 1
                 assert isinstance(current_client.options['integrations'][0],
@@ -705,8 +698,11 @@ def test_serverless_no_code_instrumentation(run_lambda_function):
         assert "sentry_handler" in response["LogResult"][3].decode("utf-8")
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
-    envelopes, _, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -720,7 +716,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
         payload=b'{"foo": "bar"}',
     )
 
-    (msg_event, error_event, transaction_event) = envelopes
+    (msg_event, error_event, transaction_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -739,7 +735,7 @@ def test_error_has_new_trace_context_performance_enabled(run_lambda_function):
 
 
 def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
-    _, events, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -753,7 +749,7 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
         payload=b'{"foo": "bar"}',
     )
 
-    (msg_event, error_event) = events
+    (msg_event, error_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -767,6 +763,9 @@ def test_error_has_new_trace_context_performance_disabled(run_lambda_function):
     )
 
 
+@pytest.mark.xfail(
+    reason="The limited log output we depend on is being clogged by a new warning"
+)
 def test_error_has_existing_trace_context_performance_enabled(run_lambda_function):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
@@ -781,7 +780,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
         }
     }
 
-    envelopes, _, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -795,7 +794,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_lambda_functio
         payload=json.dumps(payload).encode(),
     )
 
-    (msg_event, error_event, transaction_event) = envelopes
+    (msg_event, error_event, transaction_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -828,7 +827,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
         }
     }
 
-    _, events, _ = run_lambda_function(
+    envelope_items, _ = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -842,7 +841,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
         payload=json.dumps(payload).encode(),
     )
 
-    (msg_event, error_event) = events
+    (msg_event, error_event) = envelope_items
 
     assert "trace" in msg_event["contexts"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -858,7 +857,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_lambda_functi
 
 
 def test_basic_with_eventbridge_source(run_lambda_function):
-    _, events, response = run_lambda_function(
+    envelope_items, response = run_lambda_function(
         LAMBDA_PRELUDE
         + dedent(
             """
@@ -873,8 +872,27 @@ def test_basic_with_eventbridge_source(run_lambda_function):
 
     assert response["FunctionError"] == "Unhandled"
 
-    (event,) = events
+    (event,) = envelope_items
     assert event["level"] == "error"
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "Exception"
     assert exception["value"] == "Oh!"
+
+
+def test_span_origin(run_lambda_function):
+    envelope_items, response = run_lambda_function(
+        LAMBDA_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+
+        def test_handler(event, context):
+            pass
+        """
+        ),
+        b'{"foo": "bar"}',
+    )
+
+    (event,) = envelope_items
+
+    assert event["contexts"]["trace"]["origin"] == "auto.function.aws_lambda"

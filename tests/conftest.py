@@ -1,8 +1,11 @@
 import json
 import os
 import socket
+import warnings
 from threading import Thread
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from unittest import mock
 
 import pytest
 import jsonschema
@@ -17,29 +20,17 @@ try:
 except ImportError:
     eventlet = None
 
-try:
-    # Python 2
-    import BaseHTTPServer
-
-    HTTPServer = BaseHTTPServer.HTTPServer
-    BaseHTTPRequestHandler = BaseHTTPServer.BaseHTTPRequestHandler
-except Exception:
-    # Python 3
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-
-try:
-    from unittest import mock
-except ImportError:
-    import mock
-
 import sentry_sdk
-from sentry_sdk._compat import iteritems, reraise, string_types, PY2
 from sentry_sdk.envelope import Envelope
-from sentry_sdk.integrations import _processed_integrations  # noqa: F401
+from sentry_sdk.integrations import (  # noqa: F401
+    _DEFAULT_INTEGRATIONS,
+    _installed_integrations,
+    _processed_integrations,
+)
 from sentry_sdk.profiler import teardown_profiler
+from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import reraise
 
 from tests import _warning_recorder, _warning_recorder_mgr
 
@@ -70,13 +61,27 @@ else:
     del pytest_benchmark
 
 
+from sentry_sdk import scope
+
+
+@pytest.fixture(autouse=True)
+def clean_scopes():
+    """
+    Resets the scopes for every test to avoid leaking data between tests.
+    """
+    scope._global_scope = None
+    scope._isolation_scope.set(None)
+    scope._current_scope.set(None)
+
+
 @pytest.fixture(autouse=True)
 def internal_exceptions(request, monkeypatch):
     errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
 
-    def _capture_internal_exception(self, exc_info):
+    @staticmethod
+    def _capture_internal_exception(exc_info):
         errors.append(exc_info)
 
     @request.addfinalizer
@@ -87,7 +92,7 @@ def internal_exceptions(request, monkeypatch):
             reraise(*e)
 
     monkeypatch.setattr(
-        sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
+        sentry_sdk.Scope, "_capture_internal_exception", _capture_internal_exception
     )
 
     return errors
@@ -155,35 +160,6 @@ def _capture_internal_warnings():
 
 
 @pytest.fixture
-def monkeypatch_test_transport(monkeypatch, validate_event_schema):
-    def check_event(event):
-        def check_string_keys(map):
-            for key, value in iteritems(map):
-                assert isinstance(key, string_types)
-                if isinstance(value, dict):
-                    check_string_keys(value)
-
-        with capture_internal_exceptions():
-            check_string_keys(event)
-            validate_event_schema(event)
-
-    def check_envelope(envelope):
-        with capture_internal_exceptions():
-            # There used to be a check here for errors are not sent in envelopes.
-            # We changed the behaviour to send errors in envelopes when tracing is enabled.
-            # This is checked in test_client.py::test_sending_events_with_tracing
-            # and test_client.py::test_sending_events_with_no_tracing
-            pass
-
-    def inner(client):
-        monkeypatch.setattr(
-            client, "transport", TestTransport(check_event, check_envelope)
-        )
-
-    return inner
-
-
-@pytest.fixture
 def validate_event_schema(tmpdir):
     def inner(event):
         if SENTRY_EVENT_SCHEMA:
@@ -199,18 +175,23 @@ def reset_integrations():
     with a clean slate to ensure monkeypatching works well,
     but this also means some other stuff will be monkeypatched twice.
     """
-    global _processed_integrations
+    global _DEFAULT_INTEGRATIONS, _processed_integrations
+    try:
+        _DEFAULT_INTEGRATIONS.remove(
+            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
+        )
+    except ValueError:
+        pass
     _processed_integrations.clear()
+    _installed_integrations.clear()
 
 
 @pytest.fixture
-def sentry_init(monkeypatch_test_transport, request):
+def sentry_init(request):
     def inner(*a, **kw):
-        hub = sentry_sdk.Hub.current
+        kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
-        hub.bind_client(client)
-        if "transport" not in kw:
-            monkeypatch_test_transport(sentry_sdk.Hub.current.client)
+        sentry_sdk.Scope.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -218,38 +199,38 @@ def sentry_init(monkeypatch_test_transport, request):
         # fork)
         yield inner
     else:
-        with sentry_sdk.Hub(None):
+        old_client = sentry_sdk.Scope.get_global_scope().client
+        try:
+            sentry_sdk.Scope.get_current_scope().set_client(None)
             yield inner
+        finally:
+            sentry_sdk.Scope.get_global_scope().set_client(old_client)
 
 
 class TestTransport(Transport):
-    def __init__(self, capture_event_callback, capture_envelope_callback):
+    def __init__(self):
         Transport.__init__(self)
-        self.capture_event = capture_event_callback
-        self.capture_envelope = capture_envelope_callback
-        self._queue = None
+
+    def capture_envelope(self, _: Envelope) -> None:
+        """No-op capture_envelope for tests"""
+        pass
 
 
 @pytest.fixture
 def capture_events(monkeypatch):
     def inner():
         events = []
-        test_client = sentry_sdk.Hub.current.client
-        old_capture_event = test_client.transport.capture_event
+        test_client = sentry_sdk.get_client()
         old_capture_envelope = test_client.transport.capture_envelope
 
-        def append_event(event):
-            events.append(event)
-            return old_capture_event(event)
-
-        def append_envelope(envelope):
+        def append_event(envelope):
             for item in envelope:
                 if item.headers.get("type") in ("event", "transaction"):
-                    test_client.transport.capture_event(item.payload.json)
+                    events.append(item.payload.json)
             return old_capture_envelope(envelope)
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append_event)
-        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_event)
+
         return events
 
     return inner
@@ -259,42 +240,33 @@ def capture_events(monkeypatch):
 def capture_envelopes(monkeypatch):
     def inner():
         envelopes = []
-        test_client = sentry_sdk.Hub.current.client
-        old_capture_event = test_client.transport.capture_event
+        test_client = sentry_sdk.get_client()
         old_capture_envelope = test_client.transport.capture_envelope
-
-        def append_event(event):
-            envelope = Envelope()
-            envelope.add_event(event)
-            envelopes.append(envelope)
-            return old_capture_event(event)
 
         def append_envelope(envelope):
             envelopes.append(envelope)
             return old_capture_envelope(envelope)
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append_event)
         monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+
         return envelopes
 
     return inner
 
 
 @pytest.fixture
-def capture_client_reports(monkeypatch):
+def capture_record_lost_event_calls(monkeypatch):
     def inner():
-        reports = []
-        test_client = sentry_sdk.Hub.current.client
+        calls = []
+        test_client = sentry_sdk.get_client()
 
-        def record_lost_event(reason, data_category=None, item=None):
-            if data_category is None:
-                data_category = item.data_category
-            return reports.append((reason, data_category))
+        def record_lost_event(reason, data_category=None, item=None, *, quantity=1):
+            calls.append((reason, data_category, item, quantity))
 
         monkeypatch.setattr(
             test_client.transport, "record_lost_event", record_lost_event
         )
-        return reports
+        return calls
 
     return inner
 
@@ -308,19 +280,21 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         events_r = os.fdopen(events_r, "rb", 0)
         events_w = os.fdopen(events_w, "wb", 0)
 
-        test_client = sentry_sdk.Hub.current.client
+        test_client = sentry_sdk.get_client()
 
-        old_capture_event = test_client.transport.capture_event
+        old_capture_envelope = test_client.transport.capture_envelope
 
-        def append(event):
-            events_w.write(json.dumps(event).encode("utf-8"))
-            events_w.write(b"\n")
-            return old_capture_event(event)
+        def append(envelope):
+            event = envelope.get_event() or envelope.get_transaction_event()
+            if event is not None:
+                events_w.write(json.dumps(event).encode("utf-8"))
+                events_w.write(b"\n")
+            return old_capture_envelope(envelope)
 
         def flush(timeout=None, callback=None):
             events_w.write(b"flush\n")
 
-        monkeypatch.setattr(test_client.transport, "capture_event", append)
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
         return EventStreamReader(events_r, events_w)
@@ -328,7 +302,7 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
     return inner
 
 
-class EventStreamReader(object):
+class EventStreamReader:
     def __init__(self, read_file, write_file):
         self.read_file = read_file
         self.write_file = write_file
@@ -420,16 +394,10 @@ def string_containing_matcher():
 
     """
 
-    class StringContaining(object):
+    class StringContaining:
         def __init__(self, substring):
             self.substring = substring
-
-            try:
-                # the `unicode` type only exists in python 2, so if this blows up,
-                # we must be in py3 and have the `bytes` type
-                self.valid_types = (str, unicode)
-            except NameError:
-                self.valid_types = (str, bytes)
+            self.valid_types = (str, bytes)
 
         def __eq__(self, test_string):
             if not isinstance(test_string, self.valid_types):
@@ -503,7 +471,7 @@ def dictionary_containing_matcher():
     >>> f.assert_any_call(DictionaryContaining({"dogs": "yes"})) # no AssertionError
     """
 
-    class DictionaryContaining(object):
+    class DictionaryContaining:
         def __init__(self, subdict):
             self.subdict = subdict
 
@@ -543,7 +511,7 @@ def object_described_by_matcher():
 
     Used like this:
 
-    >>> class Dog(object):
+    >>> class Dog:
     ...     pass
     ...
     >>> maisey = Dog()
@@ -555,7 +523,7 @@ def object_described_by_matcher():
     >>> f.assert_any_call(ObjectDescribedBy(attrs={"name": "Maisey"})) # no AssertionError
     """
 
-    class ObjectDescribedBy(object):
+    class ObjectDescribedBy:
         def __init__(self, type=None, attrs=None):
             self.type = type
             self.attrs = attrs
@@ -585,8 +553,26 @@ def object_described_by_matcher():
 
 @pytest.fixture
 def teardown_profiling():
-    yield
+    # Make sure that a previous test didn't leave the profiler running
     teardown_profiler()
+    teardown_continuous_profiler()
+
+    yield
+
+    # Make sure that to shut down the profiler after the test
+    teardown_profiler()
+    teardown_continuous_profiler()
+
+
+@pytest.fixture()
+def suppress_deprecation_warnings():
+    """
+    Use this fixture to suppress deprecation warnings in a test.
+    Useful for testing deprecated SDK features.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        yield
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
@@ -645,10 +631,19 @@ def patch_start_tracing_child(fake_transaction_is_none=False):
         fake_transaction = None
         fake_start_child = None
 
-    version = "2" if PY2 else "3"
-
     with mock.patch(
-        "sentry_sdk.tracing_utils_py%s.get_current_span" % version,
-        return_value=fake_transaction,
+        "sentry_sdk.tracing_utils.get_current_span", return_value=fake_transaction
     ):
         yield fake_start_child
+
+
+class ApproxDict(dict):
+    def __eq__(self, other):
+        # For an ApproxDict to equal another dict, the other dict just needs to contain
+        # all the keys from the ApproxDict with the same values.
+        #
+        # The other dict may contain additional keys with any value.
+        return all(key in other and other[key] == value for key, value in self.items())
+
+    def __ne__(self, other):
+        return not self.__eq__(other)

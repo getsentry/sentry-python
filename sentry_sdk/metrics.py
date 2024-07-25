@@ -1,19 +1,19 @@
-import os
 import io
+import os
+import random
 import re
 import sys
 import threading
-import random
 import time
 import zlib
-from datetime import datetime
-from functools import wraps, partial
-from threading import Event, Lock, Thread
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from functools import wraps, partial
 
 import sentry_sdk
-from sentry_sdk._compat import text_type, utc_from_timestamp, iteritems
 from sentry_sdk.utils import (
+    ContextVar,
     now,
     nanosecond_time,
     to_timestamp,
@@ -53,9 +53,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import MetricValue
 
 
-_thread_local = threading.local()
-_sanitize_key = partial(re.compile(r"[^a-zA-Z0-9_/.-]+").sub, "_")
-_sanitize_value = partial(re.compile(r"[^\w\d_:/@\.{}\[\]$-]+", re.UNICODE).sub, "_")
+_in_metrics = ContextVar("in_metrics", default=False)
 _set = set  # set is shadowed below
 
 GOOD_TRANSACTION_SOURCES = frozenset(
@@ -66,6 +64,25 @@ GOOD_TRANSACTION_SOURCES = frozenset(
         TRANSACTION_SOURCE_TASK,
     ]
 )
+
+_sanitize_unit = partial(re.compile(r"[^a-zA-Z0-9_]+").sub, "")
+_sanitize_metric_key = partial(re.compile(r"[^a-zA-Z0-9_\-.]+").sub, "_")
+_sanitize_tag_key = partial(re.compile(r"[^a-zA-Z0-9_\-.\/]+").sub, "")
+
+
+def _sanitize_tag_value(value):
+    # type: (str) -> str
+    table = str.maketrans(
+        {
+            "\n": "\\n",
+            "\r": "\\r",
+            "\t": "\\t",
+            "\\": "\\\\",
+            "|": "\\u{7c}",
+            ",": "\\u{2c}",
+        }
+    )
+    return value.translate(table)
 
 
 def get_code_location(stacklevel):
@@ -84,15 +101,12 @@ def get_code_location(stacklevel):
 def recursion_protection():
     # type: () -> Generator[bool, None, None]
     """Enters recursion protection and returns the old flag."""
+    old_in_metrics = _in_metrics.get()
+    _in_metrics.set(True)
     try:
-        in_metrics = _thread_local.in_metrics
-    except AttributeError:
-        in_metrics = False
-    _thread_local.in_metrics = True
-    try:
-        yield in_metrics
+        yield old_in_metrics
     finally:
-        _thread_local.in_metrics = in_metrics
+        _in_metrics.set(old_in_metrics)
 
 
 def metrics_noop(func):
@@ -111,23 +125,29 @@ def metrics_noop(func):
     return new_func
 
 
-class Metric(object):
+class Metric(ABC):
     __slots__ = ()
 
+    @abstractmethod
+    def __init__(self, first):
+        # type: (MetricValue) -> None
+        pass
+
     @property
+    @abstractmethod
     def weight(self):
-        # type: (...) -> int
-        raise NotImplementedError()
+        # type: () -> int
+        pass
 
-    def add(
-        self, value  # type: MetricValue
-    ):
-        # type: (...) -> None
-        raise NotImplementedError()
+    @abstractmethod
+    def add(self, value):
+        # type: (MetricValue) -> None
+        pass
 
+    @abstractmethod
     def serialize_value(self):
-        # type: (...) -> Iterable[FlushedMetricValue]
-        raise NotImplementedError()
+        # type: () -> Iterable[FlushedMetricValue]
+        pass
 
 
 class CounterMetric(Metric):
@@ -264,15 +284,16 @@ def _encode_metrics(flushable_buckets):
     out = io.BytesIO()
     _write = out.write
 
-    # Note on sanetization: we intentionally sanetize in emission (serialization)
+    # Note on sanitization: we intentionally sanitize in emission (serialization)
     # and not during aggregation for performance reasons.  This means that the
     # envelope can in fact have duplicate buckets stored.  This is acceptable for
     # relay side emission and should not happen commonly.
 
     for timestamp, buckets in flushable_buckets:
-        for bucket_key, metric in iteritems(buckets):
+        for bucket_key, metric in buckets.items():
             metric_type, metric_name, metric_unit, metric_tags = bucket_key
-            metric_name = _sanitize_key(metric_name)
+            metric_name = _sanitize_metric_key(metric_name)
+            metric_unit = _sanitize_unit(metric_unit)
             _write(metric_name.encode("utf-8"))
             _write(b"@")
             _write(metric_unit.encode("utf-8"))
@@ -288,7 +309,7 @@ def _encode_metrics(flushable_buckets):
                 _write(b"|#")
                 first = True
                 for tag_key, tag_value in metric_tags:
-                    tag_key = _sanitize_key(tag_key)
+                    tag_key = _sanitize_tag_key(tag_key)
                     if not tag_key:
                         continue
                     if first:
@@ -297,7 +318,7 @@ def _encode_metrics(flushable_buckets):
                         _write(b",")
                     _write(tag_key.encode("utf-8"))
                     _write(b":")
-                    _write(_sanitize_value(tag_value).encode("utf-8"))
+                    _write(_sanitize_tag_value(tag_value).encode("utf-8"))
 
             _write(b"|T")
             _write(str(timestamp).encode("ascii"))
@@ -312,7 +333,9 @@ def _encode_locations(timestamp, code_locations):
 
     for key, loc in code_locations:
         metric_type, name, unit = key
-        mri = "{}:{}@{}".format(metric_type, _sanitize_key(name), unit)
+        mri = "{}:{}@{}".format(
+            metric_type, _sanitize_metric_key(name), _sanitize_unit(unit)
+        )
 
         loc["type"] = "location"
         mapping.setdefault(mri, []).append(loc)
@@ -325,7 +348,7 @@ METRIC_TYPES = {
     "g": GaugeMetric,
     "d": DistributionMetric,
     "s": SetMetric,
-}
+}  # type: dict[MetricType, type[Metric]]
 
 # some of these are dumb
 TIMING_FUNCTIONS = {
@@ -340,7 +363,7 @@ TIMING_FUNCTIONS = {
 }
 
 
-class LocalAggregator(object):
+class LocalAggregator:
     __slots__ = ("_measurements",)
 
     def __init__(self):
@@ -394,7 +417,7 @@ class LocalAggregator(object):
         return rv
 
 
-class MetricsAggregator(object):
+class MetricsAggregator:
     ROLLUP_IN_SECONDS = 10.0
     MAX_WEIGHT = 100000
     FLUSHER_SLEEP_TIME = 5.0
@@ -411,12 +434,13 @@ class MetricsAggregator(object):
         self._pending_locations = {}  # type: Dict[int, List[Tuple[MetricMetaKey, Any]]]
         self._buckets_total_weight = 0
         self._capture_func = capture_func
-        self._lock = Lock()
         self._running = True
-        self._flush_event = Event()
+        self._lock = threading.Lock()
+
+        self._flush_event = threading.Event()  # type: threading.Event
         self._force_flush = False
 
-        # The aggregator shifts it's flushing by up to an entire rollup window to
+        # The aggregator shifts its flushing by up to an entire rollup window to
         # avoid multiple clients trampling on end of a 10 second window as all the
         # buckets are anchored to multiples of ROLLUP seconds.  We randomize this
         # number once per aggregator boot to achieve some level of offsetting
@@ -424,9 +448,8 @@ class MetricsAggregator(object):
         # jittering.
         self._flush_shift = random.random() * self.ROLLUP_IN_SECONDS
 
-        self._flusher = None  # type: Optional[Thread]
+        self._flusher = None  # type: Optional[threading.Thread]
         self._flusher_pid = None  # type: Optional[int]
-        self._ensure_thread()
 
     def _ensure_thread(self):
         # type: (...) -> bool
@@ -435,13 +458,22 @@ class MetricsAggregator(object):
         """
         if not self._running:
             return False
+
         pid = os.getpid()
         if self._flusher_pid == pid:
             return True
+
         with self._lock:
+            # Recheck to make sure another thread didn't get here and start the
+            # the flusher in the meantime
+            if self._flusher_pid == pid:
+                return True
+
             self._flusher_pid = pid
-            self._flusher = Thread(target=self._flush_loop)
+
+            self._flusher = threading.Thread(target=self._flush_loop)
             self._flusher.daemon = True
+
             try:
                 self._flusher.start()
             except RuntimeError:
@@ -449,15 +481,16 @@ class MetricsAggregator(object):
                 # longer allows us to spawn a thread and we have to bail.
                 self._running = False
                 return False
+
         return True
 
     def _flush_loop(self):
         # type: (...) -> None
-        _thread_local.in_metrics = True
+        _in_metrics.set(True)
         while self._running or self._force_flush:
-            self._flush()
             if self._running:
                 self._flush_event.wait(self.FLUSHER_SLEEP_TIME)
+            self._flush()
 
     def _flush(self):
         # type: (...) -> None
@@ -478,14 +511,14 @@ class MetricsAggregator(object):
                 self._force_flush = False
             else:
                 flushable_buckets = []
-                for buckets_timestamp, buckets in iteritems(self.buckets):
+                for buckets_timestamp, buckets in self.buckets.items():
                     # If the timestamp of the bucket is newer that the rollup we want to skip it.
                     if buckets_timestamp <= cutoff:
                         flushable_buckets.append((buckets_timestamp, buckets))
 
                 # We will clear the elements while holding the lock, in order to avoid requesting it downstream again.
                 for buckets_timestamp, buckets in flushable_buckets:
-                    for _, metric in iteritems(buckets):
+                    for metric in buckets.values():
                         weight_to_remove += metric.weight
                     del self.buckets[buckets_timestamp]
 
@@ -550,6 +583,8 @@ class MetricsAggregator(object):
         # Given the new weight we consider whether we want to force flush.
         self._consider_force_flush()
 
+        # For sets, we only record that a value has been added to the set but not which one.
+        # See develop docs: https://develop.sentry.dev/sdk/metrics/#sets
         if local_aggregator is not None:
             local_value = float(added if ty == "s" else value)
             local_aggregator.add(ty, key, local_value, unit, serialized_tags)
@@ -568,7 +603,7 @@ class MetricsAggregator(object):
         if timestamp is None:
             timestamp = time.time()
         meta_key = (ty, key, unit)
-        start_of_day = utc_from_timestamp(timestamp).replace(
+        start_of_day = datetime.fromtimestamp(timestamp, timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
         start_of_day = int(to_timestamp(start_of_day))
@@ -584,7 +619,7 @@ class MetricsAggregator(object):
                 )
 
     @metrics_noop
-    def need_code_loation(
+    def need_code_location(
         self,
         ty,  # type: MetricType
         key,  # type: str
@@ -595,7 +630,7 @@ class MetricsAggregator(object):
         if self._enable_code_locations:
             return False
         meta_key = (ty, key, unit)
-        start_of_day = utc_from_timestamp(timestamp).replace(
+        start_of_day = datetime.fromtimestamp(timestamp, timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
         start_of_day = int(to_timestamp(start_of_day))
@@ -608,7 +643,6 @@ class MetricsAggregator(object):
 
         self._running = False
         self._flush_event.set()
-        self._flusher.join()
         self._flusher = None
 
     @metrics_noop
@@ -637,7 +671,7 @@ class MetricsAggregator(object):
             encoded_metrics = _encode_metrics(flushable_buckets)
             envelope.add_item(Item(payload=encoded_metrics, type="statsd"))
 
-        for timestamp, locations in iteritems(code_locations):
+        for timestamp, locations in code_locations.items():
             encoded_locations = _encode_locations(timestamp, locations)
             envelope.add_item(Item(payload=encoded_locations, type="metric_meta"))
 
@@ -655,14 +689,14 @@ def _serialize_tags(
         return ()
 
     rv = []
-    for key, value in iteritems(tags):
+    for key, value in tags.items():
         # If the value is a collection, we want to flatten it.
         if isinstance(value, (list, tuple)):
             for inner_value in value:
                 if inner_value is not None:
-                    rv.append((key, text_type(inner_value)))
+                    rv.append((key, str(inner_value)))
         elif value is not None:
-            rv.append((key, text_type(value)))
+            rv.append((key, str(value)))
 
     # It's very important to sort the tags in order to obtain the
     # same bucket key.
@@ -686,29 +720,25 @@ def _tags_to_dict(tags):
 
 def _get_aggregator():
     # type: () -> Optional[MetricsAggregator]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
+    client = sentry_sdk.get_client()
     return (
         client.metrics_aggregator
-        if client is not None and client.metrics_aggregator is not None
+        if client.is_active() and client.metrics_aggregator is not None
         else None
     )
 
 
-def _get_aggregator_and_update_tags(key, tags):
-    # type: (str, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
-    if client is None or client.metrics_aggregator is None:
+def _get_aggregator_and_update_tags(key, value, unit, tags):
+    # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
+    client = sentry_sdk.get_client()
+    if not client.is_active() or client.metrics_aggregator is None:
         return None, None, tags
-
-    experiments = client.options.get("_experiments", {})
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
-    scope = hub.scope
+    scope = sentry_sdk.Scope.get_current_scope()
     local_aggregator = None
 
     # We go with the low-level API here to access transaction information as
@@ -719,27 +749,20 @@ def _get_aggregator_and_update_tags(key, tags):
         if transaction_name:
             updated_tags.setdefault("transaction", transaction_name)
         if scope._span is not None:
-            sample_rate = experiments.get("metrics_summary_sample_rate") or 0.0
-            should_summarize_metric_callback = experiments.get(
-                "should_summarize_metric"
-            )
-            if random.random() < sample_rate and (
-                should_summarize_metric_callback is None
-                or should_summarize_metric_callback(key, updated_tags)
-            ):
-                local_aggregator = scope._span._get_local_aggregator()
+            local_aggregator = scope._span._get_local_aggregator()
 
+    experiments = client.options.get("_experiments", {})
     before_emit_callback = experiments.get("before_emit_metric")
     if before_emit_callback is not None:
         with recursion_protection() as in_metrics:
             if not in_metrics:
-                if not before_emit_callback(key, updated_tags):
+                if not before_emit_callback(key, value, unit, updated_tags):
                     return None, None, updated_tags
 
     return client.metrics_aggregator, local_aggregator, updated_tags
 
 
-def incr(
+def increment(
     key,  # type: str
     value=1.0,  # type: float
     unit="none",  # type: MeasurementUnit
@@ -749,14 +772,20 @@ def incr(
 ):
     # type: (...) -> None
     """Increments a counter."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "c", key, value, unit, tags, timestamp, local_aggregator, stacklevel
         )
 
 
-class _Timing(object):
+# alias as incr is relatively common in python
+incr = increment
+
+
+class _Timing:
     def __init__(
         self,
         key,  # type: str
@@ -806,7 +835,10 @@ class _Timing(object):
         # type: (Any, Any, Any) -> None
         assert self._span, "did not enter"
         aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
-            self.key, self.tags
+            self.key,
+            self.value,
+            self.unit,
+            self.tags,
         )
         if aggregator is not None:
             elapsed = TIMING_FUNCTIONS[self.unit]() - self.entered  # type: ignore
@@ -861,7 +893,9 @@ def timing(
     - it can be used as a decorator
     """
     if value is not None:
-        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+        aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+            key, value, unit, tags
+        )
         if aggregator is not None:
             aggregator.add(
                 "d", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -879,7 +913,9 @@ def distribution(
 ):
     # type: (...) -> None
     """Emits a distribution."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "d", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -888,7 +924,7 @@ def distribution(
 
 def set(
     key,  # type: str
-    value,  # type: MetricValue
+    value,  # type: Union[int, str]
     unit="none",  # type: MeasurementUnit
     tags=None,  # type: Optional[MetricTags]
     timestamp=None,  # type: Optional[Union[float, datetime]]
@@ -896,7 +932,9 @@ def set(
 ):
     # type: (...) -> None
     """Emits a set."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "s", key, value, unit, tags, timestamp, local_aggregator, stacklevel
@@ -913,7 +951,9 @@ def gauge(
 ):
     # type: (...) -> None
     """Emits a gauge."""
-    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(key, tags)
+    aggregator, local_aggregator, tags = _get_aggregator_and_update_tags(
+        key, value, unit, tags
+    )
     if aggregator is not None:
         aggregator.add(
             "g", key, value, unit, tags, timestamp, local_aggregator, stacklevel

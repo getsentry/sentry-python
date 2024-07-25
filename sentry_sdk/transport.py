@@ -1,27 +1,30 @@
-from __future__ import print_function
-
+from abc import ABC, abstractmethod
 import io
+import os
+import gzip
+import socket
+import time
+import warnings
+from datetime import datetime, timedelta, timezone
+from collections import defaultdict
+from urllib.request import getproxies
+
 import urllib3
 import certifi
-import gzip
-import time
 
-from datetime import timedelta
-from collections import defaultdict
-
-from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions, json_dumps
+import sentry_sdk
+from sentry_sdk.consts import EndpointType
+from sentry_sdk.utils import Dsn, logger, capture_internal_exceptions
 from sentry_sdk.worker import BackgroundWorker
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-
-from sentry_sdk._compat import datetime_utcnow
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from datetime import datetime
     from typing import Any
     from typing import Callable
     from typing import Dict
     from typing import Iterable
+    from typing import List
     from typing import Optional
     from typing import Tuple
     from typing import Type
@@ -31,17 +34,24 @@ if TYPE_CHECKING:
     from urllib3.poolmanager import PoolManager
     from urllib3.poolmanager import ProxyManager
 
-    from sentry_sdk._types import Event, EndpointType
+    from sentry_sdk._types import Event, EventDataCategory
 
-    DataCategory = Optional[str]
+KEEP_ALIVE_SOCKET_OPTIONS = []
+for option in [
+    (socket.SOL_SOCKET, lambda: getattr(socket, "SO_KEEPALIVE"), 1),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPIDLE"), 45),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPINTVL"), 10),  # noqa: B009
+    (socket.SOL_TCP, lambda: getattr(socket, "TCP_KEEPCNT"), 6),  # noqa: B009
+]:
+    try:
+        KEEP_ALIVE_SOCKET_OPTIONS.append((option[0], option[1](), option[2]))
+    except AttributeError:
+        # a specific option might not be available on specific systems,
+        # e.g. TCP_KEEPIDLE doesn't exist on macOS
+        pass
 
-try:
-    from urllib.request import getproxies
-except ImportError:
-    from urllib import getproxies  # type: ignore
 
-
-class Transport(object):
+class Transport(ABC):
     """Baseclass for all transports.
 
     A transport is used to send an event to sentry.
@@ -64,11 +74,23 @@ class Transport(object):
     ):
         # type: (...) -> None
         """
+        DEPRECATED: Please use capture_envelope instead.
+
         This gets invoked with the event dictionary when an event should
         be sent to sentry.
         """
-        raise NotImplementedError()
 
+        warnings.warn(
+            "capture_event is deprecated, please use capture_envelope instead!",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        envelope = Envelope()
+        envelope.add_event(event)
+        self.capture_envelope(envelope)
+
+    @abstractmethod
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
@@ -77,11 +99,10 @@ class Transport(object):
         Send an envelope to Sentry.
 
         Envelopes are a data container format that can hold any type of data
-        submitted to Sentry. We use it for transactions and sessions, but
-        regular "error" events should go through `capture_event` for backwards
-        compat.
+        submitted to Sentry. We use it to send all event data (including errors,
+        transactions, crons checkins, etc.) to Sentry.
         """
-        raise NotImplementedError()
+        pass
 
     def flush(
         self,
@@ -89,23 +110,46 @@ class Transport(object):
         callback=None,  # type: Optional[Any]
     ):
         # type: (...) -> None
-        """Wait `timeout` seconds for the current events to be sent out."""
-        pass
+        """
+        Wait `timeout` seconds for the current events to be sent out.
+
+        The default implementation is a no-op, since this method may only be relevant to some transports.
+        Subclasses should override this method if necessary.
+        """
+        return None
 
     def kill(self):
         # type: () -> None
-        """Forcefully kills the transport."""
-        pass
+        """
+        Forcefully kills the transport.
+
+        The default implementation is a no-op, since this method may only be relevant to some transports.
+        Subclasses should override this method if necessary.
+        """
+        return None
 
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category=None,  # type: Optional[str]
+        data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
+        *,
+        quantity=1,  # type: int
     ):
         # type: (...) -> None
         """This increments a counter for event loss by reason and
-        data category.
+        data category by the given positive-int quantity (default 1).
+
+        If an item is provided, the data category and quantity are
+        extracted from the item, and the values passed for
+        data_category and quantity are ignored.
+
+        When recording a lost transaction via data_category="transaction",
+        the calling code should also record the lost spans via this method.
+        When recording lost spans, `quantity` should be set to the number
+        of contained spans, plus one for the transaction itself. When
+        passing an Item containing a transaction via the `item` parameter,
+        this method automatically records the lost spans.
         """
         return None
 
@@ -122,16 +166,28 @@ class Transport(object):
 
 
 def _parse_rate_limits(header, now=None):
-    # type: (Any, Optional[datetime]) -> Iterable[Tuple[DataCategory, datetime]]
+    # type: (Any, Optional[datetime]) -> Iterable[Tuple[Optional[EventDataCategory], datetime]]
     if now is None:
-        now = datetime_utcnow()
+        now = datetime.now(timezone.utc)
 
     for limit in header.split(","):
         try:
-            retry_after, categories, _ = limit.strip().split(":", 2)
+            parameters = limit.strip().split(":")
+            retry_after, categories = parameters[:2]
+
             retry_after = now + timedelta(seconds=int(retry_after))
             for category in categories and categories.split(";") or (None,):
-                yield category, retry_after
+                if category == "metric_bucket":
+                    try:
+                        namespaces = parameters[4].split(";")
+                    except IndexError:
+                        namespaces = []
+
+                    if not namespaces or "custom" in namespaces:
+                        yield category, retry_after
+
+                else:
+                    yield category, retry_after
         except (LookupError, ValueError):
             continue
 
@@ -150,11 +206,11 @@ class HttpTransport(Transport):
         self.options = options  # type: Dict[str, Any]
         self._worker = BackgroundWorker(queue_size=options["transport_queue_size"])
         self._auth = self.parsed_dsn.to_auth("sentry.python/%s" % VERSION)
-        self._disabled_until = {}  # type: Dict[DataCategory, datetime]
+        self._disabled_until = {}  # type: Dict[Optional[EventDataCategory], datetime]
         self._retry = urllib3.util.Retry()
         self._discarded_events = defaultdict(
             int
-        )  # type: DefaultDict[Tuple[str, str], int]
+        )  # type: DefaultDict[Tuple[EventDataCategory, str], int]
         self._last_client_report_sent = time.time()
 
         compresslevel = options.get("_experiments", {}).get(
@@ -170,30 +226,43 @@ class HttpTransport(Transport):
             http_proxy=options["http_proxy"],
             https_proxy=options["https_proxy"],
             ca_certs=options["ca_certs"],
+            cert_file=options["cert_file"],
+            key_file=options["key_file"],
             proxy_headers=options["proxy_headers"],
         )
 
-        from sentry_sdk import Hub
-
-        self.hub_cls = Hub
+        # Backwards compatibility for deprecated `self.hub_class` attribute
+        self._hub_cls = sentry_sdk.Hub
 
     def record_lost_event(
         self,
         reason,  # type: str
-        data_category=None,  # type: Optional[str]
+        data_category=None,  # type: Optional[EventDataCategory]
         item=None,  # type: Optional[Item]
+        *,
+        quantity=1,  # type: int
     ):
         # type: (...) -> None
         if not self.options["send_client_reports"]:
             return
 
-        quantity = 1
         if item is not None:
             data_category = item.data_category
-            if data_category == "attachment":
+            quantity = 1  # If an item is provided, we always count it as 1 (except for attachments, handled below).
+
+            if data_category == "transaction":
+                # Also record the lost spans
+                event = item.get_transaction_event() or {}
+
+                # +1 for the transaction itself
+                span_count = len(event.get("spans") or []) + 1
+                self.record_lost_event(reason, "span", quantity=span_count)
+
+            elif data_category == "attachment":
                 # quantity of 0 is actually 1 as we do not want to count
                 # empty attachments as actually empty.
                 quantity = len(item.get_bytes()) or 1
+
         elif data_category is None:
             raise TypeError("data category not provided")
 
@@ -214,7 +283,7 @@ class HttpTransport(Transport):
         # sentries if a proxy in front wants to globally slow things down.
         elif response.status == 429:
             logger.warning("Rate-limited via 429")
-            self._disabled_until[None] = datetime_utcnow() + timedelta(
+            self._disabled_until[None] = datetime.now(timezone.utc) + timedelta(
                 seconds=self._retry.get_retry_after(response) or 60
             )
 
@@ -222,7 +291,7 @@ class HttpTransport(Transport):
         self,
         body,  # type: bytes
         headers,  # type: Dict[str, str]
-        endpoint_type="store",  # type: EndpointType
+        endpoint_type=EndpointType.ENVELOPE,  # type: EndpointType
         envelope=None,  # type: Optional[Envelope]
     ):
         # type: (...) -> None
@@ -320,14 +389,22 @@ class HttpTransport(Transport):
         # type: (str) -> bool
         def _disabled(bucket):
             # type: (Any) -> bool
+
+            # The envelope item type used for metrics is statsd
+            # whereas the rate limit category is metric_bucket
+            if bucket == "statsd":
+                bucket = "metric_bucket"
+
             ts = self._disabled_until.get(bucket)
-            return ts is not None and ts > datetime_utcnow()
+            return ts is not None and ts > datetime.now(timezone.utc)
 
         return _disabled(category) or _disabled(None)
 
     def _is_rate_limited(self):
         # type: () -> bool
-        return any(ts > datetime_utcnow() for ts in self._disabled_until.values())
+        return any(
+            ts > datetime.now(timezone.utc) for ts in self._disabled_until.values()
+        )
 
     def _is_worker_full(self):
         # type: () -> bool
@@ -336,46 +413,6 @@ class HttpTransport(Transport):
     def is_healthy(self):
         # type: () -> bool
         return not (self._is_worker_full() or self._is_rate_limited())
-
-    def _send_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
-
-        if self._check_disabled("error"):
-            self.on_dropped_event("self_rate_limits")
-            self.record_lost_event("ratelimit_backoff", data_category="error")
-            return None
-
-        body = io.BytesIO()
-        if self._compresslevel == 0:
-            body.write(json_dumps(event))
-        else:
-            with gzip.GzipFile(
-                fileobj=body, mode="w", compresslevel=self._compresslevel
-            ) as f:
-                f.write(json_dumps(event))
-
-        assert self.parsed_dsn is not None
-        logger.debug(
-            "Sending event, type:%s level:%s event_id:%s project:%s host:%s"
-            % (
-                event.get("type") or "null",
-                event.get("level") or "null",
-                event.get("event_id") or "null",
-                self.parsed_dsn.project_id,
-                self.parsed_dsn.host,
-            )
-        )
-
-        headers = {
-            "Content-Type": "application/json",
-        }
-        if self._compresslevel > 0:
-            headers["Content-Encoding"] = "gzip"
-
-        self._send_request(body.getvalue(), headers=headers)
-        return None
 
     def _send_envelope(
         self, envelope  # type: Envelope
@@ -386,7 +423,7 @@ class HttpTransport(Transport):
         new_items = []
         for item in envelope.items:
             if self._check_disabled(item.data_category):
-                if item.data_category in ("transaction", "error", "default"):
+                if item.data_category in ("transaction", "error", "default", "statsd"):
                     self.on_dropped_event("self_rate_limits")
                 self.record_lost_event("ratelimit_backoff", item=item)
             else:
@@ -434,18 +471,46 @@ class HttpTransport(Transport):
         self._send_request(
             body.getvalue(),
             headers=headers,
-            endpoint_type="envelope",
+            endpoint_type=EndpointType.ENVELOPE,
             envelope=envelope,
         )
         return None
 
-    def _get_pool_options(self, ca_certs):
-        # type: (Optional[Any]) -> Dict[str, Any]
-        return {
+    def _get_pool_options(self, ca_certs, cert_file=None, key_file=None):
+        # type: (Optional[Any], Optional[Any], Optional[Any]) -> Dict[str, Any]
+        options = {
             "num_pools": self._num_pools,
             "cert_reqs": "CERT_REQUIRED",
-            "ca_certs": ca_certs or certifi.where(),
         }
+
+        socket_options = None  # type: Optional[List[Tuple[int, int, int | bytes]]]
+
+        if self.options["socket_options"] is not None:
+            socket_options = self.options["socket_options"]
+
+        if self.options["keep_alive"]:
+            if socket_options is None:
+                socket_options = []
+
+            used_options = {(o[0], o[1]) for o in socket_options}
+            for default_option in KEEP_ALIVE_SOCKET_OPTIONS:
+                if (default_option[0], default_option[1]) not in used_options:
+                    socket_options.append(default_option)
+
+        if socket_options is not None:
+            options["socket_options"] = socket_options
+
+        options["ca_certs"] = (
+            ca_certs  # User-provided bundle from the SDK init
+            or os.environ.get("SSL_CERT_FILE")
+            or os.environ.get("REQUESTS_CA_BUNDLE")
+            or certifi.where()
+        )
+
+        options["cert_file"] = cert_file or os.environ.get("CLIENT_CERT_FILE")
+        options["key_file"] = key_file or os.environ.get("CLIENT_KEY_FILE")
+
+        return options
 
     def _in_no_proxy(self, parsed_dsn):
         # type: (Dsn) -> bool
@@ -464,6 +529,8 @@ class HttpTransport(Transport):
         http_proxy,  # type: Optional[str]
         https_proxy,  # type: Optional[str]
         ca_certs,  # type: Optional[Any]
+        cert_file,  # type: Optional[Any]
+        key_file,  # type: Optional[Any]
         proxy_headers,  # type: Optional[Dict[str, str]]
     ):
         # type: (...) -> Union[PoolManager, ProxyManager]
@@ -478,7 +545,7 @@ class HttpTransport(Transport):
         if not proxy and (http_proxy != ""):
             proxy = http_proxy or (not no_proxy and getproxies().get("http"))
 
-        opts = self._get_pool_options(ca_certs)
+        opts = self._get_pool_options(ca_certs, cert_file, key_file)
 
         if proxy:
             if proxy_headers:
@@ -505,35 +572,15 @@ class HttpTransport(Transport):
         else:
             return urllib3.PoolManager(**opts)
 
-    def capture_event(
-        self, event  # type: Event
-    ):
-        # type: (...) -> None
-        hub = self.hub_cls.current
-
-        def send_event_wrapper():
-            # type: () -> None
-            with hub:
-                with capture_internal_exceptions():
-                    self._send_event(event)
-                    self._flush_client_reports()
-
-        if not self._worker.submit(send_event_wrapper):
-            self.on_dropped_event("full_queue")
-            self.record_lost_event("queue_overflow", data_category="error")
-
     def capture_envelope(
         self, envelope  # type: Envelope
     ):
         # type: (...) -> None
-        hub = self.hub_cls.current
-
         def send_envelope_wrapper():
             # type: () -> None
-            with hub:
-                with capture_internal_exceptions():
-                    self._send_envelope(envelope)
-                    self._flush_client_reports()
+            with capture_internal_exceptions():
+                self._send_envelope(envelope)
+                self._flush_client_reports()
 
         if not self._worker.submit(send_envelope_wrapper):
             self.on_dropped_event("full_queue")
@@ -557,8 +604,37 @@ class HttpTransport(Transport):
         logger.debug("Killing HTTP transport")
         self._worker.kill()
 
+    @staticmethod
+    def _warn_hub_cls():
+        # type: () -> None
+        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
+        warnings.warn(
+            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    @property
+    def hub_cls(self):
+        # type: () -> type[sentry_sdk.Hub]
+        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
+        HttpTransport._warn_hub_cls()
+        return self._hub_cls
+
+    @hub_cls.setter
+    def hub_cls(self, value):
+        # type: (type[sentry_sdk.Hub]) -> None
+        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
+        HttpTransport._warn_hub_cls()
+        self._hub_cls = value
+
 
 class _FunctionTransport(Transport):
+    """
+    DEPRECATED: Users wishing to provide a custom transport should subclass
+    the Transport class, rather than providing a function.
+    """
+
     def __init__(
         self, func  # type: Callable[[Event], None]
     ):
@@ -573,19 +649,33 @@ class _FunctionTransport(Transport):
         self._func(event)
         return None
 
+    def capture_envelope(self, envelope: Envelope) -> None:
+        # Since function transports expect to be called with an event, we need
+        # to iterate over the envelope and call the function for each event, via
+        # the deprecated capture_event method.
+        event = envelope.get_event()
+        if event is not None:
+            self.capture_event(event)
+
 
 def make_transport(options):
     # type: (Dict[str, Any]) -> Optional[Transport]
     ref_transport = options["transport"]
 
-    # If no transport is given, we use the http transport class
-    if ref_transport is None:
-        transport_cls = HttpTransport  # type: Type[Transport]
-    elif isinstance(ref_transport, Transport):
+    # By default, we use the http transport class
+    transport_cls = HttpTransport  # type: Type[Transport]
+
+    if isinstance(ref_transport, Transport):
         return ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
+        warnings.warn(
+            "Function transports are deprecated and will be removed in a future release."
+            "Please provide a Transport instance or subclass, instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not

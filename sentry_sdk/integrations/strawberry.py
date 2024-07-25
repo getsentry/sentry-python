@@ -1,19 +1,30 @@
 import hashlib
-from functools import cached_property
 from inspect import isawaitable
-from sentry_sdk import configure_scope, start_span
+
+import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.hub import Hub, _should_send_default_pii
+from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    ensure_integration_enabled,
     event_from_exception,
     logger,
     package_version,
     _get_installed_modules,
 )
 from sentry_sdk._types import TYPE_CHECKING
+
+try:
+    from functools import cached_property
+except ImportError:
+    # The strawberry integration requires Python 3.8+. functools.cached_property
+    # was added in 3.8, so this check is technically not needed, but since this
+    # is an auto-enabling integration, we might get to executing this import in
+    # lower Python versions, so we need to deal with it.
+    raise DidNotEnable("strawberry-graphql integration requires Python 3.8 or newer")
 
 try:
     import strawberry.schema.schema as strawberry_schema  # type: ignore
@@ -29,11 +40,11 @@ except ImportError:
     raise DidNotEnable("strawberry-graphql is not installed")
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Generator, List, Optional
+    from typing import Any, Callable, Generator, List, Optional
     from graphql import GraphQLError, GraphQLResolveInfo  # type: ignore
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext, ExecutionResult  # type: ignore
-    from sentry_sdk._types import EventProcessor
+    from sentry_sdk._types import Event, EventProcessor
 
 
 ignore_logger("strawberry.execution")
@@ -41,6 +52,7 @@ ignore_logger("strawberry.execution")
 
 class StrawberryIntegration(Integration):
     identifier = "strawberry"
+    origin = f"auto.graphql.{identifier}"
 
     def __init__(self, async_execution=None):
         # type: (Optional[bool]) -> None
@@ -74,12 +86,10 @@ def _patch_schema_init():
     # type: () -> None
     old_schema_init = Schema.__init__
 
+    @ensure_integration_enabled(StrawberryIntegration, old_schema_init)
     def _sentry_patched_schema_init(self, *args, **kwargs):
         # type: (Schema, Any, Any) -> None
-        integration = Hub.current.get_integration(StrawberryIntegration)
-        if integration is None:
-            return old_schema_init(self, *args, **kwargs)
-
+        integration = sentry_sdk.get_client().get_integration(StrawberryIntegration)
         extensions = kwargs.get("extensions") or []
 
         if integration.async_execution is not None:
@@ -145,6 +155,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         operation_type = "query"
         op = OP.GRAPHQL_QUERY
 
+        if self.execution_context.query is None:
+            self.execution_context.query = ""
+
         if self.execution_context.query.strip().startswith("mutation"):
             operation_type = "mutation"
             op = OP.GRAPHQL_MUTATION
@@ -156,7 +169,7 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         if self._operation_name:
             description += " {}".format(self._operation_name)
 
-        Hub.current.add_breadcrumb(
+        sentry_sdk.add_breadcrumb(
             category="graphql.operation",
             data={
                 "operation_name": self._operation_name,
@@ -164,13 +177,19 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
             },
         )
 
-        with configure_scope() as scope:
-            if scope.span:
-                self.graphql_span = scope.span.start_child(
-                    op=op, description=description
-                )
-            else:
-                self.graphql_span = start_span(op=op, description=description)
+        span = sentry_sdk.get_current_span()
+        if span:
+            self.graphql_span = span.start_child(
+                op=op,
+                description=description,
+                origin=StrawberryIntegration.origin,
+            )
+        else:
+            self.graphql_span = sentry_sdk.start_span(
+                op=op,
+                description=description,
+                origin=StrawberryIntegration.origin,
+            )
 
         self.graphql_span.set_data("graphql.operation.type", operation_type)
         self.graphql_span.set_data("graphql.operation.name", self._operation_name)
@@ -179,12 +198,20 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
 
         yield
 
+        transaction = self.graphql_span.containing_transaction
+        if transaction and self.execution_context.operation_name:
+            transaction.name = self.execution_context.operation_name
+            transaction.source = TRANSACTION_SOURCE_COMPONENT
+            transaction.op = op
+
         self.graphql_span.finish()
 
     def on_validate(self):
         # type: () -> Generator[None, None, None]
         self.validation_span = self.graphql_span.start_child(
-            op=OP.GRAPHQL_VALIDATE, description="validation"
+            op=OP.GRAPHQL_VALIDATE,
+            description="validation",
+            origin=StrawberryIntegration.origin,
         )
 
         yield
@@ -194,7 +221,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
     def on_parse(self):
         # type: () -> Generator[None, None, None]
         self.parsing_span = self.graphql_span.start_child(
-            op=OP.GRAPHQL_PARSE, description="parsing"
+            op=OP.GRAPHQL_PARSE,
+            description="parsing",
+            origin=StrawberryIntegration.origin,
         )
 
         yield
@@ -222,7 +251,9 @@ class SentryAsyncExtension(SchemaExtension):  # type: ignore
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
         with self.graphql_span.start_child(
-            op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
+            op=OP.GRAPHQL_RESOLVE,
+            description="resolving {}".format(field_path),
+            origin=StrawberryIntegration.origin,
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
             span.set_data("graphql.parent_type", info.parent_type.name)
@@ -241,7 +272,9 @@ class SentrySyncExtension(SentryAsyncExtension):
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
         with self.graphql_span.start_child(
-            op=OP.GRAPHQL_RESOLVE, description="resolving {}".format(field_path)
+            op=OP.GRAPHQL_RESOLVE,
+            description="resolving {}".format(field_path),
+            origin=StrawberryIntegration.origin,
         ) as span:
             span.set_data("graphql.field_name", info.field_name)
             span.set_data("graphql.parent_type", info.parent_type.name)
@@ -258,37 +291,27 @@ def _patch_execute():
 
     async def _sentry_patched_execute_async(*args, **kwargs):
         # type: (Any, Any) -> ExecutionResult
-        hub = Hub.current
-        integration = hub.get_integration(StrawberryIntegration)
-        if integration is None:
-            return await old_execute_async(*args, **kwargs)
-
         result = await old_execute_async(*args, **kwargs)
 
+        if sentry_sdk.get_client().get_integration(StrawberryIntegration) is None:
+            return result
+
         if "execution_context" in kwargs and result.errors:
-            with hub.configure_scope() as scope:
-                event_processor = _make_request_event_processor(
-                    kwargs["execution_context"]
-                )
-                scope.add_event_processor(event_processor)
+            scope = Scope.get_isolation_scope()
+            event_processor = _make_request_event_processor(kwargs["execution_context"])
+            scope.add_event_processor(event_processor)
 
         return result
 
+    @ensure_integration_enabled(StrawberryIntegration, old_execute_sync)
     def _sentry_patched_execute_sync(*args, **kwargs):
         # type: (Any, Any) -> ExecutionResult
-        hub = Hub.current
-        integration = hub.get_integration(StrawberryIntegration)
-        if integration is None:
-            return old_execute_sync(*args, **kwargs)
-
         result = old_execute_sync(*args, **kwargs)
 
         if "execution_context" in kwargs and result.errors:
-            with hub.configure_scope() as scope:
-                event_processor = _make_request_event_processor(
-                    kwargs["execution_context"]
-                )
-                scope.add_event_processor(event_processor)
+            scope = Scope.get_isolation_scope()
+            event_processor = _make_request_event_processor(kwargs["execution_context"])
+            scope.add_event_processor(event_processor)
 
         return result
 
@@ -311,31 +334,27 @@ def _patch_views():
         old_sync_view_handle_errors(self, errors, response_data)
         _sentry_patched_handle_errors(self, errors, response_data)
 
+    @ensure_integration_enabled(StrawberryIntegration)
     def _sentry_patched_handle_errors(self, errors, response_data):
         # type: (Any, List[GraphQLError], GraphQLHTTPResponse) -> None
-        hub = Hub.current
-        integration = hub.get_integration(StrawberryIntegration)
-        if integration is None:
-            return
-
         if not errors:
             return
 
-        with hub.configure_scope() as scope:
-            event_processor = _make_response_event_processor(response_data)
-            scope.add_event_processor(event_processor)
+        scope = Scope.get_isolation_scope()
+        event_processor = _make_response_event_processor(response_data)
+        scope.add_event_processor(event_processor)
 
         with capture_internal_exceptions():
             for error in errors:
                 event, hint = event_from_exception(
                     error,
-                    client_options=hub.client.options if hub.client else None,
+                    client_options=sentry_sdk.get_client().options,
                     mechanism={
-                        "type": integration.identifier,
+                        "type": StrawberryIntegration.identifier,
                         "handled": False,
                     },
                 )
-                hub.capture_event(event, hint=hint)
+                sentry_sdk.capture_event(event, hint=hint)
 
     async_base_view.AsyncBaseHTTPView._handle_errors = (
         _sentry_patched_async_view_handle_errors
@@ -349,21 +368,21 @@ def _make_request_event_processor(execution_context):
     # type: (ExecutionContext) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
-            if _should_send_default_pii():
+            if should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
 
                 if not request_data.get("data"):
-                    request_data["data"] = {"query": execution_context.query}
+                    data = {"query": execution_context.query}
 
                     if execution_context.variables:
-                        request_data["data"]["variables"] = execution_context.variables
+                        data["variables"] = execution_context.variables
                     if execution_context.operation_name:
-                        request_data["data"][
-                            "operationName"
-                        ] = execution_context.operation_name
+                        data["operationName"] = execution_context.operation_name
+
+                    request_data["data"] = data
 
             else:
                 try:
@@ -380,9 +399,9 @@ def _make_response_event_processor(response_data):
     # type: (GraphQLHTTPResponse) -> EventProcessor
 
     def inner(event, hint):
-        # type: (Dict[str, Any], Dict[str, Any]) -> Dict[str, Any]
+        # type: (Event, dict[str, Any]) -> Event
         with capture_internal_exceptions():
-            if _should_send_default_pii():
+            if should_send_default_pii():
                 contexts = event.setdefault("contexts", {})
                 contexts["response"] = {"data": response_data}
 

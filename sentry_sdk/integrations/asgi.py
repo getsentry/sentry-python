@@ -7,19 +7,19 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 import asyncio
 import inspect
 from copy import deepcopy
+from functools import partial
 
-from sentry_sdk._functools import partial
+import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import Hub
 
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_request_data,
     _get_url,
 )
-from sentry_sdk.sessions import auto_session_tracking
+from sentry_sdk.sessions import auto_session_tracking_scope
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_ROUTE,
@@ -54,17 +54,15 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
-def _capture_exception(hub, exc, mechanism_type="asgi"):
-    # type: (Hub, Any, str) -> None
+def _capture_exception(exc, mechanism_type="asgi"):
+    # type: (Any, str) -> None
 
-    # Check client here as it might have been unset while streaming response
-    if hub.client is not None:
-        event, hint = event_from_exception(
-            exc,
-            client_options=hub.client.options,
-            mechanism={"type": mechanism_type, "handled": False},
-        )
-        hub.capture_event(event, hint=hint)
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": mechanism_type, "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 def _looks_like_asgi3(app):
@@ -84,7 +82,13 @@ def _looks_like_asgi3(app):
 
 
 class SentryAsgiMiddleware:
-    __slots__ = ("app", "__call__", "transaction_style", "mechanism_type")
+    __slots__ = (
+        "app",
+        "__call__",
+        "transaction_style",
+        "mechanism_type",
+        "span_origin",
+    )
 
     def __init__(
         self,
@@ -92,8 +96,9 @@ class SentryAsgiMiddleware:
         unsafe_context_data=False,
         transaction_style="endpoint",
         mechanism_type="asgi",
+        span_origin="manual",
     ):
-        # type: (Any, bool, str, str) -> None
+        # type: (Any, bool, str, str, str) -> None
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
         data to sent events and basic handling for exceptions bubbling up
@@ -126,6 +131,7 @@ class SentryAsgiMiddleware:
 
         self.transaction_style = transaction_style
         self.mechanism_type = mechanism_type
+        self.span_origin = span_origin
         self.app = app
 
         if _looks_like_asgi3(app):
@@ -157,19 +163,17 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                _capture_exception(Hub.current, exc, mechanism_type=self.mechanism_type)
+                _capture_exception(exc, mechanism_type=self.mechanism_type)
                 raise exc from None
 
         _asgi_middleware_applied.set(True)
         try:
-            hub = Hub(Hub.current)
-            with auto_session_tracking(hub, session_mode="request"):
-                with hub:
-                    with hub.configure_scope() as sentry_scope:
-                        sentry_scope.clear_breadcrumbs()
-                        sentry_scope._name = "asgi"
-                        processor = partial(self.event_processor, asgi_scope=scope)
-                        sentry_scope.add_event_processor(processor)
+            with sentry_sdk.isolation_scope() as sentry_scope:
+                with auto_session_tracking_scope(sentry_scope, session_mode="request"):
+                    sentry_scope.clear_breadcrumbs()
+                    sentry_scope._name = "asgi"
+                    processor = partial(self.event_processor, asgi_scope=scope)
+                    sentry_scope.add_event_processor(processor)
 
                     ty = scope["type"]
                     (
@@ -186,6 +190,7 @@ class SentryAsgiMiddleware:
                             op="{}.server".format(ty),
                             name=transaction_name,
                             source=transaction_source,
+                            origin=self.span_origin,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (continuing trace): %s",
@@ -196,6 +201,7 @@ class SentryAsgiMiddleware:
                             op=OP.HTTP_SERVER,
                             name=transaction_name,
                             source=transaction_source,
+                            origin=self.span_origin,
                         )
                         logger.debug(
                             "[ASGI] Created transaction (new): %s", transaction
@@ -208,8 +214,9 @@ class SentryAsgiMiddleware:
                         transaction.source,
                     )
 
-                    with hub.start_transaction(
-                        transaction, custom_sampling_context={"asgi_scope": scope}
+                    with sentry_sdk.start_transaction(
+                        transaction,
+                        custom_sampling_context={"asgi_scope": scope},
                     ):
                         logger.debug("[ASGI] Started transaction: %s", transaction)
                         try:
@@ -235,9 +242,7 @@ class SentryAsgiMiddleware:
                                     scope, receive, _sentry_wrapped_send
                                 )
                         except Exception as exc:
-                            _capture_exception(
-                                hub, exc, mechanism_type=self.mechanism_type
-                            )
+                            _capture_exception(exc, mechanism_type=self.mechanism_type)
                             raise exc from None
         finally:
             _asgi_middleware_applied.set(False)

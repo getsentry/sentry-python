@@ -6,23 +6,17 @@ import logging
 import os
 import re
 import threading
+from unittest import mock
 
 import pytest
 
-from sentry_sdk import last_event_id, capture_exception
+from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.utils import parse_version
-
-try:
-    from unittest import mock  # python 3.3 and above
-except ImportError:
-    import mock  # python < 3.3
-
-from sentry_sdk import capture_message
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
     StarletteRequestExtractor,
 )
+from sentry_sdk.utils import parse_version
 
 import starlette
 from starlette.authentication import (
@@ -31,6 +25,7 @@ from starlette.authentication import (
     AuthenticationError,
     SimpleUser,
 )
+from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -97,7 +92,6 @@ async def _mock_receive(msg):
     return msg
 
 
-from sentry_sdk import Hub
 from starlette.templating import Jinja2Templates
 
 
@@ -139,8 +133,7 @@ def starlette_app_factory(middleware=None, debug=True):
         )
 
     async def _render_template(request):
-        hub = Hub.current
-        capture_message(hub.get_traceparent() + "\n" + hub.get_baggage())
+        capture_message(get_traceparent() + "\n" + get_baggage())
 
         template_context = {
             "request": request,
@@ -266,7 +259,7 @@ class SamplePartialReceiveSendMiddleware:
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_content_length(sentry_init):
+async def test_starletterequestextractor_content_length(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
@@ -278,7 +271,7 @@ async def test_starlettrequestextractor_content_length(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_cookies(sentry_init):
+async def test_starletterequestextractor_cookies(sentry_init):
     starlette_request = starlette.requests.Request(SCOPE)
     extractor = StarletteRequestExtractor(starlette_request)
 
@@ -289,7 +282,7 @@ async def test_starlettrequestextractor_cookies(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_json(sentry_init):
+async def test_starletterequestextractor_json(sentry_init):
     starlette_request = starlette.requests.Request(SCOPE)
 
     # Mocking async `_receive()` that works in Python 3.7+
@@ -303,7 +296,7 @@ async def test_starlettrequestextractor_json(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_form(sentry_init):
+async def test_starletterequestextractor_form(sentry_init):
     scope = SCOPE.copy()
     scope["headers"] = [
         [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
@@ -331,7 +324,7 @@ async def test_starlettrequestextractor_form(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_body_consumed_twice(
+async def test_starletterequestextractor_body_consumed_twice(
     sentry_init, capture_events
 ):
     """
@@ -369,7 +362,7 @@ async def test_starlettrequestextractor_body_consumed_twice(
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init):
+async def test_starletterequestextractor_extract_request_info_too_big(sentry_init):
     sentry_init(
         send_default_pii=True,
         integrations=[StarletteIntegration()],
@@ -400,7 +393,7 @@ async def test_starlettrequestextractor_extract_request_info_too_big(sentry_init
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_extract_request_info(sentry_init):
+async def test_starletterequestextractor_extract_request_info(sentry_init):
     sentry_init(
         send_default_pii=True,
         integrations=[StarletteIntegration()],
@@ -431,7 +424,7 @@ async def test_starlettrequestextractor_extract_request_info(sentry_init):
 
 
 @pytest.mark.asyncio
-async def test_starlettrequestextractor_extract_request_info_no_pii(sentry_init):
+async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init):
     sentry_init(
         send_default_pii=False,
         integrations=[StarletteIntegration()],
@@ -644,18 +637,47 @@ def test_middleware_spans(sentry_init, capture_events):
 
     (_, transaction_event) = events
 
-    expected = [
+    expected_middleware_spans = [
         "ServerErrorMiddleware",
         "AuthenticationMiddleware",
         "ExceptionMiddleware",
+        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
+        "AuthenticationMiddleware",  # 'op': 'middleware.starlette.send'
+        "ServerErrorMiddleware",  # 'op': 'middleware.starlette.send'
     ]
+
+    assert len(transaction_event["spans"]) == len(expected_middleware_spans)
 
     idx = 0
     for span in transaction_event["spans"]:
-        if span["op"] == "middleware.starlette":
-            assert span["description"] == expected[idx]
-            assert span["tags"]["starlette.middleware_name"] == expected[idx]
+        if span["op"].startswith("middleware.starlette"):
+            assert (
+                span["tags"]["starlette.middleware_name"]
+                == expected_middleware_spans[idx]
+            )
             idx += 1
+
+
+def test_middleware_spans_disabled(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration(middleware_spans=False)],
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, transaction_event) = events
+
+    assert len(transaction_event["spans"]) == 0
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
@@ -779,9 +801,11 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
         {
             "op": "middleware.starlette.receive",
-            "description": "_ASGIAdapter.send.<locals>.receive"
-            if STARLETTE_VERSION < (0, 21)
-            else "_TestClientTransport.handle_request.<locals>.receive",
+            "description": (
+                "_ASGIAdapter.send.<locals>.receive"
+                if STARLETTE_VERSION < (0, 21)
+                else "_TestClientTransport.handle_request.<locals>.receive"
+            ),
             "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
@@ -819,30 +843,6 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         idx += 1
 
 
-def test_last_event_id(sentry_init, capture_events):
-    sentry_init(
-        integrations=[StarletteIntegration()],
-    )
-    events = capture_events()
-
-    def handler(request, exc):
-        capture_exception(exc)
-        return starlette.responses.PlainTextResponse(last_event_id(), status_code=500)
-
-    app = starlette_app_factory(debug=False)
-    app.add_exception_handler(500, handler)
-
-    client = TestClient(SentryAsgiMiddleware(app), raise_server_exceptions=False)
-    response = client.get("/custom_error")
-    assert response.status_code == 500
-
-    event = events[0]
-    assert response.content.strip().decode("ascii") == event["event_id"]
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "Exception"
-    assert exception["value"] == "Too Hot"
-
-
 def test_legacy_setup(
     sentry_init,
     capture_events,
@@ -864,7 +864,7 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.PROFILE_MINIMUM_SAMPLES", 0)
+@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
 def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
     sentry_init(
         traces_sample_rate=1.0,
@@ -948,9 +948,8 @@ def test_template_tracing_meta(sentry_init, capture_events):
     assert match is not None
     assert match.group(1) == traceparent
 
-    # Python 2 does not preserve sort order
     rendered_baggage = match.group(2)
-    assert sorted(rendered_baggage.split(",")) == sorted(baggage.split(","))
+    assert rendered_baggage == baggage
 
 
 @pytest.mark.parametrize(
@@ -985,7 +984,6 @@ def test_transaction_name(
         auto_enabling_integrations=False,  # Make sure that httpx integration is not added, because it adds tracing information to the starlette test clients request.
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -1046,7 +1044,6 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     app = starlette_app_factory()
@@ -1088,7 +1085,6 @@ def test_transaction_name_in_middleware(
             StarletteIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        debug=True,
     )
 
     envelopes = capture_envelopes()
@@ -1112,3 +1108,80 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
+
+
+def test_span_origin(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+    )
+    starlette_app = starlette_app_factory(
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app, raise_server_exceptions=False)
+    try:
+        client.get("/message", auth=("Gabriela", "hello123"))
+    except Exception:
+        pass
+
+    (_, event) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
+    for span in event["spans"]:
+        assert span["origin"] == "auto.http.starlette"
+
+
+@pytest.mark.parametrize(
+    "failed_request_status_codes,status_code,expected_error",
+    [
+        (None, 500, True),
+        (None, 400, False),
+        ([500, 501], 500, True),
+        ([500, 501], 401, False),
+        ([range(400, 499)], 401, True),
+        ([range(400, 499)], 500, False),
+        ([range(400, 499), range(500, 599)], 300, False),
+        ([range(400, 499), range(500, 599)], 403, True),
+        ([range(400, 499), range(500, 599)], 503, True),
+        ([range(400, 403), 500, 501], 401, True),
+        ([range(400, 403), 500, 501], 405, False),
+        ([range(400, 403), 500, 501], 501, True),
+        ([range(400, 403), 500, 501], 503, False),
+        ([None], 500, False),
+    ],
+)
+def test_configurable_status_codes(
+    sentry_init,
+    capture_events,
+    failed_request_status_codes,
+    status_code,
+    expected_error,
+):
+    sentry_init(
+        integrations=[
+            StarletteIntegration(
+                failed_request_status_codes=failed_request_status_codes
+            )
+        ]
+    )
+
+    events = capture_events()
+
+    async def _error(request):
+        raise HTTPException(status_code)
+
+    app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/error", _error, methods=["GET"]),
+        ],
+    )
+
+    client = TestClient(app)
+    client.get("/error")
+
+    if expected_error:
+        assert len(events) == 1
+    else:
+        assert not events

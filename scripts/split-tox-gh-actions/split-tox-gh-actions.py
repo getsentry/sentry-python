@@ -14,6 +14,7 @@ If the parameter `--fail-on-changes` is set, the script will raise a RuntimeErro
 files have been changed by the scripts execution. This is used in CI to check if the yaml files
 represent the current tox.ini file. (And if not the CI run fails.)
 """
+
 import configparser
 import hashlib
 import sys
@@ -32,6 +33,10 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 FRAMEWORKS_NEEDING_POSTGRES = {
     "django",
     "asyncpg",
+}
+
+FRAMEWORKS_NEEDING_REDIS = {
+    "celery",
 }
 
 FRAMEWORKS_NEEDING_CLICKHOUSE = {
@@ -53,6 +58,13 @@ GROUPS = {
     "Common": [
         "common",
     ],
+    "AI": [
+        "anthropic",
+        "cohere",
+        "langchain",
+        "openai",
+        "huggingface_hub",
+    ],
     "AWS Lambda": [
         # this is separate from Cloud Computing because only this one test suite
         # needs to run with access to GitHub secrets
@@ -70,11 +82,14 @@ GROUPS = {
         "celery",
         "huey",
         "rq",
+        "spark",
     ],
     "Databases": [
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
+        "redis",
+        "redis_py_cluster_legacy",
         "sqlalchemy",
     ],
     "GraphQL": [
@@ -91,9 +106,9 @@ GROUPS = {
     ],
     "Web Frameworks 1": [
         "django",
-        "fastapi",
         "flask",
         "starlette",
+        "fastapi",
     ],
     "Web Frameworks 2": [
         "aiohttp",
@@ -102,8 +117,6 @@ GROUPS = {
         "falcon",
         "pyramid",
         "quart",
-        "redis",
-        "rediscluster",
         "sanic",
         "starlite",
         "tornado",
@@ -111,6 +124,7 @@ GROUPS = {
     "Miscellaneous": [
         "loguru",
         "opentelemetry",
+        "potel",
         "pure_eval",
         "trytond",
     ],
@@ -155,7 +169,8 @@ def main(fail_on_changes):
 
         if old_hash != new_hash:
             raise RuntimeError(
-                "The yaml configuration files have changed. This means that tox.ini has changed "
+                "The yaml configuration files have changed. This means that either `tox.ini` "
+                "or one of the constants in `split-tox-gh-actions.py` has changed "
                 "but the changes have not been propagated to the GitHub actions config files. "
                 "Please run `python scripts/split-tox-gh-actions/split-tox-gh-actions.py` "
                 "locally and commit the changes of the yaml configuration files to continue. "
@@ -235,7 +250,7 @@ def _normalize_py_versions(py_versions):
 def get_files_hash():
     """Calculate a hash of all the yaml configuration files"""
     hasher = hashlib.md5()
-    path_pattern = (OUT_DIR / "test-integration-*.yml").as_posix()
+    path_pattern = (OUT_DIR / "test-integrations-*.yml").as_posix()
     for file in glob(path_pattern):
         with open(file, "rb") as f:
             buf = f.read()
@@ -260,11 +275,6 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         if py_versions_latest[framework]:
             categories.add("latest")
             py_versions["latest"] |= set(py_versions_latest[framework])
-        if "2.7" in py_versions_pinned[framework]:
-            categories.add("py27")
-
-    py_versions["pinned"].discard("2.7")
-    py_versions["latest"].discard("2.7")
 
     context = {
         "group": group,
@@ -273,6 +283,7 @@ def render_template(group, frameworks, py_versions_pinned, py_versions_latest):
         "needs_aws_credentials": bool(set(frameworks) & FRAMEWORKS_NEEDING_AWS),
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
+        "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "needs_github_secrets": bool(
             set(frameworks) & FRAMEWORKS_NEEDING_GITHUB_SECRETS
         ),
