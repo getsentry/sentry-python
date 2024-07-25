@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import warnings
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -23,6 +24,7 @@ import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
     _DEFAULT_INTEGRATIONS,
+    _installed_integrations,
     _processed_integrations,
 )
 from sentry_sdk.profiler import teardown_profiler
@@ -181,6 +183,7 @@ def reset_integrations():
     except ValueError:
         pass
     _processed_integrations.clear()
+    _installed_integrations.clear()
 
 
 @pytest.fixture
@@ -559,6 +562,17 @@ def teardown_profiling():
     # Make sure that to shut down the profiler after the test
     teardown_profiler()
     teardown_continuous_profiler()
+
+
+@pytest.fixture()
+def suppress_deprecation_warnings():
+    """
+    Use this fixture to suppress deprecation warnings in a test.
+    Useful for testing deprecated SDK features.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        yield
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):

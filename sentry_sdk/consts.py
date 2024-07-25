@@ -514,6 +514,7 @@ class ClientConstructor:
         profiles_sampler=None,  # type: Optional[TracesSampler]
         profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
+        disabled_integrations=None,  # type: Optional[Sequence[Integration]]
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
@@ -562,4 +563,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.10.0"
+VERSION = "2.11.0"
