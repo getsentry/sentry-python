@@ -20,7 +20,8 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Generator, Union
+    from collections.abc import Generator
+    from typing import Any, Dict, Union
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
     from graphql.type import GraphQLSchema  # type: ignore
@@ -150,6 +151,7 @@ def graphql_span(schema, source, kwargs):
     _graphql_span.set_data("graphql.operation.name", operation_name)
     _graphql_span.set_data("graphql.operation.type", operation_type)
 
-    yield
-
-    _graphql_span.finish()
+    try:
+        yield
+    finally:
+         _graphql_span.finish()
