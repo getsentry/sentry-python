@@ -20,7 +20,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Union
+    from typing import Any, Dict, Generator, Union
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
     from graphql.type import GraphQLSchema  # type: ignore
@@ -118,6 +118,7 @@ def _event_processor(event, hint):
 
 @contextmanager
 def graphql_span(schema, source, kwargs):
+    # type: (GraphQLSchema, Union[str, Source], Dict[str, Any]) -> Generator[None, None, None]
     operation_name = kwargs.get("operation_name")
 
     operation_type = "query"
