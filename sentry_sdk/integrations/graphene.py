@@ -1,4 +1,7 @@
+from contextlib import contextmanager
+
 import sentry_sdk
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.utils import (
@@ -17,6 +20,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from typing import Any, Dict, Union
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult  # type: ignore
@@ -52,13 +56,15 @@ def _patch_graphql():
         scope = Scope.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 
-        result = old_graphql_sync(schema, source, *args, **kwargs)
+        with graphql_span(schema, source, kwargs):
+            result = old_graphql_sync(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
+            client = sentry_sdk.get_client()
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=sentry_sdk.get_client().options,
+                    client_options=client.options,
                     mechanism={
                         "type": GrapheneIntegration.identifier,
                         "handled": False,
@@ -70,19 +76,22 @@ def _patch_graphql():
 
     async def _sentry_patched_graphql_async(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
-        if sentry_sdk.get_client().get_integration(GrapheneIntegration) is None:
+        integration = sentry_sdk.get_client().get_integration(GrapheneIntegration)
+        if integration is None:
             return await old_graphql_async(schema, source, *args, **kwargs)
 
         scope = Scope.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 
-        result = await old_graphql_async(schema, source, *args, **kwargs)
+        with graphql_span(schema, source, kwargs):
+            result = await old_graphql_async(schema, source, *args, **kwargs)
 
         with capture_internal_exceptions():
+            client = sentry_sdk.get_client()
             for error in result.errors or []:
                 event, hint = event_from_exception(
                     error,
-                    client_options=sentry_sdk.get_client().options,
+                    client_options=client.options,
                     mechanism={
                         "type": GrapheneIntegration.identifier,
                         "handled": False,
@@ -106,3 +115,43 @@ def _event_processor(event, hint):
         del event["request"]["data"]
 
     return event
+
+
+@contextmanager
+def graphql_span(schema, source, kwargs):
+    # type: (GraphQLSchema, Union[str, Source], Dict[str, Any]) -> Generator[None, None, None]
+    operation_name = kwargs.get("operation_name")
+
+    operation_type = "query"
+    op = OP.GRAPHQL_QUERY
+    if source.strip().startswith("mutation"):
+        operation_type = "mutation"
+        op = OP.GRAPHQL_MUTATION
+    elif source.strip().startswith("subscription"):
+        operation_type = "subscription"
+        op = OP.GRAPHQL_SUBSCRIPTION
+
+    sentry_sdk.add_breadcrumb(
+        crumb={
+            "data": {
+                "operation_name": operation_name,
+                "operation_type": operation_type,
+            },
+            "category": "graphql.operation",
+        },
+    )
+
+    scope = Scope.get_current_scope()
+    if scope.span:
+        _graphql_span = scope.span.start_child(op=op, description=operation_name)
+    else:
+        _graphql_span = sentry_sdk.start_span(op=op, description=operation_name)
+
+    _graphql_span.set_data("graphql.document", source)
+    _graphql_span.set_data("graphql.operation.name", operation_name)
+    _graphql_span.set_data("graphql.operation.type", operation_type)
+
+    try:
+        yield
+    finally:
+        _graphql_span.finish()
