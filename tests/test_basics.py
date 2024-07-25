@@ -15,7 +15,6 @@ import sentry_sdk.scope
 from sentry_sdk import (
     get_client,
     push_scope,
-    configure_scope,
     capture_event,
     capture_exception,
     capture_message,
@@ -74,13 +73,11 @@ def test_processors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    with configure_scope() as scope:
+    def error_processor(event, exc_info):
+        event["exception"]["values"][0]["value"] += " whatever"
+        return event
 
-        def error_processor(event, exc_info):
-            event["exception"]["values"][0]["value"] += " whatever"
-            return event
-
-        scope.add_error_processor(error_processor, ValueError)
+    Scope.get_isolation_scope().add_error_processor(error_processor, ValueError)
 
     try:
         raise ValueError("aha!")
@@ -432,9 +429,9 @@ def test_attachments(sentry_init, capture_envelopes):
 
     this_file = os.path.abspath(__file__.rstrip("c"))
 
-    with configure_scope() as scope:
-        scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
-        scope.add_attachment(path=this_file)
+    scope = Scope.get_isolation_scope()
+    scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
+    scope.add_attachment(path=this_file)
 
     capture_exception(ValueError())
 
@@ -466,8 +463,7 @@ def test_attachments_graceful_failure(
     sentry_init()
     envelopes = capture_envelopes()
 
-    with configure_scope() as scope:
-        scope.add_attachment(path="non_existent")
+    Scope.get_isolation_scope().add_attachment(path="non_existent")
     capture_exception(ValueError())
 
     (envelope,) = envelopes
