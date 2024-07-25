@@ -686,14 +686,13 @@ def test_cyclic_data(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    with configure_scope() as scope:
-        data = {}
-        data["is_cyclic"] = data
+    data = {}
+    data["is_cyclic"] = data
 
-        other_data = ""
-        data["not_cyclic"] = other_data
-        data["not_cyclic2"] = other_data
-        scope.set_extra("foo", data)
+    other_data = ""
+    data["not_cyclic"] = other_data
+    data["not_cyclic2"] = other_data
+    sentry_sdk.Scope.get_isolation_scope().set_extra("foo", data)
 
     capture_message("hi")
     (event,) = events
