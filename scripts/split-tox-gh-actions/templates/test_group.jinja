@@ -56,6 +56,8 @@
       - uses: actions/setup-python@v5
         with:
           python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
+        env:
+          PIP_TRUSTED_HOST: "pypi.python.org pypi.org files.pythonhosted.org"
       {% endif %}
       {% if needs_clickhouse %}
       - uses: getsentry/action-clickhouse-in-ci@v1
