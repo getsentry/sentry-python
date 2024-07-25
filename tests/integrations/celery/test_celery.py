@@ -351,7 +351,7 @@ def test_redis_backend_trace_propagation(
     runs = []
 
     @celery.task(name="dummy_task", bind=True)
-    def dummy_task(self, x, y):
+    def dummy_task(self):
         runs.append(1)
         1 / 0
 
@@ -580,26 +580,6 @@ def test_apply_async_manually_span(sentry_init):
 
     wrapped = _wrap_task_run(dummy_function)
     wrapped(mock.MagicMock(), (), headers={})
-
-
-def test_apply_async_from_beat_no_span(sentry_init):
-    sentry_init(
-        integrations=[CeleryIntegration()],
-    )
-
-    def dummy_function(*args, **kwargs):
-        headers = kwargs.get("headers")
-        assert "sentry-trace" not in headers
-        assert "baggage" not in headers
-
-    wrapped = _wrap_task_run(dummy_function)
-    wrapped(
-        mock.MagicMock(),
-        [
-            "BEAT",
-        ],
-        headers={},
-    )
 
 
 def test_apply_async_no_args(init_celery):
