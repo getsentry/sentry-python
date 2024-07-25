@@ -900,7 +900,10 @@ class Scope(object):
         add_to_transactions=False,  # type: bool
     ):
         # type: (...) -> None
-        """Adds an attachment to future events sent."""
+        """Adds an attachment to future events sent from this scope.
+
+        The parameters are the same as for the :py:class:`sentry_sdk.attachments.Attachment` constructor.
+        """
         self._attachments.append(
             Attachment(
                 bytes=bytes,
