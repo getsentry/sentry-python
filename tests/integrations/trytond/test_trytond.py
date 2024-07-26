@@ -122,8 +122,14 @@ def test_rpc_error_page(sentry_init, app, capture_events, get_client):
     )
 
     (event,) = events
-    (content, status, headers) = response
-    data = json.loads(next(content))
+    if hasattr(response, "status"):
+        status = response.status
+        data = json.loads(response.get_data())
+        headers = response.headers
+    else:
+        (content, status, headers) = response
+        data = json.loads(next(content))
+
     assert status == "200 OK"
     assert headers.get("Content-Type") == "application/json"
     assert data == dict(id=42, error=["UserError", [event["event_id"], "foo", None]])
