@@ -785,3 +785,38 @@ def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
         assert span["origin"] == "auto.queue.celery"
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
+
+
+@pytest.fixture()
+def celery_config():
+    return {
+        'broker_url': 'redis://127.0.0.1:6379/0',
+        'result_backend': 'redis://127.0.0.1:6379/1',
+        'worker_redirect_stdouts_level': 'DEBUG',
+    }
+
+
+@pytest.fixture(scope='session')
+def celery_enable_logging():
+    return True
+
+
+@pytest.mark.forked
+def test_bla(
+    celery_app, celery_worker, capture_events_forksafe, sentry_init,
+):
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    events = capture_events_forksafe()
+
+    @celery_app.task(name="dummy_task")
+    def dummy_task(x, y):
+        # 1 / 0
+        print("@@@@@@@@@@@@@@@@@@@@@@ BIN DA @@@@@@@@@@@@@@@@@@@@@@")
+        return x+y
+
+    celery_worker.reload()
+
+    with start_transaction(name="submit_celery"):
+        res = celery_app.send_task("dummy_task", kwargs={"x": 1, "y": 2})
+
+    res.wait()
