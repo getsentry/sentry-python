@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.45.1
+
+**This is a security backport release.**
+
+- Don't send full env to subprocess (892dd800) by @kmichel-aiven
+
+  See also https://github.com/getsentry/sentry-python/security/advisories/GHSA-g92j-qhmh-64v2
+
 ## 1.45.0
 
 This is the final 1.x release for the forseeable future. Development will continue on the 2.x release line. The first 2.x version will be available in the next few weeks.
