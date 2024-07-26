@@ -22,6 +22,7 @@ from sentry_sdk import (
     last_event_id,
     add_breadcrumb,
     isolation_scope,
+    new_scope,
     Hub,
     Scope,
 )
@@ -606,14 +607,14 @@ def test_scope_event_processor_order(sentry_init, capture_events):
     sentry_init(debug=True, before_send=before_send)
     events = capture_events()
 
-    with push_scope() as scope:
+    with new_scope() as scope:
 
         @scope.add_event_processor
         def foo(event, hint):
             event["message"] += "foo"
             return event
 
-        with push_scope() as scope:
+        with new_scope() as scope:
 
             @scope.add_event_processor
             def bar(event, hint):
