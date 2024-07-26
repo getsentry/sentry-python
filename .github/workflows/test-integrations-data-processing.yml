@@ -18,64 +18,6 @@ env:
   CACHED_BUILD_PATHS: |
     ${{ github.workspace }}/dist-serverless
 jobs:
-  test-data_processing-latest:
-    name: Data Processing (latest)
-    timeout-minutes: 30
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.7","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
-        os: [ubuntu-20.04]
-    steps:
-      - uses: actions/checkout@v4.1.1
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-        env:
-          PIP_TRUSTED_HOST: "pypi.python.org pypi.org files.pythonhosted.org"
-      - name: Setup Test Env
-        run: |
-          pip install coverage "tox>=3,<4"
-      - name: Erase coverage
-        run: |
-          coverage erase
-      - name: Test arq latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-arq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test beam latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-beam-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test celery latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-celery-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test huey latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-huey-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test openai latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-openai-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Test rq latest
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-rq-latest" --cov=tests --cov=sentry_sdk --cov-report= --cov-branch
-      - name: Generate coverage XML
-        run: |
-          coverage combine .coverage*
-          coverage xml -i
-      - uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: coverage.xml
   test-data_processing-pinned:
     name: Data Processing (pinned)
     timeout-minutes: 30
