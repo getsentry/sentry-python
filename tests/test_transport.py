@@ -165,6 +165,18 @@ def test_transport_num_pools(make_client, num_pools, expected_num_pools):
     assert options["num_pools"] == expected_num_pools
 
 
+def test_two_way_ssl_authentication(make_client):
+    _experiments = {}
+
+    client = make_client(_experiments=_experiments)
+
+    options = client.transport._get_pool_options(
+        [], "/path/to/cert.pem", "/path/to/key.pem"
+    )
+    assert options["cert_file"] == "/path/to/cert.pem"
+    assert options["key_file"] == "/path/to/key.pem"
+
+
 def test_socket_options(make_client):
     socket_options = [
         (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1),

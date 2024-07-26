@@ -25,7 +25,6 @@ from sentry_sdk.transport import HttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
     VERSION,
     ClientConstructor,
 )
@@ -112,9 +111,6 @@ def _get_options(*args, **kwargs):
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
-
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     if rv["project_root"] is None:
         try:
@@ -357,7 +353,6 @@ class _Client(BaseClient):
                 logger.debug(
                     "[OTel] Enabling experimental OTel-powered performance monitoring."
                 )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
                 if (
                     "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
                     not in _DEFAULT_INTEGRATIONS

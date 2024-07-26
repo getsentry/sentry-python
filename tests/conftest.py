@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import warnings
 from threading import Thread
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -78,7 +79,8 @@ def internal_exceptions(request, monkeypatch):
     if "tests_internal_exceptions" in request.keywords:
         return
 
-    def _capture_internal_exception(self, exc_info):
+    @staticmethod
+    def _capture_internal_exception(exc_info):
         errors.append(exc_info)
 
     @request.addfinalizer
@@ -89,7 +91,7 @@ def internal_exceptions(request, monkeypatch):
             reraise(*e)
 
     monkeypatch.setattr(
-        sentry_sdk.Hub, "_capture_internal_exception", _capture_internal_exception
+        sentry_sdk.Scope, "_capture_internal_exception", _capture_internal_exception
     )
 
     return errors
@@ -185,10 +187,9 @@ def reset_integrations():
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
-        hub = sentry_sdk.Hub.current
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
-        hub.bind_client(client)
+        sentry_sdk.Scope.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -196,8 +197,12 @@ def sentry_init(request):
         # fork)
         yield inner
     else:
-        with sentry_sdk.Hub(None):
+        old_client = sentry_sdk.Scope.get_global_scope().client
+        try:
+            sentry_sdk.Scope.get_current_scope().set_client(None)
             yield inner
+        finally:
+            sentry_sdk.Scope.get_global_scope().set_client(old_client)
 
 
 class TestTransport(Transport):
@@ -213,7 +218,7 @@ class TestTransport(Transport):
 def capture_events(monkeypatch):
     def inner():
         events = []
-        test_client = sentry_sdk.Hub.current.client
+        test_client = sentry_sdk.get_client()
         old_capture_envelope = test_client.transport.capture_envelope
 
         def append_event(envelope):
@@ -233,7 +238,7 @@ def capture_events(monkeypatch):
 def capture_envelopes(monkeypatch):
     def inner():
         envelopes = []
-        test_client = sentry_sdk.Hub.current.client
+        test_client = sentry_sdk.get_client()
         old_capture_envelope = test_client.transport.capture_envelope
 
         def append_envelope(envelope):
@@ -273,7 +278,7 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         events_r = os.fdopen(events_r, "rb", 0)
         events_w = os.fdopen(events_w, "wb", 0)
 
-        test_client = sentry_sdk.Hub.current.client
+        test_client = sentry_sdk.get_client()
 
         old_capture_envelope = test_client.transport.capture_envelope
 
@@ -555,6 +560,17 @@ def teardown_profiling():
     # Make sure that to shut down the profiler after the test
     teardown_profiler()
     teardown_continuous_profiler()
+
+
+@pytest.fixture()
+def suppress_deprecation_warnings():
+    """
+    Use this fixture to suppress deprecation warnings in a test.
+    Useful for testing deprecated SDK features.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        yield
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):

@@ -54,6 +54,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Setup Test Env
         run: |
           pip install coverage tox
@@ -92,6 +93,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   test-web_frameworks_1-pinned:
     name: Web Frameworks 1 (pinned)
     timeout-minutes: 30
@@ -128,6 +130,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       - name: Setup Test Env
         run: |
           pip install coverage tox
@@ -166,6 +169,7 @@ jobs:
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: .junitxml
   check_required_tests:
     name: All Web Frameworks 1 tests passed
     needs: test-web_frameworks_1-pinned

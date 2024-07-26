@@ -1,3 +1,5 @@
+import itertools
+
 from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -81,11 +83,6 @@ FALSE_VALUES = [
     "n",
     "0",
 ]
-
-
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
 
 
 class SPANDATA:
@@ -479,6 +476,7 @@ class ClientConstructor:
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
+        *,
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
@@ -515,7 +513,6 @@ class ClientConstructor:
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
         proxy_headers=None,  # type: Optional[Dict[str, str]]
-        instrumenter=INSTRUMENTER.SENTRY,  # type: Optional[str]
         before_send_transaction=None,  # type: Optional[TransactionProcessor]
         project_root=None,  # type: Optional[str]
         enable_tracing=None,  # type: Optional[bool]
@@ -532,27 +529,31 @@ class ClientConstructor:
         enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
+        cert_file=None,  # type: Optional[str]
+        key_file=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
 
 
 def _get_default_options():
-    # type: () -> Dict[str, Any]
+    # type: () -> dict[str, Any]
     import inspect
 
-    if hasattr(inspect, "getfullargspec"):
-        getargspec = inspect.getfullargspec
-    else:
-        getargspec = inspect.getargspec  # type: ignore
-
-    a = getargspec(ClientConstructor.__init__)
+    a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
-    return dict(zip(a.args[-len(defaults) :], defaults))
+    kwonlydefaults = a.kwonlydefaults or {}
+
+    return dict(
+        itertools.chain(
+            zip(a.args[-len(defaults) :], defaults),
+            kwonlydefaults.items(),
+        )
+    )
 
 
 DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.8.0"
+VERSION = "2.10.0"

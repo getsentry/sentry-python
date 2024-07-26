@@ -412,7 +412,7 @@ def test_transaction_not_started_warning(sentry_init):
         with tx:
             pass
 
-    mock_logger.warning.assert_any_call(
+    mock_logger.debug.assert_any_call(
         "Transaction was entered without being started with sentry_sdk.start_transaction."
         "The transaction will not be sent to Sentry. To fix, start the transaction by"
         "passing it to sentry_sdk.start_transaction."

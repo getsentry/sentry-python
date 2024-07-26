@@ -14,7 +14,6 @@ from opentelemetry.trace.span import (
     INVALID_TRACE_ID,
 )
 from sentry_sdk import get_client, start_transaction
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -40,11 +39,6 @@ SPAN_MAX_TIME_OPEN_MINUTES = 10
 
 def link_trace_context_to_error_event(event, otel_span_map):
     # type: (Event, dict[str, Union[Transaction, SentrySpan]]) -> Event
-    client = get_client()
-
-    if client.options["instrumenter"] != INSTRUMENTER.OTEL:
-        return event
-
     if hasattr(event, "type") and event["type"] == "transaction":
         return event
 
@@ -117,9 +111,6 @@ class SentrySpanProcessor(SpanProcessor):
         if not client.dsn:
             return
 
-        if client.options["instrumenter"] != INSTRUMENTER.OTEL:
-            return
-
         if not otel_span.get_span_context().is_valid:
             return
 
@@ -145,7 +136,6 @@ class SentrySpanProcessor(SpanProcessor):
                 span_id=trace_data["span_id"],
                 description=otel_span.name,
                 start_timestamp=start_timestamp,
-                instrumenter=INSTRUMENTER.OTEL,
                 origin=SPAN_ORIGIN,
             )
         else:
@@ -156,7 +146,6 @@ class SentrySpanProcessor(SpanProcessor):
                 trace_id=trace_data["trace_id"],
                 baggage=trace_data["baggage"],
                 start_timestamp=start_timestamp,
-                instrumenter=INSTRUMENTER.OTEL,
                 origin=SPAN_ORIGIN,
             )
 
@@ -174,11 +163,6 @@ class SentrySpanProcessor(SpanProcessor):
 
     def on_end(self, otel_span):
         # type: (OTelSpan) -> None
-        client = get_client()
-
-        if client.options["instrumenter"] != INSTRUMENTER.OTEL:
-            return
-
         span_context = otel_span.get_span_context()
         if not span_context.is_valid:
             return

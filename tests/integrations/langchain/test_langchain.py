@@ -46,6 +46,15 @@ class MockOpenAI(ChatOpenAI):
         return llm_type
 
 
+def tiktoken_encoding_if_installed():
+    try:
+        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+        return "cl100k_base"
+    except ImportError:
+        return None
+
+
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts, use_unknown_llm_type",
     [
@@ -62,7 +71,12 @@ def test_langchain_agent(
     llm_type = "acme-llm" if use_unknown_llm_type else "openai-chat"
 
     sentry_init(
-        integrations=[LangchainIntegration(include_prompts=include_prompts)],
+        integrations=[
+            LangchainIntegration(
+                include_prompts=include_prompts,
+                tiktoken_encoding_name=tiktoken_encoding_if_installed(),
+            )
+        ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )

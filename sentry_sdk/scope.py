@@ -9,7 +9,7 @@ from functools import wraps
 from itertools import chain
 
 from sentry_sdk.attachments import Attachment
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES, INSTRUMENTER
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, FALSE_VALUES
 from sentry_sdk.profiler.continuous_profiler import try_autostart_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
@@ -956,13 +956,9 @@ class Scope(object):
             self._breadcrumbs.popleft()
 
     def start_transaction(
-        self,
-        transaction=None,
-        instrumenter=INSTRUMENTER.SENTRY,
-        custom_sampling_context=None,
-        **kwargs
+        self, transaction=None, custom_sampling_context=None, **kwargs
     ):
-        # type: (Optional[Transaction], str, Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
+        # type: (Optional[Transaction], Optional[SamplingContext], Unpack[TransactionKwargs]) -> Union[Transaction, NoOpSpan]
         """
         Start and return a transaction.
 
@@ -987,7 +983,6 @@ class Scope(object):
 
         :param transaction: The transaction to start. If omitted, we create and
             start a new transaction.
-        :param instrumenter: This parameter is meant for internal use only.
         :param custom_sampling_context: The transaction's custom sampling context.
         :param kwargs: Optional keyword arguments to be passed to the Transaction
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
@@ -996,11 +991,6 @@ class Scope(object):
         kwargs.setdefault("scope", self)
 
         client = Scope.get_client()
-
-        configuration_instrumenter = client.options["instrumenter"]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
 
         try_autostart_continuous_profiler()
 
@@ -1031,16 +1021,15 @@ class Scope(object):
 
             transaction._profile = profile
 
-        # we don't bother to keep spans if we already know we're not going to
-        # send the transaction
-        if transaction.sampled:
+            # we don't bother to keep spans if we already know we're not going to
+            # send the transaction
             max_spans = (client.options["_experiments"].get("max_spans")) or 1000
             transaction.init_span_recorder(maxlen=max_spans)
 
         return transaction
 
-    def start_span(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, Any) -> Span
+    def start_span(self, **kwargs):
+        # type: (Any) -> Span
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -1055,16 +1044,13 @@ class Scope(object):
         one is not already in progress.
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
+
+        The instrumenter parameter is deprecated for user code, and it will
+        be removed in the next major version. Going forward, it should only
+        be used by the SDK itself.
         """
         with new_scope():
             kwargs.setdefault("scope", self)
-
-            client = Scope.get_client()
-
-            configuration_instrumenter = client.options["instrumenter"]
-
-            if instrumenter != configuration_instrumenter:
-                return NoOpSpan()
 
             # get current span or transaction
             span = self.span or Scope.get_isolation_scope().span
@@ -1190,10 +1176,9 @@ class Scope(object):
 
         return None
 
-    def _capture_internal_exception(
-        self, exc_info  # type: Any
-    ):
-        # type: (...) -> Any
+    @staticmethod
+    def _capture_internal_exception(exc_info):
+        # type: (ExcInfo) -> None
         """
         Capture an exception that is likely caused by a bug in the SDK
         itself.
@@ -1300,6 +1285,7 @@ class Scope(object):
         event.setdefault("breadcrumbs", {}).setdefault("values", []).extend(
             self._breadcrumbs
         )
+        event["breadcrumbs"]["values"].sort(key=lambda crumb: crumb["timestamp"])
 
     def _apply_user_to_event(self, event, hint, options):
         # type: (Event, Hint, Optional[Dict[str, Any]]) -> None
