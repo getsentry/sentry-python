@@ -19,7 +19,6 @@ try:
     from litestar.middleware import DefineMiddleware  # type: ignore
     from litestar.routes.http import HTTPRoute  # type: ignore
     from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
-    from pydantic import BaseModel  # type: ignore
 
     if TYPE_CHECKING:
         from typing import Any, Dict, List, Optional, Union
@@ -251,8 +250,6 @@ def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[Dict[str, Any]
         return None
     if isinstance(scope_user, dict):
         return scope_user
-    if isinstance(scope_user, BaseModel):
-        return scope_user.dict()
     if hasattr(scope_user, "asdict"):  # dataclasses
         return scope_user.asdict()
 
