@@ -6,7 +6,7 @@ removed at any time without prior notice.
 
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
-from sentry_sdk.integrations.opentelemetry.potel_span_processor import SentrySpanProcessor
+from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
 from sentry_sdk.utils import logger
 from sentry_sdk._types import TYPE_CHECKING
 
