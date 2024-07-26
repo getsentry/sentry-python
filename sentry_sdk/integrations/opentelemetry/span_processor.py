@@ -14,7 +14,6 @@ from opentelemetry.trace.span import (
     INVALID_TRACE_ID,
 )
 from sentry_sdk import get_client, start_transaction
-from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
@@ -175,8 +174,6 @@ class SentrySpanProcessor(SpanProcessor):
 
         sentry_span.op = otel_span.name
 
-        self._update_span_with_otel_status(sentry_span, otel_span)
-
         if isinstance(sentry_span, Transaction):
             sentry_span.name = otel_span.name
             sentry_span.set_context(
@@ -249,20 +246,6 @@ class SentrySpanProcessor(SpanProcessor):
 
         return trace_data
 
-    def _update_span_with_otel_status(self, sentry_span, otel_span):
-        # type: (SentrySpan, OTelSpan) -> None
-        """
-        Set the Sentry span status from the OTel span
-        """
-        if otel_span.status.is_unset:
-            return
-
-        if otel_span.status.is_ok:
-            sentry_span.set_status(SPANSTATUS.OK)
-            return
-
-        sentry_span.set_status(SPANSTATUS.INTERNAL_ERROR)
-
     def _update_span_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
         """
@@ -275,15 +258,21 @@ class SentrySpanProcessor(SpanProcessor):
             for key, val in otel_span.attributes.items():
                 sentry_span.set_data(key, val)
 
-        (op, description, status_code) = extract_span_data(otel_span)
+        (op, description, status, http_status) = extract_span_data(otel_span)
         sentry_span.op = op
         sentry_span.description = description
-        if status_code:
-            sentry_span.set_http_status(status_code)
+
+        if http_status:
+            sentry_span.set_http_status(http_status)
+        elif status:
+            sentry_span.set_status(status)
 
     def _update_transaction_with_otel_data(self, sentry_span, otel_span):
         # type: (SentrySpan, OTelSpan) -> None
-        (op, _, status_code) = extract_span_data(otel_span)
+        (op, _, status, http_status) = extract_span_data(otel_span)
         sentry_span.op = op
-        if status_code:
-            sentry_span.set_http_status(status_code)
+
+        if http_status:
+            sentry_span.set_http_status(http_status)
+        elif status:
+            sentry_span.set_status(status)

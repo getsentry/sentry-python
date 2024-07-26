@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from unittest import mock
 from unittest.mock import MagicMock
 
-import pytest
 from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
 
 from sentry_sdk.integrations.opentelemetry.span_processor import (
@@ -200,7 +199,7 @@ def test_update_span_with_otel_data_http_method():
     span_processor._update_span_with_otel_data(sentry_span, otel_span)
 
     assert sentry_span.op == "http.client"
-    assert sentry_span.description == "GET example.com /"
+    assert sentry_span.description == "GET /"
     assert sentry_span.status == "resource_exhausted"
 
     assert sentry_span._data["http.method"] == "GET"
@@ -209,28 +208,6 @@ def test_update_span_with_otel_data_http_method():
     assert sentry_span._data["http.user_agent"] == "curl/7.64.1"
     assert sentry_span._data["net.peer.name"] == "example.com"
     assert sentry_span._data["http.target"] == "/"
-
-
-@pytest.mark.parametrize(
-    "otel_status, expected_status",
-    [
-        pytest.param(Status(StatusCode.UNSET), None, id="unset"),
-        pytest.param(Status(StatusCode.OK), "ok", id="ok"),
-        pytest.param(Status(StatusCode.ERROR), "internal_error", id="error"),
-    ],
-)
-def test_update_span_with_otel_status(otel_status, expected_status):
-    sentry_span = Span()
-
-    otel_span = MagicMock()
-    otel_span.name = "Test OTel Span"
-    otel_span.kind = SpanKind.INTERNAL
-    otel_span.status = otel_status
-
-    span_processor = SentrySpanProcessor()
-    span_processor._update_span_with_otel_status(sentry_span, otel_span)
-
-    assert sentry_span.get_trace_context().get("status") == expected_status
 
 
 def test_update_span_with_otel_data_http_method2():
@@ -419,13 +396,14 @@ def test_on_end_sentry_transaction():
     span_processor = SentrySpanProcessor()
     span_processor._get_otel_context = MagicMock()
     span_processor._update_span_with_otel_data = MagicMock()
+    span_processor._update_transaction_with_otel_data = MagicMock()
     span_processor.otel_span_map["1234567890abcdef"] = fake_sentry_span
 
     span_processor.on_end(otel_span)
 
     fake_sentry_span.set_context.assert_called_once()
     span_processor._update_span_with_otel_data.assert_not_called()
-    fake_sentry_span.set_status.assert_called_once_with("ok")
+    span_processor._update_transaction_with_otel_data.assert_called_once()
     fake_sentry_span.finish.assert_called_once()
 
 
@@ -462,7 +440,6 @@ def test_on_end_sentry_span():
     span_processor._update_span_with_otel_data.assert_called_once_with(
         fake_sentry_span, otel_span
     )
-    fake_sentry_span.set_status.assert_called_once_with("ok")
     fake_sentry_span.finish.assert_called_once()
 
 
