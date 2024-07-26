@@ -4,6 +4,7 @@ import threading
 import pytest
 import pytest_asyncio
 
+import sentry_sdk
 from sentry_sdk import (
     set_tag,
     capture_message,
@@ -11,7 +12,6 @@ from sentry_sdk import (
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 import sentry_sdk.integrations.quart as quart_sentry
-from sentry_sdk.scope import Scope
 
 from quart import Quart, Response, abort, stream_with_context
 from quart.views import View
@@ -378,15 +378,15 @@ async def test_does_not_leak_scope(sentry_init, capture_events, app):
     sentry_init(integrations=[quart_sentry.QuartIntegration()])
     events = capture_events()
 
-    Scope.get_isolation_scope().set_tag("request_data", False)
+    sentry_sdk.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     async def index():
-        Scope.get_isolation_scope().set_tag("request_data", True)
+        sentry_sdk.get_isolation_scope().set_tag("request_data", True)
 
         async def generate():
             for row in range(1000):
-                assert Scope.get_isolation_scope()._tags["request_data"]
+                assert sentry_sdk.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -398,7 +398,7 @@ async def test_does_not_leak_scope(sentry_init, capture_events, app):
         str(row) + "\n" for row in range(1000)
     )
     assert not events
-    assert not Scope.get_isolation_scope()._tags["request_data"]
+    assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
 
 
 @pytest.mark.asyncio

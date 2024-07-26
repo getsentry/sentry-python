@@ -599,7 +599,7 @@ def test_configure_scope_available(
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
 
-    sentry_sdk.Scope.get_isolation_scope()._capture_internal_exception(
+    sentry_sdk.get_isolation_scope()._capture_internal_exception(
         (ValueError, ValueError("OK"), None)
     )
     assert "OK" in caplog.text
@@ -611,7 +611,7 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     if with_client:
         sentry_init()
 
-    sentry_sdk.Scope.get_isolation_scope()._capture_internal_exception(
+    sentry_sdk.get_isolation_scope()._capture_internal_exception(
         (ValueError, ValueError("OK"), None)
     )
     assert "OK" not in caplog.text
@@ -694,7 +694,7 @@ def test_cyclic_data(sentry_init, capture_events):
     other_data = ""
     data["not_cyclic"] = other_data
     data["not_cyclic2"] = other_data
-    sentry_sdk.Scope.get_isolation_scope().set_extra("foo", data)
+    sentry_sdk.get_isolation_scope().set_extra("foo", data)
 
     capture_message("hi")
     (event,) = events
@@ -1065,7 +1065,7 @@ def test_debug_option(
     else:
         sentry_init(debug=client_option)
 
-    sentry_sdk.Scope.get_isolation_scope()._capture_internal_exception(
+    sentry_sdk.get_isolation_scope()._capture_internal_exception(
         (ValueError, ValueError("something is wrong"), None)
     )
     if debug_output_expected:

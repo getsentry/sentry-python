@@ -191,7 +191,7 @@ def sentry_init(request):
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
-        sentry_sdk.Scope.get_global_scope().set_client(client)
+        sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -199,12 +199,12 @@ def sentry_init(request):
         # fork)
         yield inner
     else:
-        old_client = sentry_sdk.Scope.get_global_scope().client
+        old_client = sentry_sdk.get_global_scope().client
         try:
-            sentry_sdk.Scope.get_current_scope().set_client(None)
+            sentry_sdk.get_current_scope().set_client(None)
             yield inner
         finally:
-            sentry_sdk.Scope.get_global_scope().set_client(old_client)
+            sentry_sdk.get_global_scope().set_client(old_client)
 
 
 class TestTransport(Transport):

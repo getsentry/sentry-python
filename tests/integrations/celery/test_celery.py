@@ -6,7 +6,8 @@ import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
 
-from sentry_sdk import Scope, start_transaction, get_current_span
+import sentry_sdk
+from sentry_sdk import start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_apply_async,
@@ -154,7 +155,7 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
         foo = 42  # noqa
         return x / y
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
 
     celery_invocation(dummy_task, 1, 2)
     _, expected_context = celery_invocation(dummy_task, 1, 0)
@@ -256,14 +257,14 @@ def test_no_stackoverflows(celery):
 
     @celery.task(name="dummy_task")
     def dummy_task():
-        Scope.get_isolation_scope().set_tag("foo", "bar")
+        sentry_sdk.get_isolation_scope().set_tag("foo", "bar")
         results.append(42)
 
     for _ in range(10000):
         dummy_task.delay()
 
     assert results == [42] * 10000
-    assert not Scope.get_isolation_scope()._tags
+    assert not sentry_sdk.get_isolation_scope()._tags
 
 
 def test_simple_no_propagation(capture_events, init_celery):

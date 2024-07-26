@@ -4,9 +4,9 @@ import re
 import pytest
 import random
 
+import sentry_sdk
 from sentry_sdk import (
     capture_message,
-    Scope,
     start_span,
     start_transaction,
 )
@@ -66,7 +66,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
         with start_span() as old_span:
             old_span.sampled = sampled
             headers = dict(
-                Scope.get_current_scope().iter_trace_propagation_headers(old_span)
+                sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
             )
             headers["baggage"] = (
                 "other-vendor-value-1=foo;bar;baz, "
@@ -101,7 +101,7 @@ def test_continue_from_headers(sentry_init, capture_envelopes, sampled, sample_r
     with start_transaction(child_transaction):
         # change the transaction name from "WRONG" to make sure the change
         # is reflected in the final data
-        Scope.get_current_scope().transaction = "ho"
+        sentry_sdk.get_current_scope().transaction = "ho"
         capture_message("hello")
 
     # in this case the child transaction won't be captured
@@ -271,7 +271,7 @@ def test_trace_propagation_meta_head_sdk(sentry_init):
     with start_transaction(transaction):
         with start_span(op="foo", description="foodesc") as current_span:
             span = current_span
-            meta = Scope.get_current_scope().trace_propagation_meta()
+            meta = sentry_sdk.get_current_scope().trace_propagation_meta()
 
     ind = meta.find(">") + 1
     sentry_trace, baggage = meta[:ind], meta[ind:]

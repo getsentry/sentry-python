@@ -497,7 +497,7 @@ class Scope(object):
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the
         currently active span or the scopes Propagation Context.
         """
-        client = Scope.get_client()
+        client = self.get_client()
 
         # If we have an active span, return traceparent from there
         if has_tracing_enabled(client.options) and self.span is not None:
@@ -512,7 +512,7 @@ class Scope(object):
             return traceparent
 
         # Fall back to isolation scope's traceparent. It always has one
-        return Scope.get_isolation_scope().get_traceparent()
+        return self.get_isolation_scope().get_traceparent()
 
     def get_baggage(self, *args, **kwargs):
         # type: (Any, Any) -> Optional[Baggage]
@@ -520,7 +520,7 @@ class Scope(object):
         Returns the Sentry "baggage" header containing trace information from the
         currently active span or the scopes Propagation Context.
         """
-        client = Scope.get_client()
+        client = self.get_client()
 
         # If we have an active span, return baggage from there
         if has_tracing_enabled(client.options) and self.span is not None:
@@ -537,7 +537,7 @@ class Scope(object):
                 return Baggage(dynamic_sampling_context)
 
         # Fall back to isolation scope's baggage. It always has one
-        return Scope.get_isolation_scope().get_baggage()
+        return self.get_isolation_scope().get_baggage()
 
     def get_trace_context(self):
         # type: () -> Any
@@ -609,7 +609,7 @@ class Scope(object):
         If a span is given, the trace data will taken from the span.
         If no span is given, the trace data is taken from the scope.
         """
-        client = Scope.get_client()
+        client = self.get_client()
         if not client.options.get("propagate_traces"):
             return
 
@@ -627,13 +627,13 @@ class Scope(object):
                     yield header
             else:
                 # otherwise try headers from current scope
-                current_scope = Scope.get_current_scope()
+                current_scope = self.get_current_scope()
                 if current_scope._propagation_context is not None:
                     for header in current_scope.iter_headers():
                         yield header
                 else:
                     # otherwise fall back to headers from isolation scope
-                    isolation_scope = Scope.get_isolation_scope()
+                    isolation_scope = self.get_isolation_scope()
                     if isolation_scope._propagation_context is not None:
                         for header in isolation_scope.iter_headers():
                             yield header
@@ -643,11 +643,11 @@ class Scope(object):
         if self._propagation_context is not None:
             return self._propagation_context
 
-        current_scope = Scope.get_current_scope()
+        current_scope = self.get_current_scope()
         if current_scope._propagation_context is not None:
             return current_scope._propagation_context
 
-        isolation_scope = Scope.get_isolation_scope()
+        isolation_scope = self.get_isolation_scope()
         if isolation_scope._propagation_context is not None:
             return isolation_scope._propagation_context
 
@@ -779,7 +779,7 @@ class Scope(object):
         # type: (Optional[Dict[str, Any]]) -> None
         """Sets a user for the scope."""
         self._user = value
-        session = Scope.get_isolation_scope()._session
+        session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
 
@@ -924,7 +924,7 @@ class Scope(object):
         :param hint: An optional value that can be used by `before_breadcrumb`
             to customize the breadcrumbs that are emitted.
         """
-        client = Scope.get_client()
+        client = self.get_client()
 
         if not client.is_active():
             logger.info("Dropped breadcrumb because no client bound")
@@ -999,7 +999,7 @@ class Scope(object):
         """
         kwargs.setdefault("scope", self)
 
-        client = Scope.get_client()
+        client = self.get_client()
 
         configuration_instrumenter = client.options["instrumenter"]
 
@@ -1066,7 +1066,7 @@ class Scope(object):
         with new_scope():
             kwargs.setdefault("scope", self)
 
-            client = Scope.get_client()
+            client = self.get_client()
 
             configuration_instrumenter = client.options["instrumenter"]
 
@@ -1074,7 +1074,7 @@ class Scope(object):
                 return NoOpSpan()
 
             # get current span or transaction
-            span = self.span or Scope.get_isolation_scope().span
+            span = self.span or self.get_isolation_scope().span
 
             if span is None:
                 # New spans get the `trace_id` from the scope
@@ -1131,7 +1131,7 @@ class Scope(object):
         """
         scope = self._merge_scopes(scope, scope_kwargs)
 
-        event_id = Scope.get_client().capture_event(event=event, hint=hint, scope=scope)
+        event_id = self.get_client().capture_event(event=event, hint=hint, scope=scope)
 
         if event_id is not None and event.get("type") != "transaction":
             self.get_isolation_scope()._last_event_id = event_id
@@ -1187,7 +1187,7 @@ class Scope(object):
             exc_info = sys.exc_info()
 
         event, hint = event_from_exception(
-            exc_info, client_options=Scope.get_client().options
+            exc_info, client_options=self.get_client().options
         )
 
         try:
@@ -1215,7 +1215,7 @@ class Scope(object):
 
         self.end_session()
 
-        client = Scope.get_client()
+        client = self.get_client()
         self._session = Session(
             release=client.options.get("release"),
             environment=client.options.get("environment"),
@@ -1231,7 +1231,7 @@ class Scope(object):
 
         if session is not None:
             session.close()
-            Scope.get_client().capture_session(session)
+            self.get_client().capture_session(session)
 
     def stop_auto_session_tracking(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
@@ -1365,9 +1365,9 @@ class Scope(object):
         exc_info = hint.get("exc_info")
         if exc_info is not None:
             error_processors = chain(
-                Scope.get_global_scope()._error_processors,
-                Scope.get_isolation_scope()._error_processors,
-                Scope.get_current_scope()._error_processors,
+                self.get_global_scope()._error_processors,
+                self.get_isolation_scope()._error_processors,
+                self.get_current_scope()._error_processors,
             )
 
             for error_processor in error_processors:

@@ -42,7 +42,7 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 
   # later in the code execution:
 
-  scope = sentry_sdk.Scope.get_current_scope()
+  scope = sentry_sdk.get_current_scope()
   scope.set_transaction_name("new-transaction-name")
   ```
 
@@ -132,18 +132,18 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_current_scope
 
-  scope = Scope.get_current_scope()
+  scope = get_current_scope()
   # do something with `scope`
   ```
 
   Or:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_isolation_scope
 
-  scope = Scope.get_isolation_scope()
+  scope = get_isolation_scope()
   # do something with `scope`
   ```
 
