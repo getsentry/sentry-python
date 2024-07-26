@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.45.1
+
+### Various fixes & improvements
+
+- Fix tests (#3341) by @sentrivana
+- Run integrations tests on 1.x (dfcab269) by @sentrivana
+- Run CI on 1.x branch (2812640f) by @sentrivana
+- fix(integrations): don't send full env to subprocess (892dd800) by @kmichel-aiven
+
 ## 1.45.0
 
 This is the final 1.x release for the forseeable future. Development will continue on the 2.x release line. The first 2.x version will be available in the next few weeks.
