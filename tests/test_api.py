@@ -12,6 +12,7 @@ from sentry_sdk import (
     start_transaction,
     set_tags,
     configure_scope,
+    push_scope,
 )
 
 from sentry_sdk.client import Client, NonRecordingClient
@@ -185,4 +186,10 @@ def test_set_tags(sentry_init, capture_events):
 def test_configure_scope_deprecation():
     with pytest.warns(DeprecationWarning):
         with configure_scope():
+            ...
+
+
+def test_push_scope_deprecation():
+    with pytest.warns(DeprecationWarning):
+        with push_scope():
             ...
