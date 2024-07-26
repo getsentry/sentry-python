@@ -2,12 +2,11 @@
 
 ## 1.45.1
 
-### Various fixes & improvements
+**This is a security backport release.**
 
-- Fix tests (#3341) by @sentrivana
-- Run integrations tests on 1.x (dfcab269) by @sentrivana
-- Run CI on 1.x branch (2812640f) by @sentrivana
-- fix(integrations): don't send full env to subprocess (892dd800) by @kmichel-aiven
+- Don't send full env to subprocess (892dd800) by @kmichel-aiven
+
+  See also https://github.com/getsentry/sentry-python/security/advisories/GHSA-g92j-qhmh-64v2
 
 ## 1.45.0
 
