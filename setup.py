@@ -81,7 +81,7 @@ setup(
             "opentelemetry-instrumentation-aws-lambda==0.46b0",
             "opentelemetry-instrumentation-boto==0.46b0",
             "opentelemetry-instrumentation-boto3sqs==0.46b0",
-            "opentelemetry-instrumentation-botocore==0.46b0",
+            "opentelemetry-instrumentation-botocore==0.47b0",
             "opentelemetry-instrumentation-cassandra==0.46b0",
             "opentelemetry-instrumentation-celery==0.46b0",
             "opentelemetry-instrumentation-confluent-kafka==0.46b0",
