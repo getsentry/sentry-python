@@ -21,6 +21,7 @@ from sentry_sdk import (
     capture_event,
     set_tag,
 )
+from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -350,29 +351,24 @@ def test_simple_transport(sentry_init):
 
 
 def test_ignore_errors(sentry_init, capture_events):
-    with mock.patch(
-        "sentry_sdk.scope.Scope._capture_internal_exception"
-    ) as mock_capture_internal_exception:
+    sentry_init(ignore_errors=[ZeroDivisionError])
+    events = capture_events()
 
-        class MyDivisionError(ZeroDivisionError):
-            pass
+    class MyDivisionError(ZeroDivisionError):
+        pass
 
-        sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
+    def e(exc):
+        try:
+            raise exc
+        except Exception:
+            capture_exception()
 
-        def e(exc):
-            try:
-                raise exc
-            except Exception:
-                capture_exception()
+    e(ZeroDivisionError())
+    e(MyDivisionError())
+    e(ValueError())
 
-        e(ZeroDivisionError())
-        e(MyDivisionError())
-        e(ValueError())
-
-        assert mock_capture_internal_exception.call_count == 1
-        assert (
-            mock_capture_internal_exception.call_args[0][0][0] == EnvelopeCapturedError
-        )
+    assert len(events) == 1
+    assert events[0]["exception"]["values"][0]["type"] == "ValueError"
 
 
 def test_include_local_variables_enabled(sentry_init, capture_events):
@@ -599,9 +595,7 @@ def test_configure_scope_available(
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
 
-    sentry_sdk.get_isolation_scope()._capture_internal_exception(
-        (ValueError, ValueError("OK"), None)
-    )
+    capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" in caplog.text
 
 
@@ -611,9 +605,7 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     if with_client:
         sentry_init()
 
-    sentry_sdk.get_isolation_scope()._capture_internal_exception(
-        (ValueError, ValueError("OK"), None)
-    )
+    capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" not in caplog.text
 
 
@@ -1065,9 +1057,7 @@ def test_debug_option(
     else:
         sentry_init(debug=client_option)
 
-    sentry_sdk.get_isolation_scope()._capture_internal_exception(
-        (ValueError, ValueError("something is wrong"), None)
-    )
+    capture_internal_exception((ValueError, ValueError("something is wrong"), None))
     if debug_output_expected:
         assert "something is wrong" in caplog.text
     else:

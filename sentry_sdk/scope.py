@@ -28,6 +28,7 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.utils import (
+    capture_internal_exception,
     capture_internal_exceptions,
     ContextVar,
     event_from_exception,
@@ -1193,20 +1194,9 @@ class Scope(object):
         try:
             return self.capture_event(event, hint=hint, scope=scope, **scope_kwargs)
         except Exception:
-            self._capture_internal_exception(sys.exc_info())
+            capture_internal_exception(sys.exc_info())
 
         return None
-
-    @staticmethod
-    def _capture_internal_exception(exc_info):
-        # type: (ExcInfo) -> None
-        """
-        Capture an exception that is likely caused by a bug in the SDK
-        itself.
-
-        These exceptions do not end up in Sentry and are just logged instead.
-        """
-        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
     def start_session(self, *args, **kwargs):
         # type: (*Any, **Any) -> None

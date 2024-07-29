@@ -21,6 +21,7 @@ except ImportError:
     eventlet = None
 
 import sentry_sdk
+import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
     _DEFAULT_INTEGRATIONS,
@@ -91,9 +92,7 @@ def internal_exceptions(request, monkeypatch):
         for e in errors:
             reraise(*e)
 
-    monkeypatch.setattr(
-        sentry_sdk.Scope, "_capture_internal_exception", _capture_internal_exception
-    )
+    sentry_sdk.utils.capture_internal_exception = _capture_internal_exception
 
     return errors
 
