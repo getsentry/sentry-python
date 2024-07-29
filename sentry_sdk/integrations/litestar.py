@@ -129,7 +129,7 @@ def enable_span_for_middleware(middleware):
         return middleware
 
     if isinstance(middleware, DefineMiddleware):
-        old_call: "ASGIApp" = middleware.middleware.__call__
+        old_call = middleware.middleware.__call__  # type: ASGIApp
     else:
         old_call = middleware.__call__
 
@@ -203,9 +203,9 @@ def patch_http_route_handle():
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = SentryScope.get_isolation_scope()
-        request: "Request[Any, Any]" = scope["app"].request_class(
+        request = scope["app"].request_class(
             scope=scope, receive=receive, send=send
-        )
+        )  # type: Request[Any, Any]
         extracted_request_data = ConnectionDataExtractor(
             parse_body=True, parse_query=True
         )(request)
@@ -279,7 +279,7 @@ def retrieve_user_from_scope(scope):
 @ensure_integration_enabled(LitestarIntegration)
 def exception_handler(exc, scope):
     # type: (Exception, LitestarScope) -> None
-    user_info: "Optional[dict[str, Any]]" = None
+    user_info = None  # type: Optional[dict[str, Any]]
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
