@@ -64,6 +64,7 @@ jobs:
       - name: Test django latest
         run: |
           set -x # print commands that are executed
+          export PIP_CONSTRAINT=constraints.txt
           ./scripts/runtox.sh "py${{ matrix.python-version }}-django-latest"
       - name: Test flask latest
         run: |
@@ -140,6 +141,7 @@ jobs:
       - name: Test django pinned
         run: |
           set -x # print commands that are executed
+          export PIP_CONSTRAINT=constraints.txt
           ./scripts/runtox.sh --exclude-latest "py${{ matrix.python-version }}-django"
       - name: Test flask pinned
         run: |
