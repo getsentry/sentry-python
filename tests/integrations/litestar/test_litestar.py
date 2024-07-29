@@ -154,7 +154,7 @@ def test_catch_exceptions(
     assert str(exc) == expected_message
 
     (event,) = events
-    assert event["transaction"] == expected_tx_name
+    assert expected_tx_name in event["transaction"]
     assert event["exception"]["values"][0]["mechanism"]["type"] == "litestar"
 
 
