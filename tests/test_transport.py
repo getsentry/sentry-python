@@ -11,11 +11,11 @@ import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
+import sentry_sdk
 from sentry_sdk import (
     Client,
     add_breadcrumb,
     capture_message,
-    get_global_scope,
     isolation_scope,
     get_isolation_scope,
     Hub,
@@ -139,8 +139,8 @@ def test_transport_works(
     if use_pickle:
         client = pickle.loads(pickle.dumps(client))
 
-    get_global_scope().set_client(client)
-    request.addfinalizer(lambda: get_global_scope().set_client(None))
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
 
     add_breadcrumb(
         level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
@@ -275,7 +275,7 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     # to an infinite loop
     ignore_logger("werkzeug")
 
-    get_global_scope().set_client(client)
+    sentry_sdk.get_global_scope().set_client(client)
     with isolation_scope():
         capture_message("hi")
         client.flush()
@@ -291,7 +291,7 @@ def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        get_global_scope().set_client(client)
+        sentry_sdk.get_global_scope().set_client(client)
         with isolation_scope():
             capture_message("hi")
 
