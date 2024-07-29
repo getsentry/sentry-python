@@ -91,20 +91,13 @@ def patch_app_init():
 
     def injection_wrapper(self, *args, **kwargs):
         # type: (Litestar, *Any, **Any) -> None
-        after_exception = kwargs.pop("after_exception", [])
-        kwargs.update(
-            after_exception=[
-                exception_handler,
-                *(
-                    after_exception
-                    if isinstance(after_exception, list)
-                    else [after_exception]
-                ),
-            ]
-        )
+        kwargs["after_exception"] = [
+            exception_handler,
+            *kwargs.get("after_exception", []),
+        ]
 
         SentryLitestarASGIMiddleware.__call__ = SentryLitestarASGIMiddleware._run_asgi3  # type: ignore
-        middleware = kwargs.pop("middleware", None) or []
+        middleware = kwargs.get("middleware") or []
         kwargs["middleware"] = [SentryLitestarASGIMiddleware, *middleware]
         old__init__(self, *args, **kwargs)
 
