@@ -5,7 +5,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -297,7 +297,7 @@ def _patch_execute():
             return result
 
         if "execution_context" in kwargs and result.errors:
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             event_processor = _make_request_event_processor(kwargs["execution_context"])
             scope.add_event_processor(event_processor)
 
@@ -309,7 +309,7 @@ def _patch_execute():
         result = old_execute_sync(*args, **kwargs)
 
         if "execution_context" in kwargs and result.errors:
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             event_processor = _make_request_event_processor(kwargs["execution_context"])
             scope.add_event_processor(event_processor)
 
@@ -340,7 +340,7 @@ def _patch_views():
         if not errors:
             return
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         event_processor = _make_response_event_processor(response_data)
         scope.add_event_processor(event_processor)
 

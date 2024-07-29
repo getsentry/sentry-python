@@ -288,7 +288,7 @@ class Profile:
             self.sampled = False
             return
 
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         if not client.is_active():
             self.sampled = False
             return
@@ -356,7 +356,7 @@ class Profile:
 
     def __enter__(self):
         # type: () -> Profile
-        scope = sentry_sdk.scope.Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
@@ -492,7 +492,7 @@ class Profile:
 
     def valid(self):
         # type: () -> bool
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         if not client.is_active():
             return False
 

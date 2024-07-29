@@ -28,7 +28,6 @@ from sentry_sdk import (
     capture_exception,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
@@ -278,7 +277,7 @@ def test_flask_session_tracking(sentry_init, capture_envelopes, app):
 
     @app.route("/")
     def index():
-        Scope.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
+        sentry_sdk.get_isolation_scope().set_user({"ip_address": "1.2.3.4", "id": "42"})
         try:
             raise ValueError("stuff")
         except Exception:
@@ -666,15 +665,15 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     sentry_init(integrations=[flask_sentry.FlaskIntegration()])
     events = capture_events()
 
-    Scope.get_isolation_scope().set_tag("request_data", False)
+    sentry_sdk.get_isolation_scope().set_tag("request_data", False)
 
     @app.route("/")
     def index():
-        Scope.get_isolation_scope().set_tag("request_data", True)
+        sentry_sdk.get_isolation_scope().set_tag("request_data", True)
 
         def generate():
             for row in range(1000):
-                assert Scope.get_isolation_scope()._tags["request_data"]
+                assert sentry_sdk.get_isolation_scope()._tags["request_data"]
 
                 yield str(row) + "\n"
 
@@ -685,7 +684,7 @@ def test_does_not_leak_scope(sentry_init, capture_events, app):
     assert response.data.decode() == "".join(str(row) + "\n" for row in range(1000))
     assert not events
 
-    assert not Scope.get_isolation_scope()._tags["request_data"]
+    assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
 
 
 def test_scoped_test_client(sentry_init, app):

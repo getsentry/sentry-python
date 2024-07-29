@@ -6,7 +6,7 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import sentry_sdk
-from sentry_sdk import Scope, start_span, start_transaction, set_measurement
+from sentry_sdk import start_span, start_transaction, set_measurement
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
@@ -84,7 +84,7 @@ def test_finds_transaction_on_scope(sentry_init):
 
     transaction = start_transaction(name="dogpark")
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
 
     # See note in Scope class re: getters and setters of the `transaction`
     # property. For the moment, assigning to scope.transaction merely sets the
@@ -113,7 +113,7 @@ def test_finds_transaction_when_descendent_span_is_on_scope(
     transaction = start_transaction(name="dogpark")
     child_span = transaction.start_child(op="sniffing")
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope._span = child_span
 
     # this is the same whether it's the transaction itself or one of its
@@ -136,7 +136,7 @@ def test_finds_orphan_span_on_scope(sentry_init):
 
     span = start_span(op="sniffing")
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope._span = span
 
     assert scope._span is not None
@@ -150,7 +150,7 @@ def test_finds_non_orphan_span_on_scope(sentry_init):
     transaction = start_transaction(name="dogpark")
     child_span = transaction.start_child(op="sniffing")
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope._span = child_span
 
     assert scope._span is not None
@@ -357,7 +357,7 @@ def test_should_propagate_trace_to_sentry(
 def test_start_transaction_updates_scope_name_source(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
 
     with start_transaction(name="foobar", source="route"):
         assert scope._transaction == "foobar"

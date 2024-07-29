@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -53,7 +53,7 @@ def _patch_graphql():
     @ensure_integration_enabled(GrapheneIntegration, old_graphql_sync)
     def _sentry_patched_graphql_sync(schema, source, *args, **kwargs):
         # type: (GraphQLSchema, Union[str, Source], Any, Any) -> ExecutionResult
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 
         with graphql_span(schema, source, kwargs):
@@ -80,7 +80,7 @@ def _patch_graphql():
         if integration is None:
             return await old_graphql_async(schema, source, *args, **kwargs)
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_event_processor)
 
         with graphql_span(schema, source, kwargs):
@@ -141,7 +141,7 @@ def graphql_span(schema, source, kwargs):
         },
     )
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     if scope.span:
         _graphql_span = scope.span.start_child(op=op, description=operation_name)
     else:
