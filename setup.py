@@ -106,7 +106,7 @@ setup(
             "opentelemetry-instrumentation-pymysql==0.46b0",
             "opentelemetry-instrumentation-pyramid==0.46b0",
             "opentelemetry-instrumentation-redis==0.46b0",
-            "opentelemetry-instrumentation-remoulade==0.46b0",
+            "opentelemetry-instrumentation-remoulade==0.47b0",
             "opentelemetry-instrumentation-requests==0.46b0",
             "opentelemetry-instrumentation-sklearn==0.46b0",
             "opentelemetry-instrumentation-sqlalchemy==0.46b0",
