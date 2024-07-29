@@ -504,7 +504,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
   After:
 
   ```python
-  from sentry_sdkd import get_isolation_scope
+  from sentry_sdk import get_isolation_scope
 
   scope = get_isolation_scope()
   # do something with `scope`
