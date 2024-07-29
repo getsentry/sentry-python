@@ -54,7 +54,6 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    import sentry_sdk.integrations
     from sentry_sdk._types import Event, ExcInfo
 
     P = ParamSpec("P")
