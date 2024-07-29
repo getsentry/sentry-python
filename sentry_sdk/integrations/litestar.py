@@ -48,7 +48,8 @@ class LitestarIntegration(Integration):
     origin = f"auto.http.{identifier}"
 
     @staticmethod
-    def setup_once() -> None:
+    def setup_once():
+        # type: () -> None
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()
@@ -65,7 +66,9 @@ class LitestarIntegration(Integration):
 
 
 class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
-    def __init__(self, app: "ASGIApp", span_origin: str = LitestarIntegration.origin):
+    def __init__(self, app, span_origin=LitestarIntegration.origin):
+        # type: (ASGIApp, str) -> None
+
         super().__init__(
             app=app,
             unsafe_context_data=False,
@@ -75,7 +78,8 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
         )
 
 
-def patch_app_init() -> None:
+def patch_app_init():
+    # type: () -> None
     """
     Replaces the Litestar class's `__init__` function in order to inject `after_exception` handlers and set the
     `SentryLitestarASGIMiddleware` as the outmost middleware in the stack.
@@ -85,7 +89,8 @@ def patch_app_init() -> None:
     """
     old__init__ = Litestar.__init__
 
-    def injection_wrapper(self: "Litestar", *args: "Any", **kwargs: "Any") -> None:
+    def injection_wrapper(self, *args, **kwargs):
+        # type: (Litestar, *Any, **Any) -> None
         after_exception = kwargs.pop("after_exception", [])
         kwargs.update(
             after_exception=[
@@ -106,10 +111,12 @@ def patch_app_init() -> None:
     Litestar.__init__ = injection_wrapper
 
 
-def patch_middlewares() -> None:
+def patch_middlewares():
+    # type: () -> None
     old__resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
-    def resolve_middleware_wrapper(self: "Any") -> "list[Middleware]":
+    def resolve_middleware_wrapper(self):
+        # type: (Any) -> list[Middleware]
         return [
             enable_span_for_middleware(middleware)
             for middleware in old__resolve_middleware_stack(self)
@@ -118,7 +125,8 @@ def patch_middlewares() -> None:
     BaseRouteHandler.resolve_middleware = resolve_middleware_wrapper
 
 
-def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
+def enable_span_for_middleware(middleware):
+    # type: (Middleware) -> Middleware
     if (
         not hasattr(middleware, "__call__")  # noqa: B004
         or middleware is SentryLitestarASGIMiddleware
@@ -130,12 +138,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
     else:
         old_call = middleware.__call__
 
-    async def _create_span_call(
-        self: "MiddlewareProtocol",
-        scope: "LitestarScope",
-        receive: "Receive",
-        send: "Send",
-    ) -> None:
+    async def _create_span_call(self, scope, receive, send):
+        # type: (MiddlewareProtocol, LitestarScope, Receive, Send) -> None
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_call(self, scope, receive, send)
 
@@ -148,9 +152,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
-            async def _sentry_receive(
-                *args: "Any", **kwargs: "Any"
-            ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
+            async def _sentry_receive(*args, **kwargs):
+                # type: (*Any, **Any) -> Union[HTTPReceiveMessage, WebSocketReceiveMessage]
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
@@ -164,7 +167,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             new_receive = _sentry_receive if not receive_patched else receive
 
             # Creating spans for the "send" callback
-            async def _sentry_send(message: "Message") -> None:
+            async def _sentry_send(message):
+                # type: (Message) -> None
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_LITESTAR_SEND,
                     description=getattr(send, "__qualname__", str(send)),
@@ -190,12 +194,12 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
     return middleware
 
 
-def patch_http_route_handle() -> None:
+def patch_http_route_handle():
+    # type: () -> None
     old_handle = HTTPRoute.handle
 
-    async def handle_wrapper(
-        self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send"
-    ) -> None:
+    async def handle_wrapper(self, scope, receive, send):
+        # type: (HTTPRoute, HTTPScope, Receive, Send) -> None
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
@@ -210,7 +214,8 @@ def patch_http_route_handle() -> None:
 
         request_data = await body
 
-        def event_processor(event: "Event", _: "Hint") -> "Event":
+        def event_processor(event, _):
+            # type: (Event, Hint) -> Event
             route_handler = scope.get("route_handler")
 
             request_info = event.get("request", {})
@@ -251,7 +256,8 @@ def patch_http_route_handle() -> None:
     HTTPRoute.handle = handle_wrapper
 
 
-def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[dict[str, Any]]":
+def retrieve_user_from_scope(scope):
+    # type: (LitestarScope) -> Optional[dict[str, Any]]
     scope_user = scope.get("user", {})
     if not scope_user:
         return None
@@ -272,7 +278,8 @@ def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[dict[str, Any]
 
 
 @ensure_integration_enabled(LitestarIntegration)
-def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
+def exception_handler(exc, scope):
+    # type: (Exception, LitestarScope) -> None
     user_info: "Optional[dict[str, Any]]" = None
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
