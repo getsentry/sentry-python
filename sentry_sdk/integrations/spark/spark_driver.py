@@ -1,6 +1,5 @@
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
 
 from sentry_sdk._types import TYPE_CHECKING
@@ -63,7 +62,7 @@ def patch_spark_context_init():
         _start_sentry_listener(self)
         _set_app_properties()
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
 
         @scope.add_event_processor
         def process_event(event, hint):
