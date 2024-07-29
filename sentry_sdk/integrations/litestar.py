@@ -227,6 +227,9 @@ def patch_http_route_handle():
             func = None
             if route_handler.name is not None:
                 tx_name = route_handler.name
+            # Accounts for use of type `Ref` in earlier versions of litestar without the need to reference it as a type
+            elif hasattr(route_handler.fn, "value"):
+                func = route_handler.fn.value
             else:
                 func = route_handler.fn
             if func is not None:
