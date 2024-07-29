@@ -116,7 +116,7 @@ setup(
             "opentelemetry-instrumentation-threading==0.46b0",
             "opentelemetry-instrumentation-tornado==0.46b0",
             "opentelemetry-instrumentation-tortoiseorm==0.46b0",
-            "opentelemetry-instrumentation-urllib==0.46b0",
+            "opentelemetry-instrumentation-urllib==0.47b0",
             "opentelemetry-instrumentation-urllib3==0.46b0",
             "opentelemetry-instrumentation-wsgi==0.46b0",
         ],
