@@ -78,7 +78,7 @@ setup(
             "opentelemetry-instrumentation-asgi==0.46b0",
             "opentelemetry-instrumentation-asyncio==0.46b0",
             "opentelemetry-instrumentation-asyncpg==0.46b0",
-            "opentelemetry-instrumentation-aws-lambda==0.46b0",
+            "opentelemetry-instrumentation-aws-lambda==0.47b0",
             "opentelemetry-instrumentation-boto==0.46b0",
             "opentelemetry-instrumentation-boto3sqs==0.46b0",
             "opentelemetry-instrumentation-botocore==0.46b0",
