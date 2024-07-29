@@ -21,7 +21,7 @@ try:
     from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
 
     if TYPE_CHECKING:
-        from typing import Any, Dict, List, Optional, Union
+        from typing import Any, Optional, Union
 
         from litestar.types.asgi_types import ASGIApp  # type: ignore
         from litestar.types import (  # type: ignore
@@ -102,7 +102,7 @@ def patch_app_init() -> None:
 def patch_middlewares() -> None:
     old__resolve_middleware_stack = BaseRouteHandler.resolve_middleware
 
-    def resolve_middleware_wrapper(self: "Any") -> "List[Middleware]":
+    def resolve_middleware_wrapper(self: "Any") -> "list[Middleware]":
         return [
             enable_span_for_middleware(middleware)
             for middleware in old__resolve_middleware_stack(self)
@@ -244,7 +244,7 @@ def patch_http_route_handle() -> None:
     HTTPRoute.handle = handle_wrapper
 
 
-def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[Dict[str, Any]]":
+def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[dict[str, Any]]":
     scope_user = scope.get("user", {})
     if not scope_user:
         return None
@@ -266,7 +266,7 @@ def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[Dict[str, Any]
 
 @ensure_integration_enabled(LitestarIntegration)
 def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
-    user_info: "Optional[Dict[str, Any]]" = None
+    user_info: "Optional[dict[str, Any]]" = None
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
