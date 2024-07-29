@@ -89,7 +89,7 @@ setup(
             "opentelemetry-instrumentation-django==0.46b0",
             "opentelemetry-instrumentation-elasticsearch==0.46b0",
             "opentelemetry-instrumentation-falcon==0.46b0",
-            "opentelemetry-instrumentation-fastapi==0.46b0",
+            "opentelemetry-instrumentation-fastapi==0.47b0",
             "opentelemetry-instrumentation-flask==0.46b0",
             "opentelemetry-instrumentation-grpc==0.46b0",
             "opentelemetry-instrumentation-httpx==0.46b0",
