@@ -53,7 +53,14 @@ class LitestarIntegration(Integration):
         patch_middlewares()
         patch_http_route_handle()
 
-        # logs an error for every 500
+        # The following line follows the pattern found in other integrations such as `DjangoIntegration.setup_once`.
+        # The Litestar `ExceptionHandlerMiddleware.__call__` catches exceptions and does the following
+        # (among other things):
+        #   1. Logs them, some at least (such as 500s) as errors
+        #   2. Calls after_exception hooks
+        # The `LitestarIntegration`` provides an after_exception hook (see `patch_app_init` below) to create a Sentry event
+        # from an exception, which ends up being called during step 2 above. However, the Sentry `LoggingIntegration` will
+        # by default create a Sentry event from error logs made in step 1 if we do not prevent it from doing so.
         ignore_logger("litestar")
 
 
