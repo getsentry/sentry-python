@@ -51,9 +51,8 @@ def test_aggregates(sentry_init, capture_envelopes):
     envelopes = capture_envelopes()
 
     with auto_session_tracking(session_mode="request"):
-        with sentry_sdk.push_scope():
+        with sentry_sdk.new_scope() as scope:
             try:
-                scope = sentry_sdk.Scope.get_current_scope()
                 scope.set_user({"id": "42"})
                 raise Exception("all is wrong")
             except Exception:
@@ -92,7 +91,7 @@ def test_aggregates_explicitly_disabled_session_tracking_request_mode(
     envelopes = capture_envelopes()
 
     with auto_session_tracking(session_mode="request"):
-        with sentry_sdk.push_scope():
+        with sentry_sdk.new_scope():
             try:
                 raise Exception("all is wrong")
             except Exception:
@@ -127,7 +126,7 @@ def test_no_thread_on_shutdown_no_errors(sentry_init):
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
         with auto_session_tracking(session_mode="request"):
-            with sentry_sdk.push_scope():
+            with sentry_sdk.new_scope():
                 try:
                     raise Exception("all is wrong")
                 except Exception:

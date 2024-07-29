@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from contextlib import contextmanager
 
 from sentry_sdk import tracing_utils, Client
@@ -185,6 +186,14 @@ def configure_scope(  # noqa: F811
 
     :returns: If no callback is provided, returns a context manager that returns the scope.
     """
+    warnings.warn(
+        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
+        "Please consult our migration guide to learn how to migrate to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     scope = Scope.get_isolation_scope()
     scope.generate_propagation_context()
 
@@ -229,9 +238,19 @@ def push_scope(  # noqa: F811
     :returns: If no `callback` is provided, a context manager that should
         be used to pop the scope again.
     """
+    warnings.warn(
+        "sentry_sdk.push_scope is deprecated and will be removed in the next major version. "
+        "Please consult our migration guide to learn how to migrate to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     if callback is not None:
-        with push_scope() as scope:
-            callback(scope)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            with push_scope() as scope:
+                callback(scope)
         return None
 
     return _ScopeManager()

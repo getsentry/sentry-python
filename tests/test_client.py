@@ -570,7 +570,9 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     assert output.count(b"HI") == num_messages
 
 
-def test_configure_scope_available(sentry_init, request, monkeypatch):
+def test_configure_scope_available(
+    sentry_init, request, monkeypatch, suppress_deprecation_warnings
+):
     """
     Test that scope is configured if client is configured
 
@@ -686,14 +688,13 @@ def test_cyclic_data(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    with configure_scope() as scope:
-        data = {}
-        data["is_cyclic"] = data
+    data = {}
+    data["is_cyclic"] = data
 
-        other_data = ""
-        data["not_cyclic"] = other_data
-        data["not_cyclic2"] = other_data
-        scope.set_extra("foo", data)
+    other_data = ""
+    data["not_cyclic"] = other_data
+    data["not_cyclic2"] = other_data
+    sentry_sdk.Scope.get_isolation_scope().set_extra("foo", data)
 
     capture_message("hi")
     (event,) = events

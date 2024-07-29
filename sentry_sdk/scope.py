@@ -893,14 +893,17 @@ class Scope(object):
 
     def add_attachment(
         self,
-        bytes=None,  # type: Optional[bytes]
+        bytes=None,  # type: Union[None, bytes, Callable[[], bytes]]
         filename=None,  # type: Optional[str]
         path=None,  # type: Optional[str]
         content_type=None,  # type: Optional[str]
         add_to_transactions=False,  # type: bool
     ):
         # type: (...) -> None
-        """Adds an attachment to future events sent."""
+        """Adds an attachment to future events sent from this scope.
+
+        The parameters are the same as for the :py:class:`sentry_sdk.attachments.Attachment` constructor.
+        """
         self._attachments.append(
             Attachment(
                 bytes=bytes,
