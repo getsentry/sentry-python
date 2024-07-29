@@ -112,7 +112,7 @@ setup(
             "opentelemetry-instrumentation-sqlalchemy==0.46b0",
             "opentelemetry-instrumentation-sqlite3==0.46b0",
             "opentelemetry-instrumentation-starlette==0.46b0",
-            "opentelemetry-instrumentation-system-metrics==0.46b0",
+            "opentelemetry-instrumentation-system-metrics==0.47b0",
             "opentelemetry-instrumentation-threading==0.46b0",
             "opentelemetry-instrumentation-tornado==0.46b0",
             "opentelemetry-instrumentation-tortoiseorm==0.46b0",
