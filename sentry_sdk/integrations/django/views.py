@@ -1,7 +1,6 @@
 import functools
 
 import sentry_sdk
-from sentry_sdk import Scope
 from sentry_sdk.consts import OP
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -76,7 +75,7 @@ def _wrap_sync_view(callback):
     @functools.wraps(callback)
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
-        sentry_scope = Scope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         # set the active thread id to the handler thread for sync views
         # this isn't necessary for async views since that runs on main
         if sentry_scope.profile is not None:

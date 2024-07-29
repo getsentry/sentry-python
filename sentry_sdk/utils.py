@@ -25,7 +25,6 @@ except ImportError:
     BaseExceptionGroup = None  # type: ignore
 
 import sentry_sdk
-import sentry_sdk.hub
 from sentry_sdk._compat import PY37
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH, EndpointType
@@ -55,7 +54,6 @@ if TYPE_CHECKING:
 
     from gevent.hub import Hub
 
-    import sentry_sdk.integrations
     from sentry_sdk._types import Event, ExcInfo
 
     P = ParamSpec("P")
@@ -191,8 +189,14 @@ def capture_internal_exceptions():
 
 def capture_internal_exception(exc_info):
     # type: (ExcInfo) -> None
+    """
+    Capture an exception that is likely caused by a bug in the SDK
+    itself.
+
+    These exceptions do not end up in Sentry and are just logged instead.
+    """
     if sentry_sdk.get_client().is_active():
-        sentry_sdk.Scope._capture_internal_exception(exc_info)
+        logger.error("Internal error in sentry_sdk", exc_info=exc_info)
 
 
 def to_timestamp(value):

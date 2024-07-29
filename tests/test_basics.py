@@ -24,7 +24,6 @@ from sentry_sdk import (
     isolation_scope,
     new_scope,
     Hub,
-    Scope,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
@@ -78,7 +77,7 @@ def test_processors(sentry_init, capture_events):
         event["exception"]["values"][0]["value"] += " whatever"
         return event
 
-    Scope.get_isolation_scope().add_error_processor(error_processor, ValueError)
+    sentry_sdk.get_isolation_scope().add_error_processor(error_processor, ValueError)
 
     try:
         raise ValueError("aha!")
@@ -388,7 +387,7 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    Scope.get_isolation_scope().clear()
+    sentry_sdk.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
@@ -432,7 +431,7 @@ def test_attachments(sentry_init, capture_envelopes):
 
     this_file = os.path.abspath(__file__.rstrip("c"))
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
     scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
     scope.add_attachment(path=this_file)
 
@@ -466,7 +465,7 @@ def test_attachments_graceful_failure(
     sentry_init()
     envelopes = capture_envelopes()
 
-    Scope.get_isolation_scope().add_attachment(path="non_existent")
+    sentry_sdk.get_isolation_scope().add_attachment(path="non_existent")
     capture_exception(ValueError())
 
     (envelope,) = envelopes
