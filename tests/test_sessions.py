@@ -14,16 +14,16 @@ def test_basic(sentry_init, capture_envelopes):
     sentry_init(release="fun-release", environment="not-fun-env")
     envelopes = capture_envelopes()
 
-    sentry_sdk.Scope.get_isolation_scope().start_session()
+    sentry_sdk.get_isolation_scope().start_session()
 
     try:
-        scope = sentry_sdk.Scope.get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         scope.set_user({"id": "42"})
         raise Exception("all is wrong")
     except Exception:
         sentry_sdk.capture_exception()
 
-    sentry_sdk.Scope.get_isolation_scope().end_session()
+    sentry_sdk.get_isolation_scope().end_session()
     sentry_sdk.flush()
 
     assert len(envelopes) == 2
@@ -53,6 +53,7 @@ def test_aggregates(sentry_init, capture_envelopes):
     with auto_session_tracking(session_mode="request"):
         with sentry_sdk.new_scope() as scope:
             try:
+                scope = sentry_sdk.get_current_scope()
                 scope.set_user({"id": "42"})
                 raise Exception("all is wrong")
             except Exception:
@@ -61,8 +62,8 @@ def test_aggregates(sentry_init, capture_envelopes):
     with auto_session_tracking(session_mode="request"):
         pass
 
-    sentry_sdk.Scope.get_isolation_scope().start_session(session_mode="request")
-    sentry_sdk.Scope.get_isolation_scope().end_session()
+    sentry_sdk.get_isolation_scope().start_session(session_mode="request")
+    sentry_sdk.get_isolation_scope().end_session()
     sentry_sdk.flush()
 
     assert len(envelopes) == 2
@@ -100,8 +101,8 @@ def test_aggregates_explicitly_disabled_session_tracking_request_mode(
     with auto_session_tracking(session_mode="request"):
         pass
 
-    sentry_sdk.Scope.get_isolation_scope().start_session(session_mode="request")
-    sentry_sdk.Scope.get_isolation_scope().end_session()
+    sentry_sdk.get_isolation_scope().start_session(session_mode="request")
+    sentry_sdk.get_isolation_scope().end_session()
     sentry_sdk.flush()
 
     sess = envelopes[1]
@@ -135,6 +136,6 @@ def test_no_thread_on_shutdown_no_errors(sentry_init):
         with auto_session_tracking(session_mode="request"):
             pass
 
-        sentry_sdk.Scope.get_isolation_scope().start_session(session_mode="request")
-        sentry_sdk.Scope.get_isolation_scope().end_session()
+        sentry_sdk.get_isolation_scope().start_session(session_mode="request")
+        sentry_sdk.get_isolation_scope().end_session()
         sentry_sdk.flush()

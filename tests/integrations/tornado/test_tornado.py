@@ -2,9 +2,9 @@ import json
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import start_transaction, capture_message
 from sentry_sdk.integrations.tornado import TornadoIntegration
-from sentry_sdk.scope import Scope
 
 from tornado.web import RequestHandler, Application, HTTPError
 from tornado.testing import AsyncHTTPTestCase
@@ -37,11 +37,11 @@ def tornado_testcase(request):
 
 class CrashingHandler(RequestHandler):
     def get(self):
-        Scope.get_isolation_scope().set_tag("foo", "42")
+        sentry_sdk.get_isolation_scope().set_tag("foo", "42")
         1 / 0
 
     def post(self):
-        Scope.get_isolation_scope().set_tag("foo", "43")
+        sentry_sdk.get_isolation_scope().set_tag("foo", "43")
         1 / 0
 
 
@@ -53,12 +53,12 @@ class CrashingWithMessageHandler(RequestHandler):
 
 class HelloHandler(RequestHandler):
     async def get(self):
-        Scope.get_isolation_scope().set_tag("foo", "42")
+        sentry_sdk.get_isolation_scope().set_tag("foo", "42")
 
         return b"hello"
 
     async def post(self):
-        Scope.get_isolation_scope().set_tag("foo", "43")
+        sentry_sdk.get_isolation_scope().set_tag("foo", "43")
 
         return b"hello"
 
@@ -101,7 +101,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     )
     assert event["transaction_info"] == {"source": "component"}
 
-    assert not Scope.get_isolation_scope()._tags
+    assert not sentry_sdk.get_isolation_scope()._tags
 
 
 @pytest.mark.parametrize(

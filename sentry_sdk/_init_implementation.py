@@ -39,7 +39,7 @@ def _init(*args, **kwargs):
     This takes the same arguments as the client constructor.
     """
     client = sentry_sdk.Client(*args, **kwargs)
-    sentry_sdk.Scope.get_global_scope().set_client(client)
+    sentry_sdk.get_global_scope().set_client(client)
     _check_python_deprecations()
     rv = _InitGuard(client)
     return rv

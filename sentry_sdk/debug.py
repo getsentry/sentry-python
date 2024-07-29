@@ -2,8 +2,8 @@ import sys
 import logging
 import warnings
 
+from sentry_sdk import get_client
 from sentry_sdk.client import _client_init_debug
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import logger
 from logging import LogRecord
 
@@ -14,7 +14,7 @@ class _DebugFilter(logging.Filter):
         if _client_init_debug.get(False):
             return True
 
-        return Scope.get_client().options["debug"]
+        return get_client().options["debug"]
 
 
 def init_debug_support():
