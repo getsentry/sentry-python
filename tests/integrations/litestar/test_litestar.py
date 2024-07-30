@@ -5,7 +5,7 @@ import pytest
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.litestar import LitestarIntegration
 
-from typing import Any, Dict
+from typing import Any
 
 from litestar import Litestar, get, Controller
 from litestar.logging.config import LoggingConfig
@@ -69,7 +69,7 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
             raise Exception("Whoa")
 
     @get("/some_url")
-    async def homepage_handler() -> Dict[str, Any]:
+    async def homepage_handler() -> dict[str, Any]:
         1 / 0
         return {"status": "ok"}
 
@@ -78,12 +78,12 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
         raise Exception("Too Hot")
 
     @get("/message")
-    async def message() -> Dict[str, Any]:
+    async def message() -> dict[str, Any]:
         capture_message("hi")
         return {"status": "ok"}
 
     @get("/message/{message_id:str}")
-    async def message_with_id() -> Dict[str, Any]:
+    async def message_with_id() -> dict[str, Any]:
         capture_message("hi")
         return {"status": "ok"}
 
