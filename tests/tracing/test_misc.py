@@ -60,6 +60,33 @@ def test_transaction_naming(sentry_init, capture_events):
     assert events[2]["transaction"] == "a"
 
 
+def test_transaction_data(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="test-transaction"):
+        span_or_tx = sentry_sdk.get_current_span()
+        span_or_tx.set_data("foo", "bar")
+        with start_span(op="test-span") as span:
+            span.set_data("spanfoo", "spanbar")
+
+    assert len(events) == 1
+
+    transaction = events[0]
+    transaction_data = transaction["contexts"]["trace"]["data"]
+
+    assert "data" not in transaction.keys()
+    assert transaction_data.items() >= {"foo": "bar"}.items()
+
+    assert len(transaction["spans"]) == 1
+
+    span = transaction["spans"][0]
+    span_data = span["data"]
+
+    assert "contexts" not in span.keys()
+    assert span_data.items() >= {"spanfoo": "spanbar"}.items()
+
+
 def test_start_transaction(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
