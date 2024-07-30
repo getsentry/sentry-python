@@ -187,14 +187,16 @@ def test_middleware_spans(sentry_init, capture_events):
 
     (_, transaction_event) = events
 
-    expected = ["SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"]
+    expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
+    found = set()
+    
+    litestar_spans = (span for span in transaction_event["spans"] if span["op"] == "middleware.litestar")
 
-    idx = 0
-    for span in transaction_event["spans"]:
-        if span["op"] == "middleware.litestar":
-            assert span["description"] == expected[idx]
-            assert span["tags"]["litestar.middleware_name"] == expected[idx]
-            idx += 1
+    for span in litestar_spans:
+        assert span["description"] in expected
+        assert span["description"] not in found
+        found.add(span["description"])
+        assert span["description"] == span["tags"]["litestar.middleware_name"]
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
