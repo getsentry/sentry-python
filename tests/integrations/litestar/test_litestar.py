@@ -243,11 +243,8 @@ def test_middleware_receive_send(sentry_init, capture_events):
     litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
     client = TestClient(litestar_app, raise_server_exceptions=False)
-    try:
-        # See SampleReceiveSendMiddleware.__call__ above for assertions of correct behavior
-        client.get("/message")
-    except Exception:
-        pass
+    # See SampleReceiveSendMiddleware.__call__ above for assertions of correct behavior
+    client.get("/message")
 
 
 def test_middleware_partial_receive_send(sentry_init, capture_events):
@@ -279,11 +276,8 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     events = capture_events()
 
     client = TestClient(litestar_app, raise_server_exceptions=False)
-    try:
-        # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
-        client.get("/message")
-    except Exception:
-        pass
+    # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
+    client.get("/message")
 
     (_, transaction_events) = events
 
@@ -348,10 +342,7 @@ def test_span_origin(sentry_init, capture_events):
     client = TestClient(
         litestar_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
-    try:
-        client.get("/message")
-    except Exception:
-        pass
+    client.get("/message")
 
     (_, event) = events
 
