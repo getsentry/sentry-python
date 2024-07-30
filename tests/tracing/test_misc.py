@@ -11,6 +11,7 @@ from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
+from tests.conftest import ApproxDict
 
 
 def test_span_trimming(sentry_init, capture_events):
@@ -58,6 +59,35 @@ def test_transaction_naming(sentry_init, capture_events):
         pass
     assert len(events) == 3
     assert events[2]["transaction"] == "a"
+
+
+def test_transaction_data(sentry_init, capture_events):
+    sentry_init(traces_sample_rate=1.0)
+    events = capture_events()
+
+    with start_transaction(name="test-transaction"):
+        span_or_tx = sentry_sdk.get_current_span()
+        span_or_tx.set_data("foo", "bar")
+        with start_span(op="test-span") as span:
+            span.set_data("spanfoo", "spanbar")
+
+    (transaction,) = events
+    span = transaction["spans"][0]
+
+    transaction_data = transaction["contexts"]["trace"]["data"]
+    span_data = span["data"]
+
+    assert transaction_data == ApproxDict(
+        {
+            "foo": "bar",
+        }
+    )
+
+    assert span_data == ApproxDict(
+        {
+            "spanfoo": "spanbar",
+        }
+    )
 
 
 def test_start_transaction(sentry_init):
