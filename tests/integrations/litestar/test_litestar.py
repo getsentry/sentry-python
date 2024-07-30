@@ -136,10 +136,7 @@ def test_middleware_spans(sentry_init, capture_events):
     client = TestClient(
         litestar_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
-    try:
-        client.get("/message")
-    except Exception:
-        pass
+    client.get("/message")
 
     (_, transaction_event) = events
 
@@ -178,10 +175,7 @@ def test_middleware_callback_spans(sentry_init, capture_events):
     events = capture_events()
 
     client = TestClient(litestar_app, raise_server_exceptions=False)
-    try:
-        client.get("/message")
-    except Exception:
-        pass
+    client.get("/message")
 
     (_, transaction_events) = events
 
