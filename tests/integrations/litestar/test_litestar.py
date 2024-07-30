@@ -344,3 +344,55 @@ def test_span_origin(sentry_init, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.http.litestar"
     for span in event["spans"]:
         assert span["origin"] == "auto.http.litestar"
+
+
+@pytest.mark.parametrize(
+    "is_send_default_pii",
+    [
+        True,
+        False,
+    ],
+    ids=[
+        "send_default_pii=True",
+        "send_default_pii=False",
+    ],
+)
+def test_litestar_scope_user_on_exception_event(
+    sentry_init, capture_exceptions, capture_events, is_send_default_pii
+):
+    class TestUserMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send):
+            scope["user"] = {
+                "email": "lennon@thebeatles.com",
+                "username": "john",
+                "id": "1",
+            }
+            await self.app(scope, receive, send)
+
+    sentry_init(
+        integrations=[LitestarIntegration()], send_default_pii=is_send_default_pii
+    )
+    litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
+    exceptions = capture_exceptions()
+    events = capture_events()
+
+    # This request intentionally raises an exception
+    client = TestClient(litestar_app)
+    try:
+        client.get("/some_url")
+    except Exception:
+        pass
+
+    assert len(exceptions) == 1
+    assert len(events) == 1
+    (event,) = events
+
+    if is_send_default_pii:
+        assert "user" in event
+        assert event["user"] == {
+            "email": "lennon@thebeatles.com",
+            "username": "john",
+            "id": "1",
+        }
+    else:
+        assert "user" not in event
