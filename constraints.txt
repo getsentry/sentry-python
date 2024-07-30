@@ -1,3 +1,0 @@
-# Workaround for https://github.com/pypa/setuptools/issues/4519.
-# Applies only for Django tests.
-setuptools<72.0.0
