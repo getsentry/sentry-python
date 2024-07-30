@@ -32,8 +32,6 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing_extensions import TypedDict
 
-    from sentry_sdk.integrations import Integration
-
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
@@ -482,7 +480,7 @@ class ClientConstructor:
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[Integration]  # noqa: B006
+        integrations=[],  # type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
@@ -509,6 +507,7 @@ class ClientConstructor:
         profiles_sampler=None,  # type: Optional[TracesSampler]
         profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
+        disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
@@ -556,4 +555,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.10.0"
+VERSION = "2.11.0"

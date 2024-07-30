@@ -6,7 +6,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import Scope, metrics
+from sentry_sdk import metrics
 from sentry_sdk.tracing import TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.envelope import parse_json
 
@@ -538,8 +538,9 @@ def test_transaction_name(
     ts = time.time()
     envelopes = capture_envelopes()
 
-    scope = Scope.get_current_scope()
-    scope.set_transaction_name("/user/{user_id}", source="route")
+    sentry_sdk.get_current_scope().set_transaction_name(
+        "/user/{user_id}", source="route"
+    )
     metrics.distribution("dist", 1.0, tags={"a": "b"}, timestamp=ts)
     metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)
     metrics.distribution("dist", 2.0, tags={"a": "b"}, timestamp=ts)

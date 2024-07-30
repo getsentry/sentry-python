@@ -4,7 +4,8 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import Scope, start_span, start_transaction, capture_exception
+import sentry_sdk
+from sentry_sdk import start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
 
@@ -56,7 +57,7 @@ def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
     with start_transaction(name="/", sampled=sampling_decision):
         with start_span(op="child-span"):
             with start_span(op="child-child-span"):
-                scope = Scope.get_current_scope()
+                scope = sentry_sdk.get_current_scope()
                 assert scope.span.op == "child-child-span"
                 assert scope.transaction.name == "/"
 
