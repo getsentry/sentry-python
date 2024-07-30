@@ -6,7 +6,7 @@ import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -79,9 +79,9 @@ class PyramidIntegration(Integration):
             integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
 
             _set_transaction_name_and_source(
-                Scope.get_current_scope(), integration.transaction_style, request
+                sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
             )
@@ -149,7 +149,7 @@ def _capture_exception(exc_info):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Request) -> None
+    # type: (sentry_sdk.Scope, str, Request) -> None
     try:
         name_for_style = {
             "route_name": request.matched_route.name,

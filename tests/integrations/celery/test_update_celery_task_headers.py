@@ -139,7 +139,7 @@ def test_celery_trace_propagation_default(sentry_init, monitor_beat_tasks):
     headers = {}
     span = None
 
-    scope = sentry_sdk.Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
 
     outgoing_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
 
@@ -175,7 +175,7 @@ def test_celery_trace_propagation_traces_sample_rate(
     headers = {}
     span = None
 
-    scope = sentry_sdk.Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
 
     outgoing_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
 
@@ -211,7 +211,7 @@ def test_celery_trace_propagation_enable_tracing(
     headers = {}
     span = None
 
-    scope = sentry_sdk.Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
 
     outgoing_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
 

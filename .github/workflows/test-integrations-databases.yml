@@ -58,7 +58,7 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
-          pip install coverage tox
+          pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase
@@ -143,7 +143,7 @@ jobs:
       - uses: getsentry/action-clickhouse-in-ci@v1
       - name: Setup Test Env
         run: |
-          pip install coverage tox
+          pip install "coverage[toml]" tox
       - name: Erase coverage
         run: |
           coverage erase

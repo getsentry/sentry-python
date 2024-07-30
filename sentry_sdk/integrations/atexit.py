@@ -3,7 +3,6 @@ import sys
 import atexit
 
 import sentry_sdk
-from sentry_sdk import Scope
 from sentry_sdk.utils import logger
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import ensure_integration_enabled
@@ -52,5 +51,5 @@ class AtexitIntegration(Integration):
             integration = client.get_integration(AtexitIntegration)
 
             logger.debug("atexit: shutting down client")
-            Scope.get_isolation_scope().end_session()
+            sentry_sdk.get_isolation_scope().end_session()
             client.close(callback=integration.callback)

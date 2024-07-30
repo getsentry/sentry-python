@@ -358,7 +358,7 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        scope = self.scope or sentry_sdk.Scope.get_current_scope()
+        scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
         self._context_manager_state = (scope, old_span)
@@ -628,7 +628,7 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        scope = scope or sentry_sdk.Scope.get_current_scope()
+        scope = scope or sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
@@ -896,8 +896,8 @@ class Transaction(Span):
             scope, hub
         )  # type: Optional[sentry_sdk.Scope]
 
-        scope = scope or self.scope or sentry_sdk.Scope.get_current_scope()
-        client = sentry_sdk.Scope.get_client()
+        scope = scope or self.scope or sentry_sdk.get_current_scope()
+        client = sentry_sdk.get_client()
 
         if not client.is_active():
             # We have no active client and therefore nowhere to send this transaction.
@@ -1056,7 +1056,7 @@ class Transaction(Span):
         4. If `traces_sampler` is not defined and there's no parent sampling
         decision, `traces_sample_rate` will be used.
         """
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
 
         transaction_description = "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
