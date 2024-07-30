@@ -111,7 +111,7 @@ def patch_middlewares():
 
     @ensure_integration_enabled(LitestarIntegration, old_resolve_middleware_stack)
     def resolve_middleware_wrapper(self):
-        # type: (Any) -> list[Middleware]
+        # type: (BaseRouteHandler) -> list[Middleware]
         return [
             enable_span_for_middleware(middleware)
             for middleware in old_resolve_middleware_stack(self)
@@ -133,7 +133,6 @@ def enable_span_for_middleware(middleware):
     else:
         old_call = middleware.__call__
 
-    # @ensure_integration_enabled(LitestarIntegration, old_call)
     async def _create_span_call(self, scope, receive, send):
         # type: (MiddlewareProtocol, LitestarScope, Receive, Send) -> None
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
@@ -148,9 +147,10 @@ def enable_span_for_middleware(middleware):
             middleware_span.set_tag("litestar.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
-            @ensure_integration_enabled(LitestarIntegration, receive)
             async def _sentry_receive(*args, **kwargs):
                 # type: (*Any, **Any) -> Union[HTTPReceiveMessage, WebSocketReceiveMessage]
+                if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
+                    return await receive(*args, **kwargs)
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
@@ -164,9 +164,10 @@ def enable_span_for_middleware(middleware):
             new_receive = _sentry_receive if not receive_patched else receive
 
             # Creating spans for the "send" callback
-            @ensure_integration_enabled(LitestarIntegration, send)
             async def _sentry_send(message):
                 # type: (Message) -> None
+                if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
+                    return await send(message)
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_LITESTAR_SEND,
                     description=getattr(send, "__qualname__", str(send)),
@@ -196,7 +197,6 @@ def patch_http_route_handle():
     # type: () -> None
     old_handle = HTTPRoute.handle
 
-    @ensure_integration_enabled(LitestarIntegration, old_handle)
     async def handle_wrapper(self, scope, receive, send):
         # type: (HTTPRoute, HTTPScope, Receive, Send) -> None
         if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
