@@ -16,50 +16,6 @@ from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.testing import TestClient
 
 
-class SampleMiddleware(AbstractMiddleware):
-    async def __call__(self, scope, receive, send) -> None:
-        async def do_stuff(message):
-            if message["type"] == "http.response.start":
-                # do something here.
-                pass
-            await send(message)
-
-        await self.app(scope, receive, do_stuff)
-
-
-class SampleReceiveSendMiddleware(AbstractMiddleware):
-    async def __call__(self, scope, receive, send):
-        message = await receive()
-        assert message
-        assert message["type"] == "http.request"
-
-        send_output = await send({"type": "something-unimportant"})
-        assert send_output is None
-
-        await self.app(scope, receive, send)
-
-
-class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
-    async def __call__(self, scope, receive, send):
-        message = await receive()
-        assert message
-        assert message["type"] == "http.request"
-
-        send_output = await send({"type": "something-unimportant"})
-        assert send_output is None
-
-        async def my_receive(*args, **kwargs):
-            pass
-
-        async def my_send(*args, **kwargs):
-            pass
-
-        partial_receive = functools.partial(my_receive)
-        partial_send = functools.partial(my_send)
-
-        await self.app(scope, partial_receive, partial_send)
-
-
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
     class MyController(Controller):
         path = "/controller"
@@ -204,6 +160,16 @@ def test_middleware_spans(sentry_init, capture_events):
 
 
 def test_middleware_callback_spans(sentry_init, capture_events):
+    class SampleMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send) -> None:
+            async def do_stuff(message):
+                if message["type"] == "http.response.start":
+                    # do something here.
+                    pass
+                await send(message)
+
+            await self.app(scope, receive, do_stuff)
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
@@ -259,6 +225,17 @@ def test_middleware_callback_spans(sentry_init, capture_events):
 
 
 def test_middleware_receive_send(sentry_init, capture_events):
+    class SampleReceiveSendMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send):
+            message = await receive()
+            assert message
+            assert message["type"] == "http.request"
+
+            send_output = await send({"type": "something-unimportant"})
+            assert send_output is None
+
+            await self.app(scope, receive, send)
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
@@ -267,14 +244,33 @@ def test_middleware_receive_send(sentry_init, capture_events):
 
     client = TestClient(litestar_app, raise_server_exceptions=False)
     try:
-        # NOTE: the assert statements checking
-        # for correct behaviour are in `SampleReceiveSendMiddleware`!
+        # See SampleReceiveSendMiddleware.__call__ above for assertions of correct behavior
         client.get("/message")
     except Exception:
         pass
 
 
 def test_middleware_partial_receive_send(sentry_init, capture_events):
+    class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
+        async def __call__(self, scope, receive, send):
+            message = await receive()
+            assert message
+            assert message["type"] == "http.request"
+
+            send_output = await send({"type": "something-unimportant"})
+            assert send_output is None
+
+            async def my_receive(*args, **kwargs):
+                pass
+
+            async def my_send(*args, **kwargs):
+                pass
+
+            partial_receive = functools.partial(my_receive)
+            partial_send = functools.partial(my_send)
+
+            await self.app(scope, partial_receive, partial_send)
+
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
@@ -284,6 +280,7 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
 
     client = TestClient(litestar_app, raise_server_exceptions=False)
     try:
+        # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
         client.get("/message")
     except Exception:
         pass
