@@ -71,18 +71,20 @@ def test_transaction_data(sentry_init, capture_events):
         with start_span(op="test-span") as span:
             span.set_data("spanfoo", "spanbar")
 
-    (transaction,) = events
-    span = transaction["spans"][0]
-
+    transaction = events[0]
     transaction_data = transaction["contexts"]["trace"]["data"]
-    span_data = span["data"]
 
+    assert "data" not in transaction.keys()
     assert transaction_data == ApproxDict(
         {
             "foo": "bar",
         }
     )
 
+    span = transaction["spans"][0]
+    span_data = span["data"]
+
+    assert "contexts" not in span.keys()
     assert span_data == ApproxDict(
         {
             "spanfoo": "spanbar",
