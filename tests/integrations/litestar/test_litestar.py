@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 
 import pytest
@@ -25,7 +26,7 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
             raise Exception("Whoa")
 
     @get("/some_url")
-    async def homepage_handler() -> dict[str, Any]:
+    async def homepage_handler() -> "dict[str, Any]":
         1 / 0
         return {"status": "ok"}
 
@@ -34,12 +35,12 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
         raise Exception("Too Hot")
 
     @get("/message")
-    async def message() -> dict[str, Any]:
+    async def message() -> "dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
     @get("/message/{message_id:str}")
-    async def message_with_id() -> dict[str, Any]:
+    async def message_with_id() -> "dict[str, Any]":
         capture_message("hi")
         return {"status": "ok"}
 
