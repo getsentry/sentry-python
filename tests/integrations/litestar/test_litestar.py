@@ -189,8 +189,12 @@ def test_middleware_spans(sentry_init, capture_events):
 
     expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
     found = set()
-    
-    litestar_spans = (span for span in transaction_event["spans"] if span["op"] == "middleware.litestar")
+
+    litestar_spans = (
+        span
+        for span in transaction_event["spans"]
+        if span["op"] == "middleware.litestar"
+    )
 
     for span in litestar_spans:
         assert span["description"] in expected
@@ -213,9 +217,9 @@ def test_middleware_callback_spans(sentry_init, capture_events):
     except Exception:
         pass
 
-    (_, transaction_event) = events
+    (_, transaction_events) = events
 
-    expected = [
+    expected_litestar_spans = [
         {
             "op": "middleware.litestar",
             "description": "SampleMiddleware",
@@ -232,10 +236,26 @@ def test_middleware_callback_spans(sentry_init, capture_events):
             "tags": {"litestar.middleware_name": "SampleMiddleware"},
         },
     ]
-    for idx, span in enumerate(transaction_event["spans"]):
-        assert span["op"] == expected[idx]["op"]
-        assert span["description"] == expected[idx]["description"]
-        assert span["tags"] == expected[idx]["tags"]
+
+    def is_matching_span(expected_span, actual_span):
+        return (
+            expected_span["op"] == actual_span["op"]
+            and expected_span["description"] == actual_span["description"]
+            and expected_span["tags"] == actual_span["tags"]
+        )
+
+    actual_litestar_spans = list(
+        span
+        for span in transaction_events["spans"]
+        if "middleware.litestar" in span["op"]
+    )
+    assert len(actual_litestar_spans) == 3
+
+    for expected_span in expected_litestar_spans:
+        assert any(
+            is_matching_span(expected_span, actual_span)
+            for actual_span in actual_litestar_spans
+        )
 
 
 def test_middleware_receive_send(sentry_init, capture_events):
@@ -268,9 +288,9 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     except Exception:
         pass
 
-    (_, transaction_event) = events
+    (_, transaction_events) = events
 
-    expected = [
+    expected_litestar_spans = [
         {
             "op": "middleware.litestar",
             "description": "SamplePartialReceiveSendMiddleware",
@@ -288,10 +308,25 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
     ]
 
-    for idx, span in enumerate(transaction_event["spans"]):
-        assert span["op"] == expected[idx]["op"]
-        assert span["description"].startswith(expected[idx]["description"])
-        assert span["tags"] == expected[idx]["tags"]
+    def is_matching_span(expected_span, actual_span):
+        return (
+            expected_span["op"] == actual_span["op"]
+            and actual_span["description"].startswith(expected_span["description"])
+            and expected_span["tags"] == actual_span["tags"]
+        )
+
+    actual_litestar_spans = list(
+        span
+        for span in transaction_events["spans"]
+        if "middleware.litestar" in span["op"]
+    )
+    assert len(actual_litestar_spans) == 3
+
+    for expected_span in expected_litestar_spans:
+        assert any(
+            is_matching_span(expected_span, actual_span)
+            for actual_span in actual_litestar_spans
+        )
 
 
 def test_span_origin(sentry_init, capture_events):
