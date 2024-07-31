@@ -249,7 +249,7 @@ def patch_http_route_handle():
 
 def retrieve_user_from_scope(scope):
     # type: (StarliteScope) -> Optional[dict[str, Any]]
-    scope_user = scope.get("user", {})
+    scope_user = scope.get("user")
     if not scope_user:
         return None
     if isinstance(scope_user, dict):
