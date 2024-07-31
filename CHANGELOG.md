@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.12.0
+
+### Various fixes & improvements
+
+- Add span data to the transactions trace context (#3374) by @antonpirker
+- ci: Remove Django setuptools pin (#3378) by @szokeasaurusrex
+- feat(integrations): Add async support for `ai_track` decorator (#3376) by @czyber
+- ref(otel): Remove experimental autoinstrumentation (#3239) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `0feb234` to `6d2c435` (#3369) by @dependabot
+- tests: Test with Django 5.1 RC (#3370) by @sentrivana
+- Expose the scope getters to top level API and use them everywhere  (#3357) by @sl0thentr0py
+- ci: Workaround bug preventing Django test runs (#3371) by @szokeasaurusrex
+- fix(api): `push_scope` deprecation warning (#3355) (#3355) by @szokeasaurusrex
+- test(sessions): Replace `push_scope` (#3354) by @szokeasaurusrex
+- test(basics): Replace `push_scope` (#3353) by @szokeasaurusrex
+- fix(api): Deprecate `configure_scope` (#3351) by @szokeasaurusrex
+- test(client): Avoid `configure_scope` (#3350) by @szokeasaurusrex
+- test(basics): Stop using `configure_scope` (#3349) by @szokeasaurusrex
+- test(celery): Stop using `configure_scope` (#3348) by @szokeasaurusrex
+- feat(graphene): Add span for grapqhl operation (#2788) by @czyber
+- docs: Document attachment parameters (#3342) by @szokeasaurusrex
+- ref(scope): Broaden `add_attachment` type (#3342) by @szokeasaurusrex
+- Revert "ci: dependency review action (#3332)" (#3338) by @mdtro
+- Gracefully fail attachment path not found case (#3337) by @sl0thentr0py
+- build(deps): bump checkouts/data-schemas from `88273a9` to `0feb234` (#3252) by @dependabot
+- ci: dependency review action (#3332) by @mdtro
+
 ## 2.11.0
 
 ### Various fixes & improvements
