@@ -260,9 +260,7 @@ def patch_http_route_handle():
 
 def retrieve_user_from_scope(scope):
     # type: (LitestarScope) -> Optional[dict[str, Any]]
-    scope_user = scope.get("user", {})
-    if not scope_user:
-        return None
+    scope_user = scope.get("user")
     if isinstance(scope_user, dict):
         return scope_user
     if hasattr(scope_user, "asdict"):  # dataclasses
