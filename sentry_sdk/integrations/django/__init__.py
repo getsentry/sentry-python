@@ -8,7 +8,7 @@ import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.db.explain_plan.django import attach_explain_plan_to_span
-from sentry_sdk.scope import Scope, add_global_event_processor, should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_URL
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -116,6 +116,7 @@ class DjangoIntegration(Integration):
 
     identifier = "django"
     origin = f"auto.http.{identifier}"
+    origin_db = f"auto.db.{identifier}"
 
     transaction_style = ""
     middleware_spans = None
@@ -370,7 +371,7 @@ def _patch_django_asgi_handler():
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, WSGIRequest) -> None
+    # type: (sentry_sdk.Scope, str, WSGIRequest) -> None
     try:
         transaction_name = None
         if transaction_style == "function_name":
@@ -418,7 +419,7 @@ def _before_get_response(request):
 
     _patch_drf()
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     # Rely on WSGI middleware to start a trace
     _set_transaction_name_and_source(scope, integration.transaction_style, request)
 
@@ -428,7 +429,7 @@ def _before_get_response(request):
 
 
 def _attempt_resolve_again(request, scope, transaction_style):
-    # type: (WSGIRequest, Scope, str) -> None
+    # type: (WSGIRequest, sentry_sdk.Scope, str) -> None
     """
     Some django middlewares overwrite request.urlconf
     so we need to respect that contract,
@@ -447,7 +448,7 @@ def _after_get_response(request):
     if integration.transaction_style != "url":
         return
 
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     _attempt_resolve_again(request, scope, integration.transaction_style)
 
 
@@ -517,7 +518,7 @@ def _got_request_exception(request=None, **kwargs):
     integration = client.get_integration(DjangoIntegration)
 
     if request is not None and integration.transaction_style == "url":
-        scope = Scope.get_current_scope()
+        scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     event, hint = event_from_exception(
@@ -630,7 +631,7 @@ def install_sql_hook():
             params_list=params,
             paramstyle="format",
             executemany=False,
-            span_origin=DjangoIntegration.origin,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
             options = (
@@ -663,7 +664,7 @@ def install_sql_hook():
             params_list=param_list,
             paramstyle="format",
             executemany=True,
-            span_origin=DjangoIntegration.origin,
+            span_origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
 
@@ -683,7 +684,7 @@ def install_sql_hook():
         with sentry_sdk.start_span(
             op=OP.DB,
             description="connect",
-            origin=DjangoIntegration.origin,
+            origin=DjangoIntegration.origin_db,
         ) as span:
             _set_db_data(span, self)
             return real_connect(self)

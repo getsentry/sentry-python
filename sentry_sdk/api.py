@@ -1,11 +1,14 @@
 import inspect
+import warnings
 from contextlib import contextmanager
 
 from sentry_sdk import tracing, tracing_utils, Client
-from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import INSTRUMENTER
+from sentry_sdk._init_implementation import init
 from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.tracing import POTelSpan, Transaction
+from sentry_sdk.tracing import POTelSpan, Transaction, trace
+from sentry_sdk.crons import monitor
+
+from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -46,6 +49,7 @@ else:
 
 # When changing this, update __all__ in __init__.py too
 __all__ = [
+    "init",
     "add_breadcrumb",
     "capture_event",
     "capture_exception",
@@ -55,6 +59,9 @@ __all__ = [
     "flush",
     "get_baggage",
     "get_client",
+    "get_global_scope",
+    "get_isolation_scope",
+    "get_current_scope",
     "get_current_span",
     "get_traceparent",
     "is_initialized",
@@ -72,6 +79,8 @@ __all__ = [
     "start_span",
     "start_inactive_span",
     "start_transaction",
+    "trace",
+    "monitor",
 ]
 
 
@@ -93,6 +102,12 @@ def clientmethod(f):
     return f
 
 
+@scopemethod
+def get_client():
+    # type: () -> BaseClient
+    return Scope.get_client()
+
+
 def is_initialized():
     # type: () -> bool
     """
@@ -104,13 +119,35 @@ def is_initialized():
     (meaning it is configured to send data) then
     Sentry is initialized.
     """
-    return Scope.get_client().is_active()
+    return get_client().is_active()
 
 
 @scopemethod
-def get_client():
-    # type: () -> BaseClient
-    return Scope.get_client()
+def get_global_scope():
+    # type: () -> Scope
+    return Scope.get_global_scope()
+
+
+@scopemethod
+def get_isolation_scope():
+    # type: () -> Scope
+    return Scope.get_isolation_scope()
+
+
+@scopemethod
+def get_current_scope():
+    # type: () -> Scope
+    return Scope.get_current_scope()
+
+
+@scopemethod
+def last_event_id():
+    # type: () -> Optional[str]
+    """
+    See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
+    this method's limitations.
+    """
+    return Scope.last_event_id()
 
 
 @scopemethod
@@ -121,9 +158,7 @@ def capture_event(
     **scope_kwargs,  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Scope.get_current_scope().capture_event(
-        event, hint, scope=scope, **scope_kwargs
-    )
+    return get_current_scope().capture_event(event, hint, scope=scope, **scope_kwargs)
 
 
 @scopemethod
@@ -134,7 +169,7 @@ def capture_message(
     **scope_kwargs,  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Scope.get_current_scope().capture_message(
+    return get_current_scope().capture_message(
         message, level, scope=scope, **scope_kwargs
     )
 
@@ -146,9 +181,7 @@ def capture_exception(
     **scope_kwargs,  # type: Any
 ):
     # type: (...) -> Optional[str]
-    return Scope.get_current_scope().capture_exception(
-        error, scope=scope, **scope_kwargs
-    )
+    return get_current_scope().capture_exception(error, scope=scope, **scope_kwargs)
 
 
 @scopemethod
@@ -158,7 +191,7 @@ def add_breadcrumb(
     **kwargs,  # type: Any
 ):
     # type: (...) -> None
-    return Scope.get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
+    return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
 
 
 @overload
@@ -186,7 +219,15 @@ def configure_scope(  # noqa: F811
 
     :returns: If no callback is provided, returns a context manager that returns the scope.
     """
-    scope = Scope.get_isolation_scope()
+    warnings.warn(
+        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
+        "Please consult our migration guide to learn how to migrate to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    scope = get_isolation_scope()
     scope.generate_propagation_context()
 
     if callback is not None:
@@ -230,9 +271,19 @@ def push_scope(  # noqa: F811
     :returns: If no `callback` is provided, a context manager that should
         be used to pop the scope again.
     """
+    warnings.warn(
+        "sentry_sdk.push_scope is deprecated and will be removed in the next major version. "
+        "Please consult our migration guide to learn how to migrate to the new API: "
+        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     if callback is not None:
-        with push_scope() as scope:
-            callback(scope)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            with push_scope() as scope:
+                callback(scope)
         return None
 
     return _ScopeManager()
@@ -241,37 +292,37 @@ def push_scope(  # noqa: F811
 @scopemethod
 def set_tag(key, value):
     # type: (str, Any) -> None
-    return Scope.get_isolation_scope().set_tag(key, value)
+    return get_isolation_scope().set_tag(key, value)
 
 
 @scopemethod
 def set_tags(tags):
     # type: (Mapping[str, object]) -> None
-    Scope.get_isolation_scope().set_tags(tags)
+    return get_isolation_scope().set_tags(tags)
 
 
 @scopemethod
 def set_context(key, value):
     # type: (str, Dict[str, Any]) -> None
-    return Scope.get_isolation_scope().set_context(key, value)
+    return get_isolation_scope().set_context(key, value)
 
 
 @scopemethod
 def set_extra(key, value):
     # type: (str, Any) -> None
-    return Scope.get_isolation_scope().set_extra(key, value)
+    return get_isolation_scope().set_extra(key, value)
 
 
 @scopemethod
 def set_user(value):
     # type: (Optional[Dict[str, Any]]) -> None
-    return Scope.get_isolation_scope().set_user(value)
+    return get_isolation_scope().set_user(value)
 
 
 @scopemethod
 def set_level(value):
     # type: (LogLevelStr) -> None
-    return Scope.get_isolation_scope().set_level(value)
+    return get_isolation_scope().set_level(value)
 
 
 @clientmethod
@@ -280,7 +331,7 @@ def flush(
     callback=None,  # type: Optional[Callable[[int, float], None]]
 ):
     # type: (...) -> None
-    return Scope.get_client().flush(timeout=timeout, callback=callback)
+    return get_client().flush(timeout=timeout, callback=callback)
 
 
 def start_span(
@@ -299,7 +350,6 @@ def start_inactive_span(
 
 def start_transaction(
     transaction=None,  # type: Optional[Transaction]
-    instrumenter=INSTRUMENTER.SENTRY,  # type: str
     custom_sampling_context=None,  # type: Optional[SamplingContext]
     **kwargs,  # type: Unpack[TransactionKwargs]
 ):
@@ -332,30 +382,17 @@ def start_transaction(
 
     :param transaction: The transaction to start. If omitted, we create and
         start a new transaction.
-    :param instrumenter: This parameter is meant for internal use only.
     :param custom_sampling_context: The transaction's custom sampling context.
     :param kwargs: Optional keyword arguments to be passed to the Transaction
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return tracing.start_transaction(
-        transaction, instrumenter, custom_sampling_context, **kwargs
-    )
-
-
-@scopemethod
-def last_event_id():
-    # type: () -> Optional[str]
-    """
-    See :py:meth:`sentry_sdk.Scope.last_event_id` documentation regarding
-    this method's limitations.
-    """
-    return Scope.last_event_id()
+    return tracing.start_transaction(transaction, custom_sampling_context, **kwargs)
 
 
 def set_measurement(name, value, unit=""):
     # type: (str, float, MeasurementUnit) -> None
-    transaction = Scope.get_current_scope().transaction
+    transaction = get_current_scope().transaction
     if transaction is not None:
         transaction.set_measurement(name, value, unit)
 
@@ -373,7 +410,7 @@ def get_traceparent():
     """
     Returns the traceparent either from the active span or from the scope.
     """
-    return Scope.get_current_scope().get_traceparent()
+    return get_current_scope().get_traceparent()
 
 
 def get_baggage():
@@ -381,7 +418,7 @@ def get_baggage():
     """
     Returns Baggage either from the active span or from the scope.
     """
-    baggage = Scope.get_current_scope().get_baggage()
+    baggage = get_current_scope().get_baggage()
     if baggage is not None:
         return baggage.serialize()
 
@@ -395,6 +432,6 @@ def continue_trace(
     """
     Sets the propagation context from environment or headers and returns a transaction.
     """
-    return Scope.get_isolation_scope().continue_trace(
+    return get_isolation_scope().continue_trace(
         environ_or_headers, op, name, source, origin
     )

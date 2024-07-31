@@ -25,7 +25,6 @@ from sentry_sdk.transport import HttpTransport, make_transport
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
     VERSION,
     ClientConstructor,
 )
@@ -112,9 +111,6 @@ def _get_options(*args, **kwargs):
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
-
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     if rv["project_root"] is None:
         try:
@@ -271,7 +267,6 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-
             except module_not_found_error:
                 try:
                     # Try to import a class
@@ -357,7 +352,6 @@ class _Client(BaseClient):
                 logger.debug(
                     "[OTel] Enabling experimental OTel-powered performance monitoring."
                 )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
                 if (
                     "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
                     not in _DEFAULT_INTEGRATIONS
@@ -372,6 +366,7 @@ class _Client(BaseClient):
                 with_auto_enabling_integrations=self.options[
                     "auto_enabling_integrations"
                 ],
+                disabled_integrations=self.options["disabled_integrations"],
             )
 
             self.spotlight = None
@@ -448,6 +443,7 @@ class _Client(BaseClient):
 
         if scope is not None:
             is_transaction = event.get("type") == "transaction"
+            spans_before = len(event.get("spans", []))
             event_ = scope.apply_to_event(event, hint, self.options)
 
             # one of the event/error processors returned None
@@ -457,9 +453,21 @@ class _Client(BaseClient):
                         "event_processor",
                         data_category=("transaction" if is_transaction else "error"),
                     )
+                    if is_transaction:
+                        self.transport.record_lost_event(
+                            "event_processor",
+                            data_category="span",
+                            quantity=spans_before + 1,  # +1 for the transaction itself
+                        )
                 return None
 
             event = event_
+
+            spans_delta = spans_before - len(event.get("spans", []))
+            if is_transaction and spans_delta > 0 and self.transport is not None:
+                self.transport.record_lost_event(
+                    "event_processor", data_category="span", quantity=spans_delta
+                )
 
         if (
             self.options["attach_stacktrace"]
@@ -541,14 +549,27 @@ class _Client(BaseClient):
             and event.get("type") == "transaction"
         ):
             new_event = None
+            spans_before = len(event.get("spans", []))
             with capture_internal_exceptions():
                 new_event = before_send_transaction(event, hint or {})
             if new_event is None:
                 logger.info("before send transaction dropped event")
                 if self.transport:
                     self.transport.record_lost_event(
-                        "before_send", data_category="transaction"
+                        reason="before_send", data_category="transaction"
                     )
+                    self.transport.record_lost_event(
+                        reason="before_send",
+                        data_category="span",
+                        quantity=spans_before + 1,  # +1 for the transaction itself
+                    )
+            else:
+                spans_delta = spans_before - len(new_event.get("spans", []))
+                if spans_delta > 0 and self.transport is not None:
+                    self.transport.record_lost_event(
+                        reason="before_send", data_category="span", quantity=spans_delta
+                    )
+
             event = new_event  # type: ignore
 
         return event

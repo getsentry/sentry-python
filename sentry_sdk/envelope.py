@@ -189,9 +189,7 @@ class PayloadRef:
                         self.bytes = f.read()
             elif self.json is not None:
                 self.bytes = json_dumps(self.json)
-            else:
-                self.bytes = b""
-        return self.bytes
+        return self.bytes or b""
 
     @property
     def inferred_content_type(self):

@@ -16,13 +16,13 @@ try:
 except ImportError:
     from django.core.urlresolvers import reverse
 
+import sentry_sdk
 from sentry_sdk._compat import PY310
 from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration, _set_db_data
 from sentry_sdk.integrations.django.signals_handlers import _get_receiver_name
 from sentry_sdk.integrations.executing import ExecutingIntegration
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import Span
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
@@ -342,7 +342,7 @@ def test_sql_queries(sentry_init, capture_events, with_integration):
 
     sql = connection.cursor()
 
-    Scope.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(OperationalError):
         # table doesn't even exist
@@ -376,7 +376,7 @@ def test_sql_dict_query_params(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    Scope.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(ProgrammingError):
         sql.execute(
@@ -441,7 +441,7 @@ def test_sql_psycopg2_string_composition(sentry_init, capture_events, query):
 
     sql = connections["postgres"].cursor()
 
-    Scope.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
     events = capture_events()
 
@@ -474,7 +474,7 @@ def test_sql_psycopg2_placeholders(sentry_init, capture_events):
     sql = connections["postgres"].cursor()
 
     events = capture_events()
-    Scope.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(DataError):
         names = ["foo", "bar"]
@@ -626,7 +626,9 @@ def test_db_connection_span_data(sentry_init, client, capture_events):
             assert data.get(SPANDATA.SERVER_ADDRESS) == os.environ.get(
                 "SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost"
             )
-            assert data.get(SPANDATA.SERVER_PORT) == "5432"
+            assert data.get(SPANDATA.SERVER_PORT) == os.environ.get(
+                "SENTRY_PYTHON_TEST_POSTGRES_PORT", "5432"
+            )
 
 
 def test_set_db_data_custom_backend():

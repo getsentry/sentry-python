@@ -10,7 +10,6 @@ from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT, TRANSACTION_SOURCE_URL
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -28,13 +27,12 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Optional
     from typing import Union
-    from typing import Tuple
     from typing import Dict
 
     from sanic.request import Request, RequestParameters
     from sanic.response import BaseHTTPResponse
 
-    from sentry_sdk._types import Event, EventProcessor, Hint
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
     from sanic.router import Route
 
 try:
@@ -236,7 +234,7 @@ async def _set_transaction(request, route, **_):
     # type: (Request, Route, **Any) -> None
     if request.ctx._sentry_do_integration:
         with capture_internal_exceptions():
-            scope = Scope.get_current_scope()
+            scope = sentry_sdk.get_current_scope()
             route_name = route.name.replace(request.app.name, "").strip(".")
             scope.set_transaction_name(route_name, source=TRANSACTION_SOURCE_COMPONENT)
 
@@ -298,7 +296,7 @@ def _legacy_router_get(self, *args):
     rv = old_router_get(self, *args)
     if sentry_sdk.get_client().get_integration(SanicIntegration) is not None:
         with capture_internal_exceptions():
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             if SanicIntegration.version and SanicIntegration.version >= (21, 3):
                 # Sanic versions above and including 21.3 append the app name to the
                 # route name, and so we need to remove it from Route name so the
@@ -325,7 +323,7 @@ def _legacy_router_get(self, *args):
 
 @ensure_integration_enabled(SanicIntegration)
 def _capture_exception(exception):
-    # type: (Union[Tuple[Optional[type], Optional[BaseException], Any], BaseException]) -> None
+    # type: (Union[ExcInfo, BaseException]) -> None
     with capture_internal_exceptions():
         event, hint = event_from_exception(
             exception,

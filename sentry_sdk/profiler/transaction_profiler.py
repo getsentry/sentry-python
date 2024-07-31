@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 import uuid
+import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 
@@ -213,7 +214,6 @@ class Profile:
     ):
         # type: (...) -> None
         self.scheduler = _scheduler if scheduler is None else scheduler
-        self.hub = hub
 
         self.event_id = uuid.uuid4().hex  # type: str
 
@@ -239,6 +239,16 @@ class Profile:
         self.samples = []  # type: List[ProcessedSample]
 
         self.unique_samples = 0
+
+        # Backwards compatibility with the old hub property
+        self._hub = None  # type: Optional[sentry_sdk.Hub]
+        if hub is not None:
+            self._hub = hub
+            warnings.warn(
+                "The `hub` parameter is deprecated. Please do not use it.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
     def update_active_thread_id(self):
         # type: () -> None
@@ -278,7 +288,7 @@ class Profile:
             self.sampled = False
             return
 
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         if not client.is_active():
             self.sampled = False
             return
@@ -346,7 +356,7 @@ class Profile:
 
     def __enter__(self):
         # type: () -> Profile
-        scope = sentry_sdk.scope.Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         old_profile = scope.profile
         scope.profile = self
 
@@ -482,7 +492,7 @@ class Profile:
 
     def valid(self):
         # type: () -> bool
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         if not client.is_active():
             return False
 
@@ -505,6 +515,26 @@ class Profile:
             return False
 
         return True
+
+    @property
+    def hub(self):
+        # type: () -> Optional[sentry_sdk.Hub]
+        warnings.warn(
+            "The `hub` attribute is deprecated. Please do not access it.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._hub
+
+    @hub.setter
+    def hub(self, value):
+        # type: (Optional[sentry_sdk.Hub]) -> None
+        warnings.warn(
+            "The `hub` attribute is deprecated. Please do not set it.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._hub = value
 
 
 class Scheduler(ABC):

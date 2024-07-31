@@ -1,12 +1,13 @@
 import uuid
 import random
+import warnings
 from datetime import datetime, timedelta, timezone
 
 from opentelemetry import trace as otel_trace, context
 from opentelemetry.trace.status import StatusCode
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANDATA
+from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     get_current_thread_meta,
@@ -122,10 +123,8 @@ if TYPE_CHECKING:
         },
     )
 
-
 BAGGAGE_HEADER_NAME = "baggage"
 SENTRY_TRACE_HEADER_NAME = "sentry-trace"
-
 
 # Transaction source
 # see https://develop.sentry.dev/sdk/event-payloads/transaction/#transaction-annotations
@@ -154,6 +153,45 @@ SOURCE_FOR_STYLE = {
 }
 
 tracer = otel_trace.get_tracer(__name__)
+
+
+def get_span_status_from_http_code(http_status_code):
+    # type: (int) -> str
+    """
+    Returns the Sentry status corresponding to the given HTTP status code.
+
+    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
+    """
+    if http_status_code < 400:
+        return SPANSTATUS.OK
+
+    elif 400 <= http_status_code < 500:
+        if http_status_code == 403:
+            return SPANSTATUS.PERMISSION_DENIED
+        elif http_status_code == 404:
+            return SPANSTATUS.NOT_FOUND
+        elif http_status_code == 429:
+            return SPANSTATUS.RESOURCE_EXHAUSTED
+        elif http_status_code == 413:
+            return SPANSTATUS.FAILED_PRECONDITION
+        elif http_status_code == 401:
+            return SPANSTATUS.UNAUTHENTICATED
+        elif http_status_code == 409:
+            return SPANSTATUS.ALREADY_EXISTS
+        else:
+            return SPANSTATUS.INVALID_ARGUMENT
+
+    elif 500 <= http_status_code < 600:
+        if http_status_code == 504:
+            return SPANSTATUS.DEADLINE_EXCEEDED
+        elif http_status_code == 501:
+            return SPANSTATUS.UNIMPLEMENTED
+        elif http_status_code == 503:
+            return SPANSTATUS.UNAVAILABLE
+        else:
+            return SPANSTATUS.INTERNAL_ERROR
+
+    return SPANSTATUS.UNKNOWN_ERROR
 
 
 class _SpanRecorder:
@@ -254,13 +292,23 @@ class Span:
         self.op = op
         self.description = description
         self.status = status
-        self.hub = hub
+        self.hub = hub  # backwards compatibility
         self.scope = scope
         self.origin = origin
         self._measurements = {}  # type: Dict[str, MeasurementValue]
         self._tags = {}  # type: MutableMapping[str, str]
         self._data = {}  # type: Dict[str, Any]
         self._containing_transaction = containing_transaction
+
+        if hub is not None:
+            warnings.warn(
+                "The `hub` parameter is deprecated. Please use `scope` instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+            self.scope = self.scope or hub.scope
+
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
         elif isinstance(start_timestamp, float):
@@ -315,7 +363,7 @@ class Span:
 
     def __enter__(self):
         # type: () -> Span
-        scope = self.scope or sentry_sdk.Scope.get_current_scope()
+        scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
         self._context_manager_state = (scope, old_span)
@@ -324,7 +372,7 @@ class Span:
     def __exit__(self, ty, value, tb):
         # type: (Optional[Any], Optional[Any], Optional[Any]) -> None
         if value is not None:
-            self.set_status("internal_error")
+            self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         scope, old_span = self._context_manager_state
         del self._context_manager_state
@@ -343,22 +391,19 @@ class Span:
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> Span
+    def start_child(self, **kwargs):
+        # type: (**Any) -> Span
         """
         Start a sub-span from the current span or transaction.
 
         Takes the same arguments as the initializer of :py:class:`Span`. The
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
+
+        The instrumenter parameter is deprecated for user code, and it will
+        be removed in the next major version. Going forward, it should only
+        be used by the SDK itself.
         """
-        configuration_instrumenter = sentry_sdk.Scope.get_client().options[
-            "instrumenter"
-        ]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
-
         kwargs.setdefault("sampled", self.sampled)
 
         child = Span(
@@ -547,37 +592,9 @@ class Span:
         # type: (int) -> None
         self.set_tag(
             "http.status_code", str(http_status)
-        )  # we keep this for backwards compatability
+        )  # we keep this for backwards compatibility
         self.set_data(SPANDATA.HTTP_STATUS_CODE, http_status)
-
-        if http_status < 400:
-            self.set_status("ok")
-        elif 400 <= http_status < 500:
-            if http_status == 403:
-                self.set_status("permission_denied")
-            elif http_status == 404:
-                self.set_status("not_found")
-            elif http_status == 429:
-                self.set_status("resource_exhausted")
-            elif http_status == 413:
-                self.set_status("failed_precondition")
-            elif http_status == 401:
-                self.set_status("unauthenticated")
-            elif http_status == 409:
-                self.set_status("already_exists")
-            else:
-                self.set_status("invalid_argument")
-        elif 500 <= http_status < 600:
-            if http_status == 504:
-                self.set_status("deadline_exceeded")
-            elif http_status == 501:
-                self.set_status("unimplemented")
-            elif http_status == 503:
-                self.set_status("unavailable")
-            else:
-                self.set_status("internal_error")
-        else:
-            self.set_status("unknown_error")
+        self.set_status(get_span_status_from_http_code(http_status))
 
     def is_success(self):
         # type: () -> bool
@@ -616,7 +633,7 @@ class Span:
         except AttributeError:
             self.timestamp = datetime.now(timezone.utc)
 
-        scope = scope or sentry_sdk.Scope.get_current_scope()
+        scope = scope or sentry_sdk.get_current_scope()
         maybe_create_breadcrumbs_from_span(scope, self)
 
         return None
@@ -787,7 +804,7 @@ class Transaction(Span):
     def __enter__(self):
         # type: () -> Transaction
         if not self._possibly_started():
-            logger.warning(
+            logger.debug(
                 "Transaction was entered without being started with sentry_sdk.start_transaction."
                 "The transaction will not be sent to Sentry. To fix, start the transaction by"
                 "passing it to sentry_sdk.start_transaction."
@@ -819,15 +836,57 @@ class Transaction(Span):
         # reference.
         return self
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
+    def _get_scope_from_finish_args(
+        self,
+        scope_arg,  # type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]
+        hub_arg,  # type: Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]
+    ):
+        # type: (...) -> Optional[sentry_sdk.Scope]
+        """
+        Logic to get the scope from the arguments passed to finish. This
+        function exists for backwards compatibility with the old finish.
+
+        TODO: Remove this function in the next major version.
+        """
+        scope_or_hub = scope_arg
+        if hub_arg is not None:
+            warnings.warn(
+                "The `hub` parameter is deprecated. Please use the `scope` parameter, instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+
+            scope_or_hub = hub_arg
+
+        if isinstance(scope_or_hub, sentry_sdk.Hub):
+            warnings.warn(
+                "Passing a Hub to finish is deprecated. Please pass a Scope, instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+
+            return scope_or_hub.scope
+
+        return scope_or_hub
+
+    def finish(
+        self,
+        scope=None,  # type: Optional[sentry_sdk.Scope]
+        end_timestamp=None,  # type: Optional[Union[float, datetime]]
+        *,
+        hub=None,  # type: Optional[sentry_sdk.Hub]
+    ):
+        # type: (...) -> Optional[str]
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
 
-        :param hub: The hub to use for this transaction.
-            If not provided, the current hub will be used.
+        :param scope: The Scope to use for this transaction.
+            If not provided, the current Scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
+        :param hub: The hub to use for this transaction.
+            This argument is DEPRECATED. Please use the `scope`
+            parameter, instead.
 
         :return: The event ID if the transaction was sent to Sentry,
             otherwise None.
@@ -836,8 +895,14 @@ class Transaction(Span):
             # This transaction is already finished, ignore.
             return None
 
-        hub = hub or self.hub or sentry_sdk.Hub.current
-        client = sentry_sdk.Scope.get_client()
+        # For backwards compatibility, we must handle the case where `scope`
+        # or `hub` could both either be a `Scope` or a `Hub`.
+        scope = self._get_scope_from_finish_args(
+            scope, hub
+        )  # type: Optional[sentry_sdk.Scope]
+
+        scope = scope or self.scope or sentry_sdk.get_current_scope()
+        client = sentry_sdk.get_client()
 
         if not client.is_active():
             # We have no active client and therefore nowhere to send this transaction.
@@ -863,6 +928,8 @@ class Transaction(Span):
 
                 client.transport.record_lost_event(reason, data_category="transaction")
 
+                # Only one span (the transaction itself) is discarded, since we did not record any spans here.
+                client.transport.record_lost_event(reason, data_category="span")
             return None
 
         if not self.name:
@@ -871,7 +938,7 @@ class Transaction(Span):
             )
             self.name = "<unlabeled transaction>"
 
-        super().finish(hub, end_timestamp)
+        super().finish(scope, end_timestamp)
 
         if not self.sampled:
             # At this point a `sampled = None` should have already been resolved
@@ -924,7 +991,7 @@ class Transaction(Span):
             if metrics_summary:
                 event["_metrics_summary"] = metrics_summary
 
-        return hub.capture_event(event)
+        return scope.capture_event(event)
 
     def set_measurement(self, name, value, unit=""):
         # type: (str, float, MeasurementUnit) -> None
@@ -994,7 +1061,7 @@ class Transaction(Span):
         4. If `traces_sampler` is not defined and there's no parent sampling
         decision, `traces_sample_rate` will be used.
         """
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
 
         transaction_description = "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
@@ -1088,8 +1155,8 @@ class NoOpSpan(Span):
         # type: () -> Optional[Transaction]
         return None
 
-    def start_child(self, instrumenter=INSTRUMENTER.SENTRY, **kwargs):
-        # type: (str, **Any) -> NoOpSpan
+    def start_child(self, **kwargs):
+        # type: (**Any) -> NoOpSpan
         return NoOpSpan()
 
     def to_traceparent(self):
@@ -1140,8 +1207,17 @@ class NoOpSpan(Span):
         # type: () -> Any
         return {}
 
-    def finish(self, hub=None, end_timestamp=None):
-        # type: (Optional[Union[sentry_sdk.Hub, sentry_sdk.Scope]], Optional[Union[float, datetime]]) -> Optional[str]
+    def finish(
+        self,
+        scope=None,  # type: Optional[sentry_sdk.Scope]
+        end_timestamp=None,  # type: Optional[Union[float, datetime]]
+        *,
+        hub=None,  # type: Optional[sentry_sdk.Hub]
+    ):
+        # type: (...) -> Optional[str]
+        """
+        The `hub` parameter is deprecated. Please use the `scope` parameter, instead.
+        """
         pass
 
     def set_measurement(self, name, value, unit=""):

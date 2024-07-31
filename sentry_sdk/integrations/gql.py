@@ -6,7 +6,7 @@ from sentry_sdk.utils import (
 )
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 
 try:
     import gql  # type: ignore[import-not-found]
@@ -94,7 +94,7 @@ def _patch_execute():
     @ensure_integration_enabled(GQLIntegration, real_execute)
     def sentry_patched_execute(self, document, *args, **kwargs):
         # type: (gql.Client, DocumentNode, Any, Any) -> Any
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope.add_event_processor(_make_gql_event_processor(self, document))
 
         try:

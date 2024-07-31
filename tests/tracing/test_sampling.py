@@ -4,7 +4,8 @@ from unittest import mock
 
 import pytest
 
-from sentry_sdk import Scope, start_span, start_transaction, capture_exception
+import sentry_sdk
+from sentry_sdk import start_span, start_transaction, capture_exception
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.utils import logger
 
@@ -56,7 +57,7 @@ def test_get_transaction_and_span_from_scope_regardless_of_sampling_decision(
     with start_transaction(name="/", sampled=sampling_decision):
         with start_span(op="child-span"):
             with start_span(op="child-child-span"):
-                scope = Scope.get_current_scope()
+                scope = sentry_sdk.get_current_scope()
                 assert scope.span.op == "child-child-span"
                 assert scope.transaction.name == "/"
 
@@ -264,7 +265,11 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     "traces_sample_rate,sampled_output,expected_record_lost_event_calls",
     [
         (None, False, []),
-        (0.0, False, [("sample_rate", "transaction", None)]),
+        (
+            0.0,
+            False,
+            [("sample_rate", "transaction", None, 1), ("sample_rate", "span", None, 1)],
+        ),
         (1.0, True, []),
     ],
 )
@@ -290,7 +295,11 @@ def test_records_lost_event_only_if_traces_sample_rate_enabled(
     "traces_sampler,sampled_output,expected_record_lost_event_calls",
     [
         (None, False, []),
-        (lambda _x: 0.0, False, [("sample_rate", "transaction", None)]),
+        (
+            lambda _x: 0.0,
+            False,
+            [("sample_rate", "transaction", None, 1), ("sample_rate", "span", None, 1)],
+        ),
         (lambda _x: 1.0, True, []),
     ],
 )

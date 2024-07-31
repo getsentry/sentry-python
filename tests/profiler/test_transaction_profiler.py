@@ -1,8 +1,10 @@
 import inspect
 import os
+import sentry_sdk
 import sys
 import threading
 import time
+import warnings
 from collections import defaultdict
 from unittest import mock
 
@@ -162,7 +164,7 @@ def test_profiles_sample_rate(
     elif profile_count:
         assert record_lost_event_calls == []
     else:
-        assert record_lost_event_calls == [("sample_rate", "profile", None)]
+        assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
 @pytest.mark.parametrize(
@@ -231,7 +233,7 @@ def test_profiles_sampler(
     if profile_count:
         assert record_lost_event_calls == []
     else:
-        assert record_lost_event_calls == [("sample_rate", "profile", None)]
+        assert record_lost_event_calls == [("sample_rate", "profile", None, 1)]
 
 
 def test_minimum_unique_samples_required(
@@ -260,7 +262,7 @@ def test_minimum_unique_samples_required(
     # because we dont leave any time for the profiler to
     # take any samples, it should be not be sent
     assert len(items["profile"]) == 0
-    assert record_lost_event_calls == [("insufficient_data", "profile", None)]
+    assert record_lost_event_calls == [("insufficient_data", "profile", None, 1)]
 
 
 @pytest.mark.forked
@@ -813,3 +815,27 @@ def test_profile_processing(
             assert processed["frames"] == expected["frames"]
             assert processed["stacks"] == expected["stacks"]
             assert processed["samples"] == expected["samples"]
+
+
+def test_hub_backwards_compatibility(suppress_deprecation_warnings):
+    hub = sentry_sdk.Hub()
+
+    with pytest.warns(DeprecationWarning):
+        profile = Profile(True, 0, hub=hub)
+
+    with pytest.warns(DeprecationWarning):
+        assert profile.hub is hub
+
+    new_hub = sentry_sdk.Hub()
+
+    with pytest.warns(DeprecationWarning):
+        profile.hub = new_hub
+
+    with pytest.warns(DeprecationWarning):
+        assert profile.hub is new_hub
+
+
+def test_no_warning_without_hub():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        Profile(True, 0)

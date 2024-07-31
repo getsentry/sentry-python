@@ -2,7 +2,6 @@ import sentry_sdk
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import Scope
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -106,7 +105,7 @@ class SentryFalconMiddleware:
         if integration is None:
             return
 
-        scope = Scope.get_isolation_scope()
+        scope = sentry_sdk.get_isolation_scope()
         scope._name = "falcon"
         scope.add_event_processor(_make_request_event_processor(req, integration))
 

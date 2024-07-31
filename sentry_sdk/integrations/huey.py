@@ -4,9 +4,9 @@ from datetime import datetime
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -106,16 +106,16 @@ def _make_event_processor(task):
 
 def _capture_exception(exc_info):
     # type: (ExcInfo) -> None
-    scope = Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
 
     if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        scope.transaction.set_status("aborted")
+        scope.transaction.set_status(SPANSTATUS.ABORTED)
         return
 
-    scope.transaction.set_status("internal_error")
+    scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
     event, hint = event_from_exception(
         exc_info,
-        client_options=Scope.get_client().options,
+        client_options=sentry_sdk.get_client().options,
         mechanism={"type": HueyIntegration.identifier, "handled": False},
     )
     scope.capture_event(event, hint=hint)
@@ -161,7 +161,7 @@ def patch_execute():
                 source=TRANSACTION_SOURCE_TASK,
                 origin=HueyIntegration.origin,
             )
-            transaction.set_status("ok")
+            transaction.set_status(SPANSTATUS.OK)
 
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
