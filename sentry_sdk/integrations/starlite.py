@@ -1,6 +1,5 @@
-from typing import TYPE_CHECKING
-
 import sentry_sdk
+from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -20,25 +19,25 @@ try:
     from starlite.routes.http import HTTPRoute  # type: ignore
     from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
     from pydantic import BaseModel  # type: ignore
-
-    if TYPE_CHECKING:
-        from typing import Any, Optional, Union
-        from starlite.types import (  # type: ignore
-            ASGIApp,
-            Hint,
-            HTTPReceiveMessage,
-            HTTPScope,
-            Message,
-            Middleware,
-            Receive,
-            Scope as StarliteScope,
-            Send,
-            WebSocketReceiveMessage,
-        )
-        from starlite import MiddlewareProtocol
-        from sentry_sdk._types import Event
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
+
+if TYPE_CHECKING:
+    from typing import Any, Optional, Union
+    from starlite.types import (  # type: ignore
+        ASGIApp,
+        Hint,
+        HTTPReceiveMessage,
+        HTTPScope,
+        Message,
+        Middleware,
+        Receive,
+        Scope as StarliteScope,
+        Send,
+        WebSocketReceiveMessage,
+    )
+    from starlite import MiddlewareProtocol
+    from sentry_sdk._types import Event
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlite request"
@@ -84,7 +83,7 @@ def patch_app_init():
         # type: (Starlite, *Any, **Any) -> None
         kwargs["after_exception"] = [
             exception_handler,
-            *kwargs.get("after_exception", []),
+            *(kwargs.get("after_exception") or []),
         ]
 
         SentryStarliteASGIMiddleware.__call__ = SentryStarliteASGIMiddleware._run_asgi3  # type: ignore
