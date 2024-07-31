@@ -268,14 +268,6 @@ def retrieve_user_from_scope(scope):
     if hasattr(scope_user, "asdict"):  # dataclasses
         return scope_user.asdict()
 
-    # NOTE: The following section was not ported from the original StarliteIntegration based on starlite 1.x
-    # because as get_plugin_for_value from starlite 1.x no longer exists in litestar 2.y, and it is not clear
-    # what would need to be done here
-    #
-    # plugin = get_plugin_for_value(scope_user)
-    # if plugin and not is_async_callable(plugin.to_dict):
-    #     return plugin.to_dict(scope_user)
-
     return None
 
 
