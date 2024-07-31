@@ -20,10 +20,20 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
+    from typing import Sequence
     from typing import Tuple
     from typing import Type
     from typing import Union
     from typing_extensions import Literal, TypedDict
+
+    SdkInfo = TypedDict(
+        "SdkInfo",
+        {
+            "name": str,
+            "version": str,
+            "packages": Sequence[Any],
+        },
+    )
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
