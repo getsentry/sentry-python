@@ -1,15 +1,15 @@
+import logging
+
+import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
+from sentry_sdk.utils import package_version
 
 try:
     import ray  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("Ray not installed.")
 import functools
-
-from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
-import logging
-import sentry_sdk
-from importlib.metadata import version
 
 from typing import TYPE_CHECKING
 
@@ -22,8 +22,7 @@ def _check_sentry_initialized():
     # type: () -> None
     if sentry_sdk.get_client().is_active():
         return
-    
-    # We cannot use Sentry SDK logging facilities because it wasn't initialized
+
     logger = logging.getLogger("sentry_sdk.errors")
     logger.warning(
         "[Tracing] Sentry not initialized in ray cluster worker, performance data will be discarded."
@@ -40,6 +39,7 @@ def _patch_ray_remote():
         def _f(*f_args, _tracing=None, **f_kwargs):
             # type: (Any, Optional[dict[str, Any]],  Any) -> Any
             _check_sentry_initialized()
+
             transaction = None
             if _tracing is not None:
                 transaction = sentry_sdk.continue_trace(
@@ -48,9 +48,10 @@ def _patch_ray_remote():
                     source=TRANSACTION_SOURCE_TASK,
                     name="Ray worker transaction",
                 )
-            with sentry_sdk.start_transaction(transaction) as tx:
+
+            with sentry_sdk.start_transaction(transaction) as transaction:
                 result = f(*f_args, **f_kwargs)
-                tx.set_status("ok")
+                transaction.set_status("ok")
                 return result
 
         rv = old_remote(_f, *args, *kwargs)
@@ -77,10 +78,17 @@ def _patch_ray_remote():
 
 class RayIntegration(Integration):
     identifier = "ray"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
         # type: () -> None
-        if tuple(int(x) for x in version("ray").split(".")) < (2, 7, 0):
+        version = package_version("ray")
+
+        if version is None:
+            raise DidNotEnable("Unparsable ray version: {}".format(version))
+
+        if version < (2, 7, 0):
             raise DidNotEnable("Ray 2.7.0 or newer required")
+
         _patch_ray_remote()
