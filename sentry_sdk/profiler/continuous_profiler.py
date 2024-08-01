@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
     from typing_extensions import TypedDict
-    from sentry_sdk._types import ContinuousProfilerMode, SdkInfo
+    from sentry_sdk._types import ContinuousProfilerMode, SDKInfo
     from sentry_sdk.profiler.utils import (
         ExtractedSample,
         FrameId,
@@ -67,7 +67,7 @@ _scheduler = None  # type: Optional[ContinuousScheduler]
 
 
 def setup_continuous_profiler(options, sdk_info, capture_func):
-    # type: (Dict[str, Any], SdkInfo, Callable[[Envelope], None]) -> bool
+    # type: (Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> bool
     global _scheduler
 
     if _scheduler is not None:
@@ -168,7 +168,7 @@ class ContinuousScheduler(object):
     mode = "unknown"  # type: ContinuousProfilerMode
 
     def __init__(self, frequency, options, sdk_info, capture_func):
-        # type: (int, Dict[str, Any], SdkInfo, Callable[[Envelope], None]) -> None
+        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
         self.interval = 1.0 / frequency
         self.options = options
         self.sdk_info = sdk_info
@@ -273,7 +273,7 @@ class ThreadContinuousScheduler(ContinuousScheduler):
     name = "sentry.profiler.ThreadContinuousScheduler"
 
     def __init__(self, frequency, options, sdk_info, capture_func):
-        # type: (int, Dict[str, Any], SdkInfo, Callable[[Envelope], None]) -> None
+        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
         super().__init__(frequency, options, sdk_info, capture_func)
 
         self.thread = None  # type: Optional[threading.Thread]
@@ -348,7 +348,7 @@ class GeventContinuousScheduler(ContinuousScheduler):
     mode = "gevent"  # type: ContinuousProfilerMode
 
     def __init__(self, frequency, options, sdk_info, capture_func):
-        # type: (int, Dict[str, Any], SdkInfo, Callable[[Envelope], None]) -> None
+        # type: (int, Dict[str, Any], SDKInfo, Callable[[Envelope], None]) -> None
 
         if ThreadPool is None:
             raise ValueError("Profiler mode: {} is not available".format(self.mode))
@@ -412,7 +412,7 @@ PROFILE_BUFFER_SECONDS = 10
 
 class ProfileBuffer(object):
     def __init__(self, options, sdk_info, buffer_size, capture_func):
-        # type: (Dict[str, Any], SdkInfo, int, Callable[[Envelope], None]) -> None
+        # type: (Dict[str, Any], SDKInfo, int, Callable[[Envelope], None]) -> None
         self.options = options
         self.sdk_info = sdk_info
         self.buffer_size = buffer_size
@@ -499,7 +499,7 @@ class ProfileChunk(object):
                 capture_internal_exception(sys.exc_info())
 
     def to_json(self, profiler_id, options, sdk_info):
-        # type: (str, Dict[str, Any], SdkInfo) -> Dict[str, Any]
+        # type: (str, Dict[str, Any], SDKInfo) -> Dict[str, Any]
         profile = {
             "frames": self.frames,
             "stacks": self.stacks,
@@ -522,7 +522,7 @@ class ProfileChunk(object):
         payload = {
             "chunk_id": self.chunk_id,
             "client_sdk": {
-                "name": sdk_info.get("name", "sentry.python"),
+                "name": sdk_info["name"],
                 "version": VERSION,
             },
             "platform": "python",

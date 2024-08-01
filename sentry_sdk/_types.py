@@ -26,12 +26,12 @@ if TYPE_CHECKING:
     from typing import Union
     from typing_extensions import Literal, TypedDict
 
-    SdkInfo = TypedDict(
-        "SdkInfo",
+    SDKInfo = TypedDict(
+        "SDKInfo",
         {
             "name": str,
             "version": str,
-            "packages": Sequence[Any],
+            "packages": Sequence[Mapping[str, str]],
         },
     )
 

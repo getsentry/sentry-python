@@ -32,13 +32,11 @@ def experimental_options(mode=None, auto_start=None):
     }
 
 
-@pytest.fixture
-def sdk_info():
-    return {
-        "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
-        "version": VERSION,
-        "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-    }
+mock_sdk_info = {
+    "name": "sentry.python",
+    "version": VERSION,
+    "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
+}
 
 
 @pytest.mark.parametrize("mode", [pytest.param("foo")])
@@ -46,13 +44,11 @@ def sdk_info():
     "make_options",
     [pytest.param(experimental_options, id="experiment")],
 )
-def test_continuous_profiler_invalid_mode(
-    mode, make_options, sdk_info, teardown_profiling
-):
+def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
     with pytest.raises(ValueError):
         setup_continuous_profiler(
             make_options(mode=mode),
-            sdk_info,
+            mock_sdk_info,
             lambda envelope: None,
         )
 
@@ -68,13 +64,11 @@ def test_continuous_profiler_invalid_mode(
     "make_options",
     [pytest.param(experimental_options, id="experiment")],
 )
-def test_continuous_profiler_valid_mode(
-    mode, make_options, sdk_info, teardown_profiling
-):
+def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
     options = make_options(mode=mode)
     setup_continuous_profiler(
         options,
-        sdk_info,
+        mock_sdk_info,
         lambda envelope: None,
     )
 
@@ -90,20 +84,18 @@ def test_continuous_profiler_valid_mode(
     "make_options",
     [pytest.param(experimental_options, id="experiment")],
 )
-def test_continuous_profiler_setup_twice(
-    mode, make_options, sdk_info, teardown_profiling
-):
+def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
     options = make_options(mode=mode)
     # setting up the first time should return True to indicate success
     assert setup_continuous_profiler(
         options,
-        sdk_info,
+        mock_sdk_info,
         lambda envelope: None,
     )
     # setting up the second time should return False to indicate no-op
     assert not setup_continuous_profiler(
         options,
-        sdk_info,
+        mock_sdk_info,
         lambda envelope: None,
     )
 
