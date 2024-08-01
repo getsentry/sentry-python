@@ -258,6 +258,7 @@ def test_transaction_tags_started_with_otel(capture_envelopes):
     sentry_sdk.set_tag("tag.global", 99)
     with tracer.start_as_current_span("request"):
         sentry_sdk.set_tag("tag.inner", "foo")
+        print(sentry_sdk.get_isolation_scope())
 
     (envelope,) = envelopes
     (item,) = envelope.items
@@ -297,7 +298,9 @@ def test_multiple_transaction_tags_isolation_scope_started_with_otel(capture_env
     assert payload_b["tags"] == {"tag.global": 99, "tag.inner.b": "b"}
 
 
-def test_multiple_transaction_tags_isolation_scope_started_with_sentry(capture_envelopes):
+def test_multiple_transaction_tags_isolation_scope_started_with_sentry(
+    capture_envelopes,
+):
     envelopes = capture_envelopes()
 
     sentry_sdk.set_tag("tag.global", 99)

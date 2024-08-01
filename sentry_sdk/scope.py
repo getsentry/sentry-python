@@ -304,7 +304,6 @@ class Scope(object):
         """
         return _isolation_scope.get()
 
-
     @classmethod
     def set_isolation_scope(cls, new_isolation_scope):
         # type: (Scope) -> None
@@ -359,13 +358,11 @@ class Scope(object):
         final_scope = copy(_global_scope) if _global_scope is not None else Scope()
         final_scope._type = ScopeType.MERGED
 
-        isolation_scope = self._get_isolation_scope()
-        if isolation_scope is not None:
-            final_scope.update_from_scope(isolation_scope)
+        isolation_scope = self.get_isolation_scope()
+        final_scope.update_from_scope(isolation_scope)
 
-        current_scope = self._get_current_scope()
-        if current_scope is not None:
-            final_scope.update_from_scope(current_scope)
+        current_scope = self.get_current_scope()
+        final_scope.update_from_scope(current_scope)
 
         if self != current_scope and self != isolation_scope:
             final_scope.update_from_scope(self)

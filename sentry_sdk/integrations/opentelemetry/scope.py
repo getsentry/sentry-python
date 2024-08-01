@@ -30,7 +30,7 @@ class PotelScope(Scope):
         """
         Returns the current scope.
         """
-        return cls._get_current_scope() or Scope(ty=ScopeType.CURRENT)
+        return cls._get_current_scope() or _INITIAL_CURRENT_SCOPE
 
     @classmethod
     def _get_current_scope(cls):
@@ -47,7 +47,7 @@ class PotelScope(Scope):
         Returns the isolation scope.
         """
         # type: () -> Scope
-        return cls._get_isolation_scope() or Scope(ty=ScopeType.ISOLATION)
+        return cls._get_isolation_scope() or _INITIAL_ISOLATION_SCOPE
 
     @classmethod
     def _get_isolation_scope(cls):
@@ -57,6 +57,10 @@ class PotelScope(Scope):
         """
         scopes = cls._get_scopes()
         return scopes[1] if scopes else None
+
+
+_INITIAL_CURRENT_SCOPE = PotelScope(ty=ScopeType.CURRENT)
+_INITIAL_ISOLATION_SCOPE = PotelScope(ty=ScopeType.ISOLATION)
 
 
 @contextmanager
