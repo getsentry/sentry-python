@@ -7,7 +7,7 @@ from http.client import HTTPConnection
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope, add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.tracing_utils import EnvironHeaders, should_propagate_trace
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -102,7 +102,10 @@ def _install_httplib():
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
         if should_propagate_trace(client, real_url):
-            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+            for (
+                key,
+                value,
+            ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 logger.debug(
@@ -202,7 +205,7 @@ def _install_subprocess():
             description=description,
             origin="auto.subprocess.stdlib.subprocess",
         ) as span:
-            for k, v in Scope.get_current_scope().iter_trace_propagation_headers(
+            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 if env is None:

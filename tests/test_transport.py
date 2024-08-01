@@ -12,9 +12,20 @@ from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
 
 import sentry_sdk
-from sentry_sdk import Client, add_breadcrumb, capture_message, Scope
+from sentry_sdk import (
+    Client,
+    add_breadcrumb,
+    capture_message,
+    isolation_scope,
+    get_isolation_scope,
+    Hub,
+)
 from sentry_sdk.envelope import Envelope, Item, parse_json
-from sentry_sdk.transport import KEEP_ALIVE_SOCKET_OPTIONS, _parse_rate_limits
+from sentry_sdk.transport import (
+    KEEP_ALIVE_SOCKET_OPTIONS,
+    _parse_rate_limits,
+    HttpTransport,
+)
 from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
@@ -128,8 +139,8 @@ def test_transport_works(
     if use_pickle:
         client = pickle.loads(pickle.dumps(client))
 
-    sentry_sdk.Scope.get_global_scope().set_client(client)
-    request.addfinalizer(lambda: sentry_sdk.Scope.get_global_scope().set_client(None))
+    sentry_sdk.get_global_scope().set_client(client)
+    request.addfinalizer(lambda: sentry_sdk.get_global_scope().set_client(None))
 
     add_breadcrumb(
         level="info", message="i like bread", timestamp=datetime.now(timezone.utc)
@@ -264,8 +275,8 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     # to an infinite loop
     ignore_logger("werkzeug")
 
-    sentry_sdk.Scope.get_global_scope().set_client(client)
-    with sentry_sdk.isolation_scope():
+    sentry_sdk.get_global_scope().set_client(client)
+    with isolation_scope():
         capture_message("hi")
         client.flush()
 
@@ -280,8 +291,8 @@ def test_transport_no_thread_on_shutdown_no_errors(capturing_server, make_client
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),
     ):
-        sentry_sdk.Scope.get_global_scope().set_client(client)
-        with sentry_sdk.isolation_scope():
+        sentry_sdk.get_global_scope().set_client(client)
+        with isolation_scope():
             capture_message("hi")
 
     # nothing exploded but also no events can be sent anymore
@@ -434,7 +445,7 @@ def test_data_category_limits_reporting(
     client.transport._last_client_report_sent = 0
     outcomes_enabled = True
 
-    scope = Scope()
+    scope = get_isolation_scope()
     scope.add_attachment(bytes=b"Hello World", filename="hello.txt")
     client.capture_event({"type": "error"}, scope=scope)
     client.flush()
@@ -639,15 +650,15 @@ def test_metric_bucket_limits_with_all_namespaces(
 
 
 def test_hub_cls_backwards_compat():
-    class TestCustomHubClass(sentry_sdk.Hub):
+    class TestCustomHubClass(Hub):
         pass
 
-    transport = sentry_sdk.transport.HttpTransport(
+    transport = HttpTransport(
         defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
     )
 
     with pytest.deprecated_call():
-        assert transport.hub_cls is sentry_sdk.Hub
+        assert transport.hub_cls is Hub
 
     with pytest.deprecated_call():
         transport.hub_cls = TestCustomHubClass
