@@ -6,7 +6,8 @@ import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
 
-from sentry_sdk import configure_scope, start_transaction, get_current_span
+import sentry_sdk
+from sentry_sdk import start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
@@ -154,30 +155,31 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
         foo = 42  # noqa
         return x / y
 
-    with configure_scope() as scope:
-        celery_invocation(dummy_task, 1, 2)
-        _, expected_context = celery_invocation(dummy_task, 1, 0)
+    scope = sentry_sdk.get_isolation_scope()
 
-        (error_event,) = events
+    celery_invocation(dummy_task, 1, 2)
+    _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-        assert (
-            error_event["contexts"]["trace"]["trace_id"]
-            == scope._propagation_context.trace_id
-        )
-        assert (
-            error_event["contexts"]["trace"]["span_id"]
-            != scope._propagation_context.span_id
-        )
-        assert error_event["transaction"] == "dummy_task"
-        assert "celery_task_id" in error_event["tags"]
-        assert error_event["extra"]["celery-job"] == dict(
-            task_name="dummy_task", **expected_context
-        )
+    (error_event,) = events
 
-        (exception,) = error_event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
-        assert exception["mechanism"]["type"] == "celery"
-        assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == scope._propagation_context.trace_id
+    )
+    assert (
+        error_event["contexts"]["trace"]["span_id"]
+        != scope._propagation_context.span_id
+    )
+    assert error_event["transaction"] == "dummy_task"
+    assert "celery_task_id" in error_event["tags"]
+    assert error_event["extra"]["celery-job"] == dict(
+        task_name="dummy_task", **expected_context
+    )
+
+    (exception,) = error_event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "celery"
+    assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
@@ -255,18 +257,14 @@ def test_no_stackoverflows(celery):
 
     @celery.task(name="dummy_task")
     def dummy_task():
-        with configure_scope() as scope:
-            scope.set_tag("foo", "bar")
-
+        sentry_sdk.get_isolation_scope().set_tag("foo", "bar")
         results.append(42)
 
     for _ in range(10000):
         dummy_task.delay()
 
     assert results == [42] * 10000
-
-    with configure_scope() as scope:
-        assert not scope._tags
+    assert not sentry_sdk.get_isolation_scope()._tags
 
 
 def test_simple_no_propagation(capture_events, init_celery):

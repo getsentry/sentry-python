@@ -21,6 +21,7 @@ except ImportError:
     eventlet = None
 
 import sentry_sdk
+import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations import (  # noqa: F401
     _DEFAULT_INTEGRATIONS,
@@ -75,12 +76,11 @@ def clean_scopes():
 
 
 @pytest.fixture(autouse=True)
-def internal_exceptions(request, monkeypatch):
+def internal_exceptions(request):
     errors = []
     if "tests_internal_exceptions" in request.keywords:
         return
 
-    @staticmethod
     def _capture_internal_exception(exc_info):
         errors.append(exc_info)
 
@@ -91,9 +91,7 @@ def internal_exceptions(request, monkeypatch):
         for e in errors:
             reraise(*e)
 
-    monkeypatch.setattr(
-        sentry_sdk.Scope, "_capture_internal_exception", _capture_internal_exception
-    )
+    sentry_sdk.utils.capture_internal_exception = _capture_internal_exception
 
     return errors
 
@@ -191,7 +189,7 @@ def sentry_init(request):
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
-        sentry_sdk.Scope.get_global_scope().set_client(client)
+        sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
         # Do not run isolation if the test is already running in
@@ -199,12 +197,12 @@ def sentry_init(request):
         # fork)
         yield inner
     else:
-        old_client = sentry_sdk.Scope.get_global_scope().client
+        old_client = sentry_sdk.get_global_scope().client
         try:
-            sentry_sdk.Scope.get_current_scope().set_client(None)
+            sentry_sdk.get_current_scope().set_client(None)
             yield inner
         finally:
-            sentry_sdk.Scope.get_global_scope().set_client(old_client)
+            sentry_sdk.get_global_scope().set_client(old_client)
 
 
 class TestTransport(Transport):

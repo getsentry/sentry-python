@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import Scope as SentryScope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ensure_integration_enabled,
@@ -190,7 +190,7 @@ def patch_http_route_handle() -> None:
         if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
-        sentry_scope = SentryScope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         request: "Request[Any, Any]" = scope["app"].request_class(
             scope=scope, receive=receive, send=send
         )
@@ -268,7 +268,7 @@ def exception_handler(exc: Exception, scope: "StarliteScope", _: "State") -> Non
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
-        sentry_scope = SentryScope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         sentry_scope.set_user(user_info)
 
     event, hint = event_from_exception(

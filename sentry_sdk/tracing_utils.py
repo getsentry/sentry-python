@@ -524,7 +524,7 @@ class Baggage:
         Populate fresh baggage entry with sentry_items and make it immutable
         if this is the head SDK which originates traces.
         """
-        client = sentry_sdk.Scope.get_client()
+        client = sentry_sdk.get_client()
         sentry_items = {}  # type: Dict[str, str]
 
         if not client.is_active():
@@ -691,7 +691,7 @@ def get_current_span(scope=None):
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
-    scope = scope or sentry_sdk.Scope.get_current_scope()
+    scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
 
