@@ -13,7 +13,6 @@ import inspect
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
-from sentry_sdk import Scope
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 
@@ -95,7 +94,9 @@ def patch_django_asgi_handler_impl(cls):
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
-            old_app.__get__(self, cls), unsafe_context_data=True
+            old_app.__get__(self, cls),
+            unsafe_context_data=True,
+            span_origin=DjangoIntegration.origin,
         )._run_asgi3
 
         return await middleware(scope, receive, send)
@@ -110,7 +111,7 @@ def patch_django_asgi_handler_impl(cls):
         def sentry_patched_create_request(self, *args, **kwargs):
             # type: (Any, *Any, **Any) -> Any
             request, error_response = old_create_request(self, *args, **kwargs)
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             scope.add_event_processor(_make_asgi_request_event_processor(request))
 
             return request, error_response
@@ -132,8 +133,8 @@ def patch_get_response_async(cls, _before_get_response):
 
 def patch_channels_asgi_handler_impl(cls):
     # type: (Any) -> None
-
     import channels  # type: ignore
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
     if channels.__version__ < "3.0.0":
@@ -145,7 +146,9 @@ def patch_channels_asgi_handler_impl(cls):
                 return await old_app(self, receive, send)
 
             middleware = SentryAsgiMiddleware(
-                lambda _scope: old_app.__get__(self, cls), unsafe_context_data=True
+                lambda _scope: old_app.__get__(self, cls),
+                unsafe_context_data=True,
+                span_origin=DjangoIntegration.origin,
             )
 
             return await middleware(self.scope)(receive, send)
@@ -160,15 +163,19 @@ def patch_channels_asgi_handler_impl(cls):
 
 def wrap_async_view(callback):
     # type: (Any) -> Any
+    from sentry_sdk.integrations.django import DjangoIntegration
+
     @functools.wraps(callback)
     async def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
-        sentry_scope = Scope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
 
         with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
+            op=OP.VIEW_RENDER,
+            description=request.resolver_match.view_name,
+            origin=DjangoIntegration.origin,
         ):
             return await callback(request, *args, **kwargs)
 

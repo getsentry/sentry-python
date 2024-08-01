@@ -1,35 +1,40 @@
+import datetime
+import importlib
 import logging
 import os
 import sys
 import time
+from collections import Counter
 
 import pytest
 from sentry_sdk.client import Client
-
 from tests.conftest import patch_start_tracing_child
 
+import sentry_sdk
+import sentry_sdk.scope
 from sentry_sdk import (
+    get_client,
     push_scope,
-    configure_scope,
     capture_event,
     capture_exception,
     capture_message,
     start_transaction,
+    last_event_id,
     add_breadcrumb,
+    isolation_scope,
+    new_scope,
     Hub,
-    Scope,
 )
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
+    _DEFAULT_INTEGRATIONS,
     Integration,
     setup_integrations,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.scope import (  # noqa: F401
-    add_global_event_processor,
-    global_event_processors,
-)
+from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
 
@@ -68,13 +73,11 @@ def test_processors(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    with configure_scope() as scope:
+    def error_processor(event, exc_info):
+        event["exception"]["values"][0]["value"] += " whatever"
+        return event
 
-        def error_processor(event, exc_info):
-            event["exception"]["values"][0]["value"] += " whatever"
-            return event
-
-        scope.add_error_processor(error_processor, ValueError)
+    sentry_sdk.get_isolation_scope().add_error_processor(error_processor, ValueError)
 
     try:
         raise ValueError("aha!")
@@ -218,7 +221,7 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     events = capture_events()
 
     monkeypatch.setattr(
-        Hub.current.client.transport, "record_lost_event", record_lost_event
+        sentry_sdk.get_client().transport, "record_lost_event", record_lost_event
     )
 
     def do_this():
@@ -267,7 +270,7 @@ def test_option_enable_tracing(
     updated_traces_sample_rate,
 ):
     sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
-    options = Hub.current.client.options
+    options = sentry_sdk.get_client().options
     assert has_tracing_enabled(options) is tracing_enabled
     assert options["traces_sample_rate"] == updated_traces_sample_rate
 
@@ -291,7 +294,7 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     add_breadcrumb(crumb=dict(foo=42))
 
 
-def test_push_scope(sentry_init, capture_events):
+def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
     sentry_init()
     events = capture_events()
 
@@ -308,7 +311,12 @@ def test_push_scope(sentry_init, capture_events):
     assert "exception" in event
 
 
-def test_push_scope_null_client(sentry_init, capture_events):
+def test_push_scope_null_client(
+    sentry_init, capture_events, suppress_deprecation_warnings
+):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     sentry_init()
     events = capture_events()
 
@@ -329,6 +337,9 @@ def test_push_scope_null_client(sentry_init, capture_events):
 )
 @pytest.mark.parametrize("null_client", (True, False))
 def test_push_scope_callback(sentry_init, null_client, capture_events):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     sentry_init()
 
     if null_client:
@@ -376,11 +387,42 @@ def test_breadcrumbs(sentry_init, capture_events):
             category="auth", message="Authenticated user %s" % i, level="info"
         )
 
-    Scope.get_isolation_scope().clear()
+    sentry_sdk.get_isolation_scope().clear()
 
     capture_exception(ValueError())
     (event,) = events
     assert len(event["breadcrumbs"]["values"]) == 0
+
+
+def test_breadcrumb_ordering(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    timestamps = [
+        datetime.datetime.now() - datetime.timedelta(days=10),
+        datetime.datetime.now() - datetime.timedelta(days=8),
+        datetime.datetime.now() - datetime.timedelta(days=12),
+    ]
+
+    for timestamp in timestamps:
+        add_breadcrumb(
+            message="Authenticated at %s" % timestamp,
+            category="auth",
+            level="info",
+            timestamp=timestamp,
+        )
+
+    capture_exception(ValueError())
+    (event,) = events
+
+    assert len(event["breadcrumbs"]["values"]) == len(timestamps)
+    timestamps_from_event = [
+        datetime.datetime.strptime(
+            x["timestamp"].replace("Z", ""), "%Y-%m-%dT%H:%M:%S.%f"
+        )
+        for x in event["breadcrumbs"]["values"]
+    ]
+    assert timestamps_from_event == sorted(timestamps)
 
 
 def test_attachments(sentry_init, capture_envelopes):
@@ -389,9 +431,9 @@ def test_attachments(sentry_init, capture_envelopes):
 
     this_file = os.path.abspath(__file__.rstrip("c"))
 
-    with configure_scope() as scope:
-        scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
-        scope.add_attachment(path=this_file)
+    scope = sentry_sdk.get_isolation_scope()
+    scope.add_attachment(bytes=b"Hello World!", filename="message.txt")
+    scope.add_attachment(path=this_file)
 
     capture_exception(ValueError())
 
@@ -416,6 +458,21 @@ def test_attachments(sentry_init, capture_envelopes):
         assert pyfile.payload.get_bytes() == f.read()
 
 
+@pytest.mark.tests_internal_exceptions
+def test_attachments_graceful_failure(
+    sentry_init, capture_envelopes, internal_exceptions
+):
+    sentry_init()
+    envelopes = capture_envelopes()
+
+    sentry_sdk.get_isolation_scope().add_attachment(path="non_existent")
+    capture_exception(ValueError())
+
+    (envelope,) = envelopes
+    assert len(envelope.items) == 2
+    assert envelope.items[1].payload.get_bytes() == b""
+
+
 def test_integration_scoping(sentry_init, capture_events):
     logger = logging.getLogger("test_basics")
 
@@ -433,10 +490,58 @@ def test_integration_scoping(sentry_init, capture_events):
     assert not events
 
 
+default_integrations = [
+    getattr(
+        importlib.import_module(integration.rsplit(".", 1)[0]),
+        integration.rsplit(".", 1)[1],
+    )
+    for integration in _DEFAULT_INTEGRATIONS
+]
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "provided_integrations,default_integrations,disabled_integrations,expected_integrations",
+    [
+        ([], False, None, set()),
+        ([], False, [], set()),
+        ([LoggingIntegration()], False, None, {LoggingIntegration}),
+        ([], True, None, set(default_integrations)),
+        (
+            [],
+            True,
+            [LoggingIntegration(), StdlibIntegration],
+            set(default_integrations) - {LoggingIntegration, StdlibIntegration},
+        ),
+    ],
+)
+def test_integrations(
+    sentry_init,
+    provided_integrations,
+    default_integrations,
+    disabled_integrations,
+    expected_integrations,
+    reset_integrations,
+):
+    sentry_init(
+        integrations=provided_integrations,
+        default_integrations=default_integrations,
+        disabled_integrations=disabled_integrations,
+        auto_enabling_integrations=False,
+        debug=True,
+    )
+    assert {
+        type(integration) for integration in get_client().integrations.values()
+    } == expected_integrations
+
+
 @pytest.mark.skip(
     reason="This test is not valid anymore, because with the new Scopes calling bind_client on the Hub sets the client on the global scope. This test should be removed once the Hub is removed"
 )
 def test_client_initialized_within_scope(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.WARNING)
 
     sentry_init()
@@ -453,6 +558,9 @@ def test_client_initialized_within_scope(sentry_init, caplog):
     reason="This test is not valid anymore, because with the new Scopes the push_scope just returns the isolation scope. This test should be removed once the Hub is removed"
 )
 def test_scope_leaks_cleaned_up(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.WARNING)
 
     sentry_init()
@@ -473,6 +581,9 @@ def test_scope_leaks_cleaned_up(sentry_init, caplog):
     reason="This test is not valid anymore, because with the new Scopes there is not pushing and popping of scopes. This test should be removed once the Hub is removed"
 )
 def test_scope_popped_too_soon(sentry_init, caplog):
+    """
+    This test can be removed when we remove push_scope and the Hub from the SDK.
+    """
     caplog.set_level(logging.ERROR)
 
     sentry_init()
@@ -497,14 +608,14 @@ def test_scope_event_processor_order(sentry_init, capture_events):
     sentry_init(debug=True, before_send=before_send)
     events = capture_events()
 
-    with push_scope() as scope:
+    with new_scope() as scope:
 
         @scope.add_event_processor
         def foo(event, hint):
             event["message"] += "foo"
             return event
 
-        with push_scope() as scope:
+        with new_scope() as scope:
 
             @scope.add_event_processor
             def bar(event, hint):
@@ -528,7 +639,7 @@ def test_capture_event_with_scope_kwargs(sentry_init, capture_events):
 
 
 def test_dedupe_event_processor_drop_records_client_report(
-    sentry_init, capture_events, capture_client_reports
+    sentry_init, capture_events, capture_record_lost_event_calls
 ):
     """
     DedupeIntegration internally has an event_processor that filters duplicate exceptions.
@@ -537,7 +648,7 @@ def test_dedupe_event_processor_drop_records_client_report(
     """
     sentry_init()
     events = capture_events()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
     try:
         raise ValueError("aha!")
@@ -549,35 +660,50 @@ def test_dedupe_event_processor_drop_records_client_report(
             capture_exception()
 
     (event,) = events
-    (report,) = reports
+    (lost_event_call,) = record_lost_event_calls
 
     assert event["level"] == "error"
     assert "exception" in event
-    assert report == ("event_processor", "error")
+    assert lost_event_call == ("event_processor", "error", None, 1)
 
 
 def test_event_processor_drop_records_client_report(
-    sentry_init, capture_events, capture_client_reports
+    sentry_init, capture_events, capture_record_lost_event_calls
 ):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
-    reports = capture_client_reports()
+    record_lost_event_calls = capture_record_lost_event_calls()
 
-    global global_event_processors
+    # Ensure full idempotency by restoring the original global event processors list object, not just a copy.
+    old_processors = sentry_sdk.scope.global_event_processors
 
-    @add_global_event_processor
-    def foo(event, hint):
-        return None
+    try:
+        sentry_sdk.scope.global_event_processors = (
+            sentry_sdk.scope.global_event_processors.copy()
+        )
 
-    capture_message("dropped")
+        @add_global_event_processor
+        def foo(event, hint):
+            return None
 
-    with start_transaction(name="dropped"):
-        pass
+        capture_message("dropped")
 
-    assert len(events) == 0
-    assert reports == [("event_processor", "error"), ("event_processor", "transaction")]
+        with start_transaction(name="dropped"):
+            pass
 
-    global_event_processors.pop()
+        assert len(events) == 0
+
+        # Using Counter because order of record_lost_event calls does not matter
+        assert Counter(record_lost_event_calls) == Counter(
+            [
+                ("event_processor", "error", None, 1),
+                ("event_processor", "transaction", None, 1),
+                ("event_processor", "span", None, 1),
+            ]
+        )
+
+    finally:
+        sentry_sdk.scope.global_event_processors = old_processors
 
 
 @pytest.mark.parametrize(
@@ -717,7 +843,7 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
 def test_redis_disabled_when_not_installed(sentry_init):
     sentry_init()
 
-    assert Hub.current.get_integration(RedisIntegration) is None
+    assert sentry_sdk.get_client().get_integration(RedisIntegration) is None
 
 
 def test_multiple_setup_integrations_calls():
@@ -778,3 +904,50 @@ def test_classmethod_tracing(sentry_init):
         with patch_start_tracing_child() as fake_start_child:
             assert instance_or_class.class_(1) == (TracingTestClass, 1)
             assert fake_start_child.call_count == 1
+
+
+def test_last_event_id(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert last_event_id() is None
+
+    capture_exception(Exception("test"))
+
+    assert last_event_id() is not None
+
+
+def test_last_event_id_transaction(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert last_event_id() is None
+
+    with start_transaction(name="test"):
+        pass
+
+    assert last_event_id() is None, "Transaction should not set last_event_id"
+
+
+def test_last_event_id_scope(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    # Should not crash
+    with isolation_scope() as scope:
+        assert scope.last_event_id() is None
+
+
+def test_hub_constructor_deprecation_warning():
+    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
+        Hub()
+
+
+def test_hub_current_deprecation_warning():
+    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning) as warning_records:
+        Hub.current
+
+    # Make sure we only issue one deprecation warning
+    assert len(warning_records) == 1
+
+
+def test_hub_main_deprecation_warnings():
+    with pytest.warns(sentry_sdk.hub.SentryHubDeprecationWarning):
+        Hub.main

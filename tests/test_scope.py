@@ -19,6 +19,10 @@ from sentry_sdk.scope import (
 )
 
 
+SLOTS_NOT_COPIED = {"client"}
+"""__slots__ that are not copied when copying a Scope object."""
+
+
 def test_copying():
     s1 = Scope()
     s1.fingerprint = {}
@@ -32,6 +36,15 @@ def test_copying():
     assert "bam" not in s2._tags
 
     assert s1._fingerprint is s2._fingerprint
+
+
+def test_all_slots_copied():
+    scope = Scope()
+    scope_copy = copy.copy(scope)
+
+    # Check all attributes are copied
+    for attr in set(Scope.__slots__) - SLOTS_NOT_COPIED:
+        assert getattr(scope_copy, attr) == getattr(scope, attr)
 
 
 def test_merging(sentry_init, capture_events):
@@ -822,3 +835,37 @@ def test_set_tags():
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
+
+
+def test_last_event_id(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert Scope.last_event_id() is None
+
+    sentry_sdk.capture_exception(Exception("test"))
+
+    assert Scope.last_event_id() is not None
+
+
+def test_last_event_id_transaction(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    assert Scope.last_event_id() is None
+
+    with sentry_sdk.start_transaction(name="test"):
+        pass
+
+    assert Scope.last_event_id() is None, "Transaction should not set last_event_id"
+
+
+def test_last_event_id_cleared(sentry_init):
+    sentry_init(enable_tracing=True)
+
+    # Make sure last_event_id is set
+    sentry_sdk.capture_exception(Exception("test"))
+    assert Scope.last_event_id() is not None
+
+    # Clearing the isolation scope should clear the last_event_id
+    Scope.get_isolation_scope().clear()
+
+    assert Scope.last_event_id() is None, "last_event_id should be cleared"

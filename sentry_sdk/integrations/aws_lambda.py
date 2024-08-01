@@ -6,7 +6,7 @@ from os import environ
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TRANSACTION_SOURCE_COMPONENT
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -44,7 +44,7 @@ def _wrap_init_error(init_error):
         client = sentry_sdk.get_client()
 
         with capture_internal_exceptions():
-            Scope.get_isolation_scope().clear_breadcrumbs()
+            sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
             exc_info = sys.exc_info()
             if exc_info and all(exc_info):
@@ -139,6 +139,7 @@ def _wrap_handler(handler):
                 op=OP.FUNCTION_AWS,
                 name=aws_context.function_name,
                 source=TRANSACTION_SOURCE_COMPONENT,
+                origin=AwsLambdaIntegration.origin,
             )
             with sentry_sdk.start_transaction(
                 transaction,
@@ -178,6 +179,7 @@ def _drain_queue():
 
 class AwsLambdaIntegration(Integration):
     identifier = "aws_lambda"
+    origin = f"auto.function.{identifier}"
 
     def __init__(self, timeout_warning=False):
         # type: (bool) -> None

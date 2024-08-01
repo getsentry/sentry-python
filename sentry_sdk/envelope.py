@@ -73,6 +73,14 @@ class Envelope:
         # type: (...) -> None
         self.add_item(Item(payload=PayloadRef(json=profile), type="profile"))
 
+    def add_profile_chunk(
+        self, profile_chunk  # type: Any
+    ):
+        # type: (...) -> None
+        self.add_item(
+            Item(payload=PayloadRef(json=profile_chunk), type="profile_chunk")
+        )
+
     def add_checkin(
         self, checkin  # type: Any
     ):
@@ -181,9 +189,7 @@ class PayloadRef:
                         self.bytes = f.read()
             elif self.json is not None:
                 self.bytes = json_dumps(self.json)
-            else:
-                self.bytes = b""
-        return self.bytes
+        return self.bytes or b""
 
     @property
     def inferred_content_type(self):
@@ -265,6 +271,8 @@ class Item:
             return "internal"
         elif ty == "profile":
             return "profile"
+        elif ty == "profile_chunk":
+            return "profile_chunk"
         elif ty == "statsd":
             return "metric_bucket"
         elif ty == "check_in":

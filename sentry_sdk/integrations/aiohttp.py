@@ -3,10 +3,9 @@ import weakref
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope
 from sentry_sdk.sessions import auto_session_tracking_scope
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
@@ -63,6 +62,7 @@ TRANSACTION_STYLE_VALUES = ("handler_name", "method_and_path_pattern")
 
 class AioHttpIntegration(Integration):
     identifier = "aiohttp"
+    origin = f"auto.http.{identifier}"
 
     def __init__(self, transaction_style="handler_name"):
         # type: (str) -> None
@@ -120,6 +120,7 @@ class AioHttpIntegration(Integration):
                         # URL resolver did not find a route or died trying.
                         name="generic AIOHTTP request",
                         source=TRANSACTION_SOURCE_ROUTE,
+                        origin=AioHttpIntegration.origin,
                     )
                     with sentry_sdk.start_transaction(
                         transaction,
@@ -131,7 +132,7 @@ class AioHttpIntegration(Integration):
                             transaction.set_http_status(e.status_code)
                             raise
                         except (asyncio.CancelledError, ConnectionResetError):
-                            transaction.set_status("cancelled")
+                            transaction.set_status(SPANSTATUS.CANCELLED)
                             raise
                         except Exception:
                             # This will probably map to a 500 but seems like we
@@ -164,7 +165,7 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                Scope.get_current_scope().set_transaction_name(
+                sentry_sdk.get_current_scope().set_transaction_name(
                     name,
                     source=SOURCE_FOR_STYLE[integration.transaction_style],
                 )
@@ -206,6 +207,7 @@ def create_trace_config():
             op=OP.HTTP_CLIENT,
             description="%s %s"
             % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+            origin=AioHttpIntegration.origin,
         )
         span.set_data(SPANDATA.HTTP_METHOD, method)
         if parsed_url is not None:
@@ -216,7 +218,10 @@ def create_trace_config():
         client = sentry_sdk.get_client()
 
         if should_propagate_trace(client, str(params.url)):
-            for key, value in Scope.get_current_scope().iter_trace_propagation_headers(
+            for (
+                key,
+                value,
+            ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
                 logger.debug(

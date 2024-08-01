@@ -2,7 +2,6 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     exc_info_from_error,
@@ -65,7 +64,7 @@ def _tag_task_context():
     # type: () -> None
     from pyspark.taskcontext import TaskContext
 
-    scope = Scope.get_isolation_scope()
+    scope = sentry_sdk.get_isolation_scope()
 
     @scope.add_event_processor
     def process_event(event, hint):

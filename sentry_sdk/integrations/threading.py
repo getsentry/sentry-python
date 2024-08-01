@@ -5,7 +5,7 @@ from threading import Thread, current_thread
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import Scope, use_isolation_scope, use_scope
+from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -55,8 +55,8 @@ class ThreadingIntegration(Integration):
             # type: (Thread, *Any, **Any) -> Any
             integration = sentry_sdk.get_client().get_integration(ThreadingIntegration)
             if integration.propagate_scope:
-                isolation_scope = sentry_sdk.Scope.get_isolation_scope()
-                current_scope = sentry_sdk.Scope.get_current_scope()
+                isolation_scope = sentry_sdk.get_isolation_scope()
+                current_scope = sentry_sdk.get_current_scope()
             else:
                 isolation_scope = None
                 current_scope = None
@@ -81,7 +81,7 @@ class ThreadingIntegration(Integration):
 
 
 def _wrap_run(isolation_scope_to_use, current_scope_to_use, old_run_func):
-    # type: (Optional[Scope], Optional[Scope], F) -> F
+    # type: (Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope], F) -> F
     @wraps(old_run_func)
     def run(*a, **kw):
         # type: (*Any, **Any) -> Any

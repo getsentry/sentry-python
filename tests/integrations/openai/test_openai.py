@@ -78,6 +78,15 @@ def test_nonstreaming_chat_completion(
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
 
 
+def tiktoken_encoding_if_installed():
+    try:
+        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+        return "cl100k_base"
+    except ImportError:
+        return None
+
+
 # noinspection PyTypeChecker
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -87,7 +96,12 @@ def test_streaming_chat_completion(
     sentry_init, capture_events, send_default_pii, include_prompts
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[
+            OpenAIIntegration(
+                include_prompts=include_prompts,
+                tiktoken_encoding_name=tiktoken_encoding_if_installed(),
+            )
+        ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
     )
@@ -224,3 +238,111 @@ def test_embeddings_create(
 
     assert span["measurements"]["ai_prompt_tokens_used"]["value"] == 20
     assert span["measurements"]["ai_total_tokens_used"]["value"] == 30
+
+
+def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model", messages=[{"role": "system", "content": "hello"}]
+        )
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.ai.openai"
+
+
+def test_span_origin_streaming_chat(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    returned_stream = Stream(cast_to=None, response=None, client=client)
+    returned_stream._iterator = [
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=0, delta=ChoiceDelta(content="hel"), finish_reason=None
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=1, delta=ChoiceDelta(content="lo "), finish_reason=None
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+        ChatCompletionChunk(
+            id="1",
+            choices=[
+                DeltaChoice(
+                    index=2, delta=ChoiceDelta(content="world"), finish_reason="stop"
+                )
+            ],
+            created=100000,
+            model="model-id",
+            object="chat.completion.chunk",
+        ),
+    ]
+
+    client.chat.completions._post = mock.Mock(return_value=returned_stream)
+    with start_transaction(name="openai tx"):
+        response_stream = client.chat.completions.create(
+            model="some-model", messages=[{"role": "system", "content": "hello"}]
+        )
+        "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.ai.openai"
+
+
+def test_span_origin_embeddings(sentry_init, capture_events):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = mock.Mock(return_value=returned_embedding)
+    with start_transaction(name="openai tx"):
+        client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+    assert event["spans"][0]["origin"] == "auto.ai.openai"

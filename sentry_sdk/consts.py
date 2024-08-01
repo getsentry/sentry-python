@@ -1,3 +1,5 @@
+import itertools
+
 from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -30,10 +32,9 @@ if TYPE_CHECKING:
     from typing import Tuple
     from typing_extensions import TypedDict
 
-    from sentry_sdk.integrations import Integration
-
     from sentry_sdk._types import (
         BreadcrumbProcessor,
+        ContinuousProfilerMode,
         Event,
         EventProcessor,
         Hint,
@@ -55,6 +56,8 @@ if TYPE_CHECKING:
             "attach_explain_plans": dict[str, Any],
             "max_spans": Optional[int],
             "record_sql_params": Optional[bool],
+            "continuous_profiling_auto_start": Optional[bool],
+            "continuous_profiling_mode": Optional[ContinuousProfilerMode],
             "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_num_pools": Optional[int],
@@ -89,6 +92,18 @@ class SPANDATA:
     """
     Additional information describing the type of the span.
     See: https://develop.sentry.dev/sdk/performance/span-data-conventions/
+    """
+
+    AI_FREQUENCY_PENALTY = "ai.frequency_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
+    """
+
+    AI_PRESENCE_PENALTY = "ai.presence_penalty"
+    """
+    Used to reduce repetitiveness of generated tokens.
+    Example: 0.5
     """
 
     AI_INPUT_MESSAGES = "ai.input_messages"
@@ -164,10 +179,29 @@ class SPANDATA:
     For an AI model call, the logit bias
     """
 
+    AI_PREAMBLE = "ai.preamble"
+    """
+    For an AI model call, the preamble parameter.
+    Preambles are a part of the prompt used to adjust the model's overall behavior and conversation style.
+    Example: "You are now a clown."
+    """
+
+    AI_RAW_PROMPTING = "ai.raw_prompting"
+    """
+    Minimize pre-processing done to the prompt sent to the LLM.
+    Example: true
+    """
+
     AI_RESPONSES = "ai.responses"
     """
     The responses to an AI model call. Always as a list.
     Example: ["hello", "world"]
+    """
+
+    AI_SEED = "ai.seed"
+    """
+    The seed, ideally models given the same seed and same other parameters will produce the exact same output.
+    Example: 123.45
     """
 
     DB_NAME = "db.name"
@@ -197,6 +231,13 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -207,6 +248,24 @@ class SPANDATA:
     """
     The size of the requested data in bytes.
     Example: 58
+    """
+
+    CACHE_KEY = "cache.key"
+    """
+    The key of the requested data.
+    Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
+    """
+
+    NETWORK_PEER_ADDRESS = "network.peer.address"
+    """
+    Peer address of the network connection - IP address or Unix domain socket name.
+    Example: 10.1.2.80, /tmp/my.sock, localhost
+    """
+
+    NETWORK_PEER_PORT = "network.peer.port"
+    """
+    Peer port number of the network connection.
+    Example: 6379
     """
 
     HTTP_QUERY = "http.query"
@@ -231,6 +290,32 @@ class SPANDATA:
     """
     The HTTP status code as an integer.
     Example: 418
+    """
+
+    MESSAGING_DESTINATION_NAME = "messaging.destination.name"
+    """
+    The destination name where the message is being consumed from,
+    e.g. the queue name or topic.
+    """
+
+    MESSAGING_MESSAGE_ID = "messaging.message.id"
+    """
+    The message's identifier.
+    """
+
+    MESSAGING_MESSAGE_RETRY_COUNT = "messaging.message.retry.count"
+    """
+    Number of retries/attempts to process a message.
+    """
+
+    MESSAGING_MESSAGE_RECEIVE_LATENCY = "messaging.message.receive.latency"
+    """
+    The latency between when the task was enqueued and when it was started to be processed.
+    """
+
+    MESSAGING_SYSTEM = "messaging.system"
+    """
+    The messaging system's name, e.g. `kafka`, `aws_sqs`
     """
 
     SERVER_ADDRESS = "server.address"
@@ -294,10 +379,45 @@ class SPANDATA:
     Example: "MainThread"
     """
 
+    PROFILER_ID = "profiler_id"
+    """
+    Label identifying the profiler id that the span occurred in. This should be a string.
+    Example: "5249fbada8d5416482c2f6e47e337372"
+    """
+
+
+class SPANSTATUS:
+    """
+    The status of a Sentry span.
+
+    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
+    """
+
+    ABORTED = "aborted"
+    ALREADY_EXISTS = "already_exists"
+    CANCELLED = "cancelled"
+    DATA_LOSS = "data_loss"
+    DEADLINE_EXCEEDED = "deadline_exceeded"
+    FAILED_PRECONDITION = "failed_precondition"
+    INTERNAL_ERROR = "internal_error"
+    INVALID_ARGUMENT = "invalid_argument"
+    NOT_FOUND = "not_found"
+    OK = "ok"
+    OUT_OF_RANGE = "out_of_range"
+    PERMISSION_DENIED = "permission_denied"
+    RESOURCE_EXHAUSTED = "resource_exhausted"
+    UNAUTHENTICATED = "unauthenticated"
+    UNAVAILABLE = "unavailable"
+    UNIMPLEMENTED = "unimplemented"
+    UNKNOWN_ERROR = "unknown_error"
+
 
 class OP:
     ANTHROPIC_MESSAGES_CREATE = "ai.messages.create.anthropic"
-    CACHE_GET_ITEM = "cache.get_item"
+    CACHE_GET = "cache.get"
+    CACHE_PUT = "cache.put"
+    COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
+    COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
@@ -333,6 +453,8 @@ class OP:
     LANGCHAIN_TOOL = "ai.tool.langchain"
     LANGCHAIN_AGENT = "ai.agent.langchain"
     LANGCHAIN_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.langchain"
+    QUEUE_PROCESS = "queue.process"
+    QUEUE_PUBLISH = "queue.publish"
     QUEUE_SUBMIT_ARQ = "queue.submit.arq"
     QUEUE_TASK_ARQ = "queue.task.arq"
     QUEUE_SUBMIT_CELERY = "queue.submit.celery"
@@ -357,12 +479,13 @@ class ClientConstructor:
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
+        *,
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[Integration]  # noqa: B006
+        integrations=[],  # type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
@@ -389,6 +512,7 @@ class ClientConstructor:
         profiles_sampler=None,  # type: Optional[TracesSampler]
         profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
+        disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
@@ -410,27 +534,31 @@ class ClientConstructor:
         enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
+        cert_file=None,  # type: Optional[str]
+        key_file=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
 
 
 def _get_default_options():
-    # type: () -> Dict[str, Any]
+    # type: () -> dict[str, Any]
     import inspect
 
-    if hasattr(inspect, "getfullargspec"):
-        getargspec = inspect.getfullargspec
-    else:
-        getargspec = inspect.getargspec  # type: ignore
-
-    a = getargspec(ClientConstructor.__init__)
+    a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
-    return dict(zip(a.args[-len(defaults) :], defaults))
+    kwonlydefaults = a.kwonlydefaults or {}
+
+    return dict(
+        itertools.chain(
+            zip(a.args[-len(defaults) :], defaults),
+            kwonlydefaults.items(),
+        )
+    )
 
 
 DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.1.1"
+VERSION = "2.12.0"

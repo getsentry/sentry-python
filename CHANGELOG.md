@@ -1,5 +1,297 @@
 # Changelog
 
+## 2.12.0
+
+### Various fixes & improvements
+
+- API: Expose the scope getters to top level API and use them everywhere  (#3357) by @sl0thentr0py
+- API: `push_scope` deprecation warning (#3355) (#3355) by @szokeasaurusrex
+- API: Replace `push_scope` (#3353, #3354) by @szokeasaurusrex
+- API: Deprecate, avoid, or stop using `configure_scope` (#3348, #3349, #3350, #3351) by @szokeasaurusrex
+- OTel: Remove experimental autoinstrumentation (#3239) by @sentrivana
+- Graphene: Add span for grapqhl operation (#2788) by @czyber
+- AI: Add async support for `ai_track` decorator (#3376) by @czyber
+- CI: Workaround bug preventing Django test runs (#3371) by @szokeasaurusrex
+- CI: Remove Django setuptools pin (#3378) by @szokeasaurusrex
+- Tests: Test with Django 5.1 RC (#3370) by @sentrivana
+- Broaden `add_attachment` type (#3342) by @szokeasaurusrex
+- Add span data to the transactions trace context (#3374) by @antonpirker
+- Gracefully fail attachment path not found case (#3337) by @sl0thentr0py
+- Document attachment parameters (#3342) by @szokeasaurusrex
+- Bump checkouts/data-schemas from `0feb234` to `6d2c435` (#3369) by @dependabot
+- Bump checkouts/data-schemas from `88273a9` to `0feb234` (#3252) by @dependabot
+
+## 2.11.0
+
+### Various fixes & improvements
+
+- Add `disabled_integrations` (#3328) by @sentrivana
+
+  Disabling individual integrations is now much easier.
+  Instead of disabling all automatically enabled integrations and specifying the ones
+  you want to keep, you can now use the new
+  [`disabled_integrations`](https://docs.sentry.io/platforms/python/configuration/options/#auto-enabling-integrations)
+  config option to provide a list of integrations to disable:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.flask import FlaskIntegration
+
+  sentry_sdk.init(
+      # Do not use the Flask integration even if Flask is installed.
+      disabled_integrations=[
+          FlaskIntegration(),
+      ],
+  )
+  ```
+
+- Use operation name as transaction name in Strawberry (#3294) by @sentrivana
+- WSGI integrations respect `SCRIPT_NAME` env variable (#2622) by @sarvaSanjay
+- Make Django DB spans have origin `auto.db.django` (#3319) by @antonpirker
+- Sort breadcrumbs by time before sending (#3307) by @antonpirker
+- Fix `KeyError('sentry-monitor-start-timestamp-s')` (#3278) by @Mohsen-Khodabakhshi
+- Set MongoDB tags directly on span data (#3290) by @0Calories
+- Lower logger level for some messages (#3305) by @sentrivana and @antonpirker
+- Emit deprecation warnings from `Hub` API (#3280) by @szokeasaurusrex
+- Clarify that `instrumenter` is internal-only (#3299) by @szokeasaurusrex
+- Support Django 5.1 (#3207) by @sentrivana
+- Remove apparently unnecessary `if` (#3298) by @szokeasaurusrex
+- Preliminary support for Python 3.13 (#3200) by @sentrivana
+- Move `sentry_sdk.init` out of `hub.py` (#3276) by @szokeasaurusrex
+- Unhardcode integration list (#3240) by @rominf
+- Allow passing of PostgreSQL port in tests (#3281) by @rominf
+- Add tests for `@ai_track` decorator (#3325) by @colin-sentry
+- Do not include type checking code in coverage report (#3327) by @antonpirker
+- Fix test_installed_modules (#3309) by @szokeasaurusrex
+- Fix typos and grammar in a comment (#3293) by @szokeasaurusrex
+- Fixed failed tests setup (#3303) by @antonpirker
+- Only assert warnings we are interested in (#3314) by @szokeasaurusrex
+
+## 2.10.0
+
+### Various fixes & improvements
+
+- Add client cert and key support to `HttpTransport` (#3258) by @grammy-jiang
+
+  Add `cert_file` and `key_file` to your `sentry_sdk.init` to use a custom client cert and key. Alternatively, the environment variables `CLIENT_CERT_FILE` and `CLIENT_KEY_FILE` can be used as well.
+
+- OpenAI: Lazy initialize tiktoken to avoid http at import time (#3287) by @colin-sentry
+- OpenAI, Langchain: Make tiktoken encoding name configurable + tiktoken usage opt-in (#3289) by @colin-sentry
+
+  Fixed a bug where having certain packages installed along the Sentry SDK caused an HTTP request to be made to OpenAI infrastructure when the Sentry SDK was initialized. The request was made when the `tiktoken` package and at least one of the `openai` or `langchain` packages were installed.
+
+  The request was fetching a `tiktoken` encoding in order to correctly measure token usage in some OpenAI and Langchain calls. This behavior is now opt-in. The choice of encoding to use was made configurable as well. To opt in, set the `tiktoken_encoding_name` parameter in the OpenAPI or Langchain integration.
+
+  ```python
+  sentry_sdk.init(
+      integrations=[
+          OpenAIIntegration(tiktoken_encoding_name="cl100k_base"),
+          LangchainIntegration(tiktoken_encoding_name="cl100k_base"),
+      ],
+  )
+  ```
+
+- PyMongo: Send query description as valid JSON (#3291) by @0Calories
+- Remove Python 2 compatibility code (#3284) by @szokeasaurusrex
+- Fix `sentry_sdk.init` type hint (#3283) by @szokeasaurusrex
+- Deprecate `hub` in `Profile` (#3270) by @szokeasaurusrex
+- Stop using `Hub` in `init` (#3275) by @szokeasaurusrex
+- Delete `_should_send_default_pii` (#3274) by @szokeasaurusrex
+- Remove `Hub` usage in `conftest` (#3273) by @szokeasaurusrex
+- Rename debug logging filter (#3260) by @szokeasaurusrex
+- Update `NoOpSpan.finish` signature (#3267) by @szokeasaurusrex
+- Remove `Hub` in `Transaction.finish` (#3267) by @szokeasaurusrex
+- Remove Hub from `capture_internal_exception` logic (#3264) by @szokeasaurusrex
+- Improve `Scope._capture_internal_exception` type hint (#3264) by @szokeasaurusrex
+- Correct `ExcInfo` type (#3266) by @szokeasaurusrex
+- Stop using `Hub` in `tracing_utils` (#3269) by @szokeasaurusrex
+
+## 2.9.0
+
+### Various fixes & improvements
+
+- ref(transport): Improve event data category typing (#3243) by @szokeasaurusrex
+- ref(tracing): Improved handling of span status (#3261) by @antonpirker
+- test(client): Add tests for dropped span client reports (#3244) by @szokeasaurusrex
+- test(transport): Test new client report features (#3244) by @szokeasaurusrex
+- feat(tracing): Record lost spans in client reports (#3244) by @szokeasaurusrex
+- test(sampling): Replace custom logic with `capture_record_lost_event_calls` (#3257) by @szokeasaurusrex
+- test(transport): Non-order-dependent discarded events assertion (#3255) by @szokeasaurusrex
+- test(core): Introduce `capture_record_lost_event_calls` fixture (#3254) by @szokeasaurusrex
+- test(core): Fix non-idempotent test (#3253) by @szokeasaurusrex
+
+## 2.8.0
+
+### Various fixes & improvements
+
+- `profiler_id` uses underscore (#3249) by @Zylphrex
+- Don't send full env to subprocess (#3251) by @kmichel-aiven
+- Stop using `Hub` in `HttpTransport` (#3247) by @szokeasaurusrex
+- Remove `ipdb` from test requirements (#3237) by @rominf
+- Avoid propagation of empty baggage (#2968) by @hartungstenio
+- Add entry point for `SentryPropagator` (#3086) by @mender
+- Bump checkouts/data-schemas from `8c13457` to `88273a9` (#3225) by @dependabot
+
+## 2.7.1
+
+### Various fixes & improvements
+
+- fix(otel): Fix missing baggage (#3218) by @sentrivana
+- This is the config file of asdf-vm which we do not use. (#3215) by @antonpirker
+- Added option to disable middleware spans in Starlette (#3052) by @antonpirker
+- build: Update tornado version in setup.py to match code check. (#3206) by @aclemons
+
+## 2.7.0
+
+- Add `origin` to spans and transactions (#3133) by @antonpirker
+- OTel: Set up typing for OTel (#3168) by @sentrivana
+- OTel: Auto instrumentation skeleton (#3143) by @sentrivana
+- OpenAI: If there is an internal error, still return a value (#3192) by @colin-sentry
+- MongoDB: Add MongoDB collection span tag (#3182) by @0Calories
+- MongoDB: Change span operation from `db.query` to `db` (#3186) by @0Calories
+- MongoDB: Remove redundant command name in query description (#3189) by @0Calories
+- Apache Spark: Fix spark driver integration (#3162) by @seyoon-lim
+- Apache Spark: Add Spark test suite to tox.ini and to CI (#3199) by @sentrivana
+- Codecov: Add failed test commits in PRs (#3190) by @antonpirker
+- Update library, Python versions in tests (#3202) by @sentrivana
+- Remove Hub from our test suite (#3197) by @antonpirker
+- Use env vars for default CA cert bundle location (#3160) by @DragoonAethis
+- Create a separate test group for AI (#3198) by @sentrivana
+- Add additional stub packages for type checking (#3122) by @Daverball
+- Proper naming of requirements files (#3191) by @antonpirker
+- Pinning pip because new version does not work with some versions of Celery and Httpx (#3195) by @antonpirker
+- build(deps): bump supercharge/redis-github-action from 1.7.0 to 1.8.0 (#3193) by @dependabot
+- build(deps): bump actions/checkout from 4.1.6 to 4.1.7 (#3171) by @dependabot
+- build(deps): update pytest-asyncio requirement (#3087) by @dependabot
+
+## 2.6.0
+
+- Introduce continuous profiling mode (#2830) by @Zylphrex
+- Profiling: Add deprecation comment for profiler internals (#3167) by @sentrivana
+- Profiling: Move thread data to trace context (#3157) by @Zylphrex
+- Explicitly export cron symbols for typecheckers (#3072) by @spladug
+- Cleaning up ASGI tests for Django (#3180) by @antonpirker
+- Celery: Add Celery receive latency (#3174) by @antonpirker
+- Metrics: Update type hints for tag values (#3156) by @elramen
+- Django: Fix psycopg3 reconnect error (#3111) by @szokeasaurusrex
+- Tracing: Keep original function signature when decorated (#3178) by @sentrivana
+- Reapply "Refactor the Celery Beat integration (#3105)" (#3144) (#3175) by @antonpirker
+- Added contributor image to readme (#3183) by @antonpirker
+- bump actions/checkout from 4.1.4 to 4.1.6 (#3147) by @dependabot
+- bump checkouts/data-schemas from `59f9683` to `8c13457` (#3146) by @dependabot
+
+## 2.5.1
+
+This change fixes a regression in our cron monitoring feature, which caused cron checkins not to be sent. The regression appears to have been introduced in version 2.4.0.
+
+**We recommend that all users, who use Cron monitoring and are currently running sentry-python ≥2.4.0, upgrade to this release as soon as possible!**
+
+### Other fixes & improvements
+
+- feat(tracing): Warn if not-started transaction entered (#3003) by @szokeasaurusrex
+- test(scope): Ensure `last_event_id` cleared (#3124) by @szokeasaurusrex
+- fix(scope): Clear last_event_id on scope clear (#3124) by @szokeasaurusrex
+
+## 2.5.0
+
+### Various fixes & improvements
+
+- Allow to configure status codes to report to Sentry in Starlette and FastAPI (#3008) by @sentrivana
+
+  By passing a new option to the FastAPI and Starlette integrations, you're now able to configure what
+  status codes should be sent as events to Sentry. Here's how it works:
+
+  ```python
+  from sentry_sdk.integrations.starlette import StarletteIntegration
+  from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+  sentry_sdk.init(
+      # ...
+      integrations=[
+          StarletteIntegration(
+              failed_request_status_codes=[403, range(500, 599)],
+          ),
+          FastApiIntegration(
+              failed_request_status_codes=[403, range(500, 599)],
+          ),
+      ]
+  )
+  ```
+
+  `failed_request_status_codes` expects a list of integers or containers (objects that allow membership checks via `in`)
+  of integers. Examples of valid `failed_request_status_codes`:
+
+  - `[500]` will only send events on HTTP 500.
+  - `[400, range(500, 599)]` will send events on HTTP 400 as well as the 500-599 range.
+  - `[500, 503]` will send events on HTTP 500 and 503.
+
+  The default is `[range(500, 599)]`.
+
+  See the [FastAPI](https://docs.sentry.io/platforms/python/integrations/fastapi/) and [Starlette](https://docs.sentry.io/platforms/python/integrations/starlette/) integration docs for more details.
+
+- Support multiple keys with `cache_prefixes` (#3136) by @sentrivana
+- Support integer Redis keys (#3132) by @sentrivana
+- Update SDK version in CONTRIBUTING.md (#3129) by @sentrivana
+- Bump actions/checkout from 4.1.4 to 4.1.5 (#3067) by @dependabot
+
+## 2.4.0
+
+### Various fixes & improvements
+
+- Celery: Made `cache.key` span data field a list (#3110) by @antonpirker
+- Celery Beat: Refactor the Celery Beat integration (#3105) by @antonpirker
+- GRPC: Add None check for grpc.aio interceptor (#3109) by @ordinary-jamie
+- Docs: Remove `last_event_id` from migration guide (#3126) by @szokeasaurusrex
+- fix(django): Proper transaction names for i18n routes (#3104) by @sentrivana
+- fix(scope): Copy `_last_event_id` in `Scope.__copy__` (#3123) by @szokeasaurusrex
+- fix(tests): Adapt to new Anthropic version (#3119) by @sentrivana
+- build(deps): bump checkouts/data-schemas from `4381a97` to `59f9683` (#3066) by @dependabot
+
+## 2.3.1
+
+### Various fixes & improvements
+
+- Handle also byte arras as strings in Redis caches (#3101) by @antonpirker
+- Do not crash exceptiongroup (by patching excepthook and keeping the name of the function) (#3099) by @antonpirker
+
+## 2.3.0
+
+### Various fixes & improvements
+
+- NEW: Redis integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3073) by @antonpirker
+- NEW: Django integration supports now Sentry Caches module. See https://docs.sentry.io/product/performance/caches/ (#3009) by @antonpirker
+- Fix `cohere` testsuite for new release of `cohere` (#3098) by @antonpirker
+- Fix ClickHouse integration where `_sentry_span` might be missing (#3096) by @sentrivana
+
+## 2.2.1
+
+### Various fixes & improvements
+
+- Add conditional check for delivery_info's existence (#3083) by @cmanallen
+- Updated deps for latest langchain version (#3092) by @antonpirker
+- Fixed grpcio extras to work as described in the docs (#3081) by @antonpirker
+- Use pythons venv instead of virtualenv to create virtual envs (#3077) by @antonpirker
+- Celery: Add comment about kwargs_headers (#3079) by @szokeasaurusrex
+- Celery: Queues module producer implementation (#3079) by @szokeasaurusrex
+- Fix N803 flake8 failures (#3082) by @szokeasaurusrex
+
+## 2.2.0
+
+### New features
+
+- Celery integration now sends additional data to Sentry to enable new features to guage the health of your queues
+- Added a new integration for Cohere
+- Reintroduced the `last_event_id` function, which had been removed in 2.0.0
+
+### Other fixes & improvements
+
+- Add tags + data passing functionality to @ai_track (#3071) by @colin-sentry
+- Only propagate headers from spans within transactions (#3070) by @szokeasaurusrex
+- Improve type hints for set metrics (#3048) by @elramen
+- Fix `get_client` typing (#3063) by @szokeasaurusrex
+- Auto-enable Anthropic integration + gate imports (#3054) by @colin-sentry
+- Made `MeasurementValue.unit` NotRequired (#3051) by @antonpirker
+
 ## 2.1.1
 
 - Fix trace propagation in Celery tasks started by Celery Beat. (#3047) by @antonpirker
@@ -41,9 +333,9 @@
       integrations=[AnthropicIntegration()],
   )
 
-  client = Anthropic()  
+  client = Anthropic()
   ```
-  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details. 
+  Check out [the Anthropic docs](https://docs.sentry.io/platforms/python/integrations/anthropic/) for details.
 
 - **New integration:** [Huggingface Hub](https://docs.sentry.io/platforms/python/integrations/huggingface/) (#3033) by @colin-sentry
 
@@ -98,13 +390,13 @@
 
 ## 2.0.0
 
-This is the first major update in a *long* time! 
+This is the first major update in a *long* time!
 
 We dropped support for some ancient languages and frameworks (Yes, Python 2.7 is no longer supported). Additionally we refactored a big part of the foundation of the SDK (how data inside the SDK is handled).
 
 We hope you like it!
 
-For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x 
+For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x
 
 ### New Features
 
@@ -144,7 +436,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
 
     # later in the code execution:
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     scope.set_transaction_name("new-transaction-name")
     ```
 - The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
@@ -221,7 +513,7 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
       # do something with the forked scope
   ```
 
-- `configure_scope` is deprecated. Use the new isolation scope directly via `Scope.get_isolation_scope()` instead.
+- `configure_scope` is deprecated. Use the new isolation scope directly via `get_isolation_scope()` instead.
 
   Before:
 
@@ -233,9 +525,9 @@ For a shorter version of what you need to do, to upgrade to Sentry SDK 2.0 see: 
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_isolation_scope
 
-  scope = Scope.get_isolation_scope()
+  scope = get_isolation_scope()
   # do something with `scope`
   ```
 
@@ -292,7 +584,7 @@ This is the final 1.x release for the forseeable future. Development will contin
       "failure_issue_threshold": 5,
       "recovery_threshold": 5,
   }
-  
+
   @monitor(monitor_slug='<monitor-slug>', monitor_config=monitor_config)
   def tell_the_world():
       print('My scheduled task...')
@@ -307,14 +599,14 @@ This is the final 1.x release for the forseeable future. Development will contin
   ```python
   import django.db.models.signals
   import sentry_sdk
-  
+
   sentry_sdk.init(
       ...
       integrations=[
           DjangoIntegration(
               ...
               signals_denylist=[
-                  django.db.models.signals.pre_init, 
+                  django.db.models.signals.pre_init,
                   django.db.models.signals.post_init,
               ],
           ),
@@ -337,7 +629,7 @@ This is the final 1.x release for the forseeable future. Development will contin
       tags["extra"] = "foo"
       del tags["release"]
       return True
-  
+
   sentry_sdk.init(
       ...
       _experiments={

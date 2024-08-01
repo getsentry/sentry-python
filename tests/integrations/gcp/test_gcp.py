@@ -537,3 +537,27 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
         == error_event["contexts"]["trace"]["trace_id"]
         == "471a43a4192642f0b136d5159a501701"
     )
+
+
+def test_span_origin(run_cloud_function):
+    events, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            return "test_string"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.function.gcp"

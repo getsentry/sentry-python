@@ -12,18 +12,25 @@ from sentry_sdk.utils import (
     package_version,
 )
 
-from anthropic.resources import Messages
-
 from typing import TYPE_CHECKING
+
+try:
+    from anthropic.resources import Messages
+
+    if TYPE_CHECKING:
+        from anthropic.types import MessageStreamEvent
+except ImportError:
+    raise DidNotEnable("Anthropic not installed")
+
 
 if TYPE_CHECKING:
     from typing import Any, Iterator
-    from anthropic.types import MessageStreamEvent
     from sentry_sdk.tracing import Span
 
 
 class AnthropicIntegration(Integration):
     identifier = "anthropic"
+    origin = f"auto.ai.{identifier}"
 
     def __init__(self, include_prompts=True):
         # type: (AnthropicIntegration, bool) -> None
@@ -86,7 +93,9 @@ def _wrap_message_create(f):
         model = kwargs.get("model")
 
         span = sentry_sdk.start_span(
-            op=OP.ANTHROPIC_MESSAGES_CREATE, description="Anthropic messages create"
+            op=OP.ANTHROPIC_MESSAGES_CREATE,
+            description="Anthropic messages create",
+            origin=AnthropicIntegration.origin,
         )
         span.__enter__()
 

@@ -24,25 +24,28 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - `sentry_sdk.utils.is_sentry_url()` now takes a `Client` instead of a `Hub` as first parameter.
 - `sentry_sdk.utils._get_contextvars` does not return a tuple with three values, but a tuple with two values. The `copy_context` was removed.
 - You no longer have to use `configure_scope` to mutate a transaction. Instead, you simply get the current scope to mutate the transaction. Here is a recipe on how to change your code to make it work:
-    Your existing implementation:
-    ```python
-    transaction = sentry_sdk.transaction(...)
+  Your existing implementation:
 
-    # later in the code execution:
+  ```python
+  transaction = sentry_sdk.transaction(...)
 
-    with sentry_sdk.configure_scope() as scope:
-        scope.set_transaction_name("new-transaction-name")
-    ```
+  # later in the code execution:
 
-    needs to be changed to this:
-    ```python
-    transaction = sentry_sdk.transaction(...)
+  with sentry_sdk.configure_scope() as scope:
+      scope.set_transaction_name("new-transaction-name")
+  ```
 
-    # later in the code execution:
+  needs to be changed to this:
 
-    scope = sentry_sdk.Scope.get_current_scope()
-    scope.set_transaction_name("new-transaction-name")
-    ```
+  ```python
+  transaction = sentry_sdk.transaction(...)
+
+  # later in the code execution:
+
+  scope = sentry_sdk.get_current_scope()
+  scope.set_transaction_name("new-transaction-name")
+  ```
+
 - The classes listed in the table below are now abstract base classes. Therefore, they can no longer be instantiated. Subclasses can only be instantiated if they implement all of the abstract methods.
   <details>
     <summary><b>Show table</b></summary>
@@ -64,7 +67,6 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
 - Removed support for Flask 0.\*.
 - Removed support for gRPC < 1.39.
 - Removed support for Tornado < 6.
-- Removed `last_event_id()` top level API. The last event ID is still returned by `capture_event()`, `capture_exception()` and `capture_message()` but the top level API `sentry_sdk.last_event_id()` has been removed.
 - Removed support for sending events to the `/store` endpoint. Everything is now sent to the `/envelope` endpoint. If you're on SaaS you don't have to worry about this, but if you're running Sentry yourself you'll need version `20.6.0` or higher of self-hosted Sentry.
 - The deprecated `with_locals` configuration option was removed. Use `include_local_variables` instead. See https://docs.sentry.io/platforms/python/configuration/options/#include-local-variables.
 - The deprecated `request_bodies` configuration option was removed. Use `max_request_body_size`. See https://docs.sentry.io/platforms/python/configuration/options/#max-request-body-size.
@@ -130,18 +132,18 @@ Looking to upgrade from Sentry SDK 1.x to 2.x? Here's a comprehensive list of wh
   After:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_current_scope
 
-  scope = Scope.get_current_scope()
+  scope = get_current_scope()
   # do something with `scope`
   ```
 
   Or:
 
   ```python
-  from sentry_sdk.scope import Scope
+  from sentry_sdk import get_isolation_scope
 
-  scope = Scope.get_isolation_scope()
+  scope = get_isolation_scope()
   # do something with `scope`
   ```
 

@@ -125,3 +125,22 @@ def test_rpc_error_page(sentry_init, app, get_client):
     assert status == "200 OK"
     assert headers.get("Content-Type") == "application/json"
     assert data == dict(id=42, error=["UserError", ["Sentry error.", "foo", None]])
+
+
+def test_span_origin(sentry_init, app, capture_events, get_client):
+    sentry_init(
+        integrations=[TrytondWSGIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    @app.route("/something")
+    def _(request):
+        return "ok"
+
+    client = get_client()
+    client.get("/something")
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.http.trytond_wsgi"

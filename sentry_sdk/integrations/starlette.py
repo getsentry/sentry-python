@@ -7,11 +7,12 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import (
+    _in_http_status_code_range,
     _is_json_content_type,
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TRANSACTION_SOURCE_COMPONENT,
@@ -30,7 +31,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional, Tuple
 
-    from sentry_sdk._types import Event
+    from sentry_sdk._types import Event, HttpStatusCodeRange
 
 try:
     import starlette  # type: ignore
@@ -68,17 +69,27 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class StarletteIntegration(Integration):
     identifier = "starlette"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
-    def __init__(self, transaction_style="url"):
-        # type: (str) -> None
+    def __init__(
+        self,
+        transaction_style="url",
+        failed_request_status_codes=None,
+        middleware_spans=True,
+    ):
+        # type: (str, Optional[list[HttpStatusCodeRange]], bool) -> None
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
                 % (transaction_style, TRANSACTION_STYLE_VALUES)
             )
         self.transaction_style = transaction_style
+        self.middleware_spans = middleware_spans
+        self.failed_request_status_codes = failed_request_status_codes or [
+            range(500, 599)
+        ]
 
     @staticmethod
     def setup_once():
@@ -105,7 +116,7 @@ def _enable_span_for_middleware(middleware_class):
     async def _create_span_call(app, scope, receive, send, **kwargs):
         # type: (Any, Dict[str, Any], Callable[[], Awaitable[Dict[str, Any]]], Callable[[Dict[str, Any]], Awaitable[None]], Any) -> None
         integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
-        if integration is None:
+        if integration is None or not integration.middleware_spans:
             return await old_call(app, scope, receive, send, **kwargs)
 
         middleware_name = app.__class__.__name__
@@ -113,13 +124,15 @@ def _enable_span_for_middleware(middleware_class):
         # Update transaction name with middleware name
         name, source = _get_transaction_from_middleware(app, scope, integration)
         if name is not None:
-            Scope.get_current_scope().set_transaction_name(
+            sentry_sdk.get_current_scope().set_transaction_name(
                 name,
                 source=source,
             )
 
         with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLETTE, description=middleware_name
+            op=OP.MIDDLEWARE_STARLETTE,
+            description=middleware_name,
+            origin=StarletteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
@@ -129,6 +142,7 @@ def _enable_span_for_middleware(middleware_class):
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
+                    origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -143,6 +157,7 @@ def _enable_span_for_middleware(middleware_class):
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     description=getattr(send, "__qualname__", str(send)),
+                    origin=StarletteIntegration.origin,
                 ) as span:
                     span.set_tag("starlette.middleware_name", middleware_name)
                     return await send(*args, **kwargs)
@@ -198,12 +213,18 @@ def patch_exception_middleware(middleware_class):
 
             async def _sentry_patched_exception_handler(self, *args, **kwargs):
                 # type: (Any, Any, Any) -> None
+                integration = sentry_sdk.get_client().get_integration(
+                    StarletteIntegration
+                )
+
                 exp = args[0]
 
                 is_http_server_error = (
                     hasattr(exp, "status_code")
                     and isinstance(exp.status_code, int)
-                    and exp.status_code >= 500
+                    and _in_http_status_code_range(
+                        exp.status_code, integration.failed_request_status_codes
+                    )
                 )
                 if is_http_server_error:
                     _capture_exception(exp, handled=True)
@@ -277,7 +298,7 @@ def _add_user_to_sentry_scope(scope):
     if email:
         user_info.setdefault("email", starlette_user.email)
 
-    sentry_scope = Scope.get_isolation_scope()
+    sentry_scope = sentry_sdk.get_isolation_scope()
     sentry_scope.user = user_info
 
 
@@ -346,6 +367,7 @@ def patch_asgi_app():
             lambda *a, **kw: old_app(self, *a, **kw),
             mechanism_type=StarletteIntegration.identifier,
             transaction_style=integration.transaction_style,
+            span_origin=StarletteIntegration.origin,
         )
 
         middleware.__call__ = middleware._run_asgi3
@@ -388,10 +410,12 @@ def patch_request_response():
                 request = args[0]
 
                 _set_transaction_name_and_source(
-                    Scope.get_current_scope(), integration.transaction_style, request
+                    sentry_sdk.get_current_scope(),
+                    integration.transaction_style,
+                    request,
                 )
 
-                sentry_scope = Scope.get_isolation_scope()
+                sentry_scope = sentry_sdk.get_isolation_scope()
                 extractor = StarletteRequestExtractor(request)
                 info = await extractor.extract_request_info()
 
@@ -430,7 +454,7 @@ def patch_request_response():
                 integration = sentry_sdk.get_client().get_integration(
                     StarletteIntegration
                 )
-                sentry_scope = Scope.get_isolation_scope()
+                sentry_scope = sentry_sdk.get_isolation_scope()
 
                 if sentry_scope.profile is not None:
                     sentry_scope.profile.update_active_thread_id()
@@ -499,7 +523,9 @@ def patch_templates():
             # type: (Jinja2Templates, *Any, **Any) -> None
             def add_sentry_trace_meta(request):
                 # type: (Request) -> Dict[str, Any]
-                trace_meta = Markup(Scope.get_current_scope().trace_propagation_meta())
+                trace_meta = Markup(
+                    sentry_sdk.get_current_scope().trace_propagation_meta()
+                )
                 return {
                     "sentry_trace_meta": trace_meta,
                 }
@@ -633,7 +659,7 @@ def _transaction_name_from_router(scope):
 
 
 def _set_transaction_name_and_source(scope, transaction_style, request):
-    # type: (Scope, str, Any) -> None
+    # type: (sentry_sdk.Scope, str, Any) -> None
     name = None
     source = SOURCE_FOR_STYLE[transaction_style]
 

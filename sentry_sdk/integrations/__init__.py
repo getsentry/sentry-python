@@ -6,10 +6,12 @@ from sentry_sdk.utils import logger
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from typing import Callable
     from typing import Dict
     from typing import Iterator
     from typing import List
+    from typing import Optional
     from typing import Set
     from typing import Type
 
@@ -69,6 +71,7 @@ _DEFAULT_INTEGRATIONS = [
 
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
+    "sentry_sdk.integrations.anthropic.AnthropicIntegration",
     "sentry_sdk.integrations.ariadne.AriadneIntegration",
     "sentry_sdk.integrations.arq.ArqIntegration",
     "sentry_sdk.integrations.asyncpg.AsyncPGIntegration",
@@ -77,6 +80,7 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.celery.CeleryIntegration",
     "sentry_sdk.integrations.chalice.ChaliceIntegration",
     "sentry_sdk.integrations.clickhouse_driver.ClickhouseDriverIntegration",
+    "sentry_sdk.integrations.cohere.CohereIntegration",
     "sentry_sdk.integrations.django.DjangoIntegration",
     "sentry_sdk.integrations.falcon.FalconIntegration",
     "sentry_sdk.integrations.fastapi.FastApiIntegration",
@@ -112,20 +116,32 @@ del _generate_default_integrations_iterator
 
 
 def setup_integrations(
-    integrations, with_defaults=True, with_auto_enabling_integrations=False
+    integrations,
+    with_defaults=True,
+    with_auto_enabling_integrations=False,
+    disabled_integrations=None,
 ):
-    # type: (List[Integration], bool, bool) -> Dict[str, Integration]
+    # type: (Sequence[Integration], bool, bool, Optional[Sequence[Integration]]) -> Dict[str, Integration]
     """
     Given a list of integration instances, this installs them all.
 
     When `with_defaults` is set to `True` all default integrations are added
     unless they were already provided before.
+
+    `disabled_integrations` takes precedence over `with_defaults` and
+    `with_auto_enabling_integrations`.
     """
     integrations = dict(
         (integration.identifier, integration) for integration in integrations or ()
     )
 
     logger.debug("Setting up integrations (with default = %s)", with_defaults)
+
+    # Integrations that will not be enabled
+    disabled_integrations = [
+        integration if isinstance(integration, type) else type(integration)
+        for integration in disabled_integrations or []
+    ]
 
     # Integrations that are not explicitly set up by the user.
     used_as_default_integration = set()
@@ -142,20 +158,23 @@ def setup_integrations(
     for identifier, integration in integrations.items():
         with _installer_lock:
             if identifier not in _processed_integrations:
-                logger.debug(
-                    "Setting up previously not enabled integration %s", identifier
-                )
-                try:
-                    type(integration).setup_once()
-                except DidNotEnable as e:
-                    if identifier not in used_as_default_integration:
-                        raise
-
-                    logger.debug(
-                        "Did not enable default integration %s: %s", identifier, e
-                    )
+                if type(integration) in disabled_integrations:
+                    logger.debug("Ignoring integration %s", identifier)
                 else:
-                    _installed_integrations.add(identifier)
+                    logger.debug(
+                        "Setting up previously not enabled integration %s", identifier
+                    )
+                    try:
+                        type(integration).setup_once()
+                    except DidNotEnable as e:
+                        if identifier not in used_as_default_integration:
+                            raise
+
+                        logger.debug(
+                            "Did not enable default integration %s: %s", identifier, e
+                        )
+                    else:
+                        _installed_integrations.add(identifier)
 
                 _processed_integrations.add(identifier)
 
