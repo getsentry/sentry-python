@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import Scope as SentryScope, should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TRANSACTION_SOURCE_ROUTE
 from sentry_sdk.utils import (
     ensure_integration_enabled,
@@ -44,24 +44,26 @@ except ImportError:
 _DEFAULT_TRANSACTION_NAME = "generic Starlite request"
 
 
-class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
-    def __init__(self, app: "ASGIApp"):
-        super().__init__(
-            app=app,
-            unsafe_context_data=False,
-            transaction_style="endpoint",
-            mechanism_type="asgi",
-        )
-
-
 class StarliteIntegration(Integration):
     identifier = "starlite"
+    origin = f"auto.http.{identifier}"
 
     @staticmethod
     def setup_once() -> None:
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()
+
+
+class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
+    def __init__(self, app: "ASGIApp", span_origin: str = StarliteIntegration.origin):
+        super().__init__(
+            app=app,
+            unsafe_context_data=False,
+            transaction_style="endpoint",
+            mechanism_type="asgi",
+            span_origin=span_origin,
+        )
 
 
 def patch_app_init() -> None:
@@ -130,7 +132,9 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 
         middleware_name = self.__class__.__name__
         with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLITE, description=middleware_name
+            op=OP.MIDDLEWARE_STARLITE,
+            description=middleware_name,
+            origin=StarliteIntegration.origin,
         ) as middleware_span:
             middleware_span.set_tag("starlite.middleware_name", middleware_name)
 
@@ -141,6 +145,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     description=getattr(receive, "__qualname__", str(receive)),
+                    origin=StarliteIntegration.origin,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
@@ -154,6 +159,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with sentry_sdk.start_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     description=getattr(send, "__qualname__", str(send)),
+                    origin=StarliteIntegration.origin,
                 ) as span:
                     span.set_tag("starlite.middleware_name", middleware_name)
                     return await send(message)
@@ -184,7 +190,7 @@ def patch_http_route_handle() -> None:
         if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
-        sentry_scope = SentryScope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         request: "Request[Any, Any]" = scope["app"].request_class(
             scope=scope, receive=receive, send=send
         )
@@ -262,7 +268,7 @@ def exception_handler(exc: Exception, scope: "StarliteScope", _: "State") -> Non
     if should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
-        sentry_scope = SentryScope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         sentry_scope.set_user(user_info)
 
     event, hint = event_from_exception(

@@ -1,6 +1,6 @@
 import sentry_sdk
 from sentry_sdk._types import TYPE_CHECKING
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import SPANSTATUS, SPANDATA
 from sentry_sdk.db.explain_plan.sqlalchemy import attach_explain_plan_to_span
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 class SqlalchemyIntegration(Integration):
     identifier = "sqlalchemy"
+    origin = f"auto.db.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -58,6 +59,7 @@ def _before_cursor_execute(
         parameters,
         paramstyle=context and context.dialect and context.dialect.paramstyle or None,
         executemany=executemany,
+        span_origin=SqlalchemyIntegration.origin,
     )
     context._sentry_sql_span_manager = ctx_mgr
 
@@ -105,7 +107,7 @@ def _handle_error(context, *args):
     span = getattr(execution_context, "_sentry_sql_span", None)  # type: Optional[Span]
 
     if span is not None:
-        span.set_status("internal_error")
+        span.set_status(SPANSTATUS.INTERNAL_ERROR)
 
     # _after_cursor_execute does not get called for crashing SQL stmts. Judging
     # from SQLAlchemy codebase it does seem like any error coming into this

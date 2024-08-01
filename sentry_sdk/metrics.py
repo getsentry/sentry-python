@@ -720,27 +720,25 @@ def _tags_to_dict(tags):
 
 def _get_aggregator():
     # type: () -> Optional[MetricsAggregator]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
+    client = sentry_sdk.get_client()
     return (
         client.metrics_aggregator
-        if client is not None and client.metrics_aggregator is not None
+        if client.is_active() and client.metrics_aggregator is not None
         else None
     )
 
 
 def _get_aggregator_and_update_tags(key, value, unit, tags):
     # type: (str, Optional[MetricValue], MeasurementUnit, Optional[MetricTags]) -> Tuple[Optional[MetricsAggregator], Optional[LocalAggregator], Optional[MetricTags]]
-    hub = sentry_sdk.Hub.current
-    client = hub.client
-    if client is None or client.metrics_aggregator is None:
+    client = sentry_sdk.get_client()
+    if not client.is_active() or client.metrics_aggregator is None:
         return None, None, tags
 
     updated_tags = dict(tags or ())  # type: Dict[str, MetricTagValue]
     updated_tags.setdefault("release", client.options["release"])
     updated_tags.setdefault("environment", client.options["environment"])
 
-    scope = sentry_sdk.Scope.get_current_scope()
+    scope = sentry_sdk.get_current_scope()
     local_aggregator = None
 
     # We go with the low-level API here to access transaction information as

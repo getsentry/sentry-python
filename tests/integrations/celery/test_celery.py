@@ -6,7 +6,8 @@ import pytest
 from celery import Celery, VERSION
 from celery.bin import worker
 
-from sentry_sdk import Hub, configure_scope, start_transaction, get_current_span
+import sentry_sdk
+from sentry_sdk import start_transaction, get_current_span
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_apply_async,
@@ -59,9 +60,6 @@ def init_celery(sentry_init, request):
             celery.conf.broker_url = "redis://127.0.0.1:6379"
             celery.conf.result_backend = "redis://127.0.0.1:6379"
             celery.conf.task_always_eager = False
-
-            Hub.main.bind_client(Hub.current.client)
-            request.addfinalizer(lambda: Hub.main.bind_client(None))
 
             # Once we drop celery 3 we can use the celery_worker fixture
             if VERSION < (5,):
@@ -157,30 +155,31 @@ def test_simple_without_performance(capture_events, init_celery, celery_invocati
         foo = 42  # noqa
         return x / y
 
-    with configure_scope() as scope:
-        celery_invocation(dummy_task, 1, 2)
-        _, expected_context = celery_invocation(dummy_task, 1, 0)
+    scope = sentry_sdk.get_isolation_scope()
 
-        (error_event,) = events
+    celery_invocation(dummy_task, 1, 2)
+    _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-        assert (
-            error_event["contexts"]["trace"]["trace_id"]
-            == scope._propagation_context.trace_id
-        )
-        assert (
-            error_event["contexts"]["trace"]["span_id"]
-            != scope._propagation_context.span_id
-        )
-        assert error_event["transaction"] == "dummy_task"
-        assert "celery_task_id" in error_event["tags"]
-        assert error_event["extra"]["celery-job"] == dict(
-            task_name="dummy_task", **expected_context
-        )
+    (error_event,) = events
 
-        (exception,) = error_event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
-        assert exception["mechanism"]["type"] == "celery"
-        assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == scope._propagation_context.trace_id
+    )
+    assert (
+        error_event["contexts"]["trace"]["span_id"]
+        != scope._propagation_context.span_id
+    )
+    assert error_event["transaction"] == "dummy_task"
+    assert "celery_task_id" in error_event["tags"]
+    assert error_event["extra"]["celery-job"] == dict(
+        task_name="dummy_task", **expected_context
+    )
+
+    (exception,) = error_event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "celery"
+    assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
@@ -236,6 +235,7 @@ def test_transaction_events(capture_events, init_celery, celery_invocation, task
             "data": ApproxDict(),
             "description": "dummy_task",
             "op": "queue.submit.celery",
+            "origin": "auto.queue.celery",
             "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
             "same_process_as_parent": True,
             "span_id": submission_event["spans"][0]["span_id"],
@@ -257,18 +257,14 @@ def test_no_stackoverflows(celery):
 
     @celery.task(name="dummy_task")
     def dummy_task():
-        with configure_scope() as scope:
-            scope.set_tag("foo", "bar")
-
+        sentry_sdk.get_isolation_scope().set_tag("foo", "bar")
         results.append(42)
 
     for _ in range(10000):
         dummy_task.delay()
 
     assert results == [42] * 10000
-
-    with configure_scope() as scope:
-        assert not scope._tags
+    assert not sentry_sdk.get_isolation_scope()._tags
 
 
 def test_simple_no_propagation(capture_events, init_celery):
@@ -299,45 +295,6 @@ def test_ignore_expected(capture_events, celery):
     dummy_task.delay(1, 2)
     dummy_task.delay(1, 0)
     assert not events
-
-
-@pytest.mark.skip(
-    reason="This tests for a broken rerun in Celery 3. We don't support Celery 3 anymore."
-)
-def test_broken_prerun(init_celery, connect_signal):
-    from celery.signals import task_prerun
-
-    stack_lengths = []
-
-    def crash(*args, **kwargs):
-        # scope should exist in prerun
-        stack_lengths.append(len(Hub.current._stack))
-        1 / 0
-
-    # Order here is important to reproduce the bug: In Celery 3, a crashing
-    # prerun would prevent other preruns from running.
-
-    connect_signal(task_prerun, crash)
-    celery = init_celery()
-
-    assert len(Hub.current._stack) == 1
-
-    @celery.task(name="dummy_task")
-    def dummy_task(x, y):
-        stack_lengths.append(len(Hub.current._stack))
-        return x / y
-
-    if VERSION >= (4,):
-        dummy_task.delay(2, 2)
-    else:
-        with pytest.raises(ZeroDivisionError):
-            dummy_task.delay(2, 2)
-
-    assert len(Hub.current._stack) == 1
-    if VERSION < (4,):
-        assert stack_lengths == [2]
-    else:
-        assert stack_lengths == [2, 2]
 
 
 @pytest.mark.xfail(
@@ -780,3 +737,49 @@ def test_receive_latency(init_celery, capture_events):
     (span,) = event["spans"]
     assert "messaging.message.receive.latency" in span["data"]
     assert span["data"]["messaging.message.receive.latency"] > 0
+
+
+def tests_span_origin_consumer(init_celery, capture_events):
+    celery = init_celery(enable_tracing=True)
+    celery.conf.broker_url = "redis://example.com"  # noqa: E231
+
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    task.apply_async()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "auto.queue.celery"
+    assert event["spans"][0]["origin"] == "auto.queue.celery"
+
+
+def tests_span_origin_producer(monkeypatch, sentry_init, capture_events):
+    old_publish = kombu.messaging.Producer._publish
+
+    def publish(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", publish)
+
+    sentry_init(integrations=[CeleryIntegration()], enable_tracing=True)
+    celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
+
+    events = capture_events()
+
+    @celery.task()
+    def task(): ...
+
+    with start_transaction(name="custom_transaction"):
+        task.apply_async()
+
+    (event,) = events
+
+    assert event["contexts"]["trace"]["origin"] == "manual"
+
+    for span in event["spans"]:
+        assert span["origin"] == "auto.queue.celery"
+
+    monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)

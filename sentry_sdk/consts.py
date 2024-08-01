@@ -1,3 +1,5 @@
+import itertools
+
 from enum import Enum
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -29,8 +31,6 @@ if TYPE_CHECKING:
     from typing import Sequence
     from typing import Tuple
     from typing_extensions import TypedDict
-
-    from sentry_sdk.integrations import Integration
 
     from sentry_sdk._types import (
         BreadcrumbProcessor,
@@ -231,6 +231,13 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_MONGODB_COLLECTION = "db.mongodb.collection"
+    """
+    The MongoDB collection being accessed within the database.
+    See: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/database/mongodb.md#attributes
+    Example: public.users; customers
+    """
+
     CACHE_HIT = "cache.hit"
     """
     A boolean indicating whether the requested data was found in the cache.
@@ -372,11 +379,37 @@ class SPANDATA:
     Example: "MainThread"
     """
 
-    PROFILER_ID = "profiler.id"
+    PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
     Example: "5249fbada8d5416482c2f6e47e337372"
     """
+
+
+class SPANSTATUS:
+    """
+    The status of a Sentry span.
+
+    See: https://develop.sentry.dev/sdk/event-payloads/contexts/#trace-context
+    """
+
+    ABORTED = "aborted"
+    ALREADY_EXISTS = "already_exists"
+    CANCELLED = "cancelled"
+    DATA_LOSS = "data_loss"
+    DEADLINE_EXCEEDED = "deadline_exceeded"
+    FAILED_PRECONDITION = "failed_precondition"
+    INTERNAL_ERROR = "internal_error"
+    INVALID_ARGUMENT = "invalid_argument"
+    NOT_FOUND = "not_found"
+    OK = "ok"
+    OUT_OF_RANGE = "out_of_range"
+    PERMISSION_DENIED = "permission_denied"
+    RESOURCE_EXHAUSTED = "resource_exhausted"
+    UNAUTHENTICATED = "unauthenticated"
+    UNAVAILABLE = "unavailable"
+    UNIMPLEMENTED = "unimplemented"
+    UNKNOWN_ERROR = "unknown_error"
 
 
 class OP:
@@ -446,12 +479,13 @@ class ClientConstructor:
     def __init__(
         self,
         dsn=None,  # type: Optional[str]
+        *,
         max_breadcrumbs=DEFAULT_MAX_BREADCRUMBS,  # type: int
         release=None,  # type: Optional[str]
         environment=None,  # type: Optional[str]
         server_name=None,  # type: Optional[str]
         shutdown_timeout=2,  # type: float
-        integrations=[],  # type: Sequence[Integration]  # noqa: B006
+        integrations=[],  # type: Sequence[sentry_sdk.integrations.Integration]  # noqa: B006
         in_app_include=[],  # type: List[str]  # noqa: B006
         in_app_exclude=[],  # type: List[str]  # noqa: B006
         default_integrations=True,  # type: bool
@@ -478,6 +512,7 @@ class ClientConstructor:
         profiles_sampler=None,  # type: Optional[TracesSampler]
         profiler_mode=None,  # type: Optional[ProfilerMode]
         auto_enabling_integrations=True,  # type: bool
+        disabled_integrations=None,  # type: Optional[Sequence[sentry_sdk.integrations.Integration]]
         auto_session_tracking=True,  # type: bool
         send_client_reports=True,  # type: bool
         _experiments={},  # type: Experiments  # noqa: B006
@@ -499,27 +534,31 @@ class ClientConstructor:
         enable_db_query_source=True,  # type: bool
         db_query_source_threshold_ms=100,  # type: int
         spotlight=None,  # type: Optional[Union[bool, str]]
+        cert_file=None,  # type: Optional[str]
+        key_file=None,  # type: Optional[str]
     ):
         # type: (...) -> None
         pass
 
 
 def _get_default_options():
-    # type: () -> Dict[str, Any]
+    # type: () -> dict[str, Any]
     import inspect
 
-    if hasattr(inspect, "getfullargspec"):
-        getargspec = inspect.getfullargspec
-    else:
-        getargspec = inspect.getargspec  # type: ignore
-
-    a = getargspec(ClientConstructor.__init__)
+    a = inspect.getfullargspec(ClientConstructor.__init__)
     defaults = a.defaults or ()
-    return dict(zip(a.args[-len(defaults) :], defaults))
+    kwonlydefaults = a.kwonlydefaults or {}
+
+    return dict(
+        itertools.chain(
+            zip(a.args[-len(defaults) :], defaults),
+            kwonlydefaults.items(),
+        )
+    )
 
 
 DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.5.1"
+VERSION = "2.12.0"

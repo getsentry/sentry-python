@@ -6,7 +6,7 @@ from sentry_sdk._types import TYPE_CHECKING
 from sentry_sdk._werkzeug import get_host, _get_headers
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.hub import _should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.sessions import (
     auto_session_tracking_scope as auto_session_tracking,
@@ -55,20 +55,25 @@ def get_request_url(environ, use_x_forwarded_for=False):
     # type: (Dict[str, str], bool) -> str
     """Return the absolute URL without query string for the given WSGI
     environment."""
+    script_name = environ.get("SCRIPT_NAME", "").rstrip("/")
+    path_info = environ.get("PATH_INFO", "").lstrip("/")
+    path = f"{script_name}/{path_info}"
+
     return "%s://%s/%s" % (
         environ.get("wsgi.url_scheme"),
         get_host(environ, use_x_forwarded_for),
-        wsgi_decoding_dance(environ.get("PATH_INFO") or "").lstrip("/"),
+        wsgi_decoding_dance(path).lstrip("/"),
     )
 
 
 class SentryWsgiMiddleware:
-    __slots__ = ("app", "use_x_forwarded_for")
+    __slots__ = ("app", "use_x_forwarded_for", "span_origin")
 
-    def __init__(self, app, use_x_forwarded_for=False):
-        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool) -> None
+    def __init__(self, app, use_x_forwarded_for=False, span_origin="manual"):
+        # type: (Callable[[Dict[str, str], Callable[..., Any]], Any], bool, str) -> None
         self.app = app
         self.use_x_forwarded_for = use_x_forwarded_for
+        self.span_origin = span_origin
 
     def __call__(self, environ, start_response):
         # type: (Dict[str, str], Callable[..., Any]) -> _ScopedResponse
@@ -93,6 +98,7 @@ class SentryWsgiMiddleware:
                         op=OP.HTTP_SERVER,
                         name="generic WSGI request",
                         source=TRANSACTION_SOURCE_ROUTE,
+                        origin=self.span_origin,
                     )
 
                     with sentry_sdk.start_transaction(
@@ -141,7 +147,7 @@ def _get_environ(environ):
     capture (server name, port and remote addr if pii is enabled).
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
-    if _should_send_default_pii():
+    if should_send_default_pii():
         # make debugging of proxy setup easier. Proxy headers are
         # in headers.
         keys += ["REMOTE_ADDR"]
@@ -264,7 +270,7 @@ def _make_wsgi_event_processor(environ, use_x_forwarded_for):
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 
-            if _should_send_default_pii():
+            if should_send_default_pii():
                 user_info = event.setdefault("user", {})
                 if client_ip:
                     user_info.setdefault("ip_address", client_ip)

@@ -10,7 +10,6 @@ from sentry_sdk.utils import (
 from sentry_sdk.integrations import Integration, DidNotEnable
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
-from sentry_sdk.scope import Scope
 from sentry_sdk._types import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -40,6 +39,7 @@ TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 class BottleIntegration(Integration):
     identifier = "bottle"
+    origin = f"auto.http.{identifier}"
 
     transaction_style = ""
 
@@ -69,9 +69,12 @@ class BottleIntegration(Integration):
         @ensure_integration_enabled(BottleIntegration, old_app)
         def sentry_patched_wsgi_app(self, environ, start_response):
             # type: (Any, Dict[str, str], Callable[..., Any]) -> _ScopedResponse
-            return SentryWsgiMiddleware(lambda *a, **kw: old_app(self, *a, **kw))(
-                environ, start_response
+            middleware = SentryWsgiMiddleware(
+                lambda *a, **kw: old_app(self, *a, **kw),
+                span_origin=BottleIntegration.origin,
             )
+
+            return middleware(environ, start_response)
 
         Bottle.__call__ = sentry_patched_wsgi_app
 
@@ -82,7 +85,7 @@ class BottleIntegration(Integration):
             # type: (Bottle, Dict[str, Any]) -> Any
             integration = sentry_sdk.get_client().get_integration(BottleIntegration)
 
-            scope = Scope.get_isolation_scope()
+            scope = sentry_sdk.get_isolation_scope()
             scope._name = "bottle"
             scope.add_event_processor(
                 _make_request_event_processor(self, bottle_request, integration)

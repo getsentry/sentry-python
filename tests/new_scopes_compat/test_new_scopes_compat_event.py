@@ -4,6 +4,7 @@ from unittest import mock
 
 import sentry_sdk
 from sentry_sdk.hub import Hub
+from sentry_sdk.integrations import iter_default_integrations
 from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
 
 
@@ -18,7 +19,17 @@ This makes sure that we are backwards compatible. (on a best effort basis, there
 
 
 @pytest.fixture
-def expected_error():
+def integrations():
+    return [
+        integration.identifier
+        for integration in iter_default_integrations(
+            with_auto_enabling_integrations=False
+        )
+    ]
+
+
+@pytest.fixture
+def expected_error(integrations):
     def create_expected_error_event(trx, span):
         return {
             "level": "warning-X",
@@ -32,11 +43,11 @@ def expected_error():
                         "stacktrace": {
                             "frames": [
                                 {
-                                    "filename": "tests/test_new_scopes_compat_event.py",
+                                    "filename": "tests/new_scopes_compat/test_new_scopes_compat_event.py",
                                     "abs_path": mock.ANY,
                                     "function": "_faulty_function",
-                                    "module": "tests.test_new_scopes_compat_event",
-                                    "lineno": 248,
+                                    "module": "tests.new_scopes_compat.test_new_scopes_compat_event",
+                                    "lineno": mock.ANY,
                                     "pre_context": [
                                         "    return create_expected_transaction_event",
                                         "",
@@ -75,6 +86,7 @@ def expected_error():
                     "span_id": span.span_id,
                     "parent_span_id": span.parent_span_id,
                     "op": "test_span",
+                    "origin": "manual",
                     "description": None,
                     "data": {
                         "thread.id": mock.ANY,
@@ -121,16 +133,7 @@ def expected_error():
                 "name": "sentry.python",
                 "version": mock.ANY,
                 "packages": [{"name": "pypi:sentry-sdk", "version": mock.ANY}],
-                "integrations": [
-                    "argv",
-                    "atexit",
-                    "dedupe",
-                    "excepthook",
-                    "logging",
-                    "modules",
-                    "stdlib",
-                    "threading",
-                ],
+                "integrations": integrations,
             },
             "platform": "python",
             "_meta": {
@@ -148,7 +151,7 @@ def expected_error():
 
 
 @pytest.fixture
-def expected_transaction():
+def expected_transaction(integrations):
     def create_expected_transaction_event(trx, span):
         return {
             "type": "transaction",
@@ -160,6 +163,7 @@ def expected_transaction():
                     "span_id": trx.span_id,
                     "parent_span_id": None,
                     "op": "test_transaction_op",
+                    "origin": "manual",
                     "description": None,
                     "data": {
                         "thread.id": mock.ANY,
@@ -191,6 +195,7 @@ def expected_transaction():
                     "parent_span_id": span.parent_span_id,
                     "same_process_as_parent": True,
                     "op": "test_span",
+                    "origin": "manual",
                     "description": None,
                     "start_timestamp": mock.ANY,
                     "timestamp": mock.ANY,
@@ -217,16 +222,7 @@ def expected_transaction():
                 "name": "sentry.python",
                 "version": mock.ANY,
                 "packages": [{"name": "pypi:sentry-sdk", "version": mock.ANY}],
-                "integrations": [
-                    "argv",
-                    "atexit",
-                    "dedupe",
-                    "excepthook",
-                    "logging",
-                    "modules",
-                    "stdlib",
-                    "threading",
-                ],
+                "integrations": integrations,
             },
             "platform": "python",
             "_meta": {
@@ -325,6 +321,7 @@ def _init_sentry_sdk(sentry_init):
         ),
         send_default_pii=False,
         traces_sample_rate=1.0,
+        auto_enabling_integrations=False,
     )
 
 

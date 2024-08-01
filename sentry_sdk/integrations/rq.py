@@ -6,7 +6,6 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
-from sentry_sdk.scope import Scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
 
 class RqIntegration(Integration):
     identifier = "rq"
+    origin = f"auto.queue.{identifier}"
 
     @staticmethod
     def setup_once():
@@ -64,13 +64,15 @@ class RqIntegration(Integration):
                     op=OP.QUEUE_TASK_RQ,
                     name="unknown RQ task",
                     source=TRANSACTION_SOURCE_TASK,
+                    origin=RqIntegration.origin,
                 )
 
                 with capture_internal_exceptions():
                     transaction.name = job.func_name
 
                 with sentry_sdk.start_transaction(
-                    transaction, custom_sampling_context={"rq_job": job}
+                    transaction,
+                    custom_sampling_context={"rq_job": job},
                 ):
                     rv = old_perform_job(self, job, *args, **kwargs)
 
@@ -102,7 +104,7 @@ class RqIntegration(Integration):
         @ensure_integration_enabled(RqIntegration, old_enqueue_job)
         def sentry_patched_enqueue_job(self, job, **kwargs):
             # type: (Queue, Any, **Any) -> Any
-            scope = Scope.get_current_scope()
+            scope = sentry_sdk.get_current_scope()
             if scope.span is not None:
                 job.meta["_sentry_trace_headers"] = dict(
                     scope.iter_trace_propagation_headers()

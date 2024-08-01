@@ -21,7 +21,7 @@ def get_file_text(file_name):
 
 setup(
     name="sentry-sdk",
-    version="2.5.1",
+    version="2.12.0",
     author="Sentry Team and Contributors",
     author_email="hello@sentry.io",
     url="https://github.com/getsentry/sentry-python",
@@ -65,16 +65,7 @@ setup(
         "loguru": ["loguru>=0.5"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "opentelemetry": ["opentelemetry-distro>=0.35b0"],
-        "opentelemetry-experimental": [
-            "opentelemetry-distro~=0.40b0",
-            "opentelemetry-instrumentation-aiohttp-client~=0.40b0",
-            "opentelemetry-instrumentation-django~=0.40b0",
-            "opentelemetry-instrumentation-fastapi~=0.40b0",
-            "opentelemetry-instrumentation-flask~=0.40b0",
-            "opentelemetry-instrumentation-requests~=0.40b0",
-            "opentelemetry-instrumentation-sqlite3~=0.40b0",
-            "opentelemetry-instrumentation-urllib~=0.40b0",
-        ],
+        "opentelemetry-experimental": ["opentelemetry-distro"],
         "pure_eval": ["pure_eval", "executing", "asttokens"],
         "pymongo": ["pymongo>=3.1"],
         "pyspark": ["pyspark>=2.4.4"],
@@ -86,6 +77,12 @@ setup(
         "starlite": ["starlite>=1.48"],
         "tornado": ["tornado>=5"],
         "openfeature-sdk": ["openfeature-sdk>=0.7.0"],
+        "tornado": ["tornado>=6"],
+    },
+    entry_points={
+        "opentelemetry_propagator": [
+            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
+        ]
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

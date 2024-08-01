@@ -1,7 +1,6 @@
 import functools
 
 import sentry_sdk
-from sentry_sdk import Scope
 from sentry_sdk.consts import OP
 from sentry_sdk._types import TYPE_CHECKING
 
@@ -34,7 +33,9 @@ def patch_views():
     def sentry_patched_render(self):
         # type: (SimpleTemplateResponse) -> Any
         with sentry_sdk.start_span(
-            op=OP.VIEW_RESPONSE_RENDER, description="serialize response"
+            op=OP.VIEW_RESPONSE_RENDER,
+            description="serialize response",
+            origin=DjangoIntegration.origin,
         ):
             return old_render(self)
 
@@ -69,17 +70,21 @@ def patch_views():
 
 def _wrap_sync_view(callback):
     # type: (Any) -> Any
+    from sentry_sdk.integrations.django import DjangoIntegration
+
     @functools.wraps(callback)
     def sentry_wrapped_callback(request, *args, **kwargs):
         # type: (Any, *Any, **Any) -> Any
-        sentry_scope = Scope.get_isolation_scope()
+        sentry_scope = sentry_sdk.get_isolation_scope()
         # set the active thread id to the handler thread for sync views
         # this isn't necessary for async views since that runs on main
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
 
         with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER, description=request.resolver_match.view_name
+            op=OP.VIEW_RENDER,
+            description=request.resolver_match.view_name,
+            origin=DjangoIntegration.origin,
         ):
             return callback(request, *args, **kwargs)
 

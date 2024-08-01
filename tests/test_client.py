@@ -3,12 +3,14 @@ import json
 import subprocess
 import sys
 import time
+from collections import Counter, defaultdict
 from collections.abc import Mapping
 from textwrap import dedent
 from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import (
     Hub,
     Client,
@@ -19,6 +21,7 @@ from sentry_sdk import (
     capture_event,
     set_tag,
 )
+from sentry_sdk.utils import capture_internal_exception
 from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.transport import Transport
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -29,6 +32,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
     from sentry_sdk._types import Event
+
+
+maximum_python_312 = pytest.mark.skipif(
+    sys.version_info > (3, 12),
+    reason="Since Python 3.13, `FrameLocalsProxy` skips items of `locals()` that have non-`str` keys; this is a CPython implementation detail: https://github.com/python/cpython/blame/7b413952e817ae87bfda2ac85dd84d30a6ce743b/Objects/frameobject.c#L148",
+)
 
 
 class EnvelopeCapturedError(Exception):
@@ -342,29 +351,24 @@ def test_simple_transport(sentry_init):
 
 
 def test_ignore_errors(sentry_init, capture_events):
-    with mock.patch(
-        "sentry_sdk.scope.Scope._capture_internal_exception"
-    ) as mock_capture_internal_exception:
+    sentry_init(ignore_errors=[ZeroDivisionError])
+    events = capture_events()
 
-        class MyDivisionError(ZeroDivisionError):
-            pass
+    class MyDivisionError(ZeroDivisionError):
+        pass
 
-        sentry_init(ignore_errors=[ZeroDivisionError], transport=_TestTransport())
+    def e(exc):
+        try:
+            raise exc
+        except Exception:
+            capture_exception()
 
-        def e(exc):
-            try:
-                raise exc
-            except Exception:
-                capture_exception()
+    e(ZeroDivisionError())
+    e(MyDivisionError())
+    e(ValueError())
 
-        e(ZeroDivisionError())
-        e(MyDivisionError())
-        e(ValueError())
-
-        assert mock_capture_internal_exception.call_count == 1
-        assert (
-            mock_capture_internal_exception.call_args[0][0][0] == EnvelopeCapturedError
-        )
+    assert len(events) == 1
+    assert events[0]["exception"]["values"][0]["type"] == "ValueError"
 
 
 def test_include_local_variables_enabled(sentry_init, capture_events):
@@ -562,8 +566,14 @@ def test_atexit(tmpdir, monkeypatch, num_messages):
     assert output.count(b"HI") == num_messages
 
 
-def test_configure_scope_available(sentry_init, request, monkeypatch):
-    # Test that scope is configured if client is configured
+def test_configure_scope_available(
+    sentry_init, request, monkeypatch, suppress_deprecation_warnings
+):
+    """
+    Test that scope is configured if client is configured
+
+    This test can be removed once configure_scope and the Hub are removed.
+    """
     sentry_init()
 
     with configure_scope() as scope:
@@ -585,7 +595,7 @@ def test_configure_scope_available(sentry_init, request, monkeypatch):
 def test_client_debug_option_enabled(sentry_init, caplog):
     sentry_init(debug=True)
 
-    Hub.current._capture_internal_exception((ValueError, ValueError("OK"), None))
+    capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" in caplog.text
 
 
@@ -595,7 +605,7 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     if with_client:
         sentry_init()
 
-    Hub.current._capture_internal_exception((ValueError, ValueError("OK"), None))
+    capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" not in caplog.text
 
 
@@ -670,14 +680,13 @@ def test_cyclic_data(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
-    with configure_scope() as scope:
-        data = {}
-        data["is_cyclic"] = data
+    data = {}
+    data["is_cyclic"] = data
 
-        other_data = ""
-        data["not_cyclic"] = other_data
-        data["not_cyclic2"] = other_data
-        scope.set_extra("foo", data)
+    other_data = ""
+    data["not_cyclic"] = other_data
+    data["not_cyclic2"] = other_data
+    sentry_sdk.get_isolation_scope().set_extra("foo", data)
 
     capture_message("hi")
     (event,) = events
@@ -879,6 +888,7 @@ def test_errno_errors(sentry_init, capture_events):
     assert exception["mechanism"]["meta"]["errno"]["number"] == 69
 
 
+@maximum_python_312
 def test_non_string_variables(sentry_init, capture_events):
     """There is some extremely terrible code in the wild that
     inserts non-strings as variable names into `locals()`."""
@@ -949,7 +959,7 @@ def test_init_string_types(dsn, sentry_init):
     # extra code
     sentry_init(dsn)
     assert (
-        Hub.current.client.dsn
+        sentry_sdk.get_client().dsn
         == "http://894b7d594095440f8dfea9b300e6f572@localhost:8000/2"
     )
 
@@ -1047,9 +1057,7 @@ def test_debug_option(
     else:
         sentry_init(debug=client_option)
 
-    Hub.current._capture_internal_exception(
-        (ValueError, ValueError("something is wrong"), None)
-    )
+    capture_internal_exception((ValueError, ValueError("something is wrong"), None))
     if debug_output_expected:
         assert "something is wrong" in caplog.text
     else:
@@ -1205,3 +1213,159 @@ def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
                 assert flag in str(record.message)
         else:
             assert not recwarn
+
+
+class TestSpanClientReports:
+    """
+    Tests for client reports related to spans.
+    """
+
+    @staticmethod
+    def span_dropper(spans_to_drop):
+        """
+        Returns a function that can be used to drop spans from an event.
+        """
+
+        def drop_spans(event, _):
+            event["spans"] = event["spans"][spans_to_drop:]
+            return event
+
+        return drop_spans
+
+    @staticmethod
+    def mock_transaction_event(span_count):
+        """
+        Returns a mock transaction event with the given number of spans.
+        """
+
+        return defaultdict(
+            mock.MagicMock,
+            type="transaction",
+            spans=[mock.MagicMock() for _ in range(span_count)],
+        )
+
+    def __init__(self, span_count):
+        """Configures a test case with the number of spans dropped and whether the transaction was dropped."""
+        self.span_count = span_count
+        self.expected_record_lost_event_calls = Counter()
+        self.before_send = lambda event, _: event
+        self.event_processor = lambda event, _: event
+
+    def _update_resulting_calls(self, reason, drops_transactions=0, drops_spans=0):
+        """
+        Updates the expected calls with the given resulting calls.
+        """
+        if drops_transactions > 0:
+            self.expected_record_lost_event_calls[
+                (reason, "transaction", None, drops_transactions)
+            ] += 1
+
+        if drops_spans > 0:
+            self.expected_record_lost_event_calls[
+                (reason, "span", None, drops_spans)
+            ] += 1
+
+    def with_before_send(
+        self,
+        before_send,
+        *,
+        drops_transactions=0,
+        drops_spans=0,
+    ):
+        self.before_send = before_send
+        self._update_resulting_calls(
+            "before_send",
+            drops_transactions,
+            drops_spans,
+        )
+
+        return self
+
+    def with_event_processor(
+        self,
+        event_processor,
+        *,
+        drops_transactions=0,
+        drops_spans=0,
+    ):
+        self.event_processor = event_processor
+        self._update_resulting_calls(
+            "event_processor",
+            drops_transactions,
+            drops_spans,
+        )
+
+        return self
+
+    def run(self, sentry_init, capture_record_lost_event_calls):
+        """Runs the test case with the configured parameters."""
+        sentry_init(before_send_transaction=self.before_send)
+        record_lost_event_calls = capture_record_lost_event_calls()
+
+        with sentry_sdk.isolation_scope() as scope:
+            scope.add_event_processor(self.event_processor)
+            event = self.mock_transaction_event(self.span_count)
+            sentry_sdk.get_client().capture_event(event, scope=scope)
+
+        # We use counters to ensure that the calls are made the expected number of times, disregarding order.
+        assert Counter(record_lost_event_calls) == self.expected_record_lost_event_calls
+
+
+@pytest.mark.parametrize(
+    "test_config",
+    (
+        TestSpanClientReports(span_count=10),  # No spans dropped
+        TestSpanClientReports(span_count=0).with_before_send(
+            lambda e, _: None,
+            drops_transactions=1,
+            drops_spans=1,
+        ),
+        TestSpanClientReports(span_count=10).with_before_send(
+            lambda e, _: None,
+            drops_transactions=1,
+            drops_spans=11,
+        ),
+        TestSpanClientReports(span_count=10).with_before_send(
+            TestSpanClientReports.span_dropper(3),
+            drops_spans=3,
+        ),
+        TestSpanClientReports(span_count=10).with_before_send(
+            TestSpanClientReports.span_dropper(10),
+            drops_spans=10,
+        ),
+        TestSpanClientReports(span_count=10).with_event_processor(
+            lambda e, _: None,
+            drops_transactions=1,
+            drops_spans=11,
+        ),
+        TestSpanClientReports(span_count=10).with_event_processor(
+            TestSpanClientReports.span_dropper(3),
+            drops_spans=3,
+        ),
+        TestSpanClientReports(span_count=10).with_event_processor(
+            TestSpanClientReports.span_dropper(10),
+            drops_spans=10,
+        ),
+        TestSpanClientReports(span_count=10)
+        .with_event_processor(
+            TestSpanClientReports.span_dropper(3),
+            drops_spans=3,
+        )
+        .with_before_send(
+            TestSpanClientReports.span_dropper(5),
+            drops_spans=5,
+        ),
+        TestSpanClientReports(10)
+        .with_event_processor(
+            TestSpanClientReports.span_dropper(3),
+            drops_spans=3,
+        )
+        .with_before_send(
+            lambda e, _: None,
+            drops_transactions=1,
+            drops_spans=8,  # 3 of the 11 (incl. transaction) spans already dropped
+        ),
+    ),
+)
+def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_config):
+    test_config.run(sentry_init, capture_record_lost_event_calls)

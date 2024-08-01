@@ -5,6 +5,7 @@ import threading
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.dispatch import Signal
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
 from django.template import Context, Template
@@ -13,6 +14,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
+
 
 from tests.integrations.django.myapp.signals import (
     myapp_custom_signal,
@@ -114,6 +116,13 @@ def message(request):
 
 
 @csrf_exempt
+def view_with_signal(request):
+    custom_signal = Signal()
+    custom_signal.send(sender="hello")
+    return HttpResponse("ok")
+
+
+@csrf_exempt
 def mylogin(request):
     user = User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
     user.backend = "django.contrib.auth.backends.ModelBackend"
@@ -182,15 +191,13 @@ def template_test2(request, *args, **kwargs):
 
 @csrf_exempt
 def template_test3(request, *args, **kwargs):
-    from sentry_sdk import Scope
-
-    traceparent = Scope.get_current_scope().get_traceparent()
+    traceparent = sentry_sdk.get_current_scope().get_traceparent()
     if traceparent is None:
-        traceparent = Scope.get_isolation_scope().get_traceparent()
+        traceparent = sentry_sdk.get_isolation_scope().get_traceparent()
 
-    baggage = Scope.get_current_scope().get_baggage()
+    baggage = sentry_sdk.get_current_scope().get_baggage()
     if baggage is None:
-        baggage = Scope.get_isolation_scope().get_baggage()
+        baggage = sentry_sdk.get_isolation_scope().get_baggage()
 
     capture_message(traceparent + "\n" + baggage.serialize())
     return render(request, "trace_meta.html", {})
