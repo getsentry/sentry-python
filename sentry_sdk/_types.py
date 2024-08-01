@@ -9,7 +9,7 @@ MYPY = TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Container, MutableMapping
+    from collections.abc import Container, MutableMapping, Sequence
 
     from datetime import datetime
 
@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from typing import Mapping
     from typing import NotRequired
     from typing import Optional
-    from typing import Sequence
     from typing import Tuple
     from typing import Type
     from typing import Union
