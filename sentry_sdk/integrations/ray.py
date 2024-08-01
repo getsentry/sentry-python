@@ -20,9 +20,10 @@ if TYPE_CHECKING:
 
 def _check_sentry_initialized():
     # type: () -> None
-    if sentry_sdk.Hub.current.client:
+    if sentry_sdk.get_client().is_active():
         return
-    # we cannot use sentry sdk logging facilities because it wasn't initialized
+    
+    # We cannot use Sentry SDK logging facilities because it wasn't initialized
     logger = logging.getLogger("sentry_sdk.errors")
     logger.warning(
         "[Tracing] Sentry not initialized in ray cluster worker, performance data will be discarded."
@@ -62,7 +63,7 @@ def _patch_ray_remote():
             ):
                 tracing = {
                     k: v
-                    for k, v in sentry_sdk.Hub.current.iter_trace_propagation_headers()
+                    for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
                 }
                 return old_remote_method(*args, **kwargs, _tracing=tracing)
 
