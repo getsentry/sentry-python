@@ -1,6 +1,7 @@
 import logging
 
 import sentry_sdk
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import TRANSACTION_SOURCE_TASK
 from sentry_sdk.utils import package_version
@@ -43,9 +44,10 @@ def _patch_ray_remote():
             transaction = None
             if _tracing is not None:
                 transaction = sentry_sdk.continue_trace(
-                    _tracing,
-                    op="ray.remote.receive",
+                    environ_or_headers=_tracing,
+                    op=OP.QUEUE_TASK_RQ,
                     source=TRANSACTION_SOURCE_TASK,
+                    origin=RayIntegration.origin,
                     name="Ray worker transaction",
                 )
 
@@ -60,7 +62,9 @@ def _patch_ray_remote():
         def _remote_method_with_header_propagation(*args, **kwargs):
             # type: (*Any, **Any) -> Any
             with sentry_sdk.start_span(
-                op="ray.remote.send", description="Sending task to ray cluster."
+                op=OP.QUEUE_SUBMIT_RAY,
+                origin=RayIntegration.origin,
+                description="Sending task to ray cluster."
             ):
                 tracing = {
                     k: v
