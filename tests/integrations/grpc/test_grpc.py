@@ -10,7 +10,6 @@ from unittest.mock import Mock
 from sentry_sdk import start_span, start_transaction
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
-from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     add_gRPCTestServiceServicer_to_server,
@@ -169,12 +168,13 @@ def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == ApproxDict(
-        {
+    assert (
+        span["data"].items()
+        >= {
             "type": "unary unary",
             "method": "/grpc_test_server.gRPCTestService/TestServe",
             "code": "OK",
-        }
+        }.items()
     )
 
 
@@ -203,11 +203,12 @@ def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksa
         span["description"]
         == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
     )
-    assert span["data"] == ApproxDict(
-        {
+    assert (
+        span["data"].items()
+        >= {
             "type": "unary stream",
             "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
-        }
+        }.items()
     )
 
 
@@ -251,12 +252,13 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
         span["description"]
         == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
     )
-    assert span["data"] == ApproxDict(
-        {
+    assert (
+        span["data"].items()
+        >= {
             "type": "unary unary",
             "method": "/grpc_test_server.gRPCTestService/TestServe",
             "code": "OK",
-        }
+        }.items()
     )
 
 

@@ -10,7 +10,7 @@ from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 
-from tests.conftest import ApproxDict, create_mock_http_server
+from tests.conftest import create_mock_http_server
 
 PORT = create_mock_http_server()
 
@@ -29,15 +29,16 @@ def test_crumb_capture(sentry_init, capture_events):
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
+    assert (
+        crumb["data"].items()
+        >= {
             "url": url,
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
-        }
+        }.items()
     )
 
 
@@ -58,8 +59,9 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     (crumb,) = event["breadcrumbs"]["values"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
+    assert (
+        crumb["data"].items()
+        >= {
             "url": url,
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
@@ -67,7 +69,7 @@ def test_crumb_capture_hint(sentry_init, capture_events):
             "extra": "foo",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
-        }
+        }.items()
     )
 
 
@@ -118,15 +120,16 @@ def test_httplib_misuse(sentry_init, capture_events, request):
 
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
+    assert (
+        crumb["data"].items()
+        >= {
             "url": "http://localhost:{}/200".format(PORT),
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
-        }
+        }.items()
     )
 
 

@@ -4,7 +4,6 @@ import logging
 from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
 from sentry_sdk.utils import event_from_exception
 from sentry_sdk.scrubber import EventScrubber
-from tests.conftest import ApproxDict
 
 
 logger = logging.getLogger(__name__)
@@ -122,8 +121,9 @@ def test_span_data_scrubbing(sentry_init, capture_events):
             span.set_data("datafoo", "databar")
 
     (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict(
-        {"password": "[Filtered]", "datafoo": "databar"}
+    assert (
+        event["spans"][0]["data"].items()
+        >= {"password": "[Filtered]", "datafoo": "databar"}.items()
     )
     assert event["_meta"]["spans"] == {
         "0": {"data": {"password": {"": {"rem": [["!config", "s"]]}}}}

@@ -11,7 +11,6 @@ from sentry_sdk.profiler.continuous_profiler import (
     start_profiler,
     stop_profiler,
 )
-from tests.conftest import ApproxDict
 
 try:
     import gevent
@@ -89,37 +88,39 @@ def assert_single_transaction_with_profile_chunks(envelopes, thread):
 
     trace_context = transaction["contexts"]["trace"]
 
-    assert trace_context == ApproxDict(
-        {
-            "data": ApproxDict(
-                {
-                    "thread.id": str(thread.ident),
-                    "thread.name": thread.name,
-                }
-            ),
-        }
-    )
+    assert trace_context.items() >= {
+        "data": {
+            "thread.id": str(thread.ident),
+            "thread.name": thread.name,
+        }.items()
+    }
 
     profile_context = transaction["contexts"]["profile"]
     profiler_id = profile_context["profiler_id"]
 
-    assert profile_context == ApproxDict({"profiler_id": profiler_id})
+    assert profile_context.items() >= {"profiler_id": profiler_id}.items()
 
     spans = transaction["spans"]
     assert len(spans) > 0
     for span in spans:
-        assert span["data"] == ApproxDict(
-            {
+        assert (
+            span["data"].items()
+            >= {
                 "profiler_id": profiler_id,
                 "thread.id": str(thread.ident),
                 "thread.name": thread.name,
-            }
+            }.items()
         )
 
     for profile_chunk_item in items["profile_chunk"]:
         profile_chunk = profile_chunk_item.payload.json
-        assert profile_chunk == ApproxDict(
-            {"platform": "python", "profiler_id": profiler_id, "version": "2"}
+        assert (
+            profile_chunk.items()
+            >= {
+                "platform": "python",
+                "profiler_id": profiler_id,
+                "version": "2",
+            }.items()
         )
 
 

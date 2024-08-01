@@ -7,7 +7,6 @@ import responses
 from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from tests.conftest import ApproxDict
 
 
 def test_crumb_capture(sentry_init, capture_events):
@@ -25,15 +24,16 @@ def test_crumb_capture(sentry_init, capture_events):
     (crumb,) = event["breadcrumbs"]["values"]
     assert crumb["type"] == "http"
     assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
+    assert (
+        crumb["data"].items()
+        >= {
             "url": url,
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_FRAGMENT: "",
             SPANDATA.HTTP_QUERY: "",
             SPANDATA.HTTP_STATUS_CODE: response.status_code,
             "reason": response.reason,
-        }
+        }.items()
     )
 
 
@@ -55,13 +55,14 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
     capture_message("Testing!")
 
     (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
-        {
+    assert (
+        event["breadcrumbs"]["values"][0]["data"].items()
+        >= {
             SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: response.status_code,
             "reason": response.reason,
             # no url related data
-        }
+        }.items()
     )
 
     assert "url" not in event["breadcrumbs"]["values"][0]["data"]

@@ -3,7 +3,6 @@ import pytest
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-from tests.conftest import ApproxDict
 
 from fakeredis.aioredis import FakeRedis
 
@@ -65,8 +64,9 @@ async def test_async_redis_pipeline(
     (span,) = event["spans"]
     assert span["op"] == "db.redis"
     assert span["description"] == "redis.pipeline.execute"
-    assert span["data"] == ApproxDict(
-        {
+    assert (
+        span["data"].items()
+        >= {
             "redis.commands": {
                 "count": 3,
                 "first_ten": expected_first_ten,
@@ -77,7 +77,7 @@ async def test_async_redis_pipeline(
                 "host"
             ),
             SPANDATA.SERVER_PORT: 6379,
-        }
+        }.items()
     )
     assert span["tags"] == {
         "redis.transaction": is_transaction,
