@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from typing import Type
     from typing import Union
 
-    from sentry_sdk._types import Event, Hint, SdkInfo
+    from sentry_sdk._types import Event, Hint, SDKInfo
     from sentry_sdk.integrations import Integration
     from sentry_sdk.metrics import MetricsAggregator
     from sentry_sdk.scope import Scope
@@ -69,7 +69,7 @@ SDK_INFO = {
     "name": "sentry.python",  # SDK name will be overridden after integrations have been loaded with sentry_sdk.integrations.setup_integrations()
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
-}  # type: SdkInfo
+}  # type: SDKInfo
 
 
 def _get_options(*args, **kwargs):
