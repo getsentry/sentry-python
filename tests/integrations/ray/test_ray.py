@@ -1,4 +1,4 @@
-import time
+import pytest
 
 import ray
 
@@ -10,48 +10,96 @@ from tests.conftest import TestTransport
 
 class RayTestTransport(TestTransport):
     def __init__(self):
-        self.events = []
         self.envelopes = []
-        super().__init__(self.events.append, self.envelopes.append)
+        super().__init__()
+
+    def capture_envelope(self, envelope: Envelope) -> None:
+        self.envelopes.append(envelope)
 
 
-def _setup_ray_sentry():
+def setup_sentry():
     sentry_sdk.init(
-        traces_sample_rate=1.0,
         integrations=[RayIntegration()],
         transport=RayTestTransport(),
+        traces_sample_rate=1.0,
     )
 
 
-def test_ray():
-    _setup_ray_sentry()
+@pytest.mark.forked
+def test_ray_tracing():
+    setup_sentry()
 
     @ray.remote
-    def _task():
+    def example_task():
         with sentry_sdk.start_span(op="task", description="example task step"):
-            time.sleep(0.1)
+            ...
+
         return sentry_sdk.get_client().transport.envelopes
 
     ray.init(
-        runtime_env=dict(worker_process_setup_hook=_setup_ray_sentry, working_dir="./")
+        runtime_env={
+            "worker_process_setup_hook": setup_sentry,
+            "working_dir": "./",
+        }
     )
 
     with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
-        worker_envelopes = ray.get(_task.remote())
+        worker_envelopes = ray.get(example_task.remote())
 
-    _assert_envelopes_are_associated_with_same_trace_id(
-        sentry_sdk.Hub.get_client().transport.envelopes[0], worker_envelopes[0]
+    client_envelope = sentry_sdk.get_client().transport.envelopes[0]
+    client_transaction = client_envelope.get_transaction_event()
+    worker_envelope = worker_envelopes[0]
+    worker_transaction = worker_envelope.get_transaction_event()
+
+    assert (
+        client_transaction["contexts"]["trace"]["trace_id"]
+        == client_transaction["contexts"]["trace"]["trace_id"]
     )
 
+    for span in client_transaction["spans"]:
+        assert (
+            span["trace_id"]
+            == client_transaction["contexts"]["trace"]["trace_id"]
+            == client_transaction["contexts"]["trace"]["trace_id"]
+        )
 
-def _assert_envelopes_are_associated_with_same_trace_id(
-    client_side_envelope: Envelope, worker_envelope: Envelope
-):
-    client_side_envelope_dict = client_side_envelope.get_transaction_event()
-    worker_envelope_dict = worker_envelope.get_transaction_event()
-    trace_id = client_side_envelope_dict["contexts"]["trace"]["trace_id"]
-    for span in client_side_envelope_dict["spans"]:
-        assert span["trace_id"] == trace_id
-    for span in worker_envelope_dict["spans"]:
-        assert span["trace_id"] == trace_id
-    assert worker_envelope_dict["contexts"]["trace"]["trace_id"] == trace_id
+    for span in worker_transaction["spans"]:
+        assert (
+            span["trace_id"]
+            == client_transaction["contexts"]["trace"]["trace_id"]
+            == client_transaction["contexts"]["trace"]["trace_id"]
+        )
+
+
+@pytest.mark.forked
+def test_ray_spans():
+    setup_sentry()
+
+    @ray.remote
+    def example_task():
+        ...
+
+        return sentry_sdk.get_client().transport.envelopes
+
+    ray.init(
+        runtime_env={
+            "worker_process_setup_hook": setup_sentry,
+            "working_dir": "./",
+        }
+    )
+
+    with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
+        worker_envelopes = ray.get(example_task.remote())
+
+    client_envelope = sentry_sdk.get_client().transport.envelopes[0]
+    client_transaction = client_envelope.get_transaction_event()
+    worker_envelope = worker_envelopes[0]
+    worker_transaction = worker_envelope.get_transaction_event()
+
+    for span in client_transaction["spans"]:
+        assert span["op"] == "queue.submit.ray"
+        assert span["origin"] == "auto.queue.ray"
+
+    for span in worker_transaction["spans"]:
+        assert span["op"] == "queue.task.ray"
+        assert span["origin"] == "auto.queue.ray"
