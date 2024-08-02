@@ -1249,21 +1249,19 @@ class POTelSpan:
 
     def __init__(
         self,
+        *,
         active=True,  # type: bool
-        trace_id=None,  # type: Optional[str]
-        span_id=None,  # type: Optional[str]
-        parent_span_id=None,  # type: Optional[str]
-        same_process_as_parent=True,  # type: bool
-        sampled=None,  # type: Optional[bool]
         op=None,  # type: Optional[str]
         description=None,  # type: Optional[str]
-        status=None,  # type: Optional[str]
-        containing_transaction=None,  # type: Optional[Transaction]
-        start_timestamp=None,  # type: Optional[Union[datetime, float]]
-        scope=None,  # type: Optional[sentry_sdk.Scope]
         origin="manual",  # type: str
+        **_,  # type: dict[str, object]
     ):
         # type: (...) -> None
+        """
+        For backwards compatibility with old the old Span interface, this class
+        accepts arbitrary keyword arguments, in addition to the ones explicitly
+        listed in the signature. These additional arguments are ignored.
+        """
         from sentry_sdk.integrations.opentelemetry.consts import SentrySpanAttribute
 
         self._otel_span = tracer.start_span(description or op or "")  # XXX
@@ -1441,19 +1439,6 @@ def trace(func=None):
         return start_child_span_decorator(func)
     else:
         return start_child_span_decorator
-
-
-def start_span(*args, **kwargs):
-    return POTelSpan(*args, active=True, **kwargs)
-
-
-def start_inactive_span(*args, **kwargs):
-    return POTelSpan(*args, active=False, **kwargs)
-
-
-def start_transaction(*args, **kwargs):
-    # XXX force_transaction?
-    return POTelSpan(*args, active=True, **kwargs)
 
 
 # Circular imports

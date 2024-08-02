@@ -77,7 +77,6 @@ __all__ = [
     "set_tags",
     "set_user",
     "start_span",
-    "start_inactive_span",
     "start_transaction",
     "trace",
     "monitor",
@@ -338,14 +337,11 @@ def start_span(
     **kwargs,  # type: Any
 ):
     # type: (...) -> POTelSpan
-    return tracing.start_span(**kwargs)
-
-
-def start_inactive_span(
-    **kwargs,  # type: Any
-):
-    # type: (...) -> POTelSpan
-    return tracing.start_inactive_span(**kwargs)
+    """
+    Alias for tracing.POTelSpan constructor. The method signature is the same.
+    """
+    # TODO: Consider adding type hints to the method signature.
+    return tracing.POTelSpan(**kwargs)
 
 
 def start_transaction(
@@ -387,7 +383,7 @@ def start_transaction(
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
-    return tracing.start_transaction(transaction, custom_sampling_context, **kwargs)
+    return start_span(**kwargs)
 
 
 def set_measurement(name, value, unit=""):
