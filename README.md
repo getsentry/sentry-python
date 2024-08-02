@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://sentry.io/?utm_source=github&utm_medium=logo" target="_blank">
-    <img src="https://sentry-brand.storage.googleapis.com/sentry-wordmark-dark-280x84.png" alt="Sentry" width="280" height="84">
+    <img src="https://github.com/user-attachments/assets/d5bf9fe3-dd0a-4485-8191-8076eb3d9bc4" alt="Sentry">
   </a>
 </p>
 
